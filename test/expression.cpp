@@ -7,6 +7,8 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <heyoka/expression.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/variable.hpp>
 
 #include "catch.hpp"
 
@@ -16,5 +18,5 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    std::cout << "x"_var << '\n';
+    std::cout << (45_dbl + "x"_var) / -1_dbl << '\n';
 }
