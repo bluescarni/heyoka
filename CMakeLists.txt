@@ -105,17 +105,17 @@ endif()
 
 # List of source files.
 set(HEYOKA_SRC_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_00.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_01.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_00.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_01.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/function_call.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/jit.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/check_symbol_name.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/function.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/jit.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/check_symbol_name.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
 )
 
 # Setup of the heyoka shared library.
@@ -134,7 +134,7 @@ target_compile_options(heyoka PRIVATE
 )
 # Let's setup the target C++ standard, but only if the user did not provide it manually.
 if(NOT CMAKE_CXX_STANDARD)
-    set_property(TARGET heyoka PROPERTY CXX_STANDARD 20)
+    set_property(TARGET heyoka PROPERTY CXX_STANDARD 17)
 endif()
 set_property(TARGET heyoka PROPERTY CXX_STANDARD_REQUIRED YES)
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)

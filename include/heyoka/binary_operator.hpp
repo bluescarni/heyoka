@@ -1,0 +1,53 @@
+// Copyright 2020 Francesco Biscani (bluescarni@gmail.com)
+//
+// This file is part of the heyoka library.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#ifndef HEYOKA_BINARY_OPERATOR_HPP
+#define HEYOKA_BINARY_OPERATOR_HPP
+
+#include <array>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/visibility.hpp>
+
+namespace heyoka
+{
+
+class HEYOKA_DLL_PUBLIC binary_operator
+{
+public:
+    enum class type { add, sub, mul, div };
+
+private:
+    type m_type;
+    std::unique_ptr<std::array<expression, 2>> m_ops;
+
+public:
+    explicit binary_operator(type, expression, expression);
+    binary_operator(const binary_operator &);
+    binary_operator(binary_operator &&) noexcept;
+    ~binary_operator();
+
+    expression &lhs();
+    expression &rhs();
+    type &op();
+    const expression &lhs() const;
+    const expression &rhs() const;
+    const type &op() const;
+};
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const binary_operator &);
+
+HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const binary_operator &);
+
+} // namespace heyoka
+
+#endif
