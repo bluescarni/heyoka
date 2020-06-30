@@ -13,6 +13,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -52,6 +53,8 @@ HEYOKA_DLL_PUBLIC bool operator==(const binary_operator &, const binary_operator
 HEYOKA_DLL_PUBLIC bool operator!=(const binary_operator &, const binary_operator &);
 
 HEYOKA_DLL_PUBLIC expression diff(const binary_operator &, const std::string &);
+
+HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &);
 
 } // namespace heyoka
 

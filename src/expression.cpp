@@ -9,6 +9,7 @@
 #include <ostream>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -228,6 +229,11 @@ bool operator!=(const expression &e1, const expression &e2)
 expression diff(const expression &e, const std::string &s)
 {
     return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
+}
+
+double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
+{
+    return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
 }
 
 } // namespace heyoka

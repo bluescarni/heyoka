@@ -12,6 +12,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -31,7 +32,7 @@ function::function(std::string s, std::vector<expression> args)
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_name(f.m_name), m_display_name(f.m_display_name),
       m_args(std::make_unique<std::vector<expression>>(f.args())), m_attributes(f.m_attributes), m_ty(f.m_ty),
-      m_diff_f(f.m_diff_f)
+      m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f)
 {
 }
 
@@ -71,6 +72,11 @@ function::diff_t &function::diff_f()
     return m_diff_f;
 }
 
+function::eval_dbl_t &function::eval_dbl_f()
+{
+    return m_eval_dbl_f;
+}
+
 const std::string &function::name() const
 {
     return m_name;
@@ -101,6 +107,11 @@ const function::type &function::ty() const
 const function::diff_t &function::diff_f() const
 {
     return m_diff_f;
+}
+
+const function::eval_dbl_t &function::eval_dbl_f() const
+{
+    return m_eval_dbl_f;
 }
 
 std::ostream &operator<<(std::ostream &os, const function &f)
@@ -135,8 +146,12 @@ std::vector<std::string> get_variables(const function &f)
 bool operator==(const function &f1, const function &f2)
 {
     return f1.name() == f2.name() && f1.display_name() == f2.display_name() && f1.args() == f2.args()
-           && f1.attributes() == f2.attributes() && f1.ty() == f2.ty()
-           && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f());
+           && f1.attributes() == f2.attributes()
+           && f1.ty() == f2.ty()
+           // NOTE: we have no way of comparing the content of std::function,
+           // thus we just check if the std::function members contain something.
+           && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f())
+           && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f());
 }
 
 bool operator!=(const function &f1, const function &f2)
@@ -153,6 +168,18 @@ expression diff(const function &f, const std::string &s)
     } else {
         throw std::invalid_argument("The function '" + f.name()
                                     + "' does not provide an implementation of the derivative");
+    }
+}
+
+double eval_dbl(const function &f, const std::unordered_map<std::string, double> &map)
+{
+    auto &ef = f.eval_dbl_f();
+
+    if (ef) {
+        return ef(f.args(), map);
+    } else {
+        throw std::invalid_argument("The function '" + f.name()
+                                    + "' does not provide an implementation of double evaluation");
     }
 }
 

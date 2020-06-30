@@ -13,6 +13,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -131,6 +132,20 @@ expression diff(const binary_operator &bo, const std::string &s)
             return diff(bo.lhs(), s) * bo.rhs() + bo.lhs() * diff(bo.rhs(), s);
         default:
             return (diff(bo.lhs(), s) * bo.rhs() - bo.lhs() * diff(bo.rhs(), s)) / (bo.rhs() * bo.rhs());
+    }
+}
+
+double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map)
+{
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return eval_dbl(bo.lhs(), map) + eval_dbl(bo.rhs(), map);
+        case binary_operator::type::sub:
+            return eval_dbl(bo.lhs(), map) - eval_dbl(bo.rhs(), map);
+        case binary_operator::type::mul:
+            return eval_dbl(bo.lhs(), map) * eval_dbl(bo.rhs(), map);
+        default:
+            return eval_dbl(bo.lhs(), map) / eval_dbl(bo.rhs(), map);
     }
 }
 

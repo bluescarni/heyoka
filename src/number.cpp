@@ -10,6 +10,7 @@
 #include <ostream>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -157,6 +158,11 @@ expression diff(const number &n, const std::string &)
             return expression{number{type(0)}};
         },
         n.value());
+}
+
+double eval_dbl(const number &n, const std::unordered_map<std::string, double> &)
+{
+    return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
 }
 
 } // namespace heyoka

@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -73,6 +74,16 @@ expression diff(const variable &var, const std::string &s)
         return expression{number{1.}};
     } else {
         return expression{number{0.}};
+    }
+}
+
+double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map)
+{
+    if (auto it = map.find(var.name()); it != map.end()) {
+        return it->second;
+    } else {
+        throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
+                                    + "' because it is missing from the evaluation map");
     }
 }
 

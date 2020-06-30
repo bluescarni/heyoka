@@ -11,6 +11,7 @@
 
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -67,6 +68,8 @@ HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
 HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
+
+HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &);
 
 } // namespace heyoka
 

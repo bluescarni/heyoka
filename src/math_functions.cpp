@@ -6,8 +6,10 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -35,6 +37,15 @@ expression sin(expression e)
 
         return cos(args[0]) * diff(args[0], s);
     };
+    fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the sine (1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::sin(eval_dbl(args[0], map));
+    };
 
     return expression{std::move(fc)};
 }
@@ -55,6 +66,15 @@ expression cos(expression e)
         }
 
         return -sin(args[0]) * diff(args[0], s);
+    };
+    fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the cosine (1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::cos(eval_dbl(args[0], map));
     };
 
     return expression{std::move(fc)};
