@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -19,4 +20,5 @@ using namespace heyoka;
 TEST_CASE("basic")
 {
     std::cout << ((45_dbl + "x"_var) / -1_dbl == -1_dbl * (45_dbl + "x"_var)) << '\n';
+    std::cout << diff(sin(cos("x"_var)), "x") << '\n';
 }

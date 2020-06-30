@@ -48,6 +48,8 @@ HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const variable &);
 HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
 HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);
 
+HEYOKA_DLL_PUBLIC expression diff(const variable &, const std::string &);
+
 } // namespace heyoka
 
 #endif

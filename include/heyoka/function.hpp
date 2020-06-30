@@ -35,7 +35,7 @@ private:
     std::string m_name, m_display_name;
     std::unique_ptr<std::vector<expression>> m_args;
     std::vector<llvm::Attribute::AttrKind> m_attributes;
-    type m_ty;
+    type m_ty = type::internal;
     diff_t m_diff_f;
 
 public:
@@ -65,6 +65,8 @@ HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const function &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const function &, const function &);
 HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);
+
+HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 
 } // namespace heyoka
 

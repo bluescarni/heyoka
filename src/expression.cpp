@@ -225,4 +225,9 @@ bool operator!=(const expression &e1, const expression &e2)
     return !(e1 == e2);
 }
 
+expression diff(const expression &e, const std::string &s)
+{
+    return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
+}
+
 } // namespace heyoka

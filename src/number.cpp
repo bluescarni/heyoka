@@ -148,4 +148,15 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
+expression diff(const number &n, const std::string &)
+{
+    return std::visit(
+        [](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            return expression{number{type(0)}};
+        },
+        n.value());
+}
+
 } // namespace heyoka

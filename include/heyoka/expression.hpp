@@ -60,6 +60,8 @@ HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+
 } // namespace heyoka
 
 #endif

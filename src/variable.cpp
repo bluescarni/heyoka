@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -64,6 +65,15 @@ bool operator==(const variable &v1, const variable &v2)
 bool operator!=(const variable &v1, const variable &v2)
 {
     return !(v1 == v2);
+}
+
+expression diff(const variable &var, const std::string &s)
+{
+    if (s == var.name()) {
+        return expression{number{1.}};
+    } else {
+        return expression{number{0.}};
+    }
 }
 
 } // namespace heyoka

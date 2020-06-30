@@ -66,6 +66,8 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
+HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
+
 } // namespace heyoka
 
 #endif

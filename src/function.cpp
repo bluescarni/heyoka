@@ -10,6 +10,7 @@
 #include <iterator>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -141,6 +142,18 @@ bool operator==(const function &f1, const function &f2)
 bool operator!=(const function &f1, const function &f2)
 {
     return !(f1 == f2);
+}
+
+expression diff(const function &f, const std::string &s)
+{
+    auto &df = f.diff_f();
+
+    if (df) {
+        return df(f.args(), s);
+    } else {
+        throw std::invalid_argument("The function '" + f.name()
+                                    + "' does not provide an implementation of the derivative");
+    }
 }
 
 } // namespace heyoka

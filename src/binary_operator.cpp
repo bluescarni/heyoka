@@ -120,4 +120,18 @@ bool operator!=(const binary_operator &o1, const binary_operator &o2)
     return !(o1 == o2);
 }
 
+expression diff(const binary_operator &bo, const std::string &s)
+{
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return diff(bo.lhs(), s) + diff(bo.rhs(), s);
+        case binary_operator::type::sub:
+            return diff(bo.lhs(), s) - diff(bo.rhs(), s);
+        case binary_operator::type::mul:
+            return diff(bo.lhs(), s) * bo.rhs() + bo.lhs() * diff(bo.rhs(), s);
+        default:
+            return (diff(bo.lhs(), s) * bo.rhs() - bo.lhs() * diff(bo.rhs(), s)) / (bo.rhs() * bo.rhs());
+    }
+}
+
 } // namespace heyoka
