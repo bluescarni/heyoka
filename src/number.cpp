@@ -9,10 +9,12 @@
 #include <initializer_list>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/number.hpp>
 
@@ -123,6 +125,27 @@ number operator/(number n1, number n2)
             return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
         },
         std::move(n1.value()), std::move(n2.value()));
+}
+
+bool operator==(const number &n1, const number &n2)
+{
+    auto visitor = [](const auto &v1, const auto &v2) {
+        using type1 = detail::uncvref_t<decltype(v1)>;
+        using type2 = detail::uncvref_t<decltype(v2)>;
+
+        if constexpr (std::is_same_v<type1, type2>) {
+            return v1 == v2;
+        } else {
+            return false;
+        }
+    };
+
+    return std::visit(visitor, n1.value(), n2.value());
+}
+
+bool operator!=(const number &n1, const number &n2)
+{
+    return !(n1 == n2);
 }
 
 } // namespace heyoka

@@ -110,4 +110,14 @@ std::vector<std::string> get_variables(const binary_operator &bo)
     return lhs_vars;
 }
 
+bool operator==(const binary_operator &o1, const binary_operator &o2)
+{
+    return o1.op() == o2.op() && o1.lhs() == o2.lhs() && o1.rhs() == o2.rhs();
+}
+
+bool operator!=(const binary_operator &o1, const binary_operator &o2)
+{
+    return !(o1 == o2);
+}
+
 } // namespace heyoka

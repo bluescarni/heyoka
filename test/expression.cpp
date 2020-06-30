@@ -18,5 +18,5 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    std::cout << (45_dbl + "x"_var) / -1_dbl << '\n';
+    std::cout << ((45_dbl + "x"_var) / -1_dbl == -1_dbl * (45_dbl + "x"_var)) << '\n';
 }

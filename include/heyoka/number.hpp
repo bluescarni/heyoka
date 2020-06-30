@@ -63,6 +63,9 @@ HEYOKA_DLL_PUBLIC number operator-(number, number);
 HEYOKA_DLL_PUBLIC number operator*(number, number);
 HEYOKA_DLL_PUBLIC number operator/(number, number);
 
+HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
+HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
+
 } // namespace heyoka
 
 #endif

@@ -47,15 +47,24 @@ public:
     std::string &name();
     std::string &display_name();
     std::vector<expression> &args();
+    std::vector<llvm::Attribute::AttrKind> &attributes();
+    type &ty();
+    diff_t &diff_f();
 
     const std::string &name() const;
     const std::string &display_name() const;
     const std::vector<expression> &args() const;
+    const std::vector<llvm::Attribute::AttrKind> &attributes() const;
+    const type &ty() const;
+    const diff_t &diff_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const function &);
+
+HEYOKA_DLL_PUBLIC bool operator==(const function &, const function &);
+HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);
 
 } // namespace heyoka
 

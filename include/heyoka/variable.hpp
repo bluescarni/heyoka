@@ -45,6 +45,9 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const variable &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const variable &);
 
+HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
+HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);
+
 } // namespace heyoka
 
 #endif

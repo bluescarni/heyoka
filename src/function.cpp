@@ -14,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
+
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 
@@ -52,6 +54,21 @@ std::vector<expression> &function::args()
     return *m_args;
 }
 
+std::vector<llvm::Attribute::AttrKind> &function::attributes()
+{
+    return m_attributes;
+}
+
+function::type &function::ty()
+{
+    return m_ty;
+}
+
+function::diff_t &function::diff_f()
+{
+    return m_diff_f;
+}
+
 const std::string &function::name() const
 {
     return m_name;
@@ -66,6 +83,21 @@ const std::vector<expression> &function::args() const
 {
     assert(m_args);
     return *m_args;
+}
+
+const std::vector<llvm::Attribute::AttrKind> &function::attributes() const
+{
+    return m_attributes;
+}
+
+const function::type &function::ty() const
+{
+    return m_ty;
+}
+
+const function::diff_t &function::diff_f() const
+{
+    return m_diff_f;
 }
 
 std::ostream &operator<<(std::ostream &os, const function &f)
@@ -95,6 +127,18 @@ std::vector<std::string> get_variables(const function &f)
     }
 
     return ret;
+}
+
+bool operator==(const function &f1, const function &f2)
+{
+    return f1.name() == f2.name() && f1.display_name() == f2.display_name() && f1.args() == f2.args()
+           && f1.attributes() == f2.attributes() && f1.ty() == f2.ty()
+           && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f());
+}
+
+bool operator!=(const function &f1, const function &f2)
+{
+    return !(f1 == f2);
 }
 
 } // namespace heyoka

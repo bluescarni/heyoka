@@ -204,4 +204,25 @@ expression operator/(expression e1, expression e2)
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
 
+bool operator==(const expression &e1, const expression &e2)
+{
+    auto visitor = [](const auto &v1, const auto &v2) {
+        using type1 = detail::uncvref_t<decltype(v1)>;
+        using type2 = detail::uncvref_t<decltype(v2)>;
+
+        if constexpr (std::is_same_v<type1, type2>) {
+            return v1 == v2;
+        } else {
+            return false;
+        }
+    };
+
+    return std::visit(visitor, e1.value(), e2.value());
+}
+
+bool operator!=(const expression &e1, const expression &e2)
+{
+    return !(e1 == e2);
+}
+
 } // namespace heyoka

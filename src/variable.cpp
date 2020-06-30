@@ -56,4 +56,14 @@ std::vector<std::string> get_variables(const variable &var)
     return {var.name()};
 }
 
+bool operator==(const variable &v1, const variable &v2)
+{
+    return v1.name() == v2.name();
+}
+
+bool operator!=(const variable &v1, const variable &v2)
+{
+    return !(v1 == v2);
+}
+
 } // namespace heyoka
