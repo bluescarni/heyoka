@@ -11,6 +11,7 @@
 
 #include <ostream>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -21,21 +22,35 @@ namespace heyoka
 
 class HEYOKA_DLL_PUBLIC number
 {
-    double m_value;
+public:
+    using value_type = std::variant<double, long double>;
+
+private:
+    value_type m_value;
 
 public:
     explicit number(double);
+    explicit number(long double);
     number(const number &);
     number(number &&) noexcept;
     ~number();
 
-    double &value();
-    const double &value() const;
+    value_type &value();
+    const value_type &value() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
+
+HEYOKA_DLL_PUBLIC bool is_zero(const number &);
+HEYOKA_DLL_PUBLIC bool is_one(const number &);
+HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
+
+HEYOKA_DLL_PUBLIC number operator+(number, number);
+HEYOKA_DLL_PUBLIC number operator-(number, number);
+HEYOKA_DLL_PUBLIC number operator*(number, number);
+HEYOKA_DLL_PUBLIC number operator/(number, number);
 
 } // namespace heyoka
 

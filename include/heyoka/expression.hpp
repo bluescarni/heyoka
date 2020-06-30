@@ -36,6 +36,7 @@ public:
     explicit expression(number);
     explicit expression(variable);
     explicit expression(binary_operator);
+    explicit expression(function);
     expression(const expression &);
     expression(expression &&) noexcept;
     ~expression();
@@ -47,6 +48,14 @@ public:
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
+
+HEYOKA_DLL_PUBLIC expression operator+(expression);
+HEYOKA_DLL_PUBLIC expression operator-(expression);
+
+HEYOKA_DLL_PUBLIC expression operator+(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator-(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator*(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
 
 } // namespace heyoka
 
