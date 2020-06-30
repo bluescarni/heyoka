@@ -2,6 +2,10 @@
 # https://cmake.org/cmake/help/v3.8/prop_tgt/CXX_STANDARD.html
 cmake_minimum_required(VERSION 3.8.0)
 
+# NOTE: policy for using the CheckIPOSupported module:
+# https://cmake.org/cmake/help/latest/policy/CMP0069.html
+cmake_policy(SET CMP0069 NEW)
+
 # Set default build type to "Release".
 # NOTE: this should be done before the project command since the latter can set
 # CMAKE_BUILD_TYPE itself (it does so for nmake).
@@ -23,6 +27,8 @@ include(YACMACompilerLinkerSettings)
 
 # The build options.
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
+option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
+mark_as_advanced(HEYOKA_ENABLE_IPO)
 
 # Assemble the flags.
 set(HEYOKA_CXX_FLAGS_DEBUG ${YACMA_CXX_FLAGS} ${YACMA_CXX_FLAGS_DEBUG})
@@ -142,6 +148,22 @@ target_include_directories(heyoka PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>)
+
+# IPO setup.
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
+    if(HEYOKA_ENABLE_IPO)
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT _HEYOKA_IPO_RESULT OUTPUT _HEYOKA_IPO_OUTPUT)
+        if (_HEYOKA_IPO_RESULT)
+            message(STATUS "IPO requested and supported, enabling.")
+            set_property(TARGET heyoka PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+        else()
+            message(STATUS "IPO requested, but it is not supported by the compiler:\n${_HEYOKA_IPO_OUTPUT}")
+        endif()
+        unset(_HEYOKA_IPO_RESULT)
+        unset(_HEYOKA_IPO_OUTPUT)
+    endif()
+endif()
 
 find_package(LLVM REQUIRED)
 
