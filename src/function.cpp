@@ -61,6 +61,7 @@ std::vector<llvm::Attribute::AttrKind> &function::attributes()
 
 function::type &function::ty()
 {
+    assert(m_ty >= type::internal && m_ty <= type::builtin);
     return m_ty;
 }
 
@@ -92,6 +93,7 @@ const std::vector<llvm::Attribute::AttrKind> &function::attributes() const
 
 const function::type &function::ty() const
 {
+    assert(m_ty >= type::internal && m_ty <= type::builtin);
     return m_ty;
 }
 
