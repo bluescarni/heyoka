@@ -244,4 +244,9 @@ llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
     return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
 }
 
+llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
+{
+    return std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value());
+}
+
 } // namespace heyoka

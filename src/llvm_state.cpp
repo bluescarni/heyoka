@@ -427,6 +427,22 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
     }
 }
 
+void llvm_state::add_ldbl(const std::string &name, const expression &e)
+{
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    const auto vars = get_variables(e);
+
+    add_varargs_expression<long double>(name, e, vars);
+
+    // Run the optimization pass.
+    if (m_opt_level > 0u) {
+        m_pm->run(*m_module);
+    }
+}
+
 // NOTE: this function will lookup symbol names,
 // so it does not necessarily return a function
 // pointer (could be, e.g., a global variable).

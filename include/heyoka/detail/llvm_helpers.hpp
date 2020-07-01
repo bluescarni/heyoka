@@ -65,9 +65,7 @@ inline llvm::Value *invoke_codegen(llvm_state &s, const expression &e)
     if constexpr (std::is_same_v<T, double>) {
         return codegen_dbl(s, e);
     } else if constexpr (std::is_same_v<T, long double>) {
-        // TODO
-        // return codegen_ldbl(s, e);
-        static_assert(always_false_v<T>, "Unhandled type in invoke_codegen().");
+        return codegen_ldbl(s, e);
     } else {
         static_assert(always_false_v<T>, "Unhandled type in invoke_codegen().");
     }

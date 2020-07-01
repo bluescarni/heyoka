@@ -20,17 +20,17 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    auto ex = sin("x"_var);
+    auto ex = sin("x"_var) + 1.1_ldbl;
 
     llvm_state s{"pippo"};
 
-    s.add_dbl("f", ex);
+    s.add_ldbl("f", ex);
 
     std::cout << s.dump() << '\n';
 
     s.compile();
 
-    auto f = s.fetch_dbl<1>("f");
+    auto f = s.fetch_ldbl<1>("f");
 
     std::cout << f(5) << '\n';
 }

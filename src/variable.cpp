@@ -102,4 +102,9 @@ llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
     return it->second;
 }
 
+llvm::Value *codegen_ldbl(llvm_state &s, const variable &var)
+{
+    return codegen_dbl(s, var);
+}
+
 } // namespace heyoka

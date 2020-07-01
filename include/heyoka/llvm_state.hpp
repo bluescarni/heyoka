@@ -77,6 +77,7 @@ public:
     void verify_function(const std::string &);
 
     void add_dbl(const std::string &, const expression &);
+    void add_ldbl(const std::string &, const expression &);
 
     void compile();
 
@@ -149,6 +150,11 @@ public:
     auto fetch_dbl(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<double, N>>(jit_lookup(name)));
+    }
+    template <std::size_t N>
+    auto fetch_ldbl(const std::string &name)
+    {
+        return sig_check(name, reinterpret_cast<vararg_f_ptr<long double, N>>(jit_lookup(name)));
     }
 };
 

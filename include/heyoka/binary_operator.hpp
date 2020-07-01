@@ -57,6 +57,7 @@ HEYOKA_DLL_PUBLIC expression diff(const binary_operator &, const std::string &);
 HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);
 
 } // namespace heyoka
 
