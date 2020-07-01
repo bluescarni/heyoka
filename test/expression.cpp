@@ -18,6 +18,96 @@ using namespace heyoka;
 
 #include <iostream>
 
+//TEST_CASE("equality comparisons")
+//{
+//    // Expression 1
+//    {
+//        expression ex1 = "x"_var + 3_dbl + "y"_var * (cos("x"_var + 3_dbl)) / pow("x"_var + 3_dbl, "z"_var + 3_dbl);
+//        expression ex2 = "x"_var + 3_dbl + "y"_var * (cos("x"_var + 3_dbl)) / pow("x"_var + 3_dbl, "z"_var + 3_dbl);
+//        expression ex3 = "z"_var + 3_dbl + "y"_var * (cos("x"_var + 3_dbl)) / pow("x"_var + 3_dbl, "z"_var + 3_dbl);
+//        expression ex4 = "x"_var + 3_dbl + "y"_var * (cos("x"_var - 3_dbl)) / pow("x"_var + 3_dbl, "z"_var + 3_dbl);
+//        REQUIRE(ex1 == ex1);
+//        REQUIRE(ex1 == ex2);
+//        REQUIRE(ex1 != ex3);
+//        REQUIRE(ex1 != ex4);
+//    }
+//    // Expression 2
+//    {
+//        expression ex1
+//            = pow("x"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
+//        expression ex2
+//            = pow("x"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
+//        expression ex3
+//            = pow("y"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
+//        expression ex4 = pow("x"_var + sin(-1_dbl), "z"_var + 2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
+//        expression ex5
+//            = pow("x"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (cos("x"_var + 3.322_dbl)));
+//        REQUIRE(ex1 == ex2);
+//        REQUIRE(ex1 != ex3);
+//        REQUIRE(ex1 != ex4);
+//        REQUIRE(ex1 != ex5);
+//    }
+//    // Identities that will not hold
+//    {
+//        expression ex1 = 1_dbl + cos("x"_var);
+//        expression ex2 = cos("x"_var) + 1_dbl;
+//        expression ex3 = cos("x"_var) + 1_dbl + ex1 - ex1;
+//
+//        REQUIRE(ex1 != ex2);
+//        REQUIRE(ex3 != ex2);
+//    }
+//}
+
+TEST_CASE("compute connections")
+{
+    // We test the result on a simple polynomial x^2*y + 2
+    {
+        expression ex = ("x"_var * ("x"_var * "y"_var)) + 2_dbl;
+        auto connections = compute_connections(ex);
+        REQUIRE(connections.size() == 7u);
+        REQUIRE(connections[0] == std::vector<unsigned>{1, 6});
+        REQUIRE(connections[1] == std::vector<unsigned>{2, 3});
+        REQUIRE(connections[2] == std::vector<unsigned>{});
+        REQUIRE(connections[3] == std::vector<unsigned>{4, 5});
+        REQUIRE(connections[4] == std::vector<unsigned>{});
+        REQUIRE(connections[5] == std::vector<unsigned>{});
+        REQUIRE(connections[6] == std::vector<unsigned>{});
+    }
+    // We test the result on a known expression with a simple function 2cos(x) + 2yz
+    {
+        expression ex = cos("x"_var) * 2_dbl + ("y"_var * "z"_var) * 2_dbl;
+        auto connections = compute_connections(ex);
+        REQUIRE(connections.size() == 10u);
+
+        REQUIRE(connections[0] == std::vector<unsigned>{1, 5});
+        REQUIRE(connections[1] == std::vector<unsigned>{2, 4});
+        REQUIRE(connections[2] == std::vector<unsigned>{3});
+        REQUIRE(connections[3] == std::vector<unsigned>{});
+        REQUIRE(connections[4] == std::vector<unsigned>{});
+        REQUIRE(connections[5] == std::vector<unsigned>{6, 9});
+        REQUIRE(connections[6] == std::vector<unsigned>{7, 8});
+        REQUIRE(connections[7] == std::vector<unsigned>{});
+        REQUIRE(connections[8] == std::vector<unsigned>{});
+        REQUIRE(connections[9] == std::vector<unsigned>{});
+    }
+    // We test the result on a known expression including a multiargument function
+    //{
+    //    expression ex = pow("x"_var, 2_dbl) + ("y"_var * "z"_var) * 2_dbl;
+    //    auto connections = compute_connections(ex);
+    //    REQUIRE(connections.size() == 9u);
+//
+    //    REQUIRE(connections[0] == std::vector<unsigned>{1, 4});
+    //    REQUIRE(connections[1] == std::vector<unsigned>{2, 3});
+    //    REQUIRE(connections[2] == std::vector<unsigned>{});
+    //    REQUIRE(connections[3] == std::vector<unsigned>{});
+    //    REQUIRE(connections[4] == std::vector<unsigned>{5, 8});
+    //    REQUIRE(connections[5] == std::vector<unsigned>{6, 7});
+    //    REQUIRE(connections[6] == std::vector<unsigned>{});
+    //    REQUIRE(connections[7] == std::vector<unsigned>{});
+    //    REQUIRE(connections[8] == std::vector<unsigned>{});
+    //}
+}
+
 TEST_CASE("basic")
 {
     std::cout << ((45_dbl + "x"_var) / -1_dbl == -1_dbl * (45_dbl + "x"_var)) << '\n';

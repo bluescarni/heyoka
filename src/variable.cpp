@@ -87,4 +87,10 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
     }
 }
 
+void compute_connections(const variable &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    node_connections.push_back(std::vector<unsigned>());
+    node_counter++;
+}
+
 } // namespace heyoka

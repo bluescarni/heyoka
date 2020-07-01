@@ -56,6 +56,8 @@ HEYOKA_DLL_PUBLIC expression diff(const binary_operator &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &);
 
+HEYOKA_DLL_PUBLIC void compute_connections(const binary_operator &, std::vector<std::vector<unsigned>> &, unsigned &);
+
 } // namespace heyoka
 
 #endif

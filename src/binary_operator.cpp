@@ -149,4 +149,15 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
     }
 }
 
+void compute_connections(const binary_operator &bo, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    node_connections.push_back(std::vector<unsigned>(2));
+    node_connections[node_id][0] = node_counter;
+    detail::compute_connections(bo.lhs(), node_connections, node_counter);
+    node_connections[node_id][1] = node_counter;
+    detail::compute_connections(bo.rhs(), node_connections, node_counter);
+}
+
 } // namespace heyoka

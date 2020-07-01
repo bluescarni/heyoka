@@ -24,6 +24,17 @@
 namespace heyoka
 {
 
+namespace detail
+{
+void compute_connections(const expression &e, std::vector<std::vector<unsigned>> &node_connections,
+                         unsigned &node_counter)
+{
+    return std::visit([&node_connections,
+                       &node_counter](const auto &arg) { compute_connections(arg, node_connections, node_counter); },
+                      e.value());
+}
+} // namespace detail
+
 expression::expression(number n) : m_value(std::move(n)) {}
 
 expression::expression(variable var) : m_value(std::move(var)) {}
@@ -234,6 +245,14 @@ expression diff(const expression &e, const std::string &s)
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
 {
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
+}
+
+std::vector<std::vector<unsigned>> compute_connections(const expression &e)
+{
+    std::vector<std::vector<unsigned>> node_connections;
+    unsigned node_counter = 0u;
+    detail::compute_connections(e, node_connections, node_counter);
+    return node_connections;
 }
 
 } // namespace heyoka
