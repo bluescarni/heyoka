@@ -14,10 +14,13 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -250,6 +253,11 @@ std::vector<std::vector<unsigned>> compute_connections(const expression &e)
     unsigned node_counter = 0u;
     update_connections(e, node_connections, node_counter);
     return node_connections;
+}
+
+llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
+{
+    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
 }
 
 } // namespace heyoka

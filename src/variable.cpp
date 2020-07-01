@@ -13,7 +13,10 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -91,6 +94,17 @@ void update_connections(const variable &, std::vector<std::vector<unsigned>> &no
 {
     node_connections.push_back(std::vector<unsigned>());
     node_counter++;
+}
+llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
+{
+    const auto &nv = s.named_values();
+
+    auto it = nv.find(var.name());
+    if (it == nv.end()) {
+        throw std::invalid_argument("Unknown variable name: " + var.name());
+    }
+
+    return it->second;
 }
 
 } // namespace heyoka
