@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 
 #include <llvm/Config/llvm-config.h>
@@ -35,7 +36,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
 // #include <llvm/IR/Type.h>
-// #include <llvm/IR/Value.h>
+#include <llvm/IR/Value.h>
 // #include <llvm/IR/Verifier.h>
 // #include <llvm/Support/Error.h>
 #include <llvm/Support/TargetSelect.h>
@@ -236,6 +237,17 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
 
 llvm_state::~llvm_state() = default;
 
+llvm::Module &llvm_state::module()
+{
+    check_uncompiled(__func__);
+    return *m_module;
+}
+
+llvm::IRBuilder<> &llvm_state::builder()
+{
+    return *m_builder;
+}
+
 llvm::LLVMContext &llvm_state::context()
 {
     return m_jitter->get_context();
@@ -246,6 +258,22 @@ bool &llvm_state::verify()
     return m_verify;
 }
 
+std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
+{
+    return m_named_values;
+}
+
+const llvm::Module &llvm_state::module() const
+{
+    check_uncompiled(__func__);
+    return *m_module;
+}
+
+const llvm::IRBuilder<> &llvm_state::builder() const
+{
+    return *m_builder;
+}
+
 const llvm::LLVMContext &llvm_state::context() const
 {
     return m_jitter->get_context();
@@ -254,6 +282,11 @@ const llvm::LLVMContext &llvm_state::context() const
 const bool &llvm_state::verify() const
 {
     return m_verify;
+}
+
+const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
+{
+    return m_named_values;
 }
 
 void llvm_state::check_uncompiled(const char *f) const
