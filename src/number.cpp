@@ -15,8 +15,13 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/ADT/APFloat.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
 namespace heyoka
@@ -163,6 +168,22 @@ expression diff(const number &n, const std::string &)
 double eval_dbl(const number &n, const std::unordered_map<std::string, double> &)
 {
     return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
+}
+
+// NOTE: for the generation of constants of other floating-point types
+// a possible pattern seems to be:
+//
+// const auto &sem = detail::to_llvm_type<type>(s.context())->getFltSemantics();
+// return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, detail::li_to_string(v)));
+//
+// That is, we fetch the floating-point semantics of whatever LLVM type
+// corresponds to the C++ type, and then we construct a constant
+// from the string representation.
+llvm::Value *codegen_dbl(llvm_state &s, const number &n)
+{
+    return std::visit(
+        [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
+        n.value());
 }
 
 } // namespace heyoka

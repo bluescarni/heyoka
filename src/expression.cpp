@@ -14,10 +14,13 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -234,6 +237,11 @@ expression diff(const expression &e, const std::string &s)
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
 {
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
+}
+
+llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
+{
+    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
 }
 
 } // namespace heyoka
