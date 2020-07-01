@@ -95,6 +95,7 @@ void update_connections(const variable &, std::vector<std::vector<unsigned>> &no
     node_connections.push_back(std::vector<unsigned>());
     node_counter++;
 }
+
 llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
 {
     const auto &nv = s.named_values();
