@@ -17,8 +17,12 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {
@@ -146,6 +150,26 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
             return eval_dbl(bo.lhs(), map) * eval_dbl(bo.rhs(), map);
         default:
             return eval_dbl(bo.lhs(), map) / eval_dbl(bo.rhs(), map);
+    }
+}
+
+llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
+{
+    auto *l = codegen_dbl(s, bo.lhs());
+    auto *r = codegen_dbl(s, bo.rhs());
+    assert(l != nullptr && r != nullptr);
+
+    auto &builder = s.builder();
+
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return builder.CreateFAdd(l, r, "addtmp");
+        case binary_operator::type::sub:
+            return builder.CreateFSub(l, r, "subtmp");
+        case binary_operator::type::mul:
+            return builder.CreateFMul(l, r, "multmp");
+        default:
+            return builder.CreateFDiv(l, r, "divtmp");
     }
 }
 

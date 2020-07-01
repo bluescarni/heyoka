@@ -25,7 +25,9 @@ expression sin(expression e)
     std::vector<expression> args;
     args.emplace_back(std::move(e));
 
-    function fc{"llvm.sin", std::move(args)};
+    function fc{std::move(args)};
+    fc.dbl_name() = "llvm.sin";
+    fc.ldbl_name() = "llvm.sin";
     fc.display_name() = "sin";
     fc.ty() = function::type::builtin;
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
@@ -55,7 +57,9 @@ expression cos(expression e)
     std::vector<expression> args;
     args.emplace_back(std::move(e));
 
-    function fc{"llvm.cos", std::move(args)};
+    function fc{std::move(args)};
+    fc.dbl_name() = "llvm.cos";
+    fc.ldbl_name() = "llvm.cos";
     fc.display_name() = "cos";
     fc.ty() = function::type::builtin;
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
