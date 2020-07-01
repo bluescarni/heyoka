@@ -111,15 +111,13 @@ endif()
 
 # List of source files.
 set(HEYOKA_SRC_FILES
-    # "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_00.cpp"
-    # "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state_01.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/function.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
-    # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/jit.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/check_symbol_name.cpp"
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
 )
