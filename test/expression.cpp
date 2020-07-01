@@ -20,10 +20,17 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
-    std::cout << ((45_dbl + "x"_var) / -1_dbl == -1_dbl * (45_dbl + "x"_var)) << '\n';
-    std::cout << diff(sin(cos("x"_var)), "x") << '\n';
+    auto ex = sin("x"_var);
 
     llvm_state s{"pippo"};
 
+    s.add_dbl("f", ex);
+
+    std::cout << s.dump() << '\n';
+
     s.compile();
+
+    auto f = s.fetch_dbl<1>("f");
+
+    std::cout << f(5) << '\n';
 }

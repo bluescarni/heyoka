@@ -7,11 +7,14 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeindex>
+#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -41,7 +44,6 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 // #include <llvm/Support/Error.h>
-#include <llvm/Support/Casting.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO.h>
@@ -304,7 +306,7 @@ void llvm_state::check_uncompiled(const char *f) const
 
 void llvm_state::check_compiled(const char *f) const
 {
-    if (!m_module) {
+    if (m_module) {
         throw std::invalid_argument(std::string{"The function '"} + f
                                     + "' can be invoked only after the module has been compiled");
     }
@@ -320,6 +322,8 @@ void llvm_state::check_add_name(const std::string &name) const
 
 void llvm_state::verify_function_impl(llvm::Function *f)
 {
+    assert(f != nullptr);
+
     std::string err_report;
     llvm::raw_string_ostream ostr(err_report);
     if (llvm::verifyFunction(*f, &ostr) && m_verify) {
@@ -334,15 +338,9 @@ void llvm_state::verify_function(const std::string &name)
     check_uncompiled(__func__);
 
     // Lookup the function in the module.
-    auto mf = m_module->getNamedValue(name);
-    if (mf == nullptr) {
-        throw std::invalid_argument("The function '" + name + "' does not exist in the module");
-    }
-
-    // Try to see if it is a function.
-    auto f = llvm::dyn_cast<llvm::Function>(mf);
+    auto f = m_module->getFunction(name);
     if (f == nullptr) {
-        throw std::invalid_argument("The symbol '" + name + "' is not a function");
+        throw std::invalid_argument("The function '" + name + "' does not exist in the module");
     }
 
     // Run the actual check.
@@ -393,8 +391,24 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     // Finish off the function.
     m_builder->CreateRet(ret_val);
 
+    // NOTE: it seems like the module-level
+    // optimizer is able to figure out on its
+    // own at least some useful attributes for
+    // functions. Additional attributes
+    // (e.g., speculatable, willreturn)
+    // will also depend on the attributes
+    // of function calls contained in the expression,
+    // so it may be tricky to "prove" that they
+    // can be added safely.
+
     // Verify it.
     verify_function_impl(f);
+
+    // Add the function to m_sig_map.
+    std::vector<std::type_index> sig_args(vars.size(), std::type_index(typeid(T)));
+    auto sig = std::pair{std::type_index(typeid(T)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
 }
 
 void llvm_state::add_dbl(const std::string &name, const expression &e)
@@ -410,6 +424,45 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
     // Run the optimization pass.
     if (m_opt_level > 0u) {
         m_pm->run(*m_module);
+    }
+}
+
+// NOTE: this function will lookup symbol names,
+// so it does not necessarily return a function
+// pointer (could be, e.g., a global variable).
+std::uintptr_t llvm_state::jit_lookup(const std::string &name)
+{
+    check_compiled(__func__);
+
+    auto sym = m_jitter->lookup(name);
+    if (!sym) {
+        throw std::invalid_argument("Could not find the symbol '" + name + "' in the compiled module");
+    }
+
+    return static_cast<std::uintptr_t>((*sym).getAddress());
+}
+
+std::string llvm_state::dump() const
+{
+    check_uncompiled(__func__);
+
+    std::string out;
+    llvm::raw_string_ostream ostr(out);
+    m_module->print(ostr, nullptr);
+    return ostr.str();
+}
+
+std::string llvm_state::dump_function(const std::string &name) const
+{
+    check_uncompiled(__func__);
+
+    if (auto f = m_module->getFunction(name)) {
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+        f->print(ostr);
+        return ostr.str();
+    } else {
+        throw std::invalid_argument("Could not locate the function called '" + name + "'");
     }
 }
 
