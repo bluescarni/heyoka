@@ -73,6 +73,8 @@ HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::
 
 HEYOKA_DLL_PUBLIC void update_connections(const number &, std::vector<std::vector<unsigned>> &, unsigned &);
 
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const number &);
+
 } // namespace heyoka
 
 #endif

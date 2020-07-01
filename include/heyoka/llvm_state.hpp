@@ -43,11 +43,17 @@ public:
     llvm_state &operator=(llvm_state &&) = delete;
     ~llvm_state();
 
+    llvm::Module &module();
+    llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> &builder();
     llvm::LLVMContext &context();
     bool &verify();
+    std::unordered_map<std::string, llvm::Value *> &named_values();
 
+    const llvm::Module &module() const;
+    const llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> &builder() const;
     const llvm::LLVMContext &context() const;
     const bool &verify() const;
+    const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
     void compile();
 };

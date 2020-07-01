@@ -12,27 +12,33 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
 
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {
 
-function::function(std::string s, std::vector<expression> args)
-    : m_name(std::move(s)), m_display_name(m_name), m_args(std::make_unique<std::vector<expression>>(std::move(args)))
-{
-}
+function::function(std::vector<expression> args) : m_args(std::make_unique<std::vector<expression>>(std::move(args))) {}
 
 function::function(const function &f)
-    : m_disable_verify(f.m_disable_verify), m_name(f.m_name), m_display_name(f.m_display_name),
-      m_args(std::make_unique<std::vector<expression>>(f.args())), m_attributes(f.m_attributes), m_ty(f.m_ty),
-      m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f)
+    : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
+      m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
+      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f)
 {
 }
 
@@ -40,9 +46,19 @@ function::function(function &&) noexcept = default;
 
 function::~function() = default;
 
-std::string &function::name()
+bool &function::disable_verify()
 {
-    return m_name;
+    return m_disable_verify;
+}
+
+std::string &function::dbl_name()
+{
+    return m_dbl_name;
+}
+
+std::string &function::ldbl_name()
+{
+    return m_ldbl_name;
 }
 
 std::string &function::display_name()
@@ -77,9 +93,19 @@ function::eval_dbl_t &function::eval_dbl_f()
     return m_eval_dbl_f;
 }
 
-const std::string &function::name() const
+const bool &function::disable_verify() const
 {
-    return m_name;
+    return m_disable_verify;
+}
+
+const std::string &function::dbl_name() const
+{
+    return m_dbl_name;
+}
+
+const std::string &function::ldbl_name() const
+{
+    return m_ldbl_name;
 }
 
 const std::string &function::display_name() const
@@ -145,8 +171,8 @@ std::vector<std::string> get_variables(const function &f)
 
 bool operator==(const function &f1, const function &f2)
 {
-    return f1.name() == f2.name() && f1.display_name() == f2.display_name() && f1.args() == f2.args()
-           && f1.attributes() == f2.attributes()
+    return f1.dbl_name() == f2.dbl_name() && f1.ldbl_name() == f2.ldbl_name() && f1.display_name() == f2.display_name()
+           && f1.args() == f2.args() && f1.attributes() == f2.attributes()
            && f1.ty() == f2.ty()
            // NOTE: we have no way of comparing the content of std::function,
            // thus we just check if the std::function members contain something.
@@ -166,7 +192,7 @@ expression diff(const function &f, const std::string &s)
     if (df) {
         return df(f.args(), s);
     } else {
-        throw std::invalid_argument("The function '" + f.name()
+        throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide an implementation of the derivative");
     }
 }
@@ -178,7 +204,7 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
     if (ef) {
         return ef(f.args(), map);
     } else {
-        throw std::invalid_argument("The function '" + f.name()
+        throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide an implementation of double evaluation");
     }
 }
@@ -192,6 +218,137 @@ void update_connections(const function &f, std::vector<std::vector<unsigned>> &n
         node_connections[node_id][i] = node_counter;
         update_connections(f.args()[i], node_connections, node_counter);
     };
+}
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+const std::string &function_name_from_type(const function &f)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.dbl_name();
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.ldbl_name();
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type");
+    }
+}
+
+template <typename T>
+llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
+{
+    if (f.disable_verify()) {
+        s.verify() = false;
+    }
+
+    llvm::Function *callee_f;
+    const auto &f_name = function_name_from_type<T>(f);
+
+    switch (f.ty()) {
+        case function::type::internal: {
+            // Look up the name in the global module table.
+            callee_f = s.module().getFunction(f_name);
+
+            if (!callee_f) {
+                throw std::invalid_argument("Unknown internal function: '" + f_name + "'");
+            }
+
+            if (callee_f->empty()) {
+                // An internal function cannot be empty (i.e., we need declaration
+                // and definition).
+                throw std::invalid_argument("The internal function '" + f_name + "' is empty");
+            }
+
+            break;
+        }
+        case function::type::external: {
+            // Look up the name in the global module table.
+            callee_f = s.module().getFunction(f_name);
+
+            if (callee_f) {
+                // The function declaration exists already. Check that it is only a
+                // declaration and not a definition.
+                if (!callee_f->empty()) {
+                    throw std::invalid_argument(
+                        "Cannot call the function '" + f_name
+                        + "' as an external function, because it is defined as an internal module function");
+                }
+            } else {
+                // The function does not exist yet, make the prototype.
+                std::vector<llvm::Type *> arg_types(f.args().size(), to_llvm_type<T>(s.context()));
+                auto *ft = llvm::FunctionType::get(to_llvm_type<T>(s.context()), arg_types, false);
+                assert(ft);
+                callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, f_name, &s.module());
+                assert(callee_f);
+
+                // Add the function attributes.
+                for (const auto &att : f.attributes()) {
+                    callee_f->addFnAttr(att);
+                }
+            }
+
+            break;
+        }
+        default: {
+            // Builtin.
+            const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(f_name);
+            if (!intrinsic_ID) {
+                throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + f_name + "'");
+            }
+
+            // NOTE: for generic intrinsics to work, we need to specify
+            // the desired argument types. See:
+            // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
+            // And the docs of the getDeclaration() function.
+            const std::vector<llvm::Type *> arg_types(f.args().size(), to_llvm_type<T>(s.context()));
+
+            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+
+            if (!callee_f) {
+                throw std::invalid_argument("Error getting the declaration of the intrinsic '" + f_name + "'");
+            }
+
+            if (!callee_f->empty()) {
+                // It does not make sense to have a definition of a builtin.
+                throw std::invalid_argument("The intrinsic '" + f_name + "' must be an empty function");
+            }
+        }
+    }
+
+    // Check the number of arguments.
+    if (callee_f->arg_size() != f.args().size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed in a function call: "
+                                    + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(f.args().size()) + " were provided instead");
+    }
+
+    // Create the function arguments.
+    std::vector<llvm::Value *> args_v;
+    for (const auto &arg : f.args()) {
+        args_v.push_back(detail::invoke_codegen<T>(s, arg));
+        assert(args_v.back() != nullptr);
+    }
+
+    auto r = s.builder().CreateCall(callee_f, args_v, "calltmp");
+    assert(r != nullptr);
+    // NOTE: not sure what this does exactly, but the optimized
+    // IR from clang has this.
+    r->setTailCall(true);
+
+    return r;
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *codegen_dbl(llvm_state &s, const function &f)
+{
+    return detail::function_codegen_impl<double>(s, f);
 }
 
 } // namespace heyoka

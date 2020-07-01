@@ -58,6 +58,8 @@ HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_
 
 HEYOKA_DLL_PUBLIC void update_connections(const binary_operator &, std::vector<std::vector<unsigned>> &, unsigned &);
 
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
+
 } // namespace heyoka
 
 #endif

@@ -35,7 +35,7 @@ public:
 
 private:
     bool m_disable_verify = false;
-    std::string m_name, m_display_name;
+    std::string m_dbl_name, m_ldbl_name, m_display_name;
     std::unique_ptr<std::vector<expression>> m_args;
     std::vector<llvm::Attribute::AttrKind> m_attributes;
     type m_ty = type::internal;
@@ -43,12 +43,14 @@ private:
     eval_dbl_t m_eval_dbl_f;
 
 public:
-    explicit function(std::string, std::vector<expression>);
+    explicit function(std::vector<expression>);
     function(const function &);
     function(function &&) noexcept;
     ~function();
 
-    std::string &name();
+    bool &disable_verify();
+    std::string &dbl_name();
+    std::string &ldbl_name();
     std::string &display_name();
     std::vector<expression> &args();
     std::vector<llvm::Attribute::AttrKind> &attributes();
@@ -56,7 +58,9 @@ public:
     diff_t &diff_f();
     eval_dbl_t &eval_dbl_f();
 
-    const std::string &name() const;
+    const bool &disable_verify() const;
+    const std::string &dbl_name() const;
+    const std::string &ldbl_name() const;
     const std::string &display_name() const;
     const std::vector<expression> &args() const;
     const std::vector<llvm::Attribute::AttrKind> &attributes() const;
@@ -77,6 +81,8 @@ HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std::string, double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
 
 } // namespace heyoka
 

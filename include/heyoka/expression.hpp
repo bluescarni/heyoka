@@ -69,7 +69,7 @@ HEYOKA_DLL_PUBLIC std::vector<std::vector<unsigned>> compute_connections(const e
 
 HEYOKA_DLL_PUBLIC void update_connections(const expression &, std::vector<std::vector<unsigned>> &, unsigned &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const expression &);
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 
 } // namespace heyoka
 
