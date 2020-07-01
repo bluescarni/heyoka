@@ -25,11 +25,6 @@
 namespace heyoka
 {
 
-namespace detail
-{
-HEYOKA_DLL_PUBLIC void compute_connections(const expression &, std::vector<std::vector<unsigned>> &, unsigned &);
-}
-
 class HEYOKA_DLL_PUBLIC expression
 {
 public:
@@ -71,6 +66,8 @@ HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::vector<unsigned>> compute_connections(const expression &);
+
+HEYOKA_DLL_PUBLIC void update_connections(const expression &, std::vector<std::vector<unsigned>> &, unsigned &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const expression &);
 

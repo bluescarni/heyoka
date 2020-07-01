@@ -76,7 +76,7 @@ HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std::string, double> &);
 
-HEYOKA_DLL_PUBLIC void compute_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
+HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
 
 } // namespace heyoka
 

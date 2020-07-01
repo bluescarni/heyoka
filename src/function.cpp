@@ -183,14 +183,14 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
     }
 }
 
-void compute_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     node_connections.push_back(std::vector<unsigned>(f.args().size()));
     for (auto i = 0u; i < f.args().size(); ++i) {
         node_connections[node_id][i] = node_counter;
-        detail::compute_connections(f.args()[i], node_connections, node_counter);
+        update_connections(f.args()[i], node_connections, node_counter);
     };
 }
 

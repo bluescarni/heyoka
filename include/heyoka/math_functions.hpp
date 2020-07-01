@@ -17,6 +17,7 @@ namespace heyoka
 
 HEYOKA_DLL_PUBLIC expression sin(expression);
 HEYOKA_DLL_PUBLIC expression cos(expression);
+HEYOKA_DLL_PUBLIC expression pow(expression);
 
 } // namespace heyoka
 
