@@ -30,6 +30,7 @@ class Value;
 class Module;
 class ConstantFolder;
 class IRBuilderDefaultInserter;
+class Function;
 
 template <typename, typename>
 class IRBuilder;

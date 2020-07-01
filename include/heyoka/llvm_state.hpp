@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -34,6 +35,12 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
+    HEYOKA_DLL_LOCAL void check_add_name(const std::string &) const;
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_varargs_expression(const std::string &, const expression &,
+                                                 const std::vector<std::string> &);
+    HEYOKA_DLL_LOCAL void verify_function_impl(llvm::Function *);
 
 public:
     explicit llvm_state(const std::string &, unsigned = 3);
@@ -54,6 +61,10 @@ public:
     const llvm::LLVMContext &context() const;
     const bool &verify() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
+
+    void verify_function(const std::string &);
+
+    void add_dbl(const std::string &, const expression &);
 
     void compile();
 };
