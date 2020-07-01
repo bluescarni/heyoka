@@ -93,6 +93,11 @@ function::eval_dbl_t &function::eval_dbl_f()
     return m_eval_dbl_f;
 }
 
+function::eval_batch_dbl_t &function::eval_batch_dbl_f()
+{
+    return m_eval_batch_dbl_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -138,6 +143,11 @@ const function::diff_t &function::diff_f() const
 const function::eval_dbl_t &function::eval_dbl_f() const
 {
     return m_eval_dbl_f;
+}
+
+const function::eval_batch_dbl_t &function::eval_batch_dbl_f() const
+{
+    return m_eval_batch_dbl_f;
 }
 
 std::ostream &operator<<(std::ostream &os, const function &f)
@@ -208,6 +218,19 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
                                     + "' does not provide an implementation of double evaluation");
     }
 }
+
+void eval_batch_dbl(const function &f, const std::unordered_map<std::string, std::vector<double>> &map,
+                    std::vector<double> &retval)
+{
+    auto &ef = f.eval_batch_dbl_f();
+    if (ef) {
+        ef(f.args(), map, retval);
+    } else {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide an implementation of batch evaluation for doubles");
+    }
+}
+
 
 void update_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {

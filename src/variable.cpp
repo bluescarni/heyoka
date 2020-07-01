@@ -90,6 +90,17 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
     }
 }
 
+void eval_batch_dbl(const variable &var, const std::unordered_map<std::string, std::vector<double>> &map,
+                    std::vector<double> &retval)
+{
+    if (auto it = map.find(var.name()); it != map.end()) {
+        retval =  it->second;
+    } else {
+        throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
+                                    + "' because it is missing from the evaluation map");
+    }
+}
+
 void update_connections(const variable &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
     node_connections.push_back(std::vector<unsigned>());

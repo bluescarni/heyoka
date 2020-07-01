@@ -170,6 +170,18 @@ double eval_dbl(const number &n, const std::unordered_map<std::string, double> &
     return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
 }
 
+void eval_batch_dbl(const number &n, const std::unordered_map<std::string, std::vector<double>> &,
+                    std::vector<double> &retval)
+{
+    return std::visit(
+        [&retval](const auto &v) {
+            for (auto &el : retval) {
+                el = static_cast<double>(v);
+            }
+        },
+        n.value());
+}
+
 void update_connections(const number &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
     node_connections.push_back(std::vector<unsigned>());

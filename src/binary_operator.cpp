@@ -153,7 +153,30 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
     }
 }
 
-void update_connections(const binary_operator &bo, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void eval_batch_dbl(const binary_operator &bo, const std::unordered_map<std::string, std::vector<double>> &map,
+                    std::vector<double> &retval)
+{
+    auto tmp = retval;
+    eval_batch_dbl(bo.lhs(), map, retval);
+    eval_batch_dbl(bo.rhs(), map, tmp);
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::plus<double>());
+            break;
+        case binary_operator::type::sub:
+            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::minus<double>());
+            break;
+        case binary_operator::type::mul:
+            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::multiplies<double>());
+            break;
+        default:
+            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::divides<double>());
+            break;
+    }
+}
+
+void update_connections(const binary_operator &bo, std::vector<std::vector<unsigned>> &node_connections,
+                        unsigned &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;

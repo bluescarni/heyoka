@@ -239,8 +239,14 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
 }
 
+void eval_batch_dbl(const expression &e, const std::unordered_map<std::string, std::vector<double>> &map,
+                    std::vector<double> &retval)
+{
+    return std::visit([&map, &retval](const auto &arg) {eval_batch_dbl(arg, map, retval); }, e.value());
+}
+
 void update_connections(const expression &e, std::vector<std::vector<unsigned>> &node_connections,
-                         unsigned &node_counter)
+                        unsigned &node_counter)
 {
     return std::visit([&node_connections,
                        &node_counter](const auto &arg) { update_connections(arg, node_connections, node_counter); },

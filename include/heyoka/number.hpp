@@ -71,6 +71,9 @@ HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &);
 
+HEYOKA_DLL_PUBLIC void eval_batch_dbl(const number &, const std::unordered_map<std::string, std::vector<double>> &,
+                                      std::vector<double> &);
+
 HEYOKA_DLL_PUBLIC void update_connections(const number &, std::vector<std::vector<unsigned>> &, unsigned &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const number &);

@@ -32,6 +32,9 @@ public:
     using diff_t = std::function<expression(const std::vector<expression> &, const std::string &)>;
     using eval_dbl_t
         = std::function<double(const std::vector<expression> &, const std::unordered_map<std::string, double> &)>;
+    using eval_batch_dbl_t
+        = std::function<void(const std::vector<expression> &, const std::unordered_map<std::string, std::vector<double>> &,
+                             std::vector<double> &)>;
 
 private:
     bool m_disable_verify = false;
@@ -41,6 +44,7 @@ private:
     type m_ty = type::internal;
     diff_t m_diff_f;
     eval_dbl_t m_eval_dbl_f;
+    eval_batch_dbl_t m_eval_batch_dbl_f;
 
 public:
     explicit function(std::vector<expression>);
@@ -57,6 +61,7 @@ public:
     type &ty();
     diff_t &diff_f();
     eval_dbl_t &eval_dbl_f();
+    eval_batch_dbl_t &eval_batch_dbl_f();
 
     const bool &disable_verify() const;
     const std::string &dbl_name() const;
@@ -67,6 +72,7 @@ public:
     const type &ty() const;
     const diff_t &diff_f() const;
     const eval_dbl_t &eval_dbl_f() const;
+    const eval_batch_dbl_t &eval_batch_dbl_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
@@ -79,6 +85,9 @@ HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);
 HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std::string, double> &);
+
+HEYOKA_DLL_PUBLIC void eval_batch_dbl(const function &, const std::unordered_map<std::string, std::vector<double>>&,
+                                      std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
 

@@ -48,6 +48,18 @@ expression sin(expression e)
 
         return std::sin(eval_dbl(args[0], map));
     };
+    fc.eval_batch_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, std::vector<double>> &map,
+                               std::vector<double> &out) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the sine in batches (1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+        eval_batch_dbl(args[0], map, out);
+        for (auto &el : out) {
+            el = std::sin(el);
+        }
+    };
 
     return expression{std::move(fc)};
 }
@@ -73,12 +85,24 @@ expression cos(expression e)
     };
     fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
         if (args.size() != 1u) {
-            throw std::invalid_argument(
-                "Inconsistent number of arguments when evaluating the cosine (1 argument was expected, but "
-                + std::to_string(args.size()) + " arguments were provided");
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the cosine from doubles (1 "
+                                        "argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
         }
 
         return std::cos(eval_dbl(args[0], map));
+    };
+    fc.eval_batch_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, std::vector<double>> &map,
+                               std::vector<double> &out) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the cosine in batches of "
+                                        "doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+        eval_batch_dbl(args[0], map, out);
+        for (auto &el : out) {
+            el = std::cos(el);
+        }
     };
 
     return expression{std::move(fc)};
@@ -107,21 +131,24 @@ expression log(expression e)
 
     fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
         if (args.size() != 1u) {
-            throw std::invalid_argument(
-                "Inconsistent number of arguments when evaluating the logarithm (1 argument was expected, but "
-                + std::to_string(args.size()) + " arguments were provided");
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the logarithm from doubles(1 "
+                                        "argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
         }
 
         return std::log(eval_dbl(args[0], map));
     };
-    fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
+    fc.eval_batch_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, std::vector<double>> &map,
+                               std::vector<double> &out) {
         if (args.size() != 1u) {
-            throw std::invalid_argument(
-                "Inconsistent number of arguments when evaluating the cosine (1 argument was expected, but "
-                + std::to_string(args.size()) + " arguments were provided");
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the logarithm in batches of "
+                                        "doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
         }
-
-        return std::cos(eval_dbl(args[0], map));
+        eval_batch_dbl(args[0], map, out);
+        for (auto &el : out) {
+            el = std::log(el);
+        }
     };
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
@@ -137,7 +164,7 @@ expression log(expression e)
     return expression{std::move(fc)};
 }
 
- expression pow(expression e1, expression e2)
+expression pow(expression e1, expression e2)
 {
     std::vector<expression> args;
     args.emplace_back(std::move(e1));
@@ -162,11 +189,25 @@ expression log(expression e)
     fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
         if (args.size() != 2u) {
             throw std::invalid_argument(
-                "Inconsistent number of arguments when taking the derivative of the exponentiation (2 "
+                "Inconsistent number of arguments when evaluating the exponentiation from doubles (2 "
                 "arguments were expected, but "
                 + std::to_string(args.size()) + " arguments were provided");
         }
         return std::pow(eval_dbl(args[0], map), eval_dbl(args[1], map));
+    };
+    fc.eval_batch_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, std::vector<double>> &map,
+                               std::vector<double> &out) {
+        if (args.size() != 2u) {
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the exponentiation in "
+                                        "batches of doubles (2 arguments were expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+        auto out0 = out; // is this allocation needed?
+        eval_batch_dbl(args[0], map, out0);
+        eval_batch_dbl(args[1], map, out);
+        for (auto i = 0u; i < out.size(); ++i) {
+            out[i] = std::pow(out0[i], out[i]);
+        }
     };
 
     return expression{std::move(fc)};

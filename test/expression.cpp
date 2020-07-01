@@ -18,7 +18,93 @@ using namespace heyoka;
 
 #include <iostream>
 
- TEST_CASE("operator == and !=")
+TEST_CASE("eval_dbl")
+{
+    // We test on a number
+    {
+        expression ex = 2.345_dbl;
+        std::unordered_map<std::string, double> in;
+        REQUIRE(eval_dbl(ex, in) == 2.345);
+    }
+    // We test on a variable
+    {
+        expression ex = "x"_var;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        REQUIRE(eval_dbl(ex, in) == 2.345);
+    }
+    // We test on a function call
+    {
+        expression ex = cos("x"_var);
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        REQUIRE(eval_dbl(ex, in) == std::cos(2.345));
+    }
+    // We test on a binary operator
+    {
+        expression ex = "x"_var / 2.345_dbl;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        REQUIRE(eval_dbl(ex, in) == 1.);
+    }
+    // We test on a deeper tree
+    {
+        expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
+        std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
+        REQUIRE(eval_dbl(ex, in) == -2.345 + std::cos(-2.345));
+    }
+    // We test the corner case of a dictionary not containing the variable.
+    {
+        expression ex = "x"_var * "y"_var;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        REQUIRE_THROWS(eval_dbl(ex, in));
+    }
+}
+
+TEST_CASE("call operator (batch)")
+{
+    std::vector<double> out(2);
+    // We test on a number
+    {
+        expression ex = 2.345_dbl;
+        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
+        out = std::vector<double>(2);
+        eval_batch_dbl(ex, in, out);
+        REQUIRE(out == std::vector<double>{2.345, 2.345});
+    }
+    // We test on a variable
+    {
+        expression ex = "x"_var;
+        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
+        out = std::vector<double>(2);
+        eval_batch_dbl(ex, in, out);
+        REQUIRE(out == std::vector<double>{-2.345, 20.234});
+    }
+    // We test on a function call
+    {
+        expression ex = cos("x"_var);
+        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
+        out = std::vector<double>(2);
+        eval_batch_dbl(ex, in, out);
+        REQUIRE(out == std::vector<double>{std::cos(-2.345), std::cos(20.234)});
+    }
+    // We test on a deeper tree
+    {
+        expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
+        std::unordered_map<std::string, std::vector<double>> in;
+        in["x"] = std::vector<double>{3., 4.};
+        in["y"] = std::vector<double>{-1., -2.};
+        out = std::vector<double>(2);
+        eval_batch_dbl(ex, in, out);
+        REQUIRE(out == std::vector<double>{-3 + std::cos(-3), -8 + std::cos(-8)});
+    }
+    // We test the corner case of a dictionary not containing the variable.
+    {
+        expression ex = "x"_var * "y"_var;
+        std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
+        out = std::vector<double>(2);
+        REQUIRE_THROWS(eval_batch_dbl(ex, in, out));
+    }
+}
+
+TEST_CASE("operator == and !=")
 {
     // Expression 1
     {
@@ -39,8 +125,8 @@ using namespace heyoka;
             = pow("x"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
         expression ex3
             = pow("y"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
-        expression ex4 = pow("x"_var + sin(-1_dbl), "z"_var + 2_dbl) / ("x"_var / "y"_var + (sin("x"_var
-        + 3.322_dbl))); expression ex5
+        expression ex4 = pow("x"_var + sin(-1_dbl), "z"_var + 2_dbl) / ("x"_var / "y"_var + (sin("x"_var + 3.322_dbl)));
+        expression ex5
             = pow("x"_var + sin(-1_dbl), "z"_var + -2_dbl) / ("x"_var / "y"_var + (cos("x"_var + 3.322_dbl)));
         REQUIRE(ex1 == ex2);
         REQUIRE(ex1 != ex3);
