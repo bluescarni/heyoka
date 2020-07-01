@@ -1,4 +1,4 @@
-// Copyright 2020 Francesco Biscani (bluescarni@gmail.com)
+// Copyright 2020 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -64,6 +64,8 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen(llvm_state &, const expression &);
 
 } // namespace heyoka
 
