@@ -10,6 +10,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 #include "catch.hpp"
@@ -20,6 +21,15 @@ using namespace heyoka;
 
 TEST_CASE("basic")
 {
+    auto x = "x"_var, y = "y"_var;
+
+    auto d = taylor_decompose({x + sin(y), y - cos(x)});
+
+    for (const auto &ex : d) {
+        std::cout << ex << '\n';
+    }
+
+#if 0
     auto ex = sin("x"_var) + 1.1_ldbl;
 
     llvm_state s{"pippo"};
@@ -33,4 +43,5 @@ TEST_CASE("basic")
     auto f = s.fetch_ldbl<1>("f");
 
     std::cout << f(5) << '\n';
+#endif
 }
