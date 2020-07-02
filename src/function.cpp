@@ -374,4 +374,9 @@ llvm::Value *codegen_dbl(llvm_state &s, const function &f)
     return detail::function_codegen_impl<double>(s, f);
 }
 
+llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
+{
+    return detail::function_codegen_impl<long double>(s, f);
+}
+
 } // namespace heyoka

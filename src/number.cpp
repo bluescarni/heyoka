@@ -19,6 +19,8 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -201,6 +203,25 @@ llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 {
     return std::visit(
         [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
+        n.value());
+}
+
+llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
+{
+    return std::visit(
+        [&s](const auto &v) {
+            // NOTE: the idea here is that we first fetch the FP
+            // semantics of the LLVM type long double corresponds
+            // to. Then we use them to construct a FP constant from
+            // the string representation of v.
+            // NOTE: v must be cast to long double so that we ensure
+            // that li_to_string() produces a string representation
+            // of v in long double precision accurate to the
+            // last digit.
+            const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
+            return llvm::ConstantFP::get(s.context(),
+                                         llvm::APFloat(sem, detail::li_to_string(static_cast<long double>(v))));
+        },
         n.value());
 }
 

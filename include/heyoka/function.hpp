@@ -92,6 +92,7 @@ HEYOKA_DLL_PUBLIC void eval_batch_dbl(const function &, const std::unordered_map
 HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const function &);
 
 } // namespace heyoka
 

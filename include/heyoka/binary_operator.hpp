@@ -63,6 +63,7 @@ HEYOKA_DLL_PUBLIC void eval_batch_dbl(const binary_operator &,
 HEYOKA_DLL_PUBLIC void update_connections(const binary_operator &, std::vector<std::vector<unsigned>> &, unsigned &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);
 
 } // namespace heyoka
 

@@ -21,6 +21,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -187,10 +188,17 @@ void update_connections(const binary_operator &bo, std::vector<std::vector<unsig
     update_connections(bo.rhs(), node_connections, node_counter);
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
+namespace detail
 {
-    auto *l = codegen_dbl(s, bo.lhs());
-    auto *r = codegen_dbl(s, bo.rhs());
+
+namespace
+{
+
+template <typename T>
+llvm::Value *bo_codegen_impl(llvm_state &s, const binary_operator &bo)
+{
+    auto *l = invoke_codegen<T>(s, bo.lhs());
+    auto *r = invoke_codegen<T>(s, bo.rhs());
     assert(l != nullptr && r != nullptr);
 
     auto &builder = s.builder();
@@ -205,6 +213,20 @@ llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
         default:
             return builder.CreateFDiv(l, r, "divtmp");
     }
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
+{
+    return detail::bo_codegen_impl<double>(s, bo);
+}
+
+llvm::Value *codegen_ldbl(llvm_state &s, const binary_operator &bo)
+{
+    return detail::bo_codegen_impl<long double>(s, bo);
 }
 
 } // namespace heyoka
