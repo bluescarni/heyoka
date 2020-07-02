@@ -9,7 +9,7 @@
 #ifndef HEYOKA_DETAIL_STRING_CONV_HPP
 #define HEYOKA_DETAIL_STRING_CONV_HPP
 
-// #include <cstdint>
+#include <cstdint>
 #include <ios>
 #include <limits>
 #include <locale>
@@ -56,6 +56,11 @@ inline T li_from_string(const std::string &s)
     }
     return out;
 }
+
+// Small helper to compute an index from the name
+// of a u variable. E.g., for s = "u_123" this
+// will return 123.
+HEYOKA_DLL_PUBLIC std::uint32_t uname_to_index(const std::string &);
 
 } // namespace heyoka::detail
 

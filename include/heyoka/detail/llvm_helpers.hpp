@@ -21,7 +21,6 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 
 namespace heyoka::detail
@@ -59,13 +58,13 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
     }
 }
 
-template <typename T>
-inline llvm::Value *invoke_codegen(llvm_state &s, const expression &e)
+template <typename T, typename U>
+inline llvm::Value *invoke_codegen(llvm_state &s, const U &x)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, e);
+        return codegen_dbl(s, x);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, e);
+        return codegen_ldbl(s, x);
     } else {
         static_assert(always_false_v<T>, "Unhandled type in invoke_codegen().");
     }
