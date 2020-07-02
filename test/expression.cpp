@@ -261,6 +261,24 @@ TEST_CASE("update_node_values_dbl")
         REQUIRE(node_values[6] == 2.345);
         REQUIRE(node_values[7] == -1.);
     }
+    // We test the result on a known expression including a multiargument function
+    {
+        expression ex = pow("x"_var, 2_dbl) + (("x"_var * "y"_var) * 2_dbl);
+        std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 9u);
+        REQUIRE(node_values[0] == std::pow(2.345, 2.) - 2 * 2.345);
+        REQUIRE(node_values[1] == std::pow(2.345, 2.));
+        REQUIRE(node_values[2] == 2.345);
+        REQUIRE(node_values[3] == 2.);
+        REQUIRE(node_values[4] == -2*2.345);
+        REQUIRE(node_values[5] == -2.345);
+        REQUIRE(node_values[6] == 2.345);
+        REQUIRE(node_values[7] == -1.);
+    }
     // We test the corner case of a dictionary not containing the variable.
     {
         expression ex = "x"_var * "y"_var;

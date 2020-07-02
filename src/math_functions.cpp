@@ -187,15 +187,22 @@ expression log(expression e)
             el = std::log(el);
         }
     };
-    fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
+    fc.eval_num_dbl_f() = [](const std::vector<double> &args) {
         if (args.size() != 1u) {
-            throw std::invalid_argument(
-                "Inconsistent number of arguments when taking the derivative of the logarithm (1 "
-                "argument was expected, but "
-                + std::to_string(args.size()) + " arguments were provided");
+            throw std::invalid_argument("Inconsistent number of arguments when computing the numerical value of the "
+                                        "logarithm over doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
         }
 
-        return expression{number(1.)} / args[0] * diff(args[0], s);
+        return std::log(args[0]);
+    };
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+        if (args.size() != 1u || i != 0u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments or derivative requested when computing the derivative of std::log");
+        }
+
+        return 1. / args[0];
     };
 
     return expression{std::move(fc)};
@@ -247,6 +254,22 @@ expression pow(expression e1, expression e2)
                   out[i] = std::pow(out0[i], out[i]);
               }
           };
+    fc.eval_num_dbl_f() = [](const std::vector<double> &args) {
+        if (args.size() != 2u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the numerical value of the "
+                                        "exponentiation over doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::pow(args[0], args[1]);
+    };
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+        if (args.size() != 2u || i > 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments or derivative requested when computing the derivative of std::pow");
+        }
+        return args[1] * std::pow(args[0], args[1]-1.) + std::log(args[0]) * std::pow(args[0], args[1]);
+    };
 
     return expression{std::move(fc)};
 }
