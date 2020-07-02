@@ -104,6 +104,9 @@ HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vec
 HEYOKA_DLL_PUBLIC void update_node_values_dbl(const function &, const std::unordered_map<std::string, double> &,
                                               std::vector<double> &node_values,
                                               const std::vector<std::vector<unsigned>> &, unsigned &);
+HEYOKA_DLL_PUBLIC void update_grad_dbl(const function &, const std::unordered_map<std::string, double> &,
+                                       std::unordered_map<std::string, double> &, const std::vector<double> &,
+                                       const std::vector<std::vector<unsigned>> &, unsigned &, double);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const function &);

@@ -297,6 +297,22 @@ void update_node_values_dbl(const function &f, const std::unordered_map<std::str
     node_values[node_id] = eval_num_dbl(f, in_values);
 }
 
+void update_grad_dbl(const function &f, const std::unordered_map<std::string, double> &map, std::unordered_map<std::string, double> &grad,
+                     const std::vector<double> &node_values, const std::vector<std::vector<unsigned>> &node_connections,
+                     unsigned &node_counter, double acc)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    std::vector<double> in_values(f.args().size());
+    for (auto i = 0u; i <f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    for (auto i = 0u; i < f.args().size(); ++i) {
+        auto value = deval_num_dbl(f, in_values, i);
+        update_grad_dbl(f.args()[i], map, grad, node_values, node_connections, node_counter, acc * value);
+    }
+}
+
 void update_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
     const unsigned node_id = node_counter;

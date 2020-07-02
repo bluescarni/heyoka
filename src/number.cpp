@@ -195,11 +195,15 @@ void update_node_values_dbl(const number &n, const std::unordered_map<std::strin
                             const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
 
-    std::visit(
-        [&node_values, &node_counter](const auto &v) {
-            node_values[node_counter] = static_cast<double>(v);
-        },
-        n.value());
+    std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },
+               n.value());
+    node_counter++;
+}
+
+void update_grad_dbl(const number &, const std::unordered_map<std::string, double> &,
+                     std::unordered_map<std::string, double> &, const std::vector<double> &,
+                     const std::vector<std::vector<unsigned>> &, unsigned &node_counter, double)
+{
     node_counter++;
 }
 

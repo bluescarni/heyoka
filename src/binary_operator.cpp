@@ -207,6 +207,48 @@ void update_node_values_dbl(const binary_operator &bo, const std::unordered_map<
     }
 }
 
+void update_grad_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
+                     std::unordered_map<std::string, double> &grad, const std::vector<double> &node_values,
+                     const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter, double acc)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            // lhs (a + b -> 1)
+            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter, acc);
+            // rhs (a + b -> 1)
+            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter, acc);
+            break;
+
+        case binary_operator::type::sub:
+            // lhs (a + b -> 1)
+            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter, acc);
+            // rhs (a + b -> 1)
+            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter, -acc);
+            break;
+
+        case binary_operator::type::mul:
+            // lhs (a*b -> b)
+            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter,
+                            acc * node_values[node_connections[node_id][1]]);
+            // rhs (a*b -> a)
+            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter,
+                            acc * node_values[node_connections[node_id][0]]);
+            break;
+
+        default:
+            // lhs (a/b -> 1/b)
+            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter,
+                            acc / node_values[node_connections[node_id][1]]);
+            // rhs (a/b -> -a/b^2)
+            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter,
+                            -acc * node_values[node_connections[node_id][0]] / node_values[node_connections[node_id][1]]
+                                / node_values[node_connections[node_id][1]]);
+            break;
+    }
+}
+
 void update_connections(const binary_operator &bo, std::vector<std::vector<unsigned>> &node_connections,
                         unsigned &node_counter)
 {

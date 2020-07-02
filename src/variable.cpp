@@ -120,6 +120,14 @@ void update_node_values_dbl(const variable &var, const std::unordered_map<std::s
     node_counter++;
 }
 
+void update_grad_dbl(const variable &var, const std::unordered_map<std::string, double> &,
+                     std::unordered_map<std::string, double> &grad, const std::vector<double> &,
+                     const std::vector<std::vector<unsigned>> &, unsigned &node_counter, double acc)
+{
+    grad[var.name()] = grad[var.name()] + acc;
+    node_counter++;
+}
+
 llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
 {
     const auto &nv = s.named_values();

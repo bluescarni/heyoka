@@ -261,13 +261,43 @@ std::vector<std::vector<unsigned>> compute_connections(const expression &e)
     return node_connections;
 }
 
-void update_node_values_dbl(const expression &e, const std::unordered_map<std::string, double> &in,
-                        std::vector<double> &node_values, const std::vector<std::vector<unsigned>> &node_connections,
-                        unsigned &node_counter) 
+double compute_node_values_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                               const std::vector<std::vector<unsigned>> &node_connections)
 {
-    std::visit([&in, &node_values, &node_connections, &node_counter](
-                   const auto &arg) { update_node_values_dbl(arg, in, node_values, node_connections, node_counter); },
+    std::vector<double> node_values(node_connections.size());
+    unsigned node_counter = 0u;
+    update_node_values_dbl(ex, in, node_values, node_connections, node_counter);
+}
+
+void update_node_values_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                            std::vector<double> &node_values,
+                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    std::visit([&map, &node_values, &node_connections, &node_counter](
+                   const auto &arg) { update_node_values_dbl(arg, map, node_values, node_connections, node_counter); },
                e.value());
+}
+
+std::unordered_map<std::string, double> compute_grad_dbl(const expression &e,
+                                                         const std::unordered_map<std::string, double> &map,
+                                                         const std::vector<std::vector<unsigned>> &node_connections)
+{
+    std::unordered_map<std::string, double> grad;
+    auto node_values = compute_node_values(map, node_connections);
+    auto node_counter = 0u;
+    compute_grad_dbl(e, map, grad, node_values, node_connections, node_counter);
+    return grad;
+}
+
+void update_grad_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                     std::unordered_map<std::string, double> &grad, const std::vector<double> &node_values,
+                     const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter, double acc)
+{
+    std::visit(
+        [&map, &grad, &node_values, &node_connections, &node_counter, &acc](const auto &arg) {
+            update_grad_dbl(arg, map, grad, node_values, node_connections, node_counter, acc);
+        },
+        e.value());
 }
 
 llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
