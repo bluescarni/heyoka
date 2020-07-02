@@ -15,6 +15,7 @@
 #include "catch.hpp"
 
 using namespace heyoka;
+using namespace Catch::literals;
 
 #include <iostream>
 
@@ -200,9 +201,7 @@ TEST_CASE("update_node_values_dbl")
         expression ex = 2.345_dbl;
         std::unordered_map<std::string, double> in;
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 1u);
         REQUIRE(node_values[0] == 2.345);
     }
@@ -211,9 +210,7 @@ TEST_CASE("update_node_values_dbl")
         expression ex = "x"_var;
         std::unordered_map<std::string, double> in{{"x", 2.345}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 1u);
         REQUIRE(node_values[0] == 2.345);
     }
@@ -222,9 +219,7 @@ TEST_CASE("update_node_values_dbl")
         expression ex = cos("x"_var);
         std::unordered_map<std::string, double> in{{"x", 2.345}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 2u);
         REQUIRE(node_values[0] == std::cos(2.345));
         REQUIRE(node_values[1] == 2.345);
@@ -234,9 +229,7 @@ TEST_CASE("update_node_values_dbl")
         expression ex = "x"_var / 2.345_dbl;
         std::unordered_map<std::string, double> in{{"x", 2.345}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 3u);
         REQUIRE(node_values[0] == 1);
         REQUIRE(node_values[1] == 2.345);
@@ -248,9 +241,7 @@ TEST_CASE("update_node_values_dbl")
         expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
         std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 8u);
         REQUIRE(node_values[0] == -2.345 + std::cos(-2.345));
         REQUIRE(node_values[1] == -2.345);
@@ -266,15 +257,13 @@ TEST_CASE("update_node_values_dbl")
         expression ex = pow("x"_var, 2_dbl) + (("x"_var * "y"_var) * 2_dbl);
         std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        auto node_values = compute_node_values_dbl(ex, in, connections);
         REQUIRE(node_values.size() == 9u);
         REQUIRE(node_values[0] == std::pow(2.345, 2.) - 2 * 2.345);
         REQUIRE(node_values[1] == std::pow(2.345, 2.));
         REQUIRE(node_values[2] == 2.345);
         REQUIRE(node_values[3] == 2.);
-        REQUIRE(node_values[4] == -2*2.345);
+        REQUIRE(node_values[4] == -2 * 2.345);
         REQUIRE(node_values[5] == -2.345);
         REQUIRE(node_values[6] == 2.345);
         REQUIRE(node_values[7] == -1.);
@@ -284,9 +273,54 @@ TEST_CASE("update_node_values_dbl")
         expression ex = "x"_var * "y"_var;
         std::unordered_map<std::string, double> in{{"x", 2.345}};
         auto connections = compute_connections(ex);
-        std::vector<double> node_values(connections.size());
-        unsigned node_counter = 0u;
-        REQUIRE_THROWS(update_node_values_dbl(ex, in, node_values, connections, node_counter));
+        REQUIRE_THROWS(compute_node_values_dbl(ex, in, connections));
+    }
+}
+
+TEST_CASE("gradient")
+{
+    // We test that the gradient of x is one
+    {
+        expression ex = "x"_var;
+        auto connections = compute_connections(ex);
+        std::unordered_map<std::string, double> point;
+        point["x"] = 2.3;
+        auto grad = compute_grad_dbl(ex, point, connections);
+        REQUIRE(grad["x"] == 1);
+    }
+    // We test that the gradient of x*y is {x, y}
+    {
+        expression ex = "x"_var * "y"_var;
+        auto connections = compute_connections(ex);
+        std::unordered_map<std::string, double> point;
+        point["x"] = 2.3;
+        point["y"] = 12.43;
+        auto grad = compute_grad_dbl(ex, point, connections);
+        REQUIRE(grad["x"] == 12.43);
+        REQUIRE(grad["y"] == 2.3);
+    }
+    // We test that the gradient of the mathematical identity sin^2(x) + cos^2(x) = 1 is zero
+    {
+        expression ex = cos("x"_var) * cos("x"_var) + sin("x"_var) * sin("x"_var);
+        auto connections = compute_connections(ex);
+        std::unordered_map<std::string, double> point;
+        point["x"] = 2.3;
+        auto grad = compute_grad_dbl(ex, point, connections);
+        REQUIRE(grad["x"] == 0_a);
+    }
+}
+
+TEST_CASE("symbolic differentiation")
+{
+    // We test that the derivative of x is one
+    {
+        expression ex = "x"_var;
+        REQUIRE(diff(ex, "x") == 1_dbl);
+    }
+    // We test that the derivative of sin is cos
+    {
+        expression ex = sin("x"_var);
+        REQUIRE(diff(ex, "x") == cos("x"_var));
     }
 }
 
