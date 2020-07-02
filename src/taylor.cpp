@@ -104,6 +104,10 @@ void taylor_decompose_ex(expression &ex, std::vector<expression> &u_vars_defs)
 
 std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 {
+    if (v_ex.empty()) {
+        throw std::invalid_argument("Cannot decompose a system of zero equations");
+    }
+
     // Determine the variables in the system of equations.
     std::vector<std::string> vars;
     for (const auto &ex : v_ex) {
