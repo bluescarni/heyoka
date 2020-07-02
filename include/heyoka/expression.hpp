@@ -74,7 +74,7 @@ HEYOKA_DLL_PUBLIC void eval_batch_dbl(const expression &, const std::unordered_m
 // compute_*.
 HEYOKA_DLL_PUBLIC std::vector<std::vector<unsigned>> compute_connections(const expression &);
 HEYOKA_DLL_PUBLIC void update_connections(const expression &, std::vector<std::vector<unsigned>> &, unsigned &);
-HEYOKA_DLL_PUBLIC double compute_node_values_dbl(const expression &, const std::unordered_map<std::string, double> &,
+HEYOKA_DLL_PUBLIC std::vector<double> compute_node_values_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                                  const std::vector<std::vector<unsigned>> &);
 HEYOKA_DLL_PUBLIC void update_node_values_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                               std::vector<double> &, const std::vector<std::vector<unsigned>> &,
