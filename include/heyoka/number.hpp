@@ -54,6 +54,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
+HEYOKA_DLL_PUBLIC void rename_variables(number &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);

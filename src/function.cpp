@@ -169,6 +169,13 @@ std::vector<std::string> get_variables(const function &f)
     return ret;
 }
 
+void rename_variables(function &f, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    for (auto &arg_ex : f.args()) {
+        rename_variables(arg_ex, repl_map);
+    }
+}
+
 bool operator==(const function &f1, const function &f2)
 {
     return f1.dbl_name() == f2.dbl_name() && f1.ldbl_name() == f2.ldbl_name() && f1.display_name() == f2.display_name()

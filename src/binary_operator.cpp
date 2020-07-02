@@ -116,6 +116,12 @@ std::vector<std::string> get_variables(const binary_operator &bo)
     return lhs_vars;
 }
 
+void rename_variables(binary_operator &bo, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    rename_variables(bo.lhs(), repl_map);
+    rename_variables(bo.rhs(), repl_map);
+}
+
 bool operator==(const binary_operator &o1, const binary_operator &o2)
 {
     return o1.op() == o2.op() && o1.lhs() == o2.lhs() && o1.rhs() == o2.rhs();

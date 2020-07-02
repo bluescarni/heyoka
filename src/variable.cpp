@@ -61,6 +61,13 @@ std::vector<std::string> get_variables(const variable &var)
     return {var.name()};
 }
 
+void rename_variables(variable &var, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    if (auto it = repl_map.find(var.name()); it != repl_map.end()) {
+        var.name() = it->second;
+    }
+}
+
 bool operator==(const variable &v1, const variable &v2)
 {
     return v1.name() == v2.name();

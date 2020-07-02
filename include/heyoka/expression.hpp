@@ -49,6 +49,7 @@ public:
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
+HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);

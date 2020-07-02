@@ -72,6 +72,7 @@ public:
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const function &);
+HEYOKA_DLL_PUBLIC void rename_variables(function &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const function &, const function &);
 HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);

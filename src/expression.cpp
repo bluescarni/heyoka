@@ -56,6 +56,11 @@ std::vector<std::string> get_variables(const expression &e)
     return std::visit([](const auto &arg) { return get_variables(arg); }, e.value());
 }
 
+void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    std::visit([&repl_map](auto &arg) { rename_variables(arg, repl_map); }, e.value());
+}
+
 std::ostream &operator<<(std::ostream &os, const expression &e)
 {
     return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, e.value());

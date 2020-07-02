@@ -84,6 +84,8 @@ std::vector<std::string> get_variables(const number &)
     return {};
 }
 
+void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
+
 bool is_zero(const number &n)
 {
     return std::visit([](const auto &arg) { return arg == 0; }, n.value());
