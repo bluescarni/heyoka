@@ -27,7 +27,7 @@ TEST_CASE("basic")
     // auto d = taylor_decompose({(1_dbl + x) + (1_dbl + x)});
     // auto d = taylor_decompose({expression{binary_operator{binary_operator::type::add, 1_dbl, 1_dbl}}, x + y *
     // sin(x)});
-    auto d = taylor_decompose({x * (1_dbl + x), x * (1_dbl + y)});
+    auto d = taylor_decompose({x * (1_dbl + x), x * (1_dbl + cos(y))});
 
     for (const auto &ex : d) {
         std::cout << ex << '\n';

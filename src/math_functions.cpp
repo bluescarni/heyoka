@@ -13,9 +13,12 @@
 #include <utility>
 #include <vector>
 
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -48,6 +51,37 @@ expression sin(expression e)
 
         return std::sin(eval_dbl(args[0], map));
     };
+    // NOTE: for sine/cosine we need a non-default decomposition because
+    // we always need both sine *and* cosine in the decomposition
+    // in order to compute the derivatives.
+    fc.taylor_decompose_f() = [](function &&f, std::vector<expression> &u_vars_defs) {
+        if (f.args().size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the Taylor decomposition of "
+                                        "the sine (1 argument was expected, but "
+                                        + std::to_string(f.args().size()) + " arguments were provided");
+        }
+
+        // Decompose the argument.
+        auto &arg = f.args()[0];
+        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+
+        // Save a copy of the decomposed argument.
+        auto f_arg = arg;
+
+        // Append the sine decomposition.
+        u_vars_defs.emplace_back(std::move(f));
+
+        // Compute the return value (pointing to the
+        // decomposed sine).
+        const auto retval = u_vars_defs.size() - 1u;
+
+        // Append the cosine decomposition.
+        u_vars_defs.emplace_back(cos(std::move(f_arg)));
+
+        return retval;
+    };
 
     return expression{std::move(fc)};
 }
@@ -79,6 +113,27 @@ expression cos(expression e)
         }
 
         return std::cos(eval_dbl(args[0], map));
+    };
+    fc.taylor_decompose_f() = [](function &&f, std::vector<expression> &u_vars_defs) {
+        if (f.args().size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the Taylor decomposition of "
+                                        "the cosine (1 argument was expected, but "
+                                        + std::to_string(f.args().size()) + " arguments were provided");
+        }
+
+        // Decompose the argument.
+        auto &arg = f.args()[0];
+        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+
+        // Append the sine decomposition.
+        u_vars_defs.emplace_back(sin(arg));
+
+        // Append the cosine decomposition.
+        u_vars_defs.emplace_back(std::move(f));
+
+        return u_vars_defs.size() - 1u;
     };
 
     return expression{std::move(fc)};
