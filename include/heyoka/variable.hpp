@@ -57,6 +57,9 @@ HEYOKA_DLL_PUBLIC void eval_batch_dbl(const variable &, const std::unordered_map
                                       std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(const variable &, std::vector<std::vector<unsigned>> &, unsigned &);
+HEYOKA_DLL_PUBLIC void update_node_values_dbl(const variable &, const std::unordered_map<std::string, double> &,
+                                              std::vector<double> &node_values,
+                                              const std::vector<std::vector<unsigned>> &, unsigned &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const variable &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const variable &);

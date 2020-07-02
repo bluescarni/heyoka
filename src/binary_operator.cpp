@@ -155,23 +155,54 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
 }
 
 void eval_batch_dbl(const binary_operator &bo, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &retval)
+                    std::vector<double> &out_values)
 {
-    auto tmp = retval;
-    eval_batch_dbl(bo.lhs(), map, retval);
+    auto tmp = out_values;
+    eval_batch_dbl(bo.lhs(), map, out_values);
     eval_batch_dbl(bo.rhs(), map, tmp);
     switch (bo.op()) {
         case binary_operator::type::add:
-            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::plus<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::plus<double>());
             break;
         case binary_operator::type::sub:
-            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::minus<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::minus<double>());
             break;
         case binary_operator::type::mul:
-            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::multiplies<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(),
+                           std::multiplies<double>());
             break;
         default:
-            std::transform(retval.begin(), retval.end(), tmp.begin(), retval.begin(), std::divides<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(),
+                           std::divides<double>());
+            break;
+    }
+}
+
+void update_node_values_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
+                            std::vector<double> &node_values,
+                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    // We have to recurse first as to make sure out is filled before being accessed later.
+    update_node_values_dbl(bo.lhs(), map, node_values, node_connections, node_counter);
+    update_node_values_dbl(bo.rhs(), map, node_values, node_connections, node_counter);
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            node_values[node_id]
+                = node_values[node_connections[node_id][0]] + node_values[node_connections[node_id][1]];
+            break;
+        case binary_operator::type::sub:
+            node_values[node_id]
+                = node_values[node_connections[node_id][0]] - node_values[node_connections[node_id][1]];
+            break;
+        case binary_operator::type::mul:
+            node_values[node_id]
+                = node_values[node_connections[node_id][0]] * node_values[node_connections[node_id][1]];
+            break;
+        default:
+            node_values[node_id]
+                = node_values[node_connections[node_id][0]] / node_values[node_connections[node_id][1]];
             break;
     }
 }

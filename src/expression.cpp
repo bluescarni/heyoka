@@ -242,15 +242,15 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
 void eval_batch_dbl(const expression &e, const std::unordered_map<std::string, std::vector<double>> &map,
                     std::vector<double> &retval)
 {
-    return std::visit([&map, &retval](const auto &arg) {eval_batch_dbl(arg, map, retval); }, e.value());
+    std::visit([&map, &retval](const auto &arg) { eval_batch_dbl(arg, map, retval); }, e.value());
 }
 
 void update_connections(const expression &e, std::vector<std::vector<unsigned>> &node_connections,
                         unsigned &node_counter)
 {
-    return std::visit([&node_connections,
-                       &node_counter](const auto &arg) { update_connections(arg, node_connections, node_counter); },
-                      e.value());
+    std::visit([&node_connections,
+                &node_counter](const auto &arg) { update_connections(arg, node_connections, node_counter); },
+               e.value());
 }
 
 std::vector<std::vector<unsigned>> compute_connections(const expression &e)
@@ -259,6 +259,15 @@ std::vector<std::vector<unsigned>> compute_connections(const expression &e)
     unsigned node_counter = 0u;
     update_connections(e, node_connections, node_counter);
     return node_connections;
+}
+
+void update_node_values_dbl(const expression &e, const std::unordered_map<std::string, double> &in,
+                        std::vector<double> &node_values, const std::vector<std::vector<unsigned>> &node_connections,
+                        unsigned &node_counter) 
+{
+    std::visit([&in, &node_values, &node_connections, &node_counter](
+                   const auto &arg) { update_node_values_dbl(arg, in, node_values, node_connections, node_counter); },
+               e.value());
 }
 
 llvm::Value *codegen_dbl(llvm_state &s, const expression &e)

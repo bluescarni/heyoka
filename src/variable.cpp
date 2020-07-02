@@ -91,10 +91,10 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
 }
 
 void eval_batch_dbl(const variable &var, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &retval)
+                    std::vector<double> &out_values)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
-        retval =  it->second;
+        out_values = it->second;
     } else {
         throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
                                     + "' because it is missing from the evaluation map");
@@ -104,6 +104,19 @@ void eval_batch_dbl(const variable &var, const std::unordered_map<std::string, s
 void update_connections(const variable &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
     node_connections.push_back(std::vector<unsigned>());
+    node_counter++;
+}
+
+void update_node_values_dbl(const variable &var, const std::unordered_map<std::string, double> &map,
+                            std::vector<double> &node_values,
+                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    if (auto it = map.find(var.name()); it != map.end()) {
+        node_values[node_counter] = it->second;
+    } else {
+        throw std::invalid_argument("Cannot update the node output for the variable '" + var.name()
+                                    + "' because it is missing from the evaluation map");
+    }
     node_counter++;
 }
 

@@ -38,7 +38,9 @@ function::function(std::vector<expression> args) : m_args(std::make_unique<std::
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
-      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f)
+      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
+      m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
+      m_deval_num_dbl_f(f.m_deval_num_dbl_f)
 {
 }
 
@@ -98,6 +100,16 @@ function::eval_batch_dbl_t &function::eval_batch_dbl_f()
     return m_eval_batch_dbl_f;
 }
 
+function::eval_num_dbl_t &function::eval_num_dbl_f()
+{
+    return m_eval_num_dbl_f;
+}
+
+function::deval_num_dbl_t &function::deval_num_dbl_f()
+{
+    return m_deval_num_dbl_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -148,6 +160,16 @@ const function::eval_dbl_t &function::eval_dbl_f() const
 const function::eval_batch_dbl_t &function::eval_batch_dbl_f() const
 {
     return m_eval_batch_dbl_f;
+}
+
+const function::eval_num_dbl_t &function::eval_num_dbl_f() const
+{
+    return m_eval_num_dbl_f;
+}
+
+const function::deval_num_dbl_t &function::deval_num_dbl_f() const
+{
+    return m_deval_num_dbl_f;
 }
 
 std::ostream &operator<<(std::ostream &os, const function &f)
@@ -220,17 +242,60 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
 }
 
 void eval_batch_dbl(const function &f, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &retval)
+                    std::vector<double> &out_values)
 {
     auto &ef = f.eval_batch_dbl_f();
     if (ef) {
-        ef(f.args(), map, retval);
+        ef(f.args(), map, out_values);
     } else {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide an implementation of batch evaluation for doubles");
     }
 }
 
+double eval_num_dbl(const function &f, const std::vector<double> &in)
+{
+    auto &ef = f.eval_num_dbl_f();
+
+    if (ef) {
+        return ef(in);
+    } else {
+        throw std::invalid_argument(
+            "The function '" + f.display_name()
+            + "' does not provide an implementation for its pure numerical evaluation over doubles.");
+    }
+}
+
+double deval_num_dbl(const function &f, const std::vector<double> &in, std::vector<double>::size_type d)
+{
+    auto &ef = f.deval_num_dbl_f();
+
+    if (ef) {
+        return ef(in, d);
+    } else {
+        throw std::invalid_argument(
+            "The function '" + f.display_name()
+            + "' does not provide an implementation for the pure numerical evaluation of its derivative over doubles.");
+    }
+}
+
+void update_node_values_dbl(const function &f, const std::unordered_map<std::string, double> &map,
+                            std::vector<double> &node_values,
+                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    // We have to recurse first as to make sure node_values is filled before being accessed later.
+    for (auto i = 0u; i < f.args().size(); ++i) {
+        update_node_values_dbl(f.args()[i], map, node_values, node_connections, node_counter);
+    }
+    // Then we compute
+    std::vector<double> in_values(f.args().size());
+    for (auto i = 0u; i < f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    node_values[node_id] = eval_num_dbl(f, in_values);
+}
 
 void update_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
 {
