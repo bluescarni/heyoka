@@ -45,6 +45,16 @@ binary_operator::binary_operator(binary_operator &&) noexcept = default;
 
 binary_operator::~binary_operator() = default;
 
+binary_operator &binary_operator::operator=(const binary_operator &bo)
+{
+    if (this != &bo) {
+        *this = binary_operator(bo);
+    }
+    return *this;
+}
+
+binary_operator &binary_operator::operator=(binary_operator &&) noexcept = default;
+
 expression &binary_operator::lhs()
 {
     assert(m_ops);

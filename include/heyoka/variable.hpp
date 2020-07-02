@@ -31,6 +31,9 @@ public:
     variable(variable &&) noexcept;
     ~variable();
 
+    variable &operator=(const variable &);
+    variable &operator=(variable &&) noexcept;
+
     std::string &name();
     const std::string &name() const;
 };

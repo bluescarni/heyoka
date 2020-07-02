@@ -42,6 +42,9 @@ public:
     expression(expression &&) noexcept;
     ~expression();
 
+    expression &operator=(const expression &);
+    expression &operator=(expression &&) noexcept;
+
     value_type &value();
     const value_type &value() const;
 };

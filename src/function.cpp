@@ -46,6 +46,16 @@ function::function(function &&) noexcept = default;
 
 function::~function() = default;
 
+function &function::operator=(const function &f)
+{
+    if (this != &f) {
+        *this = function(f);
+    }
+    return *this;
+}
+
+function &function::operator=(function &&) noexcept = default;
+
 bool &function::disable_verify()
 {
     return m_disable_verify;

@@ -41,6 +41,10 @@ expression::expression(expression &&) noexcept = default;
 
 expression::~expression() = default;
 
+expression &expression::operator=(const expression &) = default;
+
+expression &expression::operator=(expression &&) noexcept = default;
+
 expression::value_type &expression::value()
 {
     return m_value;

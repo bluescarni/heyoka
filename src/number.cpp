@@ -39,6 +39,10 @@ number::number(number &&) noexcept = default;
 
 number::~number() = default;
 
+number &number::operator=(const number &) = default;
+
+number &number::operator=(number &&) noexcept = default;
+
 number::value_type &number::value()
 {
     return m_value;

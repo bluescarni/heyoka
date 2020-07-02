@@ -31,6 +31,10 @@ variable::variable(variable &&) noexcept = default;
 
 variable::~variable() = default;
 
+variable &variable::operator=(const variable &) = default;
+
+variable &variable::operator=(variable &&) noexcept = default;
+
 std::string &variable::name()
 {
     return m_name;

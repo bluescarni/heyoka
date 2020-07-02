@@ -36,6 +36,9 @@ public:
     number(number &&) noexcept;
     ~number();
 
+    number &operator=(const number &);
+    number &operator=(number &&) noexcept;
+
     value_type &value();
     const value_type &value() const;
 };

@@ -48,6 +48,9 @@ public:
     function(function &&) noexcept;
     ~function();
 
+    function &operator=(const function &);
+    function &operator=(function &&) noexcept;
+
     bool &disable_verify();
     std::string &dbl_name();
     std::string &ldbl_name();

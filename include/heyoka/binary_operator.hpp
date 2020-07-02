@@ -37,6 +37,9 @@ public:
     binary_operator(binary_operator &&) noexcept;
     ~binary_operator();
 
+    binary_operator &operator=(const binary_operator &);
+    binary_operator &operator=(binary_operator &&) noexcept;
+
     expression &lhs();
     expression &rhs();
     type &op();
