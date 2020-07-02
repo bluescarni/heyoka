@@ -22,8 +22,11 @@
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -209,6 +212,29 @@ llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
 llvm::Value *codegen_ldbl(llvm_state &s, const binary_operator &bo)
 {
     return detail::bo_codegen_impl<long double>(s, bo);
+}
+
+std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&bo, std::vector<expression> &u_vars_defs)
+{
+    if (const auto dres_lhs = taylor_decompose_in_place(std::move(bo.lhs()), u_vars_defs)) {
+        // The lhs required decomposition, and its decomposition
+        // was placed at index dres_lhs in u_vars_defs. Replace the lhs
+        // a u variable pointing at index dres_lhs.
+        bo.lhs() = expression{variable{"u_" + detail::li_to_string(dres_lhs)}};
+    }
+
+    if (const auto dres_rhs = taylor_decompose_in_place(std::move(bo.rhs()), u_vars_defs)) {
+        bo.rhs() = expression{variable{"u_" + detail::li_to_string(dres_rhs)}};
+    }
+
+    // Append the binary operator after decomposition
+    // of lhs and rhs.
+    u_vars_defs.emplace_back(std::move(bo));
+
+    // The decomposition of binary operators
+    // results in a new u variable, whose definition
+    // we added to u_vars_defs above.
+    return u_vars_defs.size() - 1u;
 }
 
 } // namespace heyoka

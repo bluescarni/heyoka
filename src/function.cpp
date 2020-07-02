@@ -25,20 +25,55 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
 
-function::function(std::vector<expression> args) : m_args(std::make_unique<std::vector<expression>>(std::move(args))) {}
+namespace detail
+{
+
+namespace
+{
+
+// Default implementation of Taylor decomposition for a function.
+std::vector<expression>::size_type function_default_td(function &&f, std::vector<expression> &u_vars_defs)
+{
+    // NOTE: this is a generalisation of the implementation
+    // for the binary operators.
+    for (auto &arg : f.args()) {
+        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+    }
+
+    u_vars_defs.emplace_back(std::move(f));
+
+    return u_vars_defs.size() - 1u;
+}
+
+} // namespace
+
+} // namespace detail
+
+function::function(std::vector<expression> args)
+    : m_args(std::make_unique<std::vector<expression>>(std::move(args))),
+      // Default implementation of Taylor decomposition.
+      m_taylor_decompose_f(detail::function_default_td)
+{
+}
 
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
-      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f)
+      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
+      m_taylor_decompose_f(f.m_taylor_decompose_f)
 {
 }
 
@@ -103,6 +138,11 @@ function::eval_dbl_t &function::eval_dbl_f()
     return m_eval_dbl_f;
 }
 
+function::taylor_decompose_t &function::taylor_decompose_f()
+{
+    return m_taylor_decompose_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -150,6 +190,11 @@ const function::eval_dbl_t &function::eval_dbl_f() const
     return m_eval_dbl_f;
 }
 
+const function::taylor_decompose_t &function::taylor_decompose_f() const
+{
+    return m_taylor_decompose_f;
+}
+
 std::ostream &operator<<(std::ostream &os, const function &f)
 {
     os << f.display_name() << '(';
@@ -194,7 +239,8 @@ bool operator==(const function &f1, const function &f2)
            // NOTE: we have no way of comparing the content of std::function,
            // thus we just check if the std::function members contain something.
            && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f())
-           && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f());
+           && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f())
+           && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f());
 }
 
 bool operator!=(const function &f1, const function &f2)
@@ -360,6 +406,16 @@ llvm::Value *codegen_dbl(llvm_state &s, const function &f)
 llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
 {
     return detail::function_codegen_impl<long double>(s, f);
+}
+
+std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::vector<expression> &u_vars_defs)
+{
+    auto &tdf = f.taylor_decompose_f();
+    if (!tdf) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for Taylor decomposition");
+    }
+    return tdf(std::move(f), u_vars_defs);
 }
 
 } // namespace heyoka

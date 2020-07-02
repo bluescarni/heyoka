@@ -63,6 +63,9 @@ HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);
 
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
+                                                                               std::vector<expression> &);
+
 } // namespace heyoka
 
 #endif

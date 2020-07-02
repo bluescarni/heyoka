@@ -17,8 +17,11 @@
 namespace heyoka
 {
 
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
+                                                                               std::vector<expression> &);
+
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 
-}
+} // namespace heyoka
 
 #endif

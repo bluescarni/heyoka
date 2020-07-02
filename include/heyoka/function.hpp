@@ -32,6 +32,8 @@ public:
     using diff_t = std::function<expression(const std::vector<expression> &, const std::string &)>;
     using eval_dbl_t
         = std::function<double(const std::vector<expression> &, const std::unordered_map<std::string, double> &)>;
+    using taylor_decompose_t
+        = std::function<std::vector<expression>::size_type(function &&, std::vector<expression> &)>;
 
 private:
     bool m_disable_verify = false;
@@ -41,6 +43,7 @@ private:
     type m_ty = type::internal;
     diff_t m_diff_f;
     eval_dbl_t m_eval_dbl_f;
+    taylor_decompose_t m_taylor_decompose_f;
 
 public:
     explicit function(std::vector<expression>);
@@ -60,6 +63,7 @@ public:
     type &ty();
     diff_t &diff_f();
     eval_dbl_t &eval_dbl_f();
+    taylor_decompose_t &taylor_decompose_f();
 
     const bool &disable_verify() const;
     const std::string &dbl_name() const;
@@ -70,6 +74,7 @@ public:
     const type &ty() const;
     const diff_t &diff_f() const;
     const eval_dbl_t &eval_dbl_f() const;
+    const taylor_decompose_t &taylor_decompose_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
@@ -86,6 +91,8 @@ HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const function &);
+
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(function &&, std::vector<expression> &);
 
 } // namespace heyoka
 

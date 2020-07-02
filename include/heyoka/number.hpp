@@ -78,6 +78,8 @@ HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const number &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const number &);
 
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &);
+
 } // namespace heyoka
 
 #endif

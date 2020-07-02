@@ -204,4 +204,10 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
         n.value());
 }
 
+std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &)
+{
+    // NOTE: numbers do not require decomposition.
+    return 0;
+}
+
 } // namespace heyoka
