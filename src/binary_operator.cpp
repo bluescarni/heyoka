@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -170,39 +171,37 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
     }
 }
 
-void eval_batch_dbl(const binary_operator &bo, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &out_values)
+void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
 {
     auto tmp = out_values;
-    eval_batch_dbl(bo.lhs(), map, out_values);
-    eval_batch_dbl(bo.rhs(), map, tmp);
+    eval_batch_dbl(out_values, bo.lhs(), map);
+    eval_batch_dbl(tmp, bo.rhs(), map);
     switch (bo.op()) {
         case binary_operator::type::add:
-            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::plus<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::plus<>());
             break;
         case binary_operator::type::sub:
-            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::minus<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::minus<>());
             break;
         case binary_operator::type::mul:
-            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(),
-                           std::multiplies<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::multiplies<>());
             break;
         default:
-            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(),
-                           std::divides<double>());
+            std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::divides<>());
             break;
     }
 }
 
-void update_node_values_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
-                            std::vector<double> &node_values,
-                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_node_values_dbl(std::vector<double> &node_values, const binary_operator &bo,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure out is filled before being accessed later.
-    update_node_values_dbl(bo.lhs(), map, node_values, node_connections, node_counter);
-    update_node_values_dbl(bo.rhs(), map, node_values, node_connections, node_counter);
+    update_node_values_dbl(node_values, bo.lhs(), map, node_connections, node_counter);
+    update_node_values_dbl(node_values, bo.rhs(), map, node_connections, node_counter);
     switch (bo.op()) {
         case binary_operator::type::add:
             node_values[node_id]
@@ -223,58 +222,58 @@ void update_node_values_dbl(const binary_operator &bo, const std::unordered_map<
     }
 }
 
-void update_grad_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
-                     std::unordered_map<std::string, double> &grad, const std::vector<double> &node_values,
-                     const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter, double acc)
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const binary_operator &bo,
+                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter, double acc)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     switch (bo.op()) {
         case binary_operator::type::add:
             // lhs (a + b -> 1)
-            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter, acc);
+            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter, acc);
             // rhs (a + b -> 1)
-            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter, acc);
+            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter, acc);
             break;
 
         case binary_operator::type::sub:
             // lhs (a + b -> 1)
-            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter, acc);
+            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter, acc);
             // rhs (a + b -> 1)
-            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter, -acc);
+            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter, -acc);
             break;
 
         case binary_operator::type::mul:
             // lhs (a*b -> b)
-            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter,
+            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter,
                             acc * node_values[node_connections[node_id][1]]);
             // rhs (a*b -> a)
-            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter,
+            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter,
                             acc * node_values[node_connections[node_id][0]]);
             break;
 
         default:
             // lhs (a/b -> 1/b)
-            update_grad_dbl(bo.lhs(), map, grad, node_values, node_connections, node_counter,
+            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter,
                             acc / node_values[node_connections[node_id][1]]);
             // rhs (a/b -> -a/b^2)
-            update_grad_dbl(bo.rhs(), map, grad, node_values, node_connections, node_counter,
+            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter,
                             -acc * node_values[node_connections[node_id][0]] / node_values[node_connections[node_id][1]]
                                 / node_values[node_connections[node_id][1]]);
             break;
     }
 }
 
-void update_connections(const binary_operator &bo, std::vector<std::vector<unsigned>> &node_connections,
-                        unsigned &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const binary_operator &bo,
+                        std::size_t &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
-    node_connections.push_back(std::vector<unsigned>(2));
+    node_connections.push_back(std::vector<size_t>(2));
     node_connections[node_id][0] = node_counter;
-    update_connections(bo.lhs(), node_connections, node_counter);
+    update_connections(node_connections, bo.lhs(), node_counter);
     node_connections[node_id][1] = node_counter;
-    update_connections(bo.rhs(), node_connections, node_counter);
+    update_connections(node_connections, bo.rhs(), node_counter);
 }
 
 namespace detail

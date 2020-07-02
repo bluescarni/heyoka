@@ -258,12 +258,12 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
     }
 }
 
-void eval_batch_dbl(const function &f, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &out_values)
+void eval_batch_dbl(std::vector<double> &out_values, const function &f,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
 {
     auto &ef = f.eval_batch_dbl_f();
     if (ef) {
-        ef(f.args(), map, out_values);
+        ef(out_values, f.args(), map);
     } else {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide an implementation of batch evaluation for doubles");
@@ -296,15 +296,15 @@ double deval_num_dbl(const function &f, const std::vector<double> &in, std::vect
     }
 }
 
-void update_node_values_dbl(const function &f, const std::unordered_map<std::string, double> &map,
-                            std::vector<double> &node_values,
-                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_node_values_dbl(std::vector<double> &node_values, const function &f,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure node_values is filled before being accessed later.
     for (auto i = 0u; i < f.args().size(); ++i) {
-        update_node_values_dbl(f.args()[i], map, node_values, node_connections, node_counter);
+        update_node_values_dbl(node_values, f.args()[i], map, node_connections, node_counter);
     }
     // Then we compute
     std::vector<double> in_values(f.args().size());
@@ -314,30 +314,30 @@ void update_node_values_dbl(const function &f, const std::unordered_map<std::str
     node_values[node_id] = eval_num_dbl(f, in_values);
 }
 
-void update_grad_dbl(const function &f, const std::unordered_map<std::string, double> &map, std::unordered_map<std::string, double> &grad,
-                     const std::vector<double> &node_values, const std::vector<std::vector<unsigned>> &node_connections,
-                     unsigned &node_counter, double acc)
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const function &f,
+                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter, double acc)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     std::vector<double> in_values(f.args().size());
-    for (auto i = 0u; i <f.args().size(); ++i) {
+    for (auto i = 0u; i < f.args().size(); ++i) {
         in_values[i] = node_values[node_connections[node_id][i]];
     }
     for (auto i = 0u; i < f.args().size(); ++i) {
         auto value = deval_num_dbl(f, in_values, i);
-        update_grad_dbl(f.args()[i], map, grad, node_values, node_connections, node_counter, acc * value);
+        update_grad_dbl(grad, f.args()[i], map, node_values, node_connections, node_counter, acc * value);
     }
 }
 
-void update_connections(const function &f, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const function &f, std::size_t &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
-    node_connections.push_back(std::vector<unsigned>(f.args().size()));
+    node_connections.push_back(std::vector<size_t>(f.args().size()));
     for (auto i = 0u; i < f.args().size(); ++i) {
         node_connections[node_id][i] = node_counter;
-        update_connections(f.args()[i], node_connections, node_counter);
+        update_connections(node_connections, f.args()[i], node_counter);
     };
 }
 

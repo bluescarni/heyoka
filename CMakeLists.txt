@@ -27,6 +27,7 @@ include(YACMACompilerLinkerSettings)
 
 # The build options.
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
+option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
 
@@ -193,4 +194,8 @@ endif()
 if(HEYOKA_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
+endif()
+
+if(HEYOKA_BUILD_BENCHMARKS)
+    add_subdirectory(benchmark)
 endif()

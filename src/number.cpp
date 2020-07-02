@@ -178,8 +178,8 @@ double eval_dbl(const number &n, const std::unordered_map<std::string, double> &
     return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
 }
 
-void eval_batch_dbl(const number &n, const std::unordered_map<std::string, std::vector<double>> &,
-                    std::vector<double> &out_values)
+void eval_batch_dbl(std::vector<double> &out_values, const number &n,
+                    const std::unordered_map<std::string, std::vector<double>> &)
 {
     return std::visit(
         [&out_values](const auto &v) {
@@ -190,15 +190,15 @@ void eval_batch_dbl(const number &n, const std::unordered_map<std::string, std::
         n.value());
 }
 
-void update_connections(const number &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &, std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<unsigned>());
+    node_connections.push_back(std::vector<size_t>());
     node_counter++;
 }
 
-void update_node_values_dbl(const number &n, const std::unordered_map<std::string, double> &map,
-                            std::vector<double> &node_values,
-                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_node_values_dbl(std::vector<double> &node_values, const number &n,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
 
     std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },
@@ -206,22 +206,13 @@ void update_node_values_dbl(const number &n, const std::unordered_map<std::strin
     node_counter++;
 }
 
-void update_grad_dbl(const number &, const std::unordered_map<std::string, double> &,
-                     std::unordered_map<std::string, double> &, const std::vector<double> &,
-                     const std::vector<std::vector<unsigned>> &, unsigned &node_counter, double)
+void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
+                     const std::unordered_map<std::string, double> &, const std::vector<double> &,
+                     const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter, double)
 {
     node_counter++;
 }
 
-// NOTE: for the generation of constants of other floating-point types
-// a possible pattern seems to be:
-//
-// const auto &sem = detail::to_llvm_type<type>(s.context())->getFltSemantics();
-// return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, detail::li_to_string(v)));
-//
-// That is, we fetch the floating-point semantics of whatever LLVM type
-// corresponds to the C++ type, and then we construct a constant
-// from the string representation.
 llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 {
     return std::visit(

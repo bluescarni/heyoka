@@ -33,8 +33,8 @@ public:
     using eval_dbl_t
         = std::function<double(const std::vector<expression> &, const std::unordered_map<std::string, double> &)>;
     using eval_batch_dbl_t
-        = std::function<void(const std::vector<expression> &,
-                             const std::unordered_map<std::string, std::vector<double>> &, std::vector<double> &)>;
+        = std::function<void(std::vector<double> &, const std::vector<expression> &,
+                             const std::unordered_map<std::string, std::vector<double>> &)>;
     using eval_num_dbl_t = std::function<double(const std::vector<double> &)>;
     using deval_num_dbl_t = std::function<double(const std::vector<double> &, std::vector<double>::size_type)>;
 
@@ -98,19 +98,19 @@ HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std::string, double> &);
 
-HEYOKA_DLL_PUBLIC void eval_batch_dbl(const function &, const std::unordered_map<std::string, std::vector<double>> &,
-                                      std::vector<double> &);
+HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const function &,
+                                      const std::unordered_map<std::string, std::vector<double>> &);
 
 HEYOKA_DLL_PUBLIC double eval_num_dbl_f(const function &, const std::vector<double> &);
 HEYOKA_DLL_PUBLIC double deval_num_dbl_f(const function &, const std::vector<double> &, std::vector<double>::size_type);
 
-HEYOKA_DLL_PUBLIC void update_connections(const function &, std::vector<std::vector<unsigned>> &, unsigned &);
-HEYOKA_DLL_PUBLIC void update_node_values_dbl(const function &, const std::unordered_map<std::string, double> &,
-                                              std::vector<double> &node_values,
-                                              const std::vector<std::vector<unsigned>> &, unsigned &);
-HEYOKA_DLL_PUBLIC void update_grad_dbl(const function &, const std::unordered_map<std::string, double> &,
-                                       std::unordered_map<std::string, double> &, const std::vector<double> &,
-                                       const std::vector<std::vector<unsigned>> &, unsigned &, double);
+HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const function &, std::size_t &);
+HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const function &,
+                                              const std::unordered_map<std::string, double> &,
+                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
+HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const function &,
+                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
+                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const function &);

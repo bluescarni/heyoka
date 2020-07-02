@@ -68,7 +68,7 @@ TEST_CASE("eval_batch_dbl")
         expression ex = 2.345_dbl;
         std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
         out = std::vector<double>(2);
-        eval_batch_dbl(ex, in, out);
+        eval_batch_dbl(out, ex, in);
         REQUIRE(out == std::vector<double>{2.345, 2.345});
     }
     // We test on a variable
@@ -76,7 +76,7 @@ TEST_CASE("eval_batch_dbl")
         expression ex = "x"_var;
         std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
         out = std::vector<double>(2);
-        eval_batch_dbl(ex, in, out);
+        eval_batch_dbl(out, ex, in);
         REQUIRE(out == std::vector<double>{-2.345, 20.234});
     }
     // We test on a function call
@@ -84,7 +84,7 @@ TEST_CASE("eval_batch_dbl")
         expression ex = cos("x"_var);
         std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
         out = std::vector<double>(2);
-        eval_batch_dbl(ex, in, out);
+        eval_batch_dbl(out, ex, in);
         REQUIRE(out == std::vector<double>{std::cos(-2.345), std::cos(20.234)});
     }
     // We test on a deeper tree
@@ -94,7 +94,7 @@ TEST_CASE("eval_batch_dbl")
         in["x"] = std::vector<double>{3., 4.};
         in["y"] = std::vector<double>{-1., -2.};
         out = std::vector<double>(2);
-        eval_batch_dbl(ex, in, out);
+        eval_batch_dbl(out, ex, in);
         REQUIRE(out == std::vector<double>{-3 + std::cos(-3), -8 + std::cos(-8)});
     }
     // We test the corner case of a dictionary not containing the variable.
@@ -102,7 +102,7 @@ TEST_CASE("eval_batch_dbl")
         expression ex = "x"_var * "y"_var;
         std::unordered_map<std::string, std::vector<double>> in{{"x", {-2.345, 20.234}}};
         out = std::vector<double>(2);
-        REQUIRE_THROWS(eval_batch_dbl(ex, in, out));
+        REQUIRE_THROWS(eval_batch_dbl(out, ex, in));
     }
 }
 
@@ -153,13 +153,13 @@ TEST_CASE("compute connections")
         expression ex = ("x"_var * ("x"_var * "y"_var)) + 2_dbl;
         auto connections = compute_connections(ex);
         REQUIRE(connections.size() == 7u);
-        REQUIRE(connections[0] == std::vector<unsigned>{1, 6});
-        REQUIRE(connections[1] == std::vector<unsigned>{2, 3});
-        REQUIRE(connections[2] == std::vector<unsigned>{});
-        REQUIRE(connections[3] == std::vector<unsigned>{4, 5});
-        REQUIRE(connections[4] == std::vector<unsigned>{});
-        REQUIRE(connections[5] == std::vector<unsigned>{});
-        REQUIRE(connections[6] == std::vector<unsigned>{});
+        REQUIRE(connections[0] == std::vector<std::size_t>{1, 6});
+        REQUIRE(connections[1] == std::vector<std::size_t>{2, 3});
+        REQUIRE(connections[2] == std::vector<std::size_t>{});
+        REQUIRE(connections[3] == std::vector<std::size_t>{4, 5});
+        REQUIRE(connections[4] == std::vector<std::size_t>{});
+        REQUIRE(connections[5] == std::vector<std::size_t>{});
+        REQUIRE(connections[6] == std::vector<std::size_t>{});
     }
     // We test the result on a known expression with a simple function 2cos(x) + 2yz
     {
@@ -167,31 +167,31 @@ TEST_CASE("compute connections")
         auto connections = compute_connections(ex);
         REQUIRE(connections.size() == 10u);
 
-        REQUIRE(connections[0] == std::vector<unsigned>{1, 5});
-        REQUIRE(connections[1] == std::vector<unsigned>{2, 4});
-        REQUIRE(connections[2] == std::vector<unsigned>{3});
-        REQUIRE(connections[3] == std::vector<unsigned>{});
-        REQUIRE(connections[4] == std::vector<unsigned>{});
-        REQUIRE(connections[5] == std::vector<unsigned>{6, 9});
-        REQUIRE(connections[6] == std::vector<unsigned>{7, 8});
-        REQUIRE(connections[7] == std::vector<unsigned>{});
-        REQUIRE(connections[8] == std::vector<unsigned>{});
-        REQUIRE(connections[9] == std::vector<unsigned>{});
+        REQUIRE(connections[0] == std::vector<std::size_t>{1, 5});
+        REQUIRE(connections[1] == std::vector<std::size_t>{2, 4});
+        REQUIRE(connections[2] == std::vector<std::size_t>{3});
+        REQUIRE(connections[3] == std::vector<std::size_t>{});
+        REQUIRE(connections[4] == std::vector<std::size_t>{});
+        REQUIRE(connections[5] == std::vector<std::size_t>{6, 9});
+        REQUIRE(connections[6] == std::vector<std::size_t>{7, 8});
+        REQUIRE(connections[7] == std::vector<std::size_t>{});
+        REQUIRE(connections[8] == std::vector<std::size_t>{});
+        REQUIRE(connections[9] == std::vector<std::size_t>{});
     }
     // We test the result on a known expression including a multiargument function
     {
         expression ex = pow("x"_var, 2_dbl) + ("y"_var * "z"_var) * 2_dbl;
         auto connections = compute_connections(ex);
         REQUIRE(connections.size() == 9u);
-        REQUIRE(connections[0] == std::vector<unsigned>{1, 4});
-        REQUIRE(connections[1] == std::vector<unsigned>{2, 3});
-        REQUIRE(connections[2] == std::vector<unsigned>{});
-        REQUIRE(connections[3] == std::vector<unsigned>{});
-        REQUIRE(connections[4] == std::vector<unsigned>{5, 8});
-        REQUIRE(connections[5] == std::vector<unsigned>{6, 7});
-        REQUIRE(connections[6] == std::vector<unsigned>{});
-        REQUIRE(connections[7] == std::vector<unsigned>{});
-        REQUIRE(connections[8] == std::vector<unsigned>{});
+        REQUIRE(connections[0] == std::vector<std::size_t>{1, 4});
+        REQUIRE(connections[1] == std::vector<std::size_t>{2, 3});
+        REQUIRE(connections[2] == std::vector<std::size_t>{});
+        REQUIRE(connections[3] == std::vector<std::size_t>{});
+        REQUIRE(connections[4] == std::vector<std::size_t>{5, 8});
+        REQUIRE(connections[5] == std::vector<std::size_t>{6, 7});
+        REQUIRE(connections[6] == std::vector<std::size_t>{});
+        REQUIRE(connections[7] == std::vector<std::size_t>{});
+        REQUIRE(connections[8] == std::vector<std::size_t>{});
     }
 }
 

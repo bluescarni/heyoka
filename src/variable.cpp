@@ -10,6 +10,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -101,8 +102,8 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
     }
 }
 
-void eval_batch_dbl(const variable &var, const std::unordered_map<std::string, std::vector<double>> &map,
-                    std::vector<double> &out_values)
+void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         out_values = it->second;
@@ -112,15 +113,15 @@ void eval_batch_dbl(const variable &var, const std::unordered_map<std::string, s
     }
 }
 
-void update_connections(const variable &, std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const variable &, std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<unsigned>());
+    node_connections.push_back(std::vector<size_t>());
     node_counter++;
 }
 
-void update_node_values_dbl(const variable &var, const std::unordered_map<std::string, double> &map,
-                            std::vector<double> &node_values,
-                            const std::vector<std::vector<unsigned>> &node_connections, unsigned &node_counter)
+void update_node_values_dbl(std::vector<double> &node_values, const variable &var,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         node_values[node_counter] = it->second;
@@ -131,9 +132,9 @@ void update_node_values_dbl(const variable &var, const std::unordered_map<std::s
     node_counter++;
 }
 
-void update_grad_dbl(const variable &var, const std::unordered_map<std::string, double> &,
-                     std::unordered_map<std::string, double> &grad, const std::vector<double> &,
-                     const std::vector<std::vector<unsigned>> &, unsigned &node_counter, double acc)
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variable &var,
+                     const std::unordered_map<std::string, double> &, const std::vector<double> &,
+                     const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter, double acc)
 {
     grad[var.name()] = grad[var.name()] + acc;
     node_counter++;
