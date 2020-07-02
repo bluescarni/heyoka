@@ -279,7 +279,7 @@ TEST_CASE("update_node_values_dbl")
     }
 }
 
-TEST_CASE("gradient")
+TEST_CASE("compute_grad_dbl")
 {
     // We test that the gradient of x is one
     {
@@ -312,7 +312,7 @@ TEST_CASE("gradient")
     }
 }
 
-TEST_CASE("symbolic differentiation")
+TEST_CASE("diff")
 {
     // We test that the derivative of x is one
     {
