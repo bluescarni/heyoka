@@ -268,11 +268,7 @@ TEST_CASE("update_node_values_dbl")
         auto connections = compute_connections(ex);
         std::vector<double> node_values(connections.size());
         unsigned node_counter = 0u;
-        update_node_values_dbl(ex, in, node_values, connections, node_counter);
-        REQUIRE(node_values.size() == 3u);
-        REQUIRE(node_values[0] == 0.);
-        REQUIRE(node_values[1] == 2.345);
-        REQUIRE(node_values[2] == 0.);
+        REQUIRE_THROWS(update_node_values_dbl(ex, in, node_values, connections, node_counter));
     }
 }
 
