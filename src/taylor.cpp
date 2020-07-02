@@ -11,96 +11,31 @@
 #include <iterator>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
-#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
 {
 
-namespace detail
-{
-
-namespace
-{
-
 // Transform in-place ex by decomposition, appending the
 // result of the decomposition to u_vars_defs.
+// The return value is the index, in u_vars_defs,
+// which corresponds to the decomposed version of ex.
+// If the return value is zero, ex was not decomposed.
 // NOTE: this will render ex unusable.
-void taylor_decompose_ex(expression &ex, std::vector<expression> &u_vars_defs)
+std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, std::vector<expression> &u_vars_defs)
 {
-    auto visitor = [&u_vars_defs](auto &v) {
-        using type = detail::uncvref_t<decltype(v)>;
-
-        if constexpr (std::is_same_v<type, variable> || std::is_same_v<type, number>) {
-            // NOTE: an expression does *not* require decomposition
-            // if it is a variable or a number.
-        } else if constexpr (std::is_same_v<type, binary_operator>) {
-            // Variables to track how the size
-            // of u_vars_defs changes after the decomposition
-            // of lhs and rhs.
-            auto old_size = u_vars_defs.size(), new_size = old_size;
-
-            // We decompose the lhs, and we check if the
-            // decomposition added new elements to u_vars_defs.
-            // If it did, then it means that the lhs required
-            // further decompositions and the creation of new
-            // u vars: the new lhs will become the last added
-            // u variable. If it did not, it means that the lhs
-            // was a variable or a number (see above), and thus
-            // we can use it as-is.
-            taylor_decompose_ex(v.lhs(), u_vars_defs);
-            new_size = u_vars_defs.size();
-            if (new_size > old_size) {
-                v.lhs() = expression{variable{"u_" + detail::li_to_string(new_size - 1u)}};
-            }
-            old_size = new_size;
-
-            // Same for the rhs.
-            taylor_decompose_ex(v.rhs(), u_vars_defs);
-            new_size = u_vars_defs.size();
-            if (new_size > old_size) {
-                v.rhs() = expression{variable{"u_" + detail::li_to_string(new_size - 1u)}};
-            }
-
-            u_vars_defs.emplace_back(std::move(v));
-        } else if constexpr (std::is_same_v<type, function>) {
-            // The function call treatment is a generalization
-            // of the binary operator.
-            auto old_size = u_vars_defs.size(), new_size = old_size;
-
-            for (auto &arg : v.args()) {
-                taylor_decompose_ex(arg, u_vars_defs);
-                new_size = u_vars_defs.size();
-                if (new_size > old_size) {
-                    arg = expression{variable{"u_" + detail::li_to_string(new_size - 1u)}};
-                }
-                old_size = new_size;
-            }
-
-            u_vars_defs.emplace_back(std::move(v));
-        } else {
-            static_assert(always_false_v<type>, "Unhandled expression type");
-        }
-    };
-
-    std::visit(visitor, ex.value());
+    return std::visit(
+        [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
+        std::move(ex.value()));
 }
-
-} // namespace
-
-} // namespace detail
 
 std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 {
@@ -149,23 +84,15 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 
     // Run the decomposition on each equation.
     for (decltype(v_ex.size()) i = 0; i < v_ex.size(); ++i) {
-        // Record the current size of u_vars_defs.
-        const auto orig_size = u_vars_defs.size();
-
         // Decompose the current equation.
-        detail::taylor_decompose_ex(v_ex[i], u_vars_defs);
-
-        if (u_vars_defs.size() != orig_size) {
-            // NOTE: if the size of u_vars_defs changes,
-            // it means v_ex[i] was decomposed in multiple
-            // expressions. In such
-            // case, we replace the original definition of the
-            // equation with its definition in terms of the
-            // last u variable added in the decomposition.
-            // In the other case, v_ex_copy will keep on containing
-            // the original definition of v_ex[i] in terms
-            // of u variables.
-            v_ex_copy[i] = expression{variable{"u_" + detail::li_to_string(u_vars_defs.size() - 1u)}};
+        if (const auto dres = taylor_decompose_in_place(std::move(v_ex[i]), u_vars_defs)) {
+            // NOTE: if the equation was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the equation in v_ex_copy
+            // so that it points to the u variable
+            // that now represents it.
+            v_ex_copy[i] = expression{variable{"u_" + detail::li_to_string(dres)}};
         }
     }
 

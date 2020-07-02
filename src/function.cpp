@@ -25,22 +25,56 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
 
-function::function(std::vector<expression> args) : m_args(std::make_unique<std::vector<expression>>(std::move(args))) {}
+namespace detail
+{
+
+namespace
+{
+
+// Default implementation of Taylor decomposition for a function.
+std::vector<expression>::size_type function_default_td(function &&f, std::vector<expression> &u_vars_defs)
+{
+    // NOTE: this is a generalisation of the implementation
+    // for the binary operators.
+    for (auto &arg : f.args()) {
+        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+    }
+
+    u_vars_defs.emplace_back(std::move(f));
+
+    return u_vars_defs.size() - 1u;
+}
+
+} // namespace
+
+} // namespace detail
+
+function::function(std::vector<expression> args)
+    : m_args(std::make_unique<std::vector<expression>>(std::move(args))),
+      // Default implementation of Taylor decomposition.
+      m_taylor_decompose_f(detail::function_default_td)
+{
+}
 
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
       m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
       m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
-      m_deval_num_dbl_f(f.m_deval_num_dbl_f)
+      m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f)
 {
 }
 
@@ -120,6 +154,11 @@ function::deval_num_dbl_t &function::deval_num_dbl_f()
     return m_deval_num_dbl_f;
 }
 
+function::taylor_decompose_t &function::taylor_decompose_f()
+{
+    return m_taylor_decompose_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -182,6 +221,11 @@ const function::deval_num_dbl_t &function::deval_num_dbl_f() const
     return m_deval_num_dbl_f;
 }
 
+const function::taylor_decompose_t &function::taylor_decompose_f() const
+{
+    return m_taylor_decompose_f;
+}
+
 std::ostream &operator<<(std::ostream &os, const function &f)
 {
     os << f.display_name() << '(';
@@ -226,7 +270,8 @@ bool operator==(const function &f1, const function &f2)
            // NOTE: we have no way of comparing the content of std::function,
            // thus we just check if the std::function members contain something.
            && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f())
-           && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f());
+           && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f())
+           && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f());
 }
 
 bool operator!=(const function &f1, const function &f2)
@@ -303,12 +348,12 @@ void update_node_values_dbl(std::vector<double> &node_values, const function &f,
     const unsigned node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure node_values is filled before being accessed later.
-    for (auto i = 0u; i < f.args().size(); ++i) {
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         update_node_values_dbl(node_values, f.args()[i], map, node_connections, node_counter);
     }
     // Then we compute
     std::vector<double> in_values(f.args().size());
-    for (auto i = 0u; i < f.args().size(); ++i) {
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         in_values[i] = node_values[node_connections[node_id][i]];
     }
     node_values[node_id] = eval_num_dbl(f, in_values);
@@ -316,26 +361,28 @@ void update_node_values_dbl(std::vector<double> &node_values, const function &f,
 
 void update_grad_dbl(std::unordered_map<std::string, double> &grad, const function &f,
                      const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
-                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter, double acc)
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     std::vector<double> in_values(f.args().size());
-    for (auto i = 0u; i < f.args().size(); ++i) {
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         in_values[i] = node_values[node_connections[node_id][i]];
     }
-    for (auto i = 0u; i < f.args().size(); ++i) {
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         auto value = deval_num_dbl(f, in_values, i);
         update_grad_dbl(grad, f.args()[i], map, node_values, node_connections, node_counter, acc * value);
     }
 }
 
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const function &f, std::size_t &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const function &f,
+                        std::size_t &node_counter)
 {
     const unsigned node_id = node_counter;
     node_counter++;
     node_connections.push_back(std::vector<size_t>(f.args().size()));
-    for (auto i = 0u; i < f.args().size(); ++i) {
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         node_connections[node_id][i] = node_counter;
         update_connections(node_connections, f.args()[i], node_counter);
     };
@@ -475,6 +522,16 @@ llvm::Value *codegen_dbl(llvm_state &s, const function &f)
 llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
 {
     return detail::function_codegen_impl<long double>(s, f);
+}
+
+std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::vector<expression> &u_vars_defs)
+{
+    auto &tdf = f.taylor_decompose_f();
+    if (!tdf) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for Taylor decomposition");
+    }
+    return tdf(std::move(f), u_vars_defs);
 }
 
 } // namespace heyoka

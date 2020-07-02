@@ -6,10 +6,9 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <chrono>
 #include <iostream>
 #include <random>
-#include <chrono>
-
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -38,7 +37,7 @@ std::unordered_map<std::string, std::vector<double>> vv_to_dv(const std::vector<
 {
     std::unordered_map<std::string, std::vector<double>> retval;
     std::vector<double> x_vec(in.size()), y_vec(in.size());
-    for (auto i = 0u; i < in.size(); ++i) {
+    for (decltype(in.size()) i = 0u; i < in.size(); ++i) {
         x_vec[i] = in[i][0];
         y_vec[i] = in[i][1];
     }
@@ -50,7 +49,7 @@ std::unordered_map<std::string, std::vector<double>> vv_to_dv(const std::vector<
 std::vector<std::unordered_map<std::string, double>> vv_to_vd(const std::vector<std::vector<double>> &in)
 {
     std::vector<std::unordered_map<std::string, double>> retval(in.size());
-    for (auto i = 0u; i < in.size(); ++i) {
+    for (decltype(in.size()) i = 0u; i < in.size(); ++i) {
         retval[i]["x"] = in[i][0];
         retval[i]["y"] = in[i][1];
     }
@@ -94,13 +93,13 @@ int main()
     //
     //// 5 - we time the function call from evaluate_batch (size 200)
     // std::vector<std::unordered_map<std::string, std::vector<double>>> args_dv_batches(10000 / 200);
-    // for (auto i = 0u; i < args_dv_batches.size(); ++i) {
+    // for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
     //    std::vector<std::vector<double>> tmp(args_vv.begin() + 200 * i, args_vv.begin() + 200 * (i + 1));
     //    args_dv_batches[i] = vv_to_dv(tmp);
     //}
     // out = std::vector<double>(200, 0.123);
     // start = high_resolution_clock::now();
-    // for (auto i = 0u; i < args_dv_batches.size(); ++i) {
+    // for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
     //    ex(args_dv_batches[i], out);
     //}
     // stop = high_resolution_clock::now();

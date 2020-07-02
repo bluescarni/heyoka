@@ -37,6 +37,8 @@ public:
                              const std::unordered_map<std::string, std::vector<double>> &)>;
     using eval_num_dbl_t = std::function<double(const std::vector<double> &)>;
     using deval_num_dbl_t = std::function<double(const std::vector<double> &, std::vector<double>::size_type)>;
+    using taylor_decompose_t
+        = std::function<std::vector<expression>::size_type(function &&, std::vector<expression> &)>;
 
 private:
     bool m_disable_verify = false;
@@ -49,6 +51,7 @@ private:
     eval_batch_dbl_t m_eval_batch_dbl_f;
     eval_num_dbl_t m_eval_num_dbl_f;
     deval_num_dbl_t m_deval_num_dbl_f;
+    taylor_decompose_t m_taylor_decompose_f;
 
 public:
     explicit function(std::vector<expression>);
@@ -71,6 +74,7 @@ public:
     eval_batch_dbl_t &eval_batch_dbl_f();
     eval_num_dbl_t &eval_num_dbl_f();
     deval_num_dbl_t &deval_num_dbl_f();
+    taylor_decompose_t &taylor_decompose_f();
 
     const bool &disable_verify() const;
     const std::string &dbl_name() const;
@@ -84,6 +88,7 @@ public:
     const eval_batch_dbl_t &eval_batch_dbl_f() const;
     const eval_num_dbl_t &eval_num_dbl_f() const;
     const deval_num_dbl_t &deval_num_dbl_f() const;
+    const taylor_decompose_t &taylor_decompose_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
@@ -114,6 +119,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const function &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const function &);
+
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(function &&, std::vector<expression> &);
 
 } // namespace heyoka
 

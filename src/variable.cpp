@@ -157,4 +157,10 @@ llvm::Value *codegen_ldbl(llvm_state &s, const variable &var)
     return codegen_dbl(s, var);
 }
 
+std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &)
+{
+    // NOTE: variables do not require decomposition.
+    return 0;
+}
+
 } // namespace heyoka
