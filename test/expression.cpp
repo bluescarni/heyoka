@@ -58,7 +58,7 @@ TEST_CASE("eval_dbl")
     }
 }
 
-TEST_CASE("call operator (batch)")
+TEST_CASE("eval_batch_dbl")
 {
     std::vector<double> out(2);
     // We test on a number
@@ -190,6 +190,89 @@ TEST_CASE("compute connections")
         REQUIRE(connections[6] == std::vector<unsigned>{});
         REQUIRE(connections[7] == std::vector<unsigned>{});
         REQUIRE(connections[8] == std::vector<unsigned>{});
+    }
+}
+
+TEST_CASE("update_node_values_dbl")
+{
+    // We test on a number
+    {
+        expression ex = 2.345_dbl;
+        std::unordered_map<std::string, double> in;
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 1u);
+        REQUIRE(node_values[0] == 2.345);
+    }
+    // We test on a variable
+    {
+        expression ex = "x"_var;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 1u);
+        REQUIRE(node_values[0] == 2.345);
+    }
+    // We test on a function call
+    {
+        expression ex = cos("x"_var);
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 2u);
+        REQUIRE(node_values[0] == std::cos(2.345));
+        REQUIRE(node_values[1] == 2.345);
+    }
+    // We test on a binary operator
+    {
+        expression ex = "x"_var / 2.345_dbl;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 3u);
+        REQUIRE(node_values[0] == 1);
+        REQUIRE(node_values[1] == 2.345);
+        // Note here that the tree built (after the simplifictions) is *, "x", 1/2.345
+        REQUIRE(node_values[2] == 1. / 2.345);
+    }
+    // We test on a deeper tree
+    {
+        expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
+        std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 8u);
+        REQUIRE(node_values[0] == -2.345 + std::cos(-2.345));
+        REQUIRE(node_values[1] == -2.345);
+        REQUIRE(node_values[2] == 2.345);
+        REQUIRE(node_values[3] == -1.);
+        REQUIRE(node_values[4] == std::cos(-2.345));
+        REQUIRE(node_values[5] == -2.345);
+        REQUIRE(node_values[6] == 2.345);
+        REQUIRE(node_values[7] == -1.);
+    }
+    // We test the corner case of a dictionary not containing the variable.
+    {
+        expression ex = "x"_var * "y"_var;
+        std::unordered_map<std::string, double> in{{"x", 2.345}};
+        auto connections = compute_connections(ex);
+        std::vector<double> node_values(connections.size());
+        unsigned node_counter = 0u;
+        update_node_values_dbl(ex, in, node_values, connections, node_counter);
+        REQUIRE(node_values.size() == 3u);
+        REQUIRE(node_values[0] == 0.);
+        REQUIRE(node_values[1] == 2.345);
+        REQUIRE(node_values[2] == 0.);
     }
 }
 
