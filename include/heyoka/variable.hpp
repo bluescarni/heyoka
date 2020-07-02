@@ -31,6 +31,9 @@ public:
     variable(variable &&) noexcept;
     ~variable();
 
+    variable &operator=(const variable &);
+    variable &operator=(variable &&) noexcept;
+
     std::string &name();
     const std::string &name() const;
 };
@@ -45,6 +48,7 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const variable &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const variable &);
+HEYOKA_DLL_PUBLIC void rename_variables(variable &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
 HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);

@@ -45,6 +45,16 @@ binary_operator::binary_operator(binary_operator &&) noexcept = default;
 
 binary_operator::~binary_operator() = default;
 
+binary_operator &binary_operator::operator=(const binary_operator &bo)
+{
+    if (this != &bo) {
+        *this = binary_operator(bo);
+    }
+    return *this;
+}
+
+binary_operator &binary_operator::operator=(binary_operator &&) noexcept = default;
+
 expression &binary_operator::lhs()
 {
     assert(m_ops);
@@ -114,6 +124,12 @@ std::vector<std::string> get_variables(const binary_operator &bo)
     lhs_vars.erase(std::unique(lhs_vars.begin(), lhs_vars.end()), lhs_vars.end());
 
     return lhs_vars;
+}
+
+void rename_variables(binary_operator &bo, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    rename_variables(bo.lhs(), repl_map);
+    rename_variables(bo.rhs(), repl_map);
 }
 
 bool operator==(const binary_operator &o1, const binary_operator &o2)

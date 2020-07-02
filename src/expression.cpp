@@ -41,6 +41,10 @@ expression::expression(expression &&) noexcept = default;
 
 expression::~expression() = default;
 
+expression &expression::operator=(const expression &) = default;
+
+expression &expression::operator=(expression &&) noexcept = default;
+
 expression::value_type &expression::value()
 {
     return m_value;
@@ -54,6 +58,11 @@ const expression::value_type &expression::value() const
 std::vector<std::string> get_variables(const expression &e)
 {
     return std::visit([](const auto &arg) { return get_variables(arg); }, e.value());
+}
+
+void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    std::visit([&repl_map](auto &arg) { rename_variables(arg, repl_map); }, e.value());
 }
 
 std::ostream &operator<<(std::ostream &os, const expression &e)

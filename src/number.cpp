@@ -39,6 +39,10 @@ number::number(number &&) noexcept = default;
 
 number::~number() = default;
 
+number &number::operator=(const number &) = default;
+
+number &number::operator=(number &&) noexcept = default;
+
 number::value_type &number::value()
 {
     return m_value;
@@ -83,6 +87,8 @@ std::vector<std::string> get_variables(const number &)
 {
     return {};
 }
+
+void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
 
 bool is_zero(const number &n)
 {

@@ -48,6 +48,16 @@ function::function(function &&) noexcept = default;
 
 function::~function() = default;
 
+function &function::operator=(const function &f)
+{
+    if (this != &f) {
+        *this = function(f);
+    }
+    return *this;
+}
+
+function &function::operator=(function &&) noexcept = default;
+
 bool &function::disable_verify()
 {
     return m_disable_verify;
@@ -199,6 +209,13 @@ std::vector<std::string> get_variables(const function &f)
     }
 
     return ret;
+}
+
+void rename_variables(function &f, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    for (auto &arg_ex : f.args()) {
+        rename_variables(arg_ex, repl_map);
+    }
 }
 
 bool operator==(const function &f1, const function &f2)
