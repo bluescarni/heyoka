@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <cstddef>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -74,7 +75,8 @@ function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
       m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
-      m_taylor_decompose_f(f.m_taylor_decompose_f)
+      m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
+      m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f)
 {
 }
 
@@ -139,6 +141,21 @@ function::eval_dbl_t &function::eval_dbl_f()
     return m_eval_dbl_f;
 }
 
+function::eval_batch_dbl_t &function::eval_batch_dbl_f()
+{
+    return m_eval_batch_dbl_f;
+}
+
+function::eval_num_dbl_t &function::eval_num_dbl_f()
+{
+    return m_eval_num_dbl_f;
+}
+
+function::deval_num_dbl_t &function::deval_num_dbl_f()
+{
+    return m_deval_num_dbl_f;
+}
+
 function::taylor_decompose_t &function::taylor_decompose_f()
 {
     return m_taylor_decompose_f;
@@ -189,6 +206,21 @@ const function::diff_t &function::diff_f() const
 const function::eval_dbl_t &function::eval_dbl_f() const
 {
     return m_eval_dbl_f;
+}
+
+const function::eval_batch_dbl_t &function::eval_batch_dbl_f() const
+{
+    return m_eval_batch_dbl_f;
+}
+
+const function::eval_num_dbl_t &function::eval_num_dbl_f() const
+{
+    return m_eval_num_dbl_f;
+}
+
+const function::deval_num_dbl_t &function::deval_num_dbl_f() const
+{
+    return m_deval_num_dbl_f;
 }
 
 const function::taylor_decompose_t &function::taylor_decompose_f() const
@@ -271,6 +303,91 @@ double eval_dbl(const function &f, const std::unordered_map<std::string, double>
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide an implementation of double evaluation");
     }
+}
+
+void eval_batch_dbl(std::vector<double> &out_values, const function &f,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
+{
+    auto &ef = f.eval_batch_dbl_f();
+    if (ef) {
+        ef(out_values, f.args(), map);
+    } else {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide an implementation of batch evaluation for doubles");
+    }
+}
+
+double eval_num_dbl(const function &f, const std::vector<double> &in)
+{
+    auto &ef = f.eval_num_dbl_f();
+
+    if (ef) {
+        return ef(in);
+    } else {
+        throw std::invalid_argument(
+            "The function '" + f.display_name()
+            + "' does not provide an implementation for its pure numerical evaluation over doubles.");
+    }
+}
+
+double deval_num_dbl(const function &f, const std::vector<double> &in, std::vector<double>::size_type d)
+{
+    auto &ef = f.deval_num_dbl_f();
+
+    if (ef) {
+        return ef(in, d);
+    } else {
+        throw std::invalid_argument(
+            "The function '" + f.display_name()
+            + "' does not provide an implementation for the pure numerical evaluation of its derivative over doubles.");
+    }
+}
+
+void update_node_values_dbl(std::vector<double> &node_values, const function &f,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    // We have to recurse first as to make sure node_values is filled before being accessed later.
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        update_node_values_dbl(node_values, f.args()[i], map, node_connections, node_counter);
+    }
+    // Then we compute
+    std::vector<double> in_values(f.args().size());
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    node_values[node_id] = eval_num_dbl(f, in_values);
+}
+
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const function &f,
+                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    std::vector<double> in_values(f.args().size());
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        auto value = deval_num_dbl(f, in_values, i);
+        update_grad_dbl(grad, f.args()[i], map, node_values, node_connections, node_counter, acc * value);
+    }
+}
+
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const function &f,
+                        std::size_t &node_counter)
+{
+    const unsigned node_id = node_counter;
+    node_counter++;
+    node_connections.push_back(std::vector<size_t>(f.args().size()));
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        node_connections[node_id][i] = node_counter;
+        update_connections(node_connections, f.args()[i], node_counter);
+    };
 }
 
 namespace detail

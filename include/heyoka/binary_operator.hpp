@@ -10,6 +10,7 @@
 #define HEYOKA_BINARY_OPERATOR_HPP
 
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -59,6 +60,18 @@ HEYOKA_DLL_PUBLIC bool operator!=(const binary_operator &, const binary_operator
 HEYOKA_DLL_PUBLIC expression diff(const binary_operator &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &);
+
+HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const binary_operator &,
+                                      const std::unordered_map<std::string, std::vector<double>> &);
+
+HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const binary_operator &,
+                                          std::size_t &);
+HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const binary_operator &,
+                                              const std::unordered_map<std::string, double> &,
+                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
+HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const binary_operator &,
+                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
+                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);

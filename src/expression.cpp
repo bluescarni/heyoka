@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -247,6 +248,69 @@ expression diff(const expression &e, const std::string &s)
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
 {
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
+}
+
+void eval_batch_dbl(std::vector<double> &retval, const expression &e,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
+{
+    std::visit([&map, &retval](const auto &arg) { eval_batch_dbl(retval, arg, map); }, e.value());
+}
+
+std::vector<std::vector<std::size_t>> compute_connections(const expression &e)
+{
+    std::vector<std::vector<std::size_t>> node_connections;
+    std::size_t node_counter = 0u;
+    update_connections(node_connections, e, node_counter);
+    return node_connections;
+}
+
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const expression &e,
+                        std::size_t &node_counter)
+{
+    std::visit([&node_connections,
+                &node_counter](const auto &arg) { update_connections(node_connections, arg, node_counter); },
+               e.value());
+}
+
+std::vector<double> compute_node_values_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                                            const std::vector<std::vector<std::size_t>> &node_connections)
+{
+    std::vector<double> node_values(node_connections.size());
+    std::size_t node_counter = 0u;
+    update_node_values_dbl(node_values, e, map, node_connections, node_counter);
+    return node_values;
+}
+
+void update_node_values_dbl(std::vector<double> &node_values, const expression &e,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
+{
+    std::visit([&map, &node_values, &node_connections, &node_counter](
+                   const auto &arg) { update_node_values_dbl(node_values, arg, map, node_connections, node_counter); },
+               e.value());
+}
+
+std::unordered_map<std::string, double> compute_grad_dbl(const expression &e,
+                                                         const std::unordered_map<std::string, double> &map,
+                                                         const std::vector<std::vector<std::size_t>> &node_connections)
+{
+    std::unordered_map<std::string, double> grad;
+    auto node_values = compute_node_values_dbl(e, map, node_connections);
+    std::size_t node_counter = 0u;
+    update_grad_dbl(grad, e, map, node_values, node_connections, node_counter);
+    return grad;
+}
+
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expression &e,
+                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
+{
+    std::visit(
+        [&map, &grad, &node_values, &node_connections, &node_counter, &acc](const auto &arg) {
+            update_grad_dbl(grad, arg, map, node_values, node_connections, node_counter, acc);
+        },
+        e.value());
 }
 
 llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
