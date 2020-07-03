@@ -24,6 +24,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -400,12 +401,12 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
 
 llvm::Value *codegen_dbl(llvm_state &s, const function &f)
 {
-    return detail::function_codegen_impl<double>(s, f);
+    heyoka_assert_nonnull_ret(detail::function_codegen_impl<double>(s, f));
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
 {
-    return detail::function_codegen_impl<long double>(s, f);
+    heyoka_assert_nonnull_ret(detail::function_codegen_impl<long double>(s, f));
 }
 
 std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::vector<expression> &u_vars_defs)

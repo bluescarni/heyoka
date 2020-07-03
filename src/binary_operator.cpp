@@ -21,6 +21,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -184,7 +185,6 @@ llvm::Value *bo_codegen_impl(llvm_state &s, const binary_operator &bo)
 {
     auto *l = invoke_codegen<T>(s, bo.lhs());
     auto *r = invoke_codegen<T>(s, bo.rhs());
-    assert(l != nullptr && r != nullptr);
 
     auto &builder = s.builder();
 
@@ -206,12 +206,12 @@ llvm::Value *bo_codegen_impl(llvm_state &s, const binary_operator &bo)
 
 llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
 {
-    return detail::bo_codegen_impl<double>(s, bo);
+    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<double>(s, bo));
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const binary_operator &bo)
 {
-    return detail::bo_codegen_impl<long double>(s, bo);
+    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<long double>(s, bo));
 }
 
 std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&bo, std::vector<expression> &u_vars_defs)
@@ -235,6 +235,48 @@ std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&b
     // results in a new u variable, whose definition
     // we added to u_vars_defs above.
     return u_vars_defs.size() - 1u;
+}
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_init_impl(llvm_state &s, const binary_operator &bo, llvm::Value *arr)
+{
+    auto &builder = s.builder();
+
+    // Do the Taylor init for lhs and rhs.
+    auto l = invoke_taylor_init<T>(s, bo.lhs(), arr);
+    auto r = invoke_taylor_init<T>(s, bo.rhs(), arr);
+
+    // Do the codegen for the corresponding operation.
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return builder.CreateFAdd(l, r, "taylor_init_add");
+        case binary_operator::type::sub:
+            return builder.CreateFSub(l, r, "taylor_init_sub");
+        case binary_operator::type::mul:
+            return builder.CreateFMul(l, r, "taylor_init_mul");
+        default:
+            return builder.CreateFDiv(l, r, "taylor_init_div");
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *taylor_init_dbl(llvm_state &s, const binary_operator &bo, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(detail::taylor_init_impl<double>(s, bo, arr));
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const binary_operator &bo, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(detail::taylor_init_impl<long double>(s, bo, arr));
 }
 
 } // namespace heyoka

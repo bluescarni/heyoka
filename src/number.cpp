@@ -19,6 +19,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -180,14 +181,14 @@ double eval_dbl(const number &n, const std::unordered_map<std::string, double> &
 
 llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 {
-    return std::visit(
+    heyoka_assert_nonnull_ret(std::visit(
         [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
-        n.value());
+        n.value()));
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
 {
-    return std::visit(
+    heyoka_assert_nonnull_ret(std::visit(
         [&s](const auto &v) {
             // NOTE: the idea here is that we first fetch the FP
             // semantics of the LLVM type long double corresponds
@@ -201,13 +202,25 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
             return llvm::ConstantFP::get(s.context(),
                                          llvm::APFloat(sem, detail::li_to_string(static_cast<long double>(v))));
         },
-        n.value());
+        n.value()));
 }
 
 std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &)
 {
     // NOTE: numbers do not require decomposition.
     return 0;
+}
+
+// NOTE: for numbers, the Taylor init phase is
+// just the codegen.
+llvm::Value *taylor_init_dbl(llvm_state &s, const number &n, llvm::Value *)
+{
+    return codegen_dbl(s, n);
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const number &n, llvm::Value *)
+{
+    return codegen_ldbl(s, n);
 }
 
 } // namespace heyoka

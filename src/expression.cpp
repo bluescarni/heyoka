@@ -17,6 +17,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
@@ -250,12 +251,12 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
 
 llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
 {
-    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
+    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value()));
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
 {
-    return std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value());
+    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value()));
 }
 
 } // namespace heyoka
