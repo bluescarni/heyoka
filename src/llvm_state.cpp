@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -29,13 +30,11 @@
 #include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
-// #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
-// #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
@@ -43,7 +42,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
-// #include <llvm/Support/Error.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO.h>
@@ -57,6 +55,7 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
 
 namespace heyoka
 {
@@ -480,6 +479,66 @@ std::string llvm_state::dump_function(const std::string &name) const
     } else {
         throw std::invalid_argument("Could not locate the function called '" + name + "'");
     }
+}
+
+llvm_state::ts_dbl_t llvm_state::fetch_taylor_stepper_dbl(const std::string &name)
+{
+    check_compiled(__func__);
+
+    return fetch_taylor_stepper_impl<double>(name);
+}
+
+llvm_state::ts_ldbl_t llvm_state::fetch_taylor_stepper_ldbl(const std::string &name)
+{
+    check_compiled(__func__);
+
+    return fetch_taylor_stepper_impl<long double>(name);
+}
+
+template <typename T>
+void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    if (max_order == 0u) {
+        throw std::invalid_argument("The maximum order cannot be zero");
+    }
+
+    // Record the number of equations/variables.
+    const auto n_eq = sys.size();
+
+    // Decompose the system of equations.
+    const auto dc = taylor_decompose(std::move(sys));
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = dc.size() - n_eq;
+
+    // Overflow checking. We want to make sure we can do all computations
+    // using uint32_t.
+    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+        || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the number of variables while adding a Taylor stepper");
+    }
+
+    // TODO verify, add to signature map.
+
+    // Run the optimization pass.
+    if (m_opt_level > 0u) {
+        m_pm->run(*m_module);
+    }
+}
+
+void llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    add_taylor_stepper_impl<double>(name, std::move(sys), max_order);
+}
+
+void llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
 }
 
 } // namespace heyoka

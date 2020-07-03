@@ -341,7 +341,6 @@ TEST_CASE("basic")
         std::cout << ex << '\n';
     }
 
-#if 0
     auto ex = sin("x"_var) + 1.1_ldbl;
 
     llvm_state s{"pippo"};
@@ -350,6 +349,7 @@ TEST_CASE("basic")
 
     std::cout << s.dump() << '\n';
 
+#if 0
     s.compile();
 
     auto f = s.fetch_ldbl<1>("f");
