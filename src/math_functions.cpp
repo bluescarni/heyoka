@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cassert>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -13,15 +14,75 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
 {
+
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: this code is very similar to the function invocation
+// code for builtins in function.cpp. Perhaps in the future
+// we can avoid repetition.
+template <typename T>
+llvm::Value *taylor_init_sin_impl(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the sine (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    // Lookup the intrinsic ID.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.sin");
+    if (intrinsic_ID == 0) {
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.sin'");
+    }
+
+    // Fetch the function.
+    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
+    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+    if (!callee_f) {
+        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.sin'");
+    }
+    if (!callee_f->empty()) {
+        // It does not make sense to have a definition of a builtin.
+        throw std::invalid_argument("The intrinsic 'llvm.sin' must be an empty function");
+    }
+
+    // Create the function argument. The codegen for the argument
+    // comes from taylor_init.
+    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    assert(args_v[0] != nullptr);
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_sin_tmp");
+    assert(r != nullptr);
+    r->setTailCall(true);
+
+    return r;
+}
+
+} // namespace
+
+} // namespace detail
 
 expression sin(expression e)
 {
@@ -111,9 +172,60 @@ expression sin(expression e)
 
         return retval;
     };
+    fc.taylor_init_dbl_f() = detail::taylor_init_sin_impl<double>;
+    fc.taylor_init_ldbl_f() = detail::taylor_init_sin_impl<long double>;
 
     return expression{std::move(fc)};
 }
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_init_cos_impl(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the cosine (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    // Lookup the intrinsic ID.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.cos");
+    if (intrinsic_ID == 0) {
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.cos'");
+    }
+
+    // Fetch the function.
+    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
+    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+    if (!callee_f) {
+        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.cos'");
+    }
+    if (!callee_f->empty()) {
+        // It does not make sense to have a definition of a builtin.
+        throw std::invalid_argument("The intrinsic 'llvm.cos' must be an empty function");
+    }
+
+    // Create the function argument. The codegen for the argument
+    // comes from taylor_init.
+    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    assert(args_v[0] != nullptr);
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_cos_tmp");
+    assert(r != nullptr);
+    r->setTailCall(true);
+
+    return r;
+}
+
+} // namespace
+
+} // namespace detail
 
 expression cos(expression e)
 {
@@ -193,6 +305,8 @@ expression cos(expression e)
 
         return u_vars_defs.size() - 1u;
     };
+    fc.taylor_init_dbl_f() = detail::taylor_init_cos_impl<double>;
+    fc.taylor_init_ldbl_f() = detail::taylor_init_cos_impl<long double>;
 
     return expression{std::move(fc)};
 }
