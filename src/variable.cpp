@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cassert>
 #include <cstddef>
 #include <ostream>
 #include <stdexcept>
@@ -14,8 +15,11 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/assert_nonnull_ret.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -149,6 +153,7 @@ llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
         throw std::invalid_argument("Unknown variable name: " + var.name());
     }
 
+    assert(it->second != nullptr);
     return it->second;
 }
 
@@ -161,6 +166,33 @@ std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::v
 {
     // NOTE: variables do not require decomposition.
     return 0;
+}
+
+llvm::Value *taylor_init_dbl(llvm_state &s, const variable &var, llvm::Value *arr)
+{
+    auto &builder = s.builder();
+
+    // Check that var is a u variable and extract its index.
+    const auto &var_name = var.name();
+    if (var_name.rfind("u_", 0) != 0) {
+        throw std::invalid_argument("Invalid variable name '" + var_name
+                                    + "' encountered in the Taylor initialization phase (the name "
+                                      "must be in the form 'u_n', where n is a non-negative integer)");
+    }
+    const auto idx = detail::uname_to_index(var_name);
+
+    // Index into the array of derivatives.
+    auto ptr = builder.CreateInBoundsGEP(arr, {builder.getInt32(0), builder.getInt32(idx)}, "diff_ptr");
+    assert(ptr != nullptr);
+
+    // Return a load instruction from the array of derivatives.
+    heyoka_assert_nonnull_ret(builder.CreateLoad(ptr, "diff_load"));
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const variable &var, llvm::Value *arr)
+{
+    // NOTE: no codegen differences between dbl and ldbl in this case.
+    return taylor_init_dbl(s, var, arr);
 }
 
 } // namespace heyoka

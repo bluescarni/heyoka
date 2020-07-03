@@ -79,6 +79,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator 
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
                                                                                std::vector<expression> &);
 
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const binary_operator &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const binary_operator &, llvm::Value *);
+
 } // namespace heyoka
 
 #endif

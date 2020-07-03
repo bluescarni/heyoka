@@ -16,6 +16,7 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/taylor.hpp>
@@ -103,6 +104,18 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
     }
 
     return u_vars_defs;
+}
+
+llvm::Value *taylor_init_dbl(llvm_state &s, const expression &e, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(
+        std::visit([&s, arr](const auto &arg) { return taylor_init_dbl(s, arg, arr); }, e.value()));
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const expression &e, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(
+        std::visit([&s, arr](const auto &arg) { return taylor_init_ldbl(s, arg, arr); }, e.value()));
 }
 
 } // namespace heyoka
