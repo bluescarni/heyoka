@@ -492,7 +492,7 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
         default: {
             // Builtin.
             const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(f_name);
-            if (!intrinsic_ID) {
+            if (intrinsic_ID == 0) {
                 throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + f_name + "'");
             }
 
