@@ -6,9 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <heyoka/gp.hpp>
-#include <heyoka/detail/splitmix64.hpp>
 #include <random>
+
+#include <heyoka/detail/splitmix64.hpp>
+#include <heyoka/expression.hpp>
+#include <heyoka/gp.hpp>
 
 #include "catch.hpp"
 
@@ -19,10 +21,8 @@ using namespace Catch::literals;
 
 TEST_CASE("basic")
 {
-    random_expression random_e({"x", "y"}, 3u);
-    heyoka::detail::splitmix64 engine(354u);
-    std::uniform_real_distribution<double> dis(0.0, 1.0);
-    for (auto i = 0u; i< 100; ++i) {
-        std::cout << dis(engine) << std::endl;
-    }
+    std::random_device rd;
+    detail::random_engine_type e(rd());
+    random_expression random_e({"x", "y"}, e());
+    std::cout << random_e(2, 5) << "\n";
 }

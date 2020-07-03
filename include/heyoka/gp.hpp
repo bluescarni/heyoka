@@ -26,7 +26,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC random_expression
 {
 public:
-    enum node_types { num, var, bo, u_fun, b_fun };
+    enum node_type { num, var, bo, u_fun, b_fun };
 
 private:
     static std::vector<binary_operator::type> m_bos;
@@ -34,7 +34,7 @@ private:
     static std::vector<expression (*)(expression, expression)> m_b_funcs;
 
     std::vector<std::string> m_vars;
-    detail::splitmix64 m_e;
+    detail::random_engine_type m_e;
 
 public:
     explicit random_expression(const std::vector<std::string> &, ::std::uint64_t);

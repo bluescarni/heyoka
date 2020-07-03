@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_XOROSHIRO128_PLUS_HPP
-#define HEYOKA_DETAIL_XOROSHIRO128_PLUS_HPP
+#ifndef HEYOKA_DETAIL_SPLITMIX64_PLUS_HPP
+#define HEYOKA_DETAIL_SPLITMIX64_PLUS_HPP
 
 #include <cstdint>
 #include <limits>
@@ -47,6 +47,9 @@ struct splitmix64 {
 
     ::std::uint64_t m_state;
 };
+
+// heyoka makes use of the splitmix64 implementation by Sebastiano Vigna http://prng.di.unimi.it/splitmix64.c
+using random_engine_type = splitmix64;
 
 } // namespace heyoka::detail
 
