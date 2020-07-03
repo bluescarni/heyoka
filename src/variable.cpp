@@ -117,15 +117,16 @@ void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
     }
 }
 
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const variable &, std::size_t &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const variable &,
+                        std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<size_t>());
+    node_connections.push_back(std::vector<std::size_t>());
     node_counter++;
 }
 
 void update_node_values_dbl(std::vector<double> &node_values, const variable &var,
                             const std::unordered_map<std::string, double> &map,
-                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
+                            const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         node_values[node_counter] = it->second;

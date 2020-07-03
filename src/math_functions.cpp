@@ -172,6 +172,27 @@ expression cos(expression e)
 
         return -std::sin(args[0]);
     };
+    fc.taylor_decompose_f() = [](function &&f, std::vector<expression> &u_vars_defs) {
+        if (f.args().size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the Taylor decomposition of "
+                                        "the cosine (1 argument was expected, but "
+                                        + std::to_string(f.args().size()) + " arguments were provided");
+        }
+
+        // Decompose the argument.
+        auto &arg = f.args()[0];
+        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+
+        // Append the sine decomposition.
+        u_vars_defs.emplace_back(sin(arg));
+
+        // Append the cosine decomposition.
+        u_vars_defs.emplace_back(std::move(f));
+
+        return u_vars_defs.size() - 1u;
+    };
 
     return expression{std::move(fc)};
 }
@@ -300,27 +321,6 @@ expression pow(expression e1, expression e2)
                 "Inconsistent number of arguments or derivative requested when computing the derivative of std::pow");
         }
         return args[1] * std::pow(args[0], args[1] - 1.) + std::log(args[0]) * std::pow(args[0], args[1]);
-    };
-    fc.taylor_decompose_f() = [](function &&f, std::vector<expression> &u_vars_defs) {
-        if (f.args().size() != 1u) {
-            throw std::invalid_argument("Inconsistent number of arguments when computing the Taylor decomposition of "
-                                        "the cosine (1 argument was expected, but "
-                                        + std::to_string(f.args().size()) + " arguments were provided");
-        }
-
-        // Decompose the argument.
-        auto &arg = f.args()[0];
-        if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-            arg = expression{variable{"u_" + detail::li_to_string(dres)}};
-        }
-
-        // Append the sine decomposition.
-        u_vars_defs.emplace_back(sin(arg));
-
-        // Append the cosine decomposition.
-        u_vars_defs.emplace_back(std::move(f));
-
-        return u_vars_defs.size() - 1u;
     };
 
     return expression{std::move(fc)};

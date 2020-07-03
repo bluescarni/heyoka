@@ -202,7 +202,7 @@ void update_node_values_dbl(std::vector<double> &node_values, const binary_opera
                             const std::unordered_map<std::string, double> &map,
                             const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure out is filled before being accessed later.
     update_node_values_dbl(node_values, bo.lhs(), map, node_connections, node_counter);
@@ -232,7 +232,7 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const binary
                      const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
                      double acc)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
     switch (bo.op()) {
         case binary_operator::type::add:
@@ -273,9 +273,9 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const binary
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const binary_operator &bo,
                         std::size_t &node_counter)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
-    node_connections.push_back(std::vector<size_t>(2));
+    node_connections.push_back(std::vector<std::size_t>(2));
     node_connections[node_id][0] = node_counter;
     update_connections(node_connections, bo.lhs(), node_counter);
     node_connections[node_id][1] = node_counter;
