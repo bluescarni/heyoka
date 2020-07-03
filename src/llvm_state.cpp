@@ -696,7 +696,9 @@ auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vecto
                 using type = detail::uncvref_t<decltype(v)>;
 
                 // NOTE: the only possibilities which make sense
-                // here for type are number or variable.
+                // here for type are number or variable, and thus
+                // I think we don't need this to be a general-purpose
+                // customisation point.
                 if constexpr (std::is_same_v<type, number>) {
                     // ex is a number. Add its index to the list
                     // of constant-derivative state variables.
