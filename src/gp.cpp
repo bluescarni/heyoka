@@ -8,6 +8,7 @@
 
 #include <random>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <heyoka/binary_operator.hpp>
@@ -159,17 +160,46 @@ const std::vector<std::string> &random_expression::get_vars() const
     return m_vars;
 }
 
-void random_expression::set_bos(const std::vector<binary_operator::type> &bos) {
+void random_expression::set_bos(const std::vector<binary_operator::type> &bos)
+{
     m_bos = bos;
 }
-void random_expression::set_u_funcs(const std::vector<expression (*)(expression)> &u_funcs) {
+void random_expression::set_u_funcs(const std::vector<expression (*)(expression)> &u_funcs)
+{
     m_u_funcs = u_funcs;
 }
-void random_expression::set_b_funcs(const std::vector<expression (*)(expression, expression)> &b_funcs) {
+void random_expression::set_b_funcs(const std::vector<expression (*)(expression, expression)> &b_funcs)
+{
     m_b_funcs = b_funcs;
 }
-void random_expression::set_vars(const std::vector<std::string> &vars) {
+void random_expression::set_vars(const std::vector<std::string> &vars)
+{
     m_vars = vars;
+}
+
+void random_expression::mutate(expression &e, double mut_p, unsigned depth)
+{
+    std::uniform_real_distribution<> rng01(0., 1.);
+    if (rng01(m_e) < mut_p) {
+        e = this->operator()(2, 4, depth);
+    } else {
+        std::visit(
+            [&e, this, &mut_p, &depth](auto &node) {
+                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
+                    // code for binary_operator
+                    mutate(node.lhs(), mut_p, depth + 1);
+                    mutate(node.rhs(), mut_p, depth + 1);
+                } else if constexpr (std::is_same_v<decltype(node), function &>) {
+                    // code for function
+                    for (auto &branch : node.args()) {
+                        mutate(branch, mut_p, depth + 1);
+                    }
+                } else {
+                    e = this->operator()(1, 2, depth);
+                }
+            },
+            e.value());
+    }
 }
 
 } // namespace heyoka

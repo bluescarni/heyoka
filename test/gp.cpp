@@ -24,5 +24,8 @@ TEST_CASE("basic")
     std::random_device rd;
     detail::random_engine_type e(rd());
     random_expression random_e({"x", "y"}, e());
-    std::cout << random_e(2, 5) << "\n";
+    auto ex = random_e(2, 5);
+    std::cout << ex << "\n";
+    random_e.mutate(ex, 0.005);
+    std::cout << ex << "\n";
 }

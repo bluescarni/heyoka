@@ -49,7 +49,11 @@ public:
     void set_u_funcs(const std::vector<expression (*)(expression)> &);
     void set_b_funcs(const std::vector<expression (*)(expression, expression)> &);
     void set_vars(const std::vector<std::string> &);
+
+    // expression manipulation
+    void mutate(expression &, double, unsigned = 0u);
 };
+
 
 } // namespace heyoka
 
