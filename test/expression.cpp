@@ -343,9 +343,9 @@ TEST_CASE("basic")
 
     auto ex = sin("x"_var) + 1.1_ldbl;
 
-    llvm_state s{"pippo"};
+    llvm_state s{"pippo", 0};
 
-    s.add_ldbl("f", ex);
+    s.add_taylor_stepper_dbl("f", {2.1_dbl, x + y}, 20);
 
     std::cout << s.dump() << '\n';
 

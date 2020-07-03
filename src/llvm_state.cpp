@@ -18,6 +18,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <llvm/Config/llvm-config.h>
@@ -30,6 +31,7 @@
 #include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -53,9 +55,12 @@
 #include <llvm/Transforms/Vectorize.h>
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -495,6 +500,227 @@ llvm_state::ts_ldbl_t llvm_state::fetch_taylor_stepper_ldbl(const std::string &n
     return fetch_taylor_stepper_impl<long double>(name);
 }
 
+// Create the function to implement the n-th order normalised derivative of a
+// state variable in a Taylor system. n_uvars is the total number of
+// u variables in the decomposition, var is the u variable which is equal to
+// the first derivative of the state variable.
+template <typename T>
+auto llvm_state::taylor_add_sv_diff(const std::string &fname, std::uint32_t n_uvars, const variable &var)
+{
+    check_add_name(fname);
+
+    // Extract the index of the u variable.
+    const auto u_idx = detail::uname_to_index(var.name());
+
+    // Prepare the main function prototype. The arguments are:
+    // - const float pointer to the derivatives array,
+    // - 32-bit integer (order of the derivative).
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())),
+                                    m_builder->getInt32Ty()};
+
+    // The function will return the n-th derivative.
+    auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
+    assert(ft != nullptr);
+
+    // Now create the function. Don't need to call it from outside,
+    // thus internal linkage.
+    auto *f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, m_module.get());
+    assert(f != nullptr);
+
+    // Setup the function arugments.
+    auto arg_it = f->args().begin();
+    arg_it->setName("diff_ptr");
+    arg_it->addAttr(llvm::Attribute::ReadOnly);
+    arg_it->addAttr(llvm::Attribute::NoCapture);
+    auto diff_ptr = arg_it;
+
+    (++arg_it)->setName("order");
+    auto order = arg_it;
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Fetch from diff_ptr the pointer to the u variable
+    // at u_idx. The index is (order - 1) * n_uvars + u_idx.
+    auto in_ptr = m_builder->CreateInBoundsGEP(
+        diff_ptr,
+        {m_builder->CreateAdd(
+            m_builder->CreateMul(m_builder->getInt32(n_uvars), m_builder->CreateSub(order, m_builder->getInt32(1))),
+            m_builder->getInt32(u_idx))},
+        "diff_ptr");
+
+    // Load the value from in_ptr.
+    auto diff_load = m_builder->CreateLoad(in_ptr, "diff_load");
+
+    // We have to divide the derivative by order
+    // to get the normalised derivative of the state variable.
+    // NOTE: precompute in the main function the 1/n factors?
+    auto ret = m_builder->CreateFDiv(diff_load, m_builder->CreateUIToFP(order, detail::to_llvm_type<T>(context())));
+
+    m_builder->CreateRet(ret);
+
+    // Verify it.
+    verify_function_impl(f);
+
+    // NOTE: no need to add the function
+    // signature to m_sig_map, as this
+    // is just an internal function.
+
+    return f;
+}
+
+// Same as above, but for the special case in which the derivative
+// of a state variable is not equal to a u variable, but to
+// a constant (e.g., x' = 1).
+template <typename T>
+auto llvm_state::taylor_add_sv_diff(const std::string &fname, std::uint32_t, const number &num)
+{
+    check_add_name(fname);
+
+    // Prepare the main function prototype. The arguments are:
+    // - const float pointer to the derivatives array,
+    // - 32-bit integer (order of the derivative).
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())),
+                                    m_builder->getInt32Ty()};
+
+    // The function will return the n-th derivative.
+    auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
+    assert(ft != nullptr);
+
+    // Now create the function. Don't need to call it from outside,
+    // thus internal linkage.
+    auto *f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, m_module.get());
+    assert(f != nullptr);
+
+    // Setup the function arugments.
+    // NOTE: the fist argument will be unused.
+    auto arg_it = f->args().begin();
+    arg_it->setName("diff_ptr");
+    arg_it->addAttr(llvm::Attribute::ReadOnly);
+    arg_it->addAttr(llvm::Attribute::NoCapture);
+
+    (++arg_it)->setName("order");
+    auto order = arg_it;
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // If the first-order derivative is being requested,
+    // we return the constant in num. Otherwise, we return
+    // zero.
+    // Create the comparison instruction.
+    auto cmp_inst = m_builder->CreateICmpEQ(order, m_builder->getInt32(1), "order_cmp");
+    assert(cmp_inst != nullptr);
+
+    // Create blocks for the then and else cases.  Insert the 'then' block at the
+    // end of the function.
+    auto then_bb = llvm::BasicBlock::Create(context(), "then", f);
+    assert(then_bb != nullptr);
+    auto else_bb = llvm::BasicBlock::Create(context(), "else");
+    assert(else_bb != nullptr);
+    auto merge_bb = llvm::BasicBlock::Create(context(), "ifcont");
+    assert(merge_bb != nullptr);
+
+    auto branch_inst = m_builder->CreateCondBr(cmp_inst, then_bb, else_bb);
+    assert(branch_inst != nullptr);
+
+    // Emit then value.
+    m_builder->SetInsertPoint(then_bb);
+    auto then_value = detail::invoke_codegen<T>(*this, num);
+
+    auto lab = m_builder->CreateBr(merge_bb);
+    assert(lab != nullptr);
+
+    // Codegen of 'then' can change the current block, update then_bb for the PHI.
+    then_bb = m_builder->GetInsertBlock();
+
+    // Emit else block.
+    f->getBasicBlockList().push_back(else_bb);
+    m_builder->SetInsertPoint(else_bb);
+    auto else_value = detail::invoke_codegen<T>(*this, number(0.));
+
+    lab = m_builder->CreateBr(merge_bb);
+    assert(lab != nullptr);
+
+    // Codegen of 'else' can change the current block, update else_bb for the PHI.
+    else_bb = m_builder->GetInsertBlock();
+
+    // Emit merge block.
+    f->getBasicBlockList().push_back(merge_bb);
+    m_builder->SetInsertPoint(merge_bb);
+    auto PN = m_builder->CreatePHI(detail::to_llvm_type<T>(context()), 2, "iftmp");
+    assert(PN != nullptr);
+
+    PN->addIncoming(then_value, then_bb);
+    PN->addIncoming(else_value, else_bb);
+
+    m_builder->CreateRet(PN);
+
+    // Verify it.
+    verify_function_impl(f);
+
+    // NOTE: no need to add the function
+    // signature to m_sig_map, as this
+    // is just an internal function.
+
+    return f;
+}
+
+// Helper to create the functions for the computation
+// of the derivatives of the u variables.
+template <typename T>
+auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vector<expression> &dc,
+                                       std::uint32_t n_uvars)
+{
+    // We begin with the state variables.
+    // We will also identify the state variables whose derivatives
+    // are constants and record them.
+    std::unordered_map<std::uint32_t, number> cd_uvars;
+    // We will store pointers to the created functions
+    // for later use.
+    std::vector<llvm::Function *> u_diff_funcs;
+
+    // NOTE: the derivatives of the state variables
+    // are at the end of the decomposition vector.
+    for (std::uint32_t i = n_uvars; i < dc.size(); ++i) {
+        const auto &ex = dc[i];
+        const auto u_idx = static_cast<std::uint32_t>(i - n_uvars);
+        const auto fname = name + ".diff." + detail::li_to_string(u_idx);
+
+        std::visit(
+            [this, &u_diff_funcs, &cd_uvars, &fname, n_uvars, u_idx](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                // NOTE: the only possibilities which make sense
+                // here for type are number or variable.
+                if constexpr (std::is_same_v<type, number>) {
+                    // ex is a number. Add its index to the list
+                    // of constant-derivative state variables.
+                    cd_uvars.emplace(u_idx, v);
+                    u_diff_funcs.emplace_back(this->taylor_add_sv_diff<T>(fname, n_uvars, v));
+                } else if constexpr (std::is_same_v<type, variable>) {
+                    // ex is a variable.
+                    u_diff_funcs.emplace_back(this->taylor_add_sv_diff<T>(fname, n_uvars, v));
+                } else {
+                    assert(false);
+                }
+            },
+            ex.value());
+    }
+
+#if 0
+    // Now the derivatives of the other u variables.
+    for (decltype(dc.size()) i = n_eq; i < n_uvars; ++i) {
+        u_diff_funcs.emplace_back(dc[i].taylor_diff(*this, name + ".diff." + detail::li_to_string(i),
+                                                    static_cast<std::uint32_t>(n_uvars), cd_uvars));
+    }
+#endif
+}
+
 template <typename T>
 void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
@@ -522,6 +748,10 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
         throw std::overflow_error(
             "An overflow condition was detected in the number of variables while adding a Taylor stepper");
     }
+
+    // Create the functions for the computation of the derivatives
+    // of the u variables.
+    taylor_add_uvars_diff<T>(name, dc, static_cast<std::uint32_t>(n_uvars));
 
     // TODO verify, add to signature map.
 
