@@ -31,14 +31,19 @@ public:
     enum class type { internal, external, builtin };
 
     using diff_t = std::function<expression(const std::vector<expression> &, const std::string &)>;
+
+    // Evaluation function types.
     using eval_dbl_t
         = std::function<double(const std::vector<expression> &, const std::unordered_map<std::string, double> &)>;
     using eval_batch_dbl_t = std::function<void(std::vector<double> &, const std::vector<expression> &,
                                                 const std::unordered_map<std::string, std::vector<double>> &)>;
     using eval_num_dbl_t = std::function<double(const std::vector<double> &)>;
     using deval_num_dbl_t = std::function<double(const std::vector<double> &, std::vector<double>::size_type)>;
+
+    // Taylor integration function types.
     using taylor_decompose_t
         = std::function<std::vector<expression>::size_type(function &&, std::vector<expression> &)>;
+    using taylor_init_t = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *)>;
 
 private:
     bool m_disable_verify = false;
@@ -46,12 +51,17 @@ private:
     std::unique_ptr<std::vector<expression>> m_args;
     std::vector<llvm::Attribute::AttrKind> m_attributes;
     type m_ty = type::internal;
+
     diff_t m_diff_f;
+
     eval_dbl_t m_eval_dbl_f;
     eval_batch_dbl_t m_eval_batch_dbl_f;
     eval_num_dbl_t m_eval_num_dbl_f;
     deval_num_dbl_t m_deval_num_dbl_f;
+
     taylor_decompose_t m_taylor_decompose_f;
+    taylor_init_t m_taylor_init_dbl_f;
+    taylor_init_t m_taylor_init_ldbl_f;
 
 public:
     explicit function(std::vector<expression>);
@@ -75,6 +85,8 @@ public:
     eval_num_dbl_t &eval_num_dbl_f();
     deval_num_dbl_t &deval_num_dbl_f();
     taylor_decompose_t &taylor_decompose_f();
+    taylor_init_t &taylor_init_dbl_f();
+    taylor_init_t &taylor_init_ldbl_f();
 
     const bool &disable_verify() const;
     const std::string &dbl_name() const;
@@ -89,6 +101,8 @@ public:
     const eval_num_dbl_t &eval_num_dbl_f() const;
     const deval_num_dbl_t &deval_num_dbl_f() const;
     const taylor_decompose_t &taylor_decompose_f() const;
+    const taylor_init_t &taylor_init_dbl_f() const;
+    const taylor_init_t &taylor_init_ldbl_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);

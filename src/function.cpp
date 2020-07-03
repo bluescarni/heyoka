@@ -74,9 +74,10 @@ function::function(std::vector<expression> args)
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
-      m_attributes(f.m_attributes), m_ty(f.m_ty), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
+      m_attributes(f.m_attributes), m_ty(f.ty()), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
       m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
-      m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f)
+      m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f),
+      m_taylor_init_dbl_f(f.m_taylor_init_dbl_f), m_taylor_init_ldbl_f(f.m_taylor_init_ldbl_f)
 {
 }
 
@@ -161,6 +162,16 @@ function::taylor_decompose_t &function::taylor_decompose_f()
     return m_taylor_decompose_f;
 }
 
+function::taylor_init_t &function::taylor_init_dbl_f()
+{
+    return m_taylor_init_dbl_f;
+}
+
+function::taylor_init_t &function::taylor_init_ldbl_f()
+{
+    return m_taylor_init_ldbl_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -228,6 +239,16 @@ const function::taylor_decompose_t &function::taylor_decompose_f() const
     return m_taylor_decompose_f;
 }
 
+const function::taylor_init_t &function::taylor_init_dbl_f() const
+{
+    return m_taylor_init_dbl_f;
+}
+
+const function::taylor_init_t &function::taylor_init_ldbl_f() const
+{
+    return m_taylor_init_ldbl_f;
+}
+
 std::ostream &operator<<(std::ostream &os, const function &f)
 {
     os << f.display_name() << '(';
@@ -273,7 +294,12 @@ bool operator==(const function &f1, const function &f2)
            // thus we just check if the std::function members contain something.
            && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f())
            && static_cast<bool>(f1.eval_dbl_f()) == static_cast<bool>(f2.eval_dbl_f())
-           && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f());
+           && static_cast<bool>(f1.eval_batch_dbl_f()) == static_cast<bool>(f2.eval_batch_dbl_f())
+           && static_cast<bool>(f1.eval_num_dbl_f()) == static_cast<bool>(f2.eval_num_dbl_f())
+           && static_cast<bool>(f1.deval_num_dbl_f()) == static_cast<bool>(f2.deval_num_dbl_f())
+           && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f())
+           && static_cast<bool>(f1.taylor_init_dbl_f()) == static_cast<bool>(f2.taylor_init_dbl_f())
+           && static_cast<bool>(f1.taylor_init_ldbl_f()) == static_cast<bool>(f2.taylor_init_ldbl_f());
 }
 
 bool operator!=(const function &f1, const function &f2)
@@ -534,6 +560,26 @@ std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::
                                     + "' does not provide a function for Taylor decomposition");
     }
     return tdf(std::move(f), u_vars_defs);
+}
+
+llvm::Value *taylor_init_dbl(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    auto &tidf = f.taylor_init_dbl_f();
+    if (!tidf) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for doulbe Taylor init");
+    }
+    return tidf(s, f, arr);
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    auto &tildf = f.taylor_init_ldbl_f();
+    if (!tildf) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for long doulbe Taylor init");
+    }
+    return tildf(s, f, arr);
 }
 
 } // namespace heyoka
