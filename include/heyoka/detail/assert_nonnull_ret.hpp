@@ -11,6 +11,9 @@
 
 #include <cassert>
 
+// Small macro to compute a pointer return value
+// from expr and assert that it is not null
+// before returning it.
 #define heyoka_assert_nonnull_ret(expr)                                                                                \
     do {                                                                                                               \
         auto ret = expr;                                                                                               \
