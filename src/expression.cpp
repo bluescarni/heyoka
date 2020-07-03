@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -301,7 +302,8 @@ std::unordered_map<std::string, double> compute_grad_dbl(const expression &e,
 
 void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expression &e,
                      const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
-                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter, double acc)
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
 {
     std::visit(
         [&map, &grad, &node_values, &node_connections, &node_counter, &acc](const auto &arg) {

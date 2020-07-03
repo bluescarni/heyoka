@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>

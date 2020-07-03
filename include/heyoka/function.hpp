@@ -9,6 +9,7 @@
 #ifndef HEYOKA_FUNCTION_HPP
 #define HEYOKA_FUNCTION_HPP
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -32,9 +33,8 @@ public:
     using diff_t = std::function<expression(const std::vector<expression> &, const std::string &)>;
     using eval_dbl_t
         = std::function<double(const std::vector<expression> &, const std::unordered_map<std::string, double> &)>;
-    using eval_batch_dbl_t
-        = std::function<void(std::vector<double> &, const std::vector<expression> &,
-                             const std::unordered_map<std::string, std::vector<double>> &)>;
+    using eval_batch_dbl_t = std::function<void(std::vector<double> &, const std::vector<expression> &,
+                                                const std::unordered_map<std::string, std::vector<double>> &)>;
     using eval_num_dbl_t = std::function<double(const std::vector<double> &)>;
     using deval_num_dbl_t = std::function<double(const std::vector<double> &, std::vector<double>::size_type)>;
     using taylor_decompose_t

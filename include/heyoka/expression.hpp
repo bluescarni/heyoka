@@ -9,6 +9,7 @@
 #ifndef HEYOKA_EXPRESSION_HPP
 #define HEYOKA_EXPRESSION_HPP
 
+#include <cstddef>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -70,7 +71,7 @@ HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const expression &,
-                                      const std::unordered_map<std::string, std::vector<double>>&);
+                                      const std::unordered_map<std::string, std::vector<double>> &);
 
 // When traversing the expression tree with some recursive algorithm we may have to do some book-keeping and use
 // preallocated memory to store the result, in which case the corresponding function is called update_*. A corresponding

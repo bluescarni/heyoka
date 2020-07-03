@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <initializer_list>
 #include <ostream>
 #include <string>
@@ -190,7 +191,8 @@ void eval_batch_dbl(std::vector<double> &out_values, const number &n,
         n.value());
 }
 
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &, std::size_t &node_counter)
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &,
+                        std::size_t &node_counter)
 {
     node_connections.push_back(std::vector<size_t>());
     node_counter++;

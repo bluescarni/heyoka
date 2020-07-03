@@ -9,6 +9,7 @@
 #ifndef HEYOKA_NUMBER_HPP
 #define HEYOKA_NUMBER_HPP
 
+#include <cstddef>
 #include <ostream>
 #include <string>
 #include <unordered_map>

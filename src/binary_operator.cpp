@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <functional>
 #include <iterator>
 #include <memory>
@@ -227,7 +228,8 @@ void update_node_values_dbl(std::vector<double> &node_values, const binary_opera
 
 void update_grad_dbl(std::unordered_map<std::string, double> &grad, const binary_operator &bo,
                      const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
-                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter, double acc)
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
 {
     const unsigned node_id = node_counter;
     node_counter++;
