@@ -195,13 +195,13 @@ void eval_batch_dbl(std::vector<double> &out_values, const number &n,
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &,
                         std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<size_t>());
+    node_connections.push_back(std::vector<std::size_t>());
     node_counter++;
 }
 
 void update_node_values_dbl(std::vector<double> &node_values, const number &n,
-                            const std::unordered_map<std::string, double> &map,
-                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
+                            const std::unordered_map<std::string, double> &,
+                            const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter)
 {
 
     std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },

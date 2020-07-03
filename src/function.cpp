@@ -347,7 +347,7 @@ void update_node_values_dbl(std::vector<double> &node_values, const function &f,
                             const std::unordered_map<std::string, double> &map,
                             const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
     // We have to recurse first as to make sure node_values is filled before being accessed later.
     for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
@@ -366,7 +366,7 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const functi
                      const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
                      double acc)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
     std::vector<double> in_values(f.args().size());
     for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
@@ -381,9 +381,9 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const functi
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const function &f,
                         std::size_t &node_counter)
 {
-    const unsigned node_id = node_counter;
+    const auto node_id = node_counter;
     node_counter++;
-    node_connections.push_back(std::vector<size_t>(f.args().size()));
+    node_connections.push_back(std::vector<std::size_t>(f.args().size()));
     for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
         node_connections[node_id][i] = node_counter;
         update_connections(node_connections, f.args()[i], node_counter);
