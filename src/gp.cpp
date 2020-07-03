@@ -33,7 +33,12 @@ It random_element(It start, It end, Rng &g)
 } // namespace detail
 
 random_expression::random_expression(const std::vector<std::string> &vars, ::std::uint64_t seed)
-    : m_vars(vars), m_e(seed){};
+    : m_vars(vars), m_e(seed), m_b_funcs() {
+    // These are the default blocks for a random expression.
+    m_bos = {binary_operator::type::add, binary_operator::type::sub, binary_operator::type::mul, binary_operator::type::div};
+    m_u_funcs = {heyoka::sin, heyoka::cos};
+    m_b_funcs = {};
+    };
 
 expression random_expression::operator()(unsigned min_depth, unsigned max_depth, unsigned depth)
 {
@@ -47,7 +52,7 @@ expression random_expression::operator()(unsigned min_depth, unsigned max_depth,
         double n_bos = m_bos.size();
         double n_u_fun = m_u_funcs.size();
         double n_b_fun = m_b_funcs.size();
-        std::discrete_distribution<> dis({n_bos*2, n_u_fun, n_b_fun});
+        std::discrete_distribution<> dis({n_bos*4, n_u_fun*2, n_b_fun});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -62,7 +67,7 @@ expression random_expression::operator()(unsigned min_depth, unsigned max_depth,
     } else if (depth >= max_depth) {
         // If the node depth is above the maximum desired, we force leaves (num or var) to be selected
         double n_var = m_vars.size();
-        std::discrete_distribution<> dis({n_var, 1.});
+        std::discrete_distribution<> dis({n_var*4, 1.});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::var;
@@ -77,7 +82,7 @@ expression random_expression::operator()(unsigned min_depth, unsigned max_depth,
         double n_u_fun = m_u_funcs.size();
         double n_b_fun = m_b_funcs.size();
         double n_var = m_vars.size();
-        std::discrete_distribution<> dis({n_bos*2, n_u_fun, n_b_fun, n_var*2, 1.});
+        std::discrete_distribution<> dis({n_bos*8, n_u_fun*2, n_b_fun, n_var*4, 1.});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -134,9 +139,6 @@ expression random_expression::operator()(unsigned min_depth, unsigned max_depth,
     }
 };
 
-std::vector<binary_operator::type> random_expression::m_bos
-    = {binary_operator::type::add, binary_operator::type::sub, binary_operator::type::mul, binary_operator::type::div};
-std::vector<expression (*)(expression)> random_expression::m_u_funcs = {heyoka::sin, heyoka::cos, heyoka::log};
-std::vector<expression (*)(expression, expression)> random_expression::m_b_funcs = {heyoka::pow};
+
 
 } // namespace heyoka
