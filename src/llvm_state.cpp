@@ -726,7 +726,7 @@ auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vecto
 }
 
 template <typename T>
-auto llvm_state::taylor_add_stepper_func(const std::string &name, const std::vector<expression> &dc,
+void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vector<expression> &dc,
                                          const std::vector<llvm::Function *> &u_diff_funcs, std::uint32_t n_uvars,
                                          std::uint32_t max_order, std::uint32_t n_eq)
 {
@@ -924,6 +924,7 @@ auto llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
         // current state variable).
         auto sv_diff_f_call = m_builder->CreateCall(u_diff_funcs[i], {base_diff_ptr, order_arg},
                                                     "final_sv_diff_" + detail::li_to_string(i));
+        assert(sv_diff_f_call != nullptr);
         sv_diff_f_call->setTailCall(true);
         auto final_sv = m_builder->CreateFAdd(m_builder->CreateLoad(sv),
                                               m_builder->CreateFMul(m_builder->CreateLoad(h_acc), sv_diff_f_call),
@@ -1005,6 +1006,292 @@ void llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<exp
 void llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
     add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
+}
+
+template <typename T>
+void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<expression> &dc,
+                                     const std::vector<llvm::Function *> &u_diff_funcs, std::uint32_t n_uvars,
+                                     std::uint32_t max_order, std::uint32_t n_eq)
+{
+    // Prepare the main function prototype. The arguments are:
+    // - float pointer to in/out array,
+    // - 32-bit integer (order of the derivative).
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())),
+                                    m_builder->getInt32Ty()};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
+    assert(f != nullptr);
+
+    // Set the name of the function arguments.
+    auto arg_it = f->args().begin();
+    auto in_out_arg = arg_it;
+    (arg_it++)->setName("in_out");
+    auto order_arg = arg_it;
+    arg_it->setName("order");
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Create the array of derivatives for the u variables.
+    // NOTE: the static cast is fine, as we checked earlier that n_uvars * max_order
+    // fits in 32 bits.
+    auto array_type
+        = llvm::ArrayType::get(detail::to_llvm_type<T>(context()), static_cast<std::uint64_t>(n_uvars * max_order));
+    assert(array_type != nullptr);
+    auto diff_arr = m_builder->CreateAlloca(array_type, 0, "diff");
+    assert(diff_arr != nullptr);
+    // Store a pointer to the beginning of the
+    // derivatives array.
+    auto base_diff_ptr
+        = m_builder->CreateInBoundsGEP(diff_arr, {m_builder->getInt32(0), m_builder->getInt32(0)}, "base_diff_ptr");
+    assert(base_diff_ptr != nullptr);
+
+    // Fill-in the order-0 row of the derivatives array.
+    // Use a separate block for clarity.
+    auto *init_bb = llvm::BasicBlock::Create(context(), "order_0_init", f);
+    assert(init_bb != nullptr);
+    m_builder->CreateBr(init_bb);
+    m_builder->SetInsertPoint(init_bb);
+
+    // Load the initial values for the state variables from in_out.
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        // Fetch the input pointer from in_out.
+        auto in_ptr = m_builder->CreateInBoundsGEP(in_out_arg, {m_builder->getInt32(i)}, "in_out_ptr");
+        assert(in_ptr != nullptr);
+
+        // Create the load instruction from in_out.
+        auto load_inst = m_builder->CreateLoad(in_ptr, "in_out_load");
+        assert(load_inst != nullptr);
+
+        // Fetch the target pointer in diff_arr.
+        auto diff_ptr = m_builder->CreateInBoundsGEP(diff_arr,
+                                                     // The offsets. The first is fixed because
+                                                     // diff_arr somehow becomes a pointer
+                                                     // to itself in the generation of the instruction,
+                                                     // and thus we need to deref it. The second
+                                                     // offset is the index into the array.
+                                                     {m_builder->getInt32(0), m_builder->getInt32(i)},
+                                                     // Name for the pointer variable.
+                                                     "diff_ptr");
+        assert(diff_ptr != nullptr);
+
+        // Do the copy.
+        m_builder->CreateStore(load_inst, diff_ptr);
+    }
+
+    // Fill in the initial values for the other u vars in the diff array.
+    // These are not loaded directly from in_out, rather they are computed
+    // via the taylor_init machinery.
+    for (auto i = n_eq; i < n_uvars; ++i) {
+        const auto &u_ex = dc[i];
+
+        // Fetch the target pointer in diff_arr.
+        auto diff_ptr
+            = m_builder->CreateInBoundsGEP(diff_arr, {m_builder->getInt32(0), m_builder->getInt32(i)}, "diff_ptr");
+        assert(diff_ptr != nullptr);
+
+        // Run the initialization and store the result.
+        m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
+    }
+
+    // The for loop to fill the derivatives array. We will iterate
+    // in the [1, order) range.
+    // Init the variable for the start of the loop (i = 1).
+    auto start_val = m_builder->getInt32(1);
+    assert(start_val != nullptr);
+
+    // Make the new basic block for the loop header,
+    // inserting after current block.
+    auto *preheader_bb = m_builder->GetInsertBlock();
+    assert(preheader_bb != nullptr);
+    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop", f);
+
+    // Insert an explicit fall through from the current block to the loop_bb.
+    m_builder->CreateBr(loop_bb);
+
+    // Start insertion in loop_bb.
+    m_builder->SetInsertPoint(loop_bb);
+
+    // Start the PHI node with an entry for Start.
+    auto *cur_order = m_builder->CreatePHI(m_builder->getInt32Ty(), 2, "i");
+    assert(cur_order != nullptr);
+    cur_order->addIncoming(start_val, preheader_bb);
+
+    // Loop body.
+
+    // For each u var, we invoke the function to
+    // compute its derivative at the current order.
+    for (std::uint32_t i = 0; i < n_uvars; ++i) {
+        // Compute the diff_arr index into which we will be writing.
+        // The index is num_uvars * current_order + i.
+        auto out_idx = m_builder->CreateAdd(m_builder->CreateMul(m_builder->getInt32(n_uvars), cur_order),
+                                            m_builder->getInt32(i));
+        assert(out_idx != nullptr);
+        // Get the corresponding pointer.
+        auto out_ptr = m_builder->CreateInBoundsGEP(diff_arr, {m_builder->getInt32(0), out_idx},
+                                                    "out_ptr_" + detail::li_to_string(i));
+        assert(out_ptr != nullptr);
+
+        // Invoke the derivative and store the result.
+        auto diff_f_call
+            = m_builder->CreateCall(u_diff_funcs[i], {base_diff_ptr, cur_order}, "uv_diff_" + detail::li_to_string(i));
+        assert(diff_f_call != nullptr);
+        diff_f_call->setTailCall(true);
+        m_builder->CreateStore(diff_f_call, out_ptr);
+
+        // If i is a state variable, write the current-order derivatives
+        // to in_out too.
+        if (i < n_eq) {
+            // The in_out index into which we need to write is
+            // n_eq * cur_order + i.
+            out_idx = m_builder->CreateAdd(m_builder->CreateMul(m_builder->getInt32(n_eq), cur_order),
+                                           m_builder->getInt32(i));
+            assert(out_idx != nullptr);
+            // Fetch the corresponding pointer in in_out.
+            out_ptr = m_builder->CreateInBoundsGEP(in_out_arg, {out_idx}, "in_out_ptr_" + detail::li_to_string(i));
+            assert(out_ptr != nullptr);
+
+            // Do the store.
+            m_builder->CreateStore(diff_f_call, out_ptr);
+        }
+    }
+
+    // Compute the next value of the iteration.
+    // NOTE: addition works regardless of integral signedness.
+    auto *next_order = m_builder->CreateAdd(cur_order, m_builder->getInt32(1), "nextvar");
+    assert(next_order != nullptr);
+
+    // Compute the end condition.
+    // NOTE: we use the unsigned less-than predicate.
+    auto *end_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_ULT, next_order, order_arg, "loopcond");
+    assert(end_cond != nullptr);
+
+    // Create the "after loop" block and insert it.
+    auto *loop_end_bb = m_builder->GetInsertBlock();
+    assert(loop_end_bb != nullptr);
+    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop", f);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    m_builder->CreateCondBr(end_cond, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    m_builder->SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    cur_order->addIncoming(next_order, loop_end_bb);
+
+    // The last step is to write the last-order derivatives to in_out.
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        // Compute the derivative.
+        auto sv_diff_f_call = m_builder->CreateCall(u_diff_funcs[i], {base_diff_ptr, order_arg},
+                                                    "final_sv_diff_" + detail::li_to_string(i));
+        assert(sv_diff_f_call != nullptr);
+        sv_diff_f_call->setTailCall(true);
+
+        // Store the result in in_out.
+        // The in_out index into which we need to write is
+        // n_eq * order + i.
+        const auto out_idx
+            = m_builder->CreateAdd(m_builder->CreateMul(m_builder->getInt32(n_eq), order_arg), m_builder->getInt32(i));
+        assert(out_idx != nullptr);
+        // Fetch the corresponding pointer in in_out.
+        const auto out_ptr
+            = m_builder->CreateInBoundsGEP(in_out_arg, {out_idx}, "in_out_ptr_" + detail::li_to_string(i));
+        assert(out_ptr != nullptr);
+
+        // Do the store.
+        m_builder->CreateStore(sv_diff_f_call, out_ptr);
+    }
+
+    // Finish off the function.
+    m_builder->CreateRetVoid();
+
+    // Verify it.
+    verify_function_impl(f);
+
+    // Add the function to m_sig_map. The signature
+    // is: void(T *, std::uint32_t).
+    std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(std::uint32_t))};
+    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
+}
+
+template <typename T>
+void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    if (max_order == 0u) {
+        throw std::invalid_argument("The maximum order cannot be zero");
+    }
+
+    // Record the number of equations/variables.
+    const auto n_eq = sys.size();
+
+    // Decompose the system of equations.
+    const auto dc = taylor_decompose(std::move(sys));
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = dc.size() - n_eq;
+
+    // Overflow checking. We want to make sure we can do all computations
+    // using uint32_t.
+    // NOTE: even though some automatic differentiation formulae have
+    // sums up to i = order (and thus could formally overflow in a
+    // for loop), we never invoke them with order = max_order, only
+    // up to order = max_order - 1.
+    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+        || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the number of variables while adding a Taylor jet");
+    }
+
+    // Create the functions for the computation of the derivatives
+    // of the u variables.
+    const auto u_diff_funcs
+        = taylor_add_uvars_diff<T>(name, dc, static_cast<std::uint32_t>(n_uvars), static_cast<std::uint32_t>(n_eq));
+    assert(u_diff_funcs.size() == n_uvars);
+
+    // Add the main jet function.
+    taylor_add_jet_func<T>(name, dc, u_diff_funcs, static_cast<std::uint32_t>(n_uvars), max_order,
+                           static_cast<std::uint32_t>(n_eq));
+
+    // Run the optimization pass.
+    if (m_opt_level > 0u) {
+        m_pm->run(*m_module);
+    }
+}
+
+void llvm_state::add_taylor_jet_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    add_taylor_jet_impl<double>(name, std::move(sys), max_order);
+}
+
+void llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+{
+    add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
+}
+
+llvm_state::tj_dbl_t llvm_state::fetch_taylor_jet_dbl(const std::string &name)
+{
+    check_compiled(__func__);
+
+    return fetch_taylor_jet_impl<double>(name);
+}
+
+llvm_state::tj_ldbl_t llvm_state::fetch_taylor_jet_ldbl(const std::string &name)
+{
+    check_compiled(__func__);
+
+    return fetch_taylor_jet_impl<long double>(name);
 }
 
 } // namespace heyoka

@@ -64,9 +64,15 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename T>
     HEYOKA_DLL_LOCAL auto taylor_add_sv_diff(const std::string &, std::uint32_t, const number &);
     template <typename T>
-    HEYOKA_DLL_LOCAL auto taylor_add_stepper_func(const std::string &, const std::vector<expression> &,
+    HEYOKA_DLL_LOCAL void taylor_add_stepper_func(const std::string &, const std::vector<expression> &,
                                                   const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
                                                   std::uint32_t);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_taylor_jet_impl(const std::string &, std::vector<expression>, std::uint32_t);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void taylor_add_jet_func(const std::string &, const std::vector<expression> &,
+                                              const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
+                                              std::uint32_t);
 
 public:
     explicit llvm_state(const std::string &, unsigned = 3);
@@ -95,8 +101,11 @@ public:
 
     void add_dbl(const std::string &, const expression &);
     void add_ldbl(const std::string &, const expression &);
+
     void add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
     void add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    void add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
+    void add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
 
     void compile();
 
@@ -188,9 +197,23 @@ private:
 public:
     using ts_dbl_t = void (*)(double *, double, std::uint32_t);
     using ts_ldbl_t = void (*)(long double *, long double, std::uint32_t);
-
     ts_dbl_t fetch_taylor_stepper_dbl(const std::string &);
     ts_ldbl_t fetch_taylor_stepper_ldbl(const std::string &);
+
+private:
+    template <typename T>
+    auto fetch_taylor_jet_impl(const std::string &name)
+    {
+        using ret_t = void (*)(T *, std::uint32_t);
+
+        return sig_check(name, reinterpret_cast<ret_t>(jit_lookup(name)));
+    }
+
+public:
+    using tj_dbl_t = void (*)(double *, std::uint32_t);
+    using tj_ldbl_t = void (*)(long double *, std::uint32_t);
+    tj_dbl_t fetch_taylor_jet_dbl(const std::string &);
+    tj_ldbl_t fetch_taylor_jet_ldbl(const std::string &);
 };
 
 } // namespace heyoka
