@@ -62,6 +62,7 @@ HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const 
                               const unsigned = 0u);
 HEYOKA_DLL_PUBLIC void extract_subtree(expression &, const expression &, const std::size_t);
 HEYOKA_DLL_PUBLIC void inject_subtree(expression &, const expression &, const std::size_t);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
 
 } // namespace heyoka
 

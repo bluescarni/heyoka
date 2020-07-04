@@ -292,4 +292,19 @@ void inject_subtree(expression &e, const expression &e_sub, const size_t node_ta
     detail::inject_subtree_impl(e, e_sub, node_target, node_counter);
 }
 
+void crossover(expression &e1, expression &e2, detail::random_engine_type &engine)
+{
+    std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
+    std::uniform_int_distribution<std::size_t> t2(0, count_nodes(e2) - 1u);
+    // We need to construct bogus expressions to extract in the subtrees.
+    expression e1_sub{number{0.}};
+    expression e2_sub{number{0.}};
+    auto node_target1 = t1(engine);
+    auto node_target2 = t2(engine);
+    extract_subtree(e1_sub, e1, node_target1);
+    extract_subtree(e2_sub, e2, node_target2);
+    inject_subtree(e1, e2_sub, node_target1);
+    inject_subtree(e2, e1_sub, node_target2);
+}
+
 } // namespace heyoka
