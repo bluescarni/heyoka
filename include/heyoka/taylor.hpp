@@ -9,6 +9,9 @@
 #ifndef HEYOKA_TAYLOR_HPP
 #define HEYOKA_TAYLOR_HPP
 
+#include <cstdint>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -24,6 +27,10 @@ HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expressio
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const expression &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const expression &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
+                                                  std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
+                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
 
 } // namespace heyoka
 

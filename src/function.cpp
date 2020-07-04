@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -32,6 +33,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -580,6 +582,18 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const function &f, llvm::Value *arr
                                     + "' does not provide a function for long doulbe Taylor init");
     }
     return tildf(s, f, arr);
+}
+
+llvm::Function *taylor_diff_dbl(llvm_state &, const function &, std::uint32_t, const std::string &, std::uint32_t,
+                                const std::unordered_map<std::uint32_t, number> &)
+{
+    throw;
+}
+
+llvm::Function *taylor_diff_ldbl(llvm_state &, const function &, std::uint32_t, const std::string &, std::uint32_t,
+                                 const std::unordered_map<std::uint32_t, number> &)
+{
+    throw;
 }
 
 } // namespace heyoka

@@ -674,7 +674,7 @@ auto llvm_state::taylor_add_sv_diff(const std::string &fname, std::uint32_t, con
 // of the derivatives of the u variables.
 template <typename T>
 auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vector<expression> &dc,
-                                       std::uint32_t n_uvars)
+                                       std::uint32_t n_uvars, std::uint32_t n_eq)
 {
     // We begin with the state variables.
     // We will also identify the state variables whose derivatives
@@ -714,13 +714,10 @@ auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vecto
             ex.value());
     }
 
-#if 0
     // Now the derivatives of the other u variables.
-    for (decltype(dc.size()) i = n_eq; i < n_uvars; ++i) {
-        u_diff_funcs.emplace_back(dc[i].taylor_diff(*this, name + ".diff." + detail::li_to_string(i),
-                                                    static_cast<std::uint32_t>(n_uvars), cd_uvars));
+    for (auto i = n_eq; i < n_uvars; ++i) {
+        detail::invoke_taylor_diff<T>(*this, dc[i], i, name + ".diff." + detail::li_to_string(i), n_uvars, cd_uvars);
     }
-#endif
 }
 
 template <typename T>
@@ -753,9 +750,9 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
 
     // Create the functions for the computation of the derivatives
     // of the u variables.
-    taylor_add_uvars_diff<T>(name, dc, static_cast<std::uint32_t>(n_uvars));
+    taylor_add_uvars_diff<T>(name, dc, static_cast<std::uint32_t>(n_uvars), static_cast<std::uint32_t>(n_eq));
 
-    // TODO verify, add to signature map.
+    // TODO main function: verify, add to signature map.
 
     // Run the optimization pass.
     if (m_opt_level > 0u) {

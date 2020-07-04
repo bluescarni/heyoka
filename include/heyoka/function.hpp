@@ -10,6 +10,7 @@
 #define HEYOKA_FUNCTION_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -138,6 +139,10 @@ HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(f
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const function &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const function &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const function &, std::uint32_t, const std::string &,
+                                                  std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const function &, std::uint32_t, const std::string &,
+                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
 
 } // namespace heyoka
 

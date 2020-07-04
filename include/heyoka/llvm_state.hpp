@@ -57,7 +57,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename T>
     HEYOKA_DLL_LOCAL void add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
     template <typename T>
-    HEYOKA_DLL_LOCAL auto taylor_add_uvars_diff(const std::string &, const std::vector<expression> &, std::uint32_t);
+    HEYOKA_DLL_LOCAL auto taylor_add_uvars_diff(const std::string &, const std::vector<expression> &, std::uint32_t,
+                                                std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL auto taylor_add_sv_diff(const std::string &, std::uint32_t, const variable &);
     template <typename T>

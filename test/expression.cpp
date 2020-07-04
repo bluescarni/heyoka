@@ -345,7 +345,7 @@ TEST_CASE("basic")
 
     llvm_state s{"pippo", 0};
 
-    s.add_taylor_stepper_dbl("f", {2.1_dbl, x + y}, 20);
+    s.add_taylor_stepper_dbl("f", {y, (1_dbl - x * x) * y - x}, 20);
 
     std::cout << s.dump() << '\n';
 

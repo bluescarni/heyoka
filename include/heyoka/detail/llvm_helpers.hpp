@@ -10,18 +10,22 @@
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
 #include <cassert>
+#include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+#include <unordered_map>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 
 namespace heyoka::detail
 {
@@ -79,6 +83,20 @@ inline llvm::Value *invoke_taylor_init(llvm_state &s, const U &x, llvm::Value *a
         return taylor_init_ldbl(s, x, arr);
     } else {
         static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_init().");
+    }
+}
+
+template <typename T, typename U>
+inline llvm::Function *invoke_taylor_diff(llvm_state &s, const U &x, std::uint32_t idx, const std::string &name,
+                                          std::uint32_t n_uvars,
+                                          const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_diff_dbl(s, x, idx, name, n_uvars, cd_uvars);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_diff_ldbl(s, x, idx, name, n_uvars, cd_uvars);
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_diff().");
     }
 }
 
