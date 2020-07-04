@@ -343,11 +343,19 @@ TEST_CASE("basic")
 
     auto ex = sin("x"_var) + 1.1_ldbl;
 
-    llvm_state s{"pippo", 0};
+    llvm_state s{"pippo"};
 
     s.add_taylor_stepper_dbl("f", {y, (1_dbl - x * x) * y - x}, 20);
 
-    std::cout << s.dump() << '\n';
+    s.compile();
+
+    std::cout.precision(14);
+
+    double state[] = {1, 2};
+
+    s.fetch_taylor_stepper_dbl("f")(state, .1, 12);
+    s.fetch_taylor_stepper_dbl("f")(state, -.1, 12);
+    std::cout << state[0] << ", " << state[1] << '\n';
 
 #if 0
     s.compile();
