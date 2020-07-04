@@ -742,12 +742,156 @@ llvm::Function *bo_taylor_diff_mul(llvm_state &s, const binary_operator &bo, std
         bo.lhs().value(), bo.rhs().value());
 }
 
+// Derivative of number / number.
 template <typename T>
-llvm::Function *bo_taylor_diff_div(llvm_state &, const binary_operator &, std::uint32_t, const std::string &,
-                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t, const number &, const number &,
+                                        const std::string &name, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
-    // TODO
-    throw;
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+
+    // The derivative of a constant is always zero.
+    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// Derivative of variable / variable or number / variable. These two cases
+// are quite similar, so we handle them together.
+template <typename T, typename U,
+          std::enable_if_t<std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>>, int> = 0>
+llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t idx, const U &nv, const variable &var1,
+                                        const std::string &name, std::uint32_t n_uvars,
+                                        const std::unordered_map<std::uint32_t, number> &)
+{
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+
+    // Let's build the result of the summation first.
+    // Accumulator for the result.
+    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "sum_acc");
+    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+
+    // Initial value for the for-loop. We will be operating
+    // in the range [1, order] (i.e., order inclusive).
+    auto start_val = builder.getInt32(1);
+
+    // Make the new basic block for the loop header,
+    // inserting after current block.
+    auto *preheader_bb = builder.GetInsertBlock();
+    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop", f);
+
+    // Insert an explicit fall through from the current block to the loop_bb.
+    builder.CreateBr(loop_bb);
+
+    // Start insertion in loop_bb.
+    builder.SetInsertPoint(loop_bb);
+
+    // Start the PHI node with an entry for Start.
+    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "j");
+    j_var->addIncoming(start_val, preheader_bb);
+
+    // Loop body.
+    // Compute the indices for accessing the derivatives in this loop iteration.
+    // The indices are:
+    // - (order - j_var) * n_uvars + idx,
+    // - j_var * n_uvars + u_idx1.
+    const auto u_idx1 = uname_to_index(var1.name());
+    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
+                                      builder.getInt32(idx));
+    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(u_idx1));
+    // Convert into pointers.
+    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
+    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
+    // Load the values.
+    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
+    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
+    // Update ret_acc: ret_acc = ret_acc + v0*v1.
+    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(ret_acc), builder.CreateFMul(v0, v1)), ret_acc);
+
+    // Compute the next value of the iteration.
+    // NOTE: addition works regardless of integral signedness.
+    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+
+    // Compute the end condition.
+    // NOTE: we use the unsigned less-than-or-equal predicate.
+    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULE, next_j_var, order, "loopcond");
+
+    // Create the "after loop" block and insert it.
+    auto *loop_end_bb = builder.GetInsertBlock();
+    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop", f);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    builder.SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    j_var->addIncoming(next_j_var, loop_end_bb);
+
+    // Load the divisor for the quotient formula.
+    // This is the zero-th order derivative of var1.
+    // The index is thus just u_idx1.
+    auto div_ptr = builder.CreateInBoundsGEP(diff_ptr, builder.getInt32(u_idx1), "div_ptr");
+    auto div = builder.CreateLoad(div_ptr, "div");
+
+    if constexpr (std::is_same_v<U, number>) {
+        // nv is a number. Negate the accumulator
+        // and divide it by the divisor.
+        builder.CreateRet(builder.CreateFDiv(builder.CreateFNeg(builder.CreateLoad(ret_acc)), div));
+    } else {
+        // nv is a variable. We need to fetch its
+        // derivative of order 'order' from the array of derivatives.
+        // The index will be order * n_uvars + u_idx0.
+        const auto u_idx0 = uname_to_index(nv.name());
+        arr_idx0 = builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx0));
+        arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_nv_ptr");
+        auto diff_nv_v = builder.CreateLoad(arr_ptr0, "diff_nv");
+
+        // Produce the result: (diff_nv_v - ret_acc) / div.
+        builder.CreateRet(builder.CreateFDiv(builder.CreateFSub(diff_nv_v, builder.CreateLoad(ret_acc)), div));
+    }
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// Derivative of var / number.
+template <typename T>
+llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t, const variable &var, const number &num,
+                                        const std::string &name, std::uint32_t n_uvars,
+                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    // NOTE: implement as the derivative of var * (1 / number).
+    return bo_taylor_diff_mul_impl<T>(s, var, number(1.) / num, name, n_uvars, cd_uvars);
+}
+
+// All the other cases. We should never end up here.
+template <typename, typename V1, typename V2>
+llvm::Function *bo_taylor_diff_div_impl(llvm_state &, std::uint32_t, const V1 &, const V2 &, const std::string &,
+                                        std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+{
+    assert(false);
+
+    return nullptr;
+}
+
+template <typename T>
+llvm::Function *bo_taylor_diff_div(llvm_state &s, const binary_operator &bo, std::uint32_t idx, const std::string &name,
+                                   std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    return std::visit(
+        [&s, idx, &name, n_uvars, &cd_uvars](const auto &v1, const auto &v2) {
+            return bo_taylor_diff_div_impl<T>(s, idx, v1, v2, name, n_uvars, cd_uvars);
+        },
+        bo.lhs().value(), bo.rhs().value());
 }
 
 template <typename T>
