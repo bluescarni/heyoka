@@ -21,8 +21,13 @@
 
 namespace heyoka
 {
+namespace detail
+{
+//void extract_subtree_impl(expression &, const expression &, const size_t, size_t &);
+//void count_nodes_impl(const expression &, size_t &);
+} // namespace detail
 
-class HEYOKA_DLL_PUBLIC random_expression
+class HEYOKA_DLL_PUBLIC expression_generator
 {
 public:
     enum node_type { num, var, bo, u_fun, b_fun };
@@ -32,11 +37,11 @@ private:
     std::vector<expression (*)(expression)> m_u_funcs;
     std::vector<expression (*)(expression, expression)> m_b_funcs;
     std::vector<std::string> m_vars;
-    detail::random_engine_type m_e;
+    mutable detail::random_engine_type m_e;
 
 public:
-    explicit random_expression(const std::vector<std::string> &, ::std::uint64_t);
-    expression operator()(unsigned, unsigned, unsigned = 0u);
+    explicit expression_generator(const std::vector<std::string> &, ::std::uint64_t);
+    expression operator()(unsigned, unsigned, unsigned = 0u) const;
 
     // getters
     const std::vector<binary_operator::type> &get_bos() const;
@@ -49,11 +54,14 @@ public:
     void set_u_funcs(const std::vector<expression (*)(expression)> &);
     void set_b_funcs(const std::vector<expression (*)(expression, expression)> &);
     void set_vars(const std::vector<std::string> &);
-
-    // expression manipulation
-    void mutate(expression &, double, unsigned = 0u);
 };
 
+// expression manipulators
+HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
+HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
+                              const unsigned = 0u);
+HEYOKA_DLL_PUBLIC void extract_subtree(expression &, const expression &, const std::size_t);
+HEYOKA_DLL_PUBLIC void inject_subtree(expression &, const expression &, const std::size_t);
 
 } // namespace heyoka
 

@@ -11,6 +11,8 @@
 #include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/gp.hpp>
+#include <heyoka/math_functions.hpp>
+#include <heyoka/variable.hpp>
 
 #include "catch.hpp"
 
@@ -22,10 +24,17 @@ using namespace Catch::literals;
 TEST_CASE("basic")
 {
     std::random_device rd;
-    detail::random_engine_type e(rd());
-    random_expression random_e({"x", "y"}, e());
-    auto ex = random_e(2, 5);
-    std::cout << ex << "\n";
-    random_e.mutate(ex, 0.005);
-    std::cout << ex << "\n";
+    detail::random_engine_type engine(rd());
+    expression_generator generator({"x", "y"}, engine());
+    auto ex = generator(2, 5);
+    std::cout << "Random: " << ex << "\n";
+    mutate(ex, generator, 0.1, engine);
+    std::cout << "Mutated: " << ex << "\n";
+    std::uniform_int_distribution<> node_target(0, count_nodes(ex) - 1u);
+    auto ex2 = ex;
+    extract_subtree(ex2, ex, node_target(engine));
+    std::cout << "Extracted: " << ex2 << "\n";
+
+    inject_subtree(ex, ex2, node_target(engine));
+    std::cout << "Injected: " << ex << "\n";
 }

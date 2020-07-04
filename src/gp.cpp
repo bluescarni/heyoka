@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <iostream>
 #include <random>
 #include <string>
 #include <variant>
@@ -19,6 +20,8 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
+#include <heyoka/detail/type_traits.hpp>
+
 namespace heyoka
 {
 
@@ -31,9 +34,78 @@ It random_element(It start, It end, Rng &g)
     std::advance(start, dis(g));
     return start;
 }
+
+void extract_subtree_impl(expression &e_sub, const expression &e, const size_t node_target, size_t &node_counter)
+{
+    if (node_target == node_counter) {
+        e_sub = e;
+        node_counter++;
+    } else {
+        node_counter++;
+        std::visit(
+            [&e_sub, &e, &node_target, &node_counter](auto &node) {
+                using type = detail::uncvref_t<decltype(node)>;
+                if constexpr (std::is_same_v<type, binary_operator>) {
+                    // code for binary_operator
+                    extract_subtree_impl(e_sub, node.lhs(), node_target, node_counter);
+                    extract_subtree_impl(e_sub, node.rhs(), node_target, node_counter);
+                } else if constexpr (std::is_same_v<type, function>) {
+                    // code for function
+                    for (auto &arg : node.args()) {
+                        extract_subtree_impl(e_sub, arg, node_target, node_counter);
+                    }
+                }
+            },
+            e.value());
+    }
+}
+
+void inject_subtree_impl(expression &e, const expression &e_sub, const size_t node_target, size_t &node_counter)
+{
+    if (node_target == node_counter) {
+        e = e_sub;
+        node_counter++;
+    } else {
+        node_counter++;
+        std::visit(
+            [&e, &e_sub, &node_target, &node_counter](auto &node) {
+                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
+                    // code for binary_operator
+                    inject_subtree_impl(node.lhs(), e_sub, node_target, node_counter);
+                    inject_subtree_impl(node.rhs(), e_sub, node_target, node_counter);
+                } else if constexpr (std::is_same_v<decltype(node), function &>) {
+                    // code for function
+                    for (auto &arg : node.args()) {
+                        inject_subtree_impl(arg, e_sub, node_target, node_counter);
+                    }
+                }
+            },
+            e.value());
+    }
+}
+
+void count_nodes_impl(const expression &e, std::size_t &node_counter)
+{
+    node_counter++;
+    std::visit(
+        [&e, &node_counter](auto &node) {
+            using type = detail::uncvref_t<decltype(node)>;
+            if constexpr (std::is_same_v<type, binary_operator>) {
+                // code for binary_operator
+                count_nodes_impl(node.lhs(), node_counter);
+                count_nodes_impl(node.rhs(), node_counter);
+            } else if constexpr (std::is_same_v<type, function>) {
+                // code for function
+                for (auto &arg : node.args()) {
+                    count_nodes_impl(arg, node_counter);
+                }
+            }
+        },
+        e.value());
+}
 } // namespace detail
 
-random_expression::random_expression(const std::vector<std::string> &vars, ::std::uint64_t seed)
+expression_generator::expression_generator(const std::vector<std::string> &vars, ::std::uint64_t seed)
     : m_vars(vars), m_e(seed), m_b_funcs()
 {
     // These are the default blocks for a random expression.
@@ -43,7 +115,7 @@ random_expression::random_expression(const std::vector<std::string> &vars, ::std
     m_b_funcs = {};
 };
 
-expression random_expression::operator()(unsigned min_depth, unsigned max_depth, unsigned depth)
+expression expression_generator::operator()(unsigned min_depth, unsigned max_depth, unsigned depth) const
 {
     std::uniform_real_distribution<double> rng01(0.0, 1.0);
     std::uniform_real_distribution<double> rngm11(-1.0, 1.0);
@@ -143,63 +215,81 @@ expression random_expression::operator()(unsigned min_depth, unsigned max_depth,
     }
 };
 
-const std::vector<binary_operator::type> &random_expression::get_bos() const
+const std::vector<binary_operator::type> &expression_generator::get_bos() const
 {
     return m_bos;
 }
-const std::vector<expression (*)(expression)> &random_expression::get_u_funcs() const
+const std::vector<expression (*)(expression)> &expression_generator::get_u_funcs() const
 {
     return m_u_funcs;
 }
-const std::vector<expression (*)(expression, expression)> &random_expression::get_b_funcs() const
+const std::vector<expression (*)(expression, expression)> &expression_generator::get_b_funcs() const
 {
     return m_b_funcs;
 }
-const std::vector<std::string> &random_expression::get_vars() const
+const std::vector<std::string> &expression_generator::get_vars() const
 {
     return m_vars;
 }
 
-void random_expression::set_bos(const std::vector<binary_operator::type> &bos)
+void expression_generator::set_bos(const std::vector<binary_operator::type> &bos)
 {
     m_bos = bos;
 }
-void random_expression::set_u_funcs(const std::vector<expression (*)(expression)> &u_funcs)
+void expression_generator::set_u_funcs(const std::vector<expression (*)(expression)> &u_funcs)
 {
     m_u_funcs = u_funcs;
 }
-void random_expression::set_b_funcs(const std::vector<expression (*)(expression, expression)> &b_funcs)
+void expression_generator::set_b_funcs(const std::vector<expression (*)(expression, expression)> &b_funcs)
 {
     m_b_funcs = b_funcs;
 }
-void random_expression::set_vars(const std::vector<std::string> &vars)
+void expression_generator::set_vars(const std::vector<std::string> &vars)
 {
     m_vars = vars;
 }
 
-void random_expression::mutate(expression &e, double mut_p, unsigned depth)
+void mutate(expression &e, const expression_generator &generator, const double mut_p,
+            detail::random_engine_type &engine, const unsigned depth)
 {
     std::uniform_real_distribution<> rng01(0., 1.);
-    if (rng01(m_e) < mut_p) {
-        e = this->operator()(2, 4, depth);
+    if (rng01(engine) < mut_p) {
+        e = generator(2, 4, depth);
     } else {
         std::visit(
-            [&e, this, &mut_p, &depth](auto &node) {
+            [&e, &generator, &mut_p, &depth, &engine](auto &node) {
                 if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
                     // code for binary_operator
-                    mutate(node.lhs(), mut_p, depth + 1);
-                    mutate(node.rhs(), mut_p, depth + 1);
+                    mutate(node.lhs(), generator, mut_p, engine, depth + 1);
+                    mutate(node.rhs(), generator, mut_p, engine, depth + 1);
                 } else if constexpr (std::is_same_v<decltype(node), function &>) {
                     // code for function
                     for (auto &branch : node.args()) {
-                        mutate(branch, mut_p, depth + 1);
+                        mutate(branch, generator, mut_p, engine, depth + 1);
                     }
-                } else {
-                    e = this->operator()(1, 2, depth);
                 }
             },
             e.value());
     }
+}
+
+size_t count_nodes(const expression &e)
+{
+    size_t node_counter = 0u;
+    detail::count_nodes_impl(e, node_counter);
+    return node_counter;
+}
+
+void extract_subtree(expression &e_sub, const expression &e, const size_t node_target)
+{
+    size_t node_counter = 0;
+    detail::extract_subtree_impl(e_sub, e, node_target, node_counter);
+}
+
+void inject_subtree(expression &e, const expression &e_sub, const size_t node_target)
+{
+    size_t node_counter = 0;
+    detail::inject_subtree_impl(e, e_sub, node_target, node_counter);
 }
 
 } // namespace heyoka
