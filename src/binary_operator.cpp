@@ -16,20 +16,16 @@
 #include <memory>
 #include <ostream>
 #include <string>
-#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
@@ -405,52 +401,6 @@ namespace detail
 namespace
 {
 
-// Common boilerplate for the implementation of
-// the Taylor derivatives of binary operators.
-template <typename T>
-auto bo_taylor_diff_common(llvm_state &s, const std::string &name)
-{
-    auto &builder = s.builder();
-
-    // Check the function name.
-    if (s.module().getFunction(name) != nullptr) {
-        throw std::invalid_argument("Cannot add the function '" + name
-                                    + "' when building the Taylor derivative of a binary operator expression: the "
-                                      "function already exists in the LLVM module");
-    }
-
-    // Prepare the function prototype. The arguments are:
-    // - const float pointer to the derivatives array,
-    // - 32-bit integer (order of the derivative).
-    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())), builder.getInt32Ty()};
-
-    // The function will return the n-th derivative as a float.
-    auto *ft = llvm::FunctionType::get(to_llvm_type<T>(s.context()), fargs, false);
-    assert(ft != nullptr);
-
-    // Now create the function. Don't need to call it from outside,
-    // thus internal linkage.
-    auto *f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, name, s.module());
-    assert(f != nullptr);
-
-    // Setup the function arugments.
-    auto arg_it = f->args().begin();
-    arg_it->setName("diff_ptr");
-    arg_it->addAttr(llvm::Attribute::ReadOnly);
-    arg_it->addAttr(llvm::Attribute::NoCapture);
-    auto diff_ptr = arg_it;
-
-    (++arg_it)->setName("order");
-    auto order = arg_it;
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
-    assert(bb != nullptr);
-    builder.SetInsertPoint(bb);
-
-    return std::tuple{f, diff_ptr, order};
-}
-
 // Derivative of number +- number.
 template <bool, typename T>
 llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const number &, const std::string &name,
@@ -458,7 +408,7 @@ llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const 
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
     builder.CreateRet(invoke_codegen<T>(s, number(0.)));
@@ -479,7 +429,7 @@ llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const 
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Compute the index for accessing the derivative. The index is order * n_uvars + u_idx.
     const auto u_idx = uname_to_index(var.name());
@@ -508,7 +458,7 @@ llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, c
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Compute the index for accessing the derivative. The index is order * n_uvars + u_idx.
     const auto u_idx = uname_to_index(var.name());
@@ -534,7 +484,7 @@ llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, 
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Compute the indices for accessing the derivatives. The indices are order * n_uvars + (idx0, idx1).
     const auto u_idx0 = uname_to_index(var0.name());
@@ -598,7 +548,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const number &, const num
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
     builder.CreateRet(invoke_codegen<T>(s, number(0.)));
@@ -615,7 +565,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const number &num, const 
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Compute the index for accessing the derivative. The index is order * n_uvars + u_idx.
     const auto u_idx = uname_to_index(var.name());
@@ -649,7 +599,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, con
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
@@ -750,7 +700,7 @@ llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t, const numb
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
     builder.CreateRet(invoke_codegen<T>(s, number(0.)));
@@ -770,7 +720,7 @@ llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t idx, const 
 {
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = bo_taylor_diff_common<T>(s, name);
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // Let's build the result of the summation first.
     // Accumulator for the result.
