@@ -80,6 +80,12 @@ expression operator""_ldbl(unsigned long long n)
 
 } // namespace literals
 
+void swap(number &n0, number &n1) noexcept
+{
+    using std::swap;
+    swap(n0.value(), n1.value());
+}
+
 std::ostream &operator<<(std::ostream &os, const number &n)
 {
     return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, n.value());

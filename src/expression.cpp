@@ -67,6 +67,12 @@ void rename_variables(expression &e, const std::unordered_map<std::string, std::
     std::visit([&repl_map](auto &arg) { rename_variables(arg, repl_map); }, e.value());
 }
 
+void swap(expression &ex0, expression &ex1) noexcept
+{
+    using std::swap;
+    swap(ex0.value(), ex1.value());
+}
+
 std::ostream &operator<<(std::ostream &os, const expression &e)
 {
     return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, e.value());
