@@ -16,4 +16,6 @@ function(ADD_HEYOKA_BENCHMARK arg1)
   add_test(${arg1} ${arg1})
 endfunction()
 
-ADD_HEYOKA_BENCHMARK(evaluate_benchmark_dbl)
+ADD_HEYOKA_BENCHMARK(evaluate_dbl)
+ADD_HEYOKA_BENCHMARK(genetics)
+

@@ -60,13 +60,12 @@ std::vector<std::unordered_map<std::string, double>> vv_to_vd(const std::vector<
 using namespace std::chrono;
 int main()
 {
-    // Init the LLVM machinery.
-    llvm_state s{"optimized"};
-
     auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
     std::cout << "ex: " << ex << "\n";
 
-    unsigned N = 10000;
+    unsigned N = 10000u;
+    unsigned N_batches = 50u;
+    unsigned batch_size = N / N_batches;
 
     auto args_vv = random_args_vv(N, 3u);
 
@@ -92,20 +91,23 @@ int main()
               << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
     //
     //// 5 - we time the function call from evaluate_batch (size 200)
-    // std::vector<std::unordered_map<std::string, std::vector<double>>> args_dv_batches(10000 / 200);
-    // for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
-    //    std::vector<std::vector<double>> tmp(args_vv.begin() + 200 * i, args_vv.begin() + 200 * (i + 1));
-    //    args_dv_batches[i] = vv_to_dv(tmp);
-    //}
-    // out = std::vector<double>(200, 0.123);
-    // start = high_resolution_clock::now();
-    // for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
-    //    ex(args_dv_batches[i], out);
-    //}
-    // stop = high_resolution_clock::now();
-    // duration = duration_cast<microseconds>(stop - start);
-    // std::cout << "Millions of evaluations per second (tree in batches of 200): "
-    //          << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
+    std::vector<std::unordered_map<std::string, std::vector<double>>> args_dv_batches(N_batches);
+    for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
+        std::vector<std::vector<double>> tmp(args_vv.begin() + batch_size * i, args_vv.begin() + batch_size * (i + 1));
+        args_dv_batches[i] = vv_to_dv(tmp);
+    }
+    out = std::vector<double>(batch_size, 0.123);
+    start = high_resolution_clock::now();
+    for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
+        eval_batch_dbl(out, ex, args_dv_batches[i]);
+    }
+    stop = high_resolution_clock::now();
+    duration = duration_cast<microseconds>(stop - start);
+    std::cout << "Millions of evaluations per second (tree in batches of 200): "
+              << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
+    //
+    // Init the LLVM machinery.
+    // llvm_state s{"optimized"};
     //
     //// 6 - we time the function call from llvm batch
     // auto func_batch = s.fetch_batch("f");
