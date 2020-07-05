@@ -8,17 +8,27 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <iterator>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
+#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -116,6 +126,38 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const expression &e, llvm::Value *a
 {
     heyoka_assert_nonnull_ret(
         std::visit([&s, arr](const auto &arg) { return taylor_init_ldbl(s, arg, arr); }, e.value()));
+}
+
+llvm::Function *taylor_diff_dbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
+                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    auto visitor = [&s, idx, &name, n_uvars, &cd_uvars](const auto &v) -> llvm::Function * {
+        using type = detail::uncvref_t<decltype(v)>;
+
+        if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+            return taylor_diff_dbl(s, v, idx, name, n_uvars, cd_uvars);
+        } else {
+            throw std::invalid_argument("Taylor derivatives can be computed only for binary operators or functions");
+        }
+    };
+
+    heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
+}
+
+llvm::Function *taylor_diff_ldbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
+                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    auto visitor = [&s, idx, &name, n_uvars, &cd_uvars](const auto &v) -> llvm::Function * {
+        using type = detail::uncvref_t<decltype(v)>;
+
+        if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+            return taylor_diff_ldbl(s, v, idx, name, n_uvars, cd_uvars);
+        } else {
+            throw std::invalid_argument("Taylor derivatives can be computed only for binary operators or functions");
+        }
+    };
+
+    heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
 }
 
 } // namespace heyoka

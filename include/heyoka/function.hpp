@@ -10,6 +10,7 @@
 #define HEYOKA_FUNCTION_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -44,6 +45,9 @@ public:
     using taylor_decompose_t
         = std::function<std::vector<expression>::size_type(function &&, std::vector<expression> &)>;
     using taylor_init_t = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *)>;
+    using taylor_diff_t
+        = std::function<llvm::Function *(llvm_state &, const function &, std::uint32_t, const std::string &,
+                                         std::uint32_t, const std::unordered_map<std::uint32_t, number> &)>;
 
 private:
     bool m_disable_verify = false;
@@ -62,6 +66,8 @@ private:
     taylor_decompose_t m_taylor_decompose_f;
     taylor_init_t m_taylor_init_dbl_f;
     taylor_init_t m_taylor_init_ldbl_f;
+    taylor_diff_t m_taylor_diff_dbl_f;
+    taylor_diff_t m_taylor_diff_ldbl_f;
 
 public:
     explicit function(std::vector<expression>);
@@ -87,6 +93,8 @@ public:
     taylor_decompose_t &taylor_decompose_f();
     taylor_init_t &taylor_init_dbl_f();
     taylor_init_t &taylor_init_ldbl_f();
+    taylor_diff_t &taylor_diff_dbl_f();
+    taylor_diff_t &taylor_diff_ldbl_f();
 
     const bool &disable_verify() const;
     const std::string &dbl_name() const;
@@ -103,6 +111,8 @@ public:
     const taylor_decompose_t &taylor_decompose_f() const;
     const taylor_init_t &taylor_init_dbl_f() const;
     const taylor_init_t &taylor_init_ldbl_f() const;
+    const taylor_diff_t &taylor_diff_dbl_f() const;
+    const taylor_diff_t &taylor_diff_ldbl_f() const;
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
@@ -138,6 +148,10 @@ HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(f
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const function &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const function &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const function &, std::uint32_t, const std::string &,
+                                                  std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const function &, std::uint32_t, const std::string &,
+                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
 
 } // namespace heyoka
 

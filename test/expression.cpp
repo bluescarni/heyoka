@@ -335,21 +335,38 @@ TEST_CASE("basic")
     // auto d = taylor_decompose({(1_dbl + x) + (1_dbl + x)});
     // auto d = taylor_decompose({expression{binary_operator{binary_operator::type::add, 1_dbl, 1_dbl}}, x + y *
     // sin(x)});
-    auto d = taylor_decompose({x * (1_dbl + x), x * (1_dbl + cos(y))});
+    // auto d = taylor_decompose({x * (1_dbl + x), x * (1_dbl + cos(y))});
 
-    for (const auto &ex : d) {
-        std::cout << ex << '\n';
-    }
+    // for (const auto &ex : d) {
+    //     std::cout << ex << '\n';
+    // }
 
-#if 0
     auto ex = sin("x"_var) + 1.1_ldbl;
 
     llvm_state s{"pippo"};
 
-    s.add_ldbl("f", ex);
+    // s.add_taylor_stepper_dbl("f", {y, (1_dbl - x * x) * y - x}, 20);
+    // s.add_taylor_jet_dbl("fj", {y, (1_dbl - x * x) * y - x}, 20);
+    s.add_taylor_jet_dbl("fj", {cos(y), sin(x)}, 20);
 
     std::cout << s.dump() << '\n';
 
+    s.compile();
+
+    std::cout.precision(14);
+
+    double state[(20 + 1) * 2] = {};
+    state[0] = 1;
+    state[1] = 2;
+
+    // s.fetch_taylor_stepper_dbl("f")(state, .1, 12);
+    // s.fetch_taylor_stepper_dbl("f")(state, -.1, 12);
+    s.fetch_taylor_jet_dbl("fj")(state, 3);
+    for (auto v : state) {
+        std::cout << v << '\n';
+    }
+
+#if 0
     s.compile();
 
     auto f = s.fetch_ldbl<1>("f");

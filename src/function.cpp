@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -32,6 +33,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -77,7 +79,8 @@ function::function(const function &f)
       m_attributes(f.m_attributes), m_ty(f.ty()), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
       m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
       m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f),
-      m_taylor_init_dbl_f(f.m_taylor_init_dbl_f), m_taylor_init_ldbl_f(f.m_taylor_init_ldbl_f)
+      m_taylor_init_dbl_f(f.m_taylor_init_dbl_f), m_taylor_init_ldbl_f(f.m_taylor_init_ldbl_f),
+      m_taylor_diff_dbl_f(f.m_taylor_diff_dbl_f), m_taylor_diff_ldbl_f(f.m_taylor_diff_ldbl_f)
 {
 }
 
@@ -172,6 +175,16 @@ function::taylor_init_t &function::taylor_init_ldbl_f()
     return m_taylor_init_ldbl_f;
 }
 
+function::taylor_diff_t &function::taylor_diff_dbl_f()
+{
+    return m_taylor_diff_dbl_f;
+}
+
+function::taylor_diff_t &function::taylor_diff_ldbl_f()
+{
+    return m_taylor_diff_ldbl_f;
+}
+
 const bool &function::disable_verify() const
 {
     return m_disable_verify;
@@ -249,6 +262,16 @@ const function::taylor_init_t &function::taylor_init_ldbl_f() const
     return m_taylor_init_ldbl_f;
 }
 
+const function::taylor_diff_t &function::taylor_diff_dbl_f() const
+{
+    return m_taylor_diff_dbl_f;
+}
+
+const function::taylor_diff_t &function::taylor_diff_ldbl_f() const
+{
+    return m_taylor_diff_ldbl_f;
+}
+
 std::ostream &operator<<(std::ostream &os, const function &f)
 {
     os << f.display_name() << '(';
@@ -299,7 +322,9 @@ bool operator==(const function &f1, const function &f2)
            && static_cast<bool>(f1.deval_num_dbl_f()) == static_cast<bool>(f2.deval_num_dbl_f())
            && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f())
            && static_cast<bool>(f1.taylor_init_dbl_f()) == static_cast<bool>(f2.taylor_init_dbl_f())
-           && static_cast<bool>(f1.taylor_init_ldbl_f()) == static_cast<bool>(f2.taylor_init_ldbl_f());
+           && static_cast<bool>(f1.taylor_init_ldbl_f()) == static_cast<bool>(f2.taylor_init_ldbl_f())
+           && static_cast<bool>(f1.taylor_diff_dbl_f()) == static_cast<bool>(f2.taylor_diff_dbl_f())
+           && static_cast<bool>(f1.taylor_diff_ldbl_f()) == static_cast<bool>(f2.taylor_diff_ldbl_f());
 }
 
 bool operator!=(const function &f1, const function &f2)
@@ -492,7 +517,7 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
         default: {
             // Builtin.
             const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(f_name);
-            if (!intrinsic_ID) {
+            if (intrinsic_ID == 0) {
                 throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + f_name + "'");
             }
 
@@ -567,7 +592,7 @@ llvm::Value *taylor_init_dbl(llvm_state &s, const function &f, llvm::Value *arr)
     auto &tidf = f.taylor_init_dbl_f();
     if (!tidf) {
         throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for doulbe Taylor init");
+                                    + "' does not provide a function for double Taylor init");
     }
     return tidf(s, f, arr);
 }
@@ -577,9 +602,31 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const function &f, llvm::Value *arr
     auto &tildf = f.taylor_init_ldbl_f();
     if (!tildf) {
         throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for long doulbe Taylor init");
+                                    + "' does not provide a function for long double Taylor init");
     }
     return tildf(s, f, arr);
+}
+
+llvm::Function *taylor_diff_dbl(llvm_state &s, const function &f, std::uint32_t idx, const std::string &name,
+                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    auto &tdd = f.taylor_diff_dbl_f();
+    if (!tdd) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for double Taylor diff");
+    }
+    return tdd(s, f, idx, name, n_uvars, cd_uvars);
+}
+
+llvm::Function *taylor_diff_ldbl(llvm_state &s, const function &f, std::uint32_t idx, const std::string &name,
+                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    auto &tdl = f.taylor_diff_ldbl_f();
+    if (!tdl) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for long double Taylor diff");
+    }
+    return tdl(s, f, idx, name, n_uvars, cd_uvars);
 }
 
 } // namespace heyoka
