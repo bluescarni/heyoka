@@ -60,6 +60,12 @@ expression operator""_var(const char *s, std::size_t n)
 
 } // namespace literals
 
+void swap(variable &v0, variable &v1) noexcept
+{
+    using std::swap;
+    swap(v0.name(), v1.name());
+}
+
 std::ostream &operator<<(std::ostream &os, const variable &var)
 {
     return os << var.name();

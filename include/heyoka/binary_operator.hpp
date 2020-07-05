@@ -24,8 +24,12 @@
 namespace heyoka
 {
 
+HEYOKA_DLL_PUBLIC void swap(binary_operator &, binary_operator &) noexcept;
+
 class HEYOKA_DLL_PUBLIC binary_operator
 {
+    friend void swap(binary_operator &, binary_operator &) noexcept;
+
 public:
     enum class type { add, sub, mul, div };
 

@@ -50,6 +50,8 @@ public:
     const value_type &value() const;
 };
 
+HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);

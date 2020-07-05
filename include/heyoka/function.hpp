@@ -115,6 +115,8 @@ public:
     const taylor_diff_t &taylor_diff_ldbl_f() const;
 };
 
+HEYOKA_DLL_PUBLIC void swap(function &, function &) noexcept;
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const function &);

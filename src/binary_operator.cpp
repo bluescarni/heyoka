@@ -105,6 +105,13 @@ const binary_operator::type &binary_operator::op() const
     return m_type;
 }
 
+void swap(binary_operator &bo0, binary_operator &bo1) noexcept
+{
+    using std::swap;
+    swap(bo0.m_type, bo1.m_type);
+    swap(bo0.m_ops, bo1.m_ops);
+}
+
 std::ostream &operator<<(std::ostream &os, const binary_operator &bo)
 {
     os << '(' << bo.lhs() << ' ';
