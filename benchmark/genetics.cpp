@@ -19,6 +19,8 @@ int main()
         std::cout << *fetch_from_node_id(ex2, 4) << '\n';
         std::cout << *fetch_from_node_id(ex2, 5) << '\n';
         std::cout << *fetch_from_node_id(ex2, 6) << '\n';
+        std::cout << fetch_from_node_id(ex2, 7) << '\n';
+
     }
     unsigned N = 10000;
     std::random_device rd;

@@ -273,11 +273,10 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
 {
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
     std::uniform_int_distribution<std::size_t> t2(0, count_nodes(e2) - 1u);
-    // We need to construct bogus expressions to extract in the subtrees.
-    auto node_target1 = t1(engine);
-    auto node_target2 = t2(engine);
-    auto e2_sub_ptr = fetch_from_node_id(e1, node_target1);
-    auto e1_sub_ptr = fetch_from_node_id(e2, node_target2);
+    auto node_id1 = t1(engine);
+    auto node_id2 = t2(engine);
+    auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
+    auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
     assert(e2_sub_ptr != nullptr);
     assert(e1_sub_ptr != nullptr);
     swap(*e2_sub_ptr, *e1_sub_ptr);
