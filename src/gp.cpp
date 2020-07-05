@@ -35,52 +35,26 @@ It random_element(It start, It end, Rng &g)
     return start;
 }
 
-void extract_subtree_impl(expression &e_sub, const expression &e, const size_t node_target, size_t &node_counter)
+void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &node_counter, expression *&ret)
 {
-    if (node_target == node_counter) {
-        e_sub = e;
-        node_counter++;
+    if (node_counter == node_id) {
+        ret = &ex;
+        return;
     } else {
-        node_counter++;
+        ++node_counter;
         std::visit(
-            [&e_sub, &e, &node_target, &node_counter](auto &node) {
+            [node_id, &node_counter, &ret](auto &node) {
                 using type = detail::uncvref_t<decltype(node)>;
                 if constexpr (std::is_same_v<type, binary_operator>) {
-                    // code for binary_operator
-                    extract_subtree_impl(e_sub, node.lhs(), node_target, node_counter);
-                    extract_subtree_impl(e_sub, node.rhs(), node_target, node_counter);
+                    fetch_from_node_id_impl(node.lhs(), node_id, node_counter, ret);
+                    fetch_from_node_id_impl(node.rhs(), node_id, node_counter, ret);
                 } else if constexpr (std::is_same_v<type, function>) {
-                    // code for function
                     for (auto &arg : node.args()) {
-                        extract_subtree_impl(e_sub, arg, node_target, node_counter);
+                        fetch_from_node_id_impl(arg, node_id, node_counter, ret);
                     }
                 }
             },
-            e.value());
-    }
-}
-
-void inject_subtree_impl(expression &e, const expression &e_sub, const size_t node_target, size_t &node_counter)
-{
-    if (node_target == node_counter) {
-        e = e_sub;
-        node_counter++;
-    } else {
-        node_counter++;
-        std::visit(
-            [&e, &e_sub, &node_target, &node_counter](auto &node) {
-                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
-                    // code for binary_operator
-                    inject_subtree_impl(node.lhs(), e_sub, node_target, node_counter);
-                    inject_subtree_impl(node.rhs(), e_sub, node_target, node_counter);
-                } else if constexpr (std::is_same_v<decltype(node), function &>) {
-                    // code for function
-                    for (auto &arg : node.args()) {
-                        inject_subtree_impl(arg, e_sub, node_target, node_counter);
-                    }
-                }
-            },
-            e.value());
+            ex.value());
     }
 }
 
@@ -280,16 +254,14 @@ size_t count_nodes(const expression &e)
     return node_counter;
 }
 
-void extract_subtree(expression &e_sub, const expression &e, const size_t node_target)
+expression *fetch_from_node_id(expression &ex, std::size_t node_id)
 {
-    size_t node_counter = 0;
-    detail::extract_subtree_impl(e_sub, e, node_target, node_counter);
-}
+    std::size_t cur_id = 0;
+    expression *ret = nullptr;
 
-void inject_subtree(expression &e, const expression &e_sub, const size_t node_target)
-{
-    size_t node_counter = 0;
-    detail::inject_subtree_impl(e, e_sub, node_target, node_counter);
+    detail::fetch_from_node_id_impl(ex, node_id, cur_id, ret);
+
+    return ret;
 }
 
 void crossover(expression &e1, expression &e2, detail::random_engine_type &engine)
@@ -297,14 +269,13 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
     std::uniform_int_distribution<std::size_t> t2(0, count_nodes(e2) - 1u);
     // We need to construct bogus expressions to extract in the subtrees.
-    expression e1_sub{number{0.}};
-    expression e2_sub{number{0.}};
     auto node_target1 = t1(engine);
     auto node_target2 = t2(engine);
-    extract_subtree(e1_sub, e1, node_target1);
-    extract_subtree(e2_sub, e2, node_target2);
-    inject_subtree(e1, e2_sub, node_target1);
-    inject_subtree(e2, e1_sub, node_target2);
+    auto e2_sub_ptr = fetch_from_node_id(e1, node_target1);
+    auto e1_sub_ptr = fetch_from_node_id(e2, node_target2);
+    assert(e2_sub_ptr != nullptr);
+    assert(e1_sub_ptr != nullptr);
+    swap(*e2_sub_ptr, *e1_sub_ptr);
 }
 
 } // namespace heyoka

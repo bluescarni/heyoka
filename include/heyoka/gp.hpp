@@ -23,8 +23,8 @@ namespace heyoka
 {
 namespace detail
 {
-//void extract_subtree_impl(expression &, const expression &, const size_t, size_t &);
-//void count_nodes_impl(const expression &, size_t &);
+// void extract_subtree_impl(expression &, const expression &, const size_t, size_t &);
+// void count_nodes_impl(const expression &, size_t &);
 } // namespace detail
 
 class HEYOKA_DLL_PUBLIC expression_generator
@@ -60,8 +60,7 @@ public:
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
 HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
                               const unsigned = 0u);
-HEYOKA_DLL_PUBLIC void extract_subtree(expression &, const expression &, const std::size_t);
-HEYOKA_DLL_PUBLIC void inject_subtree(expression &, const expression &, const std::size_t);
+HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
 
 } // namespace heyoka
