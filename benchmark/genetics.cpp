@@ -2,9 +2,8 @@
 #include <iostream>
 #include <random>
 
-#include <heyoka/gp.hpp>
 #include <heyoka/detail/splitmix64.hpp>
-
+#include <heyoka/gp.hpp>
 
 using namespace heyoka;
 
@@ -18,9 +17,19 @@ int main()
     expression_generator generator({"x", "y"}, engine());
     auto start = high_resolution_clock::now();
     for (auto i = 0u; i < N; ++i) {
-        auto ex = generator(2u, 6u);
+        auto ex = generator(2u, 4u);
     }
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
-    std::cout << "Millions of expressions generated: " << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
+    std::cout << "Millions of expressions generated per second: " << N / static_cast<double>(duration.count()) << "M\n";
+
+    // 2 - We time the number of mutations we may do
+    start = high_resolution_clock::now();
+    auto ex = generator(2u, 4u);
+    for (auto i = 0u; i < N; ++i) {
+        mutate(ex, generator, 0.1, engine);
+    }
+    stop = high_resolution_clock::now();
+    duration = duration_cast<microseconds>(stop - start);
+    std::cout << "Millions of mutations per second: " << N / static_cast<double>(duration.count()) << "M\n";
 }
