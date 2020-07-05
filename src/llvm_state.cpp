@@ -760,6 +760,11 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
     // Create the array of derivatives for the u variables.
     // NOTE: the static cast is fine, as we checked earlier that n_uvars * max_order
     // fits in 32 bits.
+    // NOTE: by allocating max_order rows, we are able to store derivatives
+    // up to max_order - 1 (rather than max_order), because we start from order
+    // 0. This is ok, because in this function we will be reading/writing from/to
+    // the derivatives array only up to order - 1: the last step involves only the
+    // derivatives of the state variables, which access only values at order - 1.
     auto array_type
         = llvm::ArrayType::get(detail::to_llvm_type<T>(context()), static_cast<std::uint64_t>(n_uvars * max_order));
     assert(array_type != nullptr);
@@ -1040,6 +1045,11 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
     // Create the array of derivatives for the u variables.
     // NOTE: the static cast is fine, as we checked earlier that n_uvars * max_order
     // fits in 32 bits.
+    // NOTE: by allocating max_order rows, we are able to store derivatives
+    // up to max_order - 1 (rather than max_order), because we start from order
+    // 0. This is ok, because in this function we will be reading/writing from/to
+    // the derivatives array only up to order - 1: the last step involves only the
+    // derivatives of the state variables, which access only values at order - 1.
     auto array_type
         = llvm::ArrayType::get(detail::to_llvm_type<T>(context()), static_cast<std::uint64_t>(n_uvars * max_order));
     assert(array_type != nullptr);
