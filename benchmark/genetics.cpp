@@ -10,6 +10,16 @@ using namespace heyoka;
 using namespace std::chrono;
 int main()
 {
+    {
+        auto ex2 = ("x"_var + "y"_var) * 2_dbl - "y"_var;
+        std::cout << *fetch_from_node_id(ex2, 0) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 1) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 2) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 3) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 4) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 5) << '\n';
+        std::cout << *fetch_from_node_id(ex2, 6) << '\n';
+    }
     unsigned N = 10000;
     std::random_device rd;
     detail::random_engine_type engine(rd());

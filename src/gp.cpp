@@ -39,7 +39,6 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
 {
     if (node_counter == node_id) {
         ret = &ex;
-        return;
     } else {
         ++node_counter;
         std::visit(
@@ -47,10 +46,16 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
                 using type = detail::uncvref_t<decltype(node)>;
                 if constexpr (std::is_same_v<type, binary_operator>) {
                     fetch_from_node_id_impl(node.lhs(), node_id, node_counter, ret);
+                    if (ret) {
+                        return;
+                    }
                     fetch_from_node_id_impl(node.rhs(), node_id, node_counter, ret);
                 } else if constexpr (std::is_same_v<type, function>) {
                     for (auto &arg : node.args()) {
                         fetch_from_node_id_impl(arg, node_id, node_counter, ret);
+                        if (ret) {
+                            return;
+                        }
                     }
                 }
             },
