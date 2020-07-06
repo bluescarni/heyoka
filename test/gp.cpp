@@ -27,15 +27,13 @@ TEST_CASE("basic")
     detail::random_engine_type engine(rd());
     expression_generator generator({"x", "y"}, engine());
     auto ex = generator(2, 4);
+    auto ex2 = generator(2, 4);
     std::cout << "Random: " << ex << "\n";
     mutate(ex, generator, 0.1, engine);
     std::cout << "Mutated: " << ex << "\n";
     std::uniform_int_distribution<> node_target(0, count_nodes(ex) - 1u);
-    auto ex2 = ex;
-    extract_subtree(ex2, ex, node_target(engine));
-    std::cout << "Extracted: " << ex2 << "\n";
-    inject_subtree(ex, ex2, node_target(engine));
-    std::cout << "Injected: " << ex << "\n";
+    std::cout << "\nParent 1: " << ex << "\n";
+    std::cout << "Parent 2: " << ex2 << "\n";
     crossover(ex, ex2, engine);
     std::cout << "Crossovered 1: " << ex << "\n";
     std::cout << "Crossovered 2: " << ex2 << "\n";

@@ -269,7 +269,7 @@ expression *fetch_from_node_id(expression &ex, std::size_t node_id)
     return ret;
 }
 
-// Crossover randomly pick
+// Crossover
 void crossover(expression &e1, expression &e2, detail::random_engine_type &engine)
 {
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
@@ -283,7 +283,7 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
     swap(*e2_sub_ptr, *e1_sub_ptr);
 }
 
-// Version with the node count passed as argument (faster).
+// Crossover targeting specific node_ids
 void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, detail::random_engine_type &engine)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);

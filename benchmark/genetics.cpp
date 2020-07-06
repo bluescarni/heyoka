@@ -6,8 +6,34 @@
 #include <heyoka/gp.hpp>
 
 using namespace heyoka;
-
 using namespace std::chrono;
+
+static std::mt19937 gen(12345u);
+std::vector<std::vector<double>> random_args_vv(unsigned N, unsigned n)
+{
+    std::uniform_real_distribution<double> rngm11(-1, 1.);
+    std::vector<std::vector<double>> retval(N, std::vector<double>(n, 0u));
+    for (auto &vec : retval) {
+        for (auto &el : vec) {
+            el = rngm11(gen);
+        }
+    }
+    return retval;
+}
+
+std::unordered_map<std::string, std::vector<double>> vv_to_dv(const std::vector<std::vector<double>> &in)
+{
+    std::unordered_map<std::string, std::vector<double>> retval;
+    std::vector<double> x_vec(in.size()), y_vec(in.size());
+    for (decltype(in.size()) i = 0u; i < in.size(); ++i) {
+        x_vec[i] = in[i][0];
+        y_vec[i] = in[i][1];
+    }
+    retval["x"] = x_vec;
+    retval["y"] = y_vec;
+    return retval;
+}
+
 int main()
 {
     unsigned N = 10000;
@@ -72,4 +98,22 @@ int main()
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Millions of crossovers per second (no node count): " << N / static_cast<double>(duration.count()) / 2
               << "M\n";
+
+    // 6 - We time the single step of a genetic algorithm, evaluation, crossover over data with 200 points of
+    // dimension 3.
+    auto data = random_args_vv(200u, 3u);
+    auto data_batch = vv_to_dv(data);
+    auto out = std::vector<double>(200u, 0.123);
+
+    start = high_resolution_clock::now();
+    for (auto i = 0u; i < N; ++i) {
+        // We need to evaluate the output of the expression
+        eval_batch_dbl(out, exs[i], data_batch);
+        // And to make some crossover
+        crossover(exs[i], exs[std::uniform_int_distribution<size_t>(0,9999)(engine)], engine);
+    }
+    stop = high_resolution_clock::now();
+    duration = duration_cast<microseconds>(stop - start);
+    std::cout << "Models tried per second - evaluation (200 points) and crossover: "
+              << (N / static_cast<double>(duration.count())) * 1000000 << "\n";
 }

@@ -10,7 +10,9 @@
 #include <iostream>
 #include <random>
 
+#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/gp.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
@@ -60,7 +62,13 @@ std::vector<std::unordered_map<std::string, double>> vv_to_vd(const std::vector<
 using namespace std::chrono;
 int main()
 {
-    auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
+    std::random_device rd;
+    detail::random_engine_type engine(rd());
+    // Here we define the type of expression (two variables, default choices for the operators)
+    expression_generator generator({"x", "y"}, engine());
+    auto ex = generator(2, 4);
+    // uncomment for this expression
+    // auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
     std::cout << "ex: " << ex << "\n";
 
     unsigned N = 10000u;
@@ -79,7 +87,7 @@ int main()
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << "Millions of evaluations per second (tree): " << 1. / (static_cast<double>(duration.count()) / N)
               << "M\n";
-    //
+
     //// 2 - we time the function call from evaluate_batch
     auto args_dv = vv_to_dv(args_vv);
     std::vector<double> out(10000, 0.12345);
@@ -89,7 +97,7 @@ int main()
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Millions of evaluations per second (tree in one batch): "
               << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
-    //
+
     //// 5 - we time the function call from evaluate_batch (size 200)
     std::vector<std::unordered_map<std::string, std::vector<double>>> args_dv_batches(N_batches);
     for (decltype(args_dv_batches.size()) i = 0u; i < args_dv_batches.size(); ++i) {
