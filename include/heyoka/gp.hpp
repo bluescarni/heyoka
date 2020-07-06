@@ -62,6 +62,8 @@ HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const 
                               const unsigned = 0u);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::random_engine_type &);
+
 
 } // namespace heyoka
 

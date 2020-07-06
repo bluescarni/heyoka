@@ -65,7 +65,7 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
 
 void count_nodes_impl(const expression &e, std::size_t &node_counter)
 {
-    node_counter++;
+    ++node_counter;
     std::visit(
         [&e, &node_counter](auto &node) {
             using type = detail::uncvref_t<decltype(node)>;
@@ -269,6 +269,7 @@ expression *fetch_from_node_id(expression &ex, std::size_t node_id)
     return ret;
 }
 
+// Crossover randomly pick
 void crossover(expression &e1, expression &e2, detail::random_engine_type &engine)
 {
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
@@ -279,6 +280,21 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
     assert(e2_sub_ptr != nullptr);
     assert(e1_sub_ptr != nullptr);
+    swap(*e2_sub_ptr, *e1_sub_ptr);
+}
+
+// Version with the node count passed as argument (faster).
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, detail::random_engine_type &engine)
+{
+    auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
+    auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
+    if (!e1_sub_ptr) {
+        throw std::invalid_argument(
+            "The node id requested: " + std::to_string(node_id1) + " was not found in the expression e1: ");
+    } else if (!e2_sub_ptr) {
+        throw std::invalid_argument(
+            "The node id requested: " + std::to_string(node_id2) + " was not found in the expression e2: ");
+    }
     swap(*e2_sub_ptr, *e1_sub_ptr);
 }
 
