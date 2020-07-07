@@ -976,12 +976,14 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
     const auto n_uvars = dc.size() - n_eq;
 
     // Overflow checking. We want to make sure we can do all computations
-    // using uint32_t.
+    // using uint32_t. We need to be able to:
+    // - index into the in_out array (size n_eq),
+    // - index into the internal derivatives array (size n_uvars * max_order).
     // NOTE: even though some automatic differentiation formulae have
-    // sums up to i = order (and thus could formally overflow in a
+    // sums up to i = order inclusive (and thus could formally overflow in a
     // for loop), we never invoke them with order = max_order, only
     // up to order = max_order - 1.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+    if (n_eq > std::numeric_limits<std::uint32_t>::max()
         || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
         throw std::overflow_error(
             "An overflow condition was detected in the number of variables while adding a Taylor stepper");
@@ -1253,12 +1255,15 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
     const auto n_uvars = dc.size() - n_eq;
 
     // Overflow checking. We want to make sure we can do all computations
-    // using uint32_t.
+    // using uint32_t. We need to be able to:
+    // - index into the jet array (size n_eq * (max_order + 1)),
+    // - index into the internal derivatives array (size n_uvars * max_order).
     // NOTE: even though some automatic differentiation formulae have
     // sums up to i = order (and thus could formally overflow in a
     // for loop), we never invoke them with order = max_order, only
     // up to order = max_order - 1.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+    if (max_order == std::numeric_limits<std::uint32_t>::max()
+        || n_eq > std::numeric_limits<std::uint32_t>::max() / (max_order + 1u)
         || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
         throw std::overflow_error(
             "An overflow condition was detected in the number of variables while adding a Taylor jet");
