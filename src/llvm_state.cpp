@@ -334,8 +334,10 @@ void llvm_state::verify_function_impl(llvm::Function *f)
     llvm::raw_string_ostream ostr(err_report);
     if (llvm::verifyFunction(*f, &ostr) && m_verify) {
         // Remove function before throwing.
+        const auto fname = std::string(f->getName());
         f->eraseFromParent();
-        throw std::invalid_argument("Function verification failed. The full error message:\n" + ostr.str());
+        throw std::invalid_argument("The verification of the function '" + fname + "' failed. The full error message:\n"
+                                    + ostr.str());
     }
 }
 
