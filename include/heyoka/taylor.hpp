@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -88,8 +89,17 @@ public:
 
     std::pair<outcome, T> step();
     std::pair<outcome, T> step_backward();
-    outcome propagate_for(T, std::size_t = 0);
-    outcome propagate_until(T, std::size_t = 0);
+    // NOTE: return values:
+    // - outcome,
+    // - min abs(timestep),
+    // - max abs(timestep),
+    // - total number of steps successfully
+    //   undertaken.
+    // NOTE: the min/max timestep values are well-defined
+    // only if at least 2 steps were taken successfully. Otherwise,
+    // they are infinity and zero respectively.
+    std::tuple<outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
+    std::tuple<outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
 };
 
 } // namespace detail

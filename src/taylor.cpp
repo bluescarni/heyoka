@@ -15,6 +15,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -409,48 +410,81 @@ std::pair<typename taylor_adaptive_impl<T>::outcome, T> taylor_adaptive_impl<T>:
 }
 
 template <typename T>
-typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::size_t>
+taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
 {
     return propagate_until(m_time + delta_t, max_steps);
 }
 
 template <typename T>
-typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::size_t>
+taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 {
     if (!std::isfinite(t)) {
         throw std::invalid_argument(
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
+    // Initial values for the counter,
+    // and the min/max abs of the integration
+    // timesteps.
+    std::size_t step_counter = 0;
+    T min_h = std::numeric_limits<T>::infinity();
+    T max_h = 0;
+
     if (t == m_time) {
-        return outcome::success;
+        return std::tuple{outcome::success, min_h, max_h, step_counter};
     }
 
-    std::size_t step_counter = 0;
-
     if (t > m_time) {
-        while (t > m_time) {
+        while (true) {
             const auto res = step_impl<true, true>(t - m_time);
             if (res.first != outcome::success) {
-                return res.first;
+                return std::tuple{res.first, min_h, max_h, step_counter};
             }
-            if (max_steps != 0u && ++step_counter == max_steps) {
-                return outcome::step_limit;
+
+            // Update the number of steps
+            // completed successfully.
+            ++step_counter;
+
+            // Break out if the time limit is reached,
+            // *before* updating the min_h/max_h values.
+            if (t <= m_time) {
+                break;
+            }
+
+            // Update min_h/max_h.
+            min_h = std::min(min_h, std::abs(res.second));
+            max_h = std::max(max_h, std::abs(res.second));
+
+            // Check the max number of steps stopping criterion.
+            if (max_steps != 0u && step_counter == max_steps) {
+                return std::tuple{outcome::step_limit, min_h, max_h, step_counter};
             }
         }
     } else {
-        while (t < m_time) {
+        while (true) {
             const auto res = step_impl<true, false>(m_time - t);
             if (res.first != outcome::success) {
-                return res.first;
+                return std::tuple{res.first, min_h, max_h, step_counter};
             }
-            if (max_steps != 0u && ++step_counter == max_steps) {
-                return outcome::step_limit;
+
+            ++step_counter;
+
+            if (t >= m_time) {
+                break;
+            }
+
+            min_h = std::min(min_h, std::abs(res.second));
+            max_h = std::max(max_h, std::abs(res.second));
+
+            if (max_steps != 0u && step_counter == max_steps) {
+                return std::tuple{outcome::step_limit, min_h, max_h, step_counter};
             }
         }
     }
 
-    return outcome::success;
+    return std::tuple{outcome::success, min_h, max_h, step_counter};
 }
 
 template <typename T>
