@@ -168,8 +168,10 @@ namespace detail
 {
 
 template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol)
-    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol), m_llvm("adaptive taylor integrator")
+taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
+                                              unsigned opt_level)
+    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
+      m_llvm("adaptive taylor integrator", opt_level)
 {
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !std::isfinite(x); })) {

@@ -66,7 +66,7 @@ private:
     HEYOKA_DLL_LOCAL std::pair<outcome, T> step_impl(T);
 
 public:
-    explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T);
+    explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T, unsigned = 3);
 
     taylor_adaptive_impl(const taylor_adaptive_impl &) = delete;
     taylor_adaptive_impl(taylor_adaptive_impl &&) = delete;
