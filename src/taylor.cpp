@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
 #include <limits>
@@ -253,6 +254,24 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
                                   "integrator resulted in an overflow condition");
     }
     m_jet.resize((static_cast<jet_size_t>(m_max_order) + 1u) * n_vars);
+
+    // Check the values of the derivatives
+    // for the initial state.
+
+    // Copy the current state to the order zero
+    // of the jet of derivatives.
+    std::copy(m_state.begin(), m_state.end(), m_jet.begin());
+
+    // Compute the jet of derivatives at max order.
+    auto jet_ptr = m_jet.data();
+    m_jet_f(jet_ptr, m_max_order);
+
+    // Check the computed derivatives, starting from order 1.
+    if (std::any_of(jet_ptr + n_vars, jet_ptr + m_jet.size(), [](const T &x) { return !std::isfinite(x); })) {
+        throw std::invalid_argument(
+            "Non-finite value(s) detected in the jet of derivatives corresponding to the initial "
+            "state of an adaptive Taylor integrator");
+    }
 }
 
 template <typename T>
@@ -390,13 +409,13 @@ std::pair<typename taylor_adaptive_impl<T>::outcome, T> taylor_adaptive_impl<T>:
 }
 
 template <typename T>
-typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_for(T delta_t)
+typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
 {
-    return propagate_until(m_time + delta_t);
+    return propagate_until(m_time + delta_t, max_steps);
 }
 
 template <typename T>
-typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_until(T t)
+typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 {
     if (!std::isfinite(t)) {
         throw std::invalid_argument(
@@ -407,11 +426,16 @@ typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_unt
         return outcome::success;
     }
 
+    std::size_t step_counter = 0;
+
     if (t > m_time) {
         while (t > m_time) {
             const auto res = step_impl<true, true>(t - m_time);
             if (res.first != outcome::success) {
                 return res.first;
+            }
+            if (max_steps != 0u && ++step_counter == max_steps) {
+                return outcome::step_limit;
             }
         }
     } else {
@@ -419,6 +443,9 @@ typename taylor_adaptive_impl<T>::outcome taylor_adaptive_impl<T>::propagate_unt
             const auto res = step_impl<true, false>(m_time - t);
             if (res.first != outcome::success) {
                 return res.first;
+            }
+            if (max_steps != 0u && ++step_counter == max_steps) {
+                return outcome::step_limit;
             }
         }
     }

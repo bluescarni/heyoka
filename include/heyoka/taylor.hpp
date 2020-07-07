@@ -9,6 +9,7 @@
 #ifndef HEYOKA_TAYLOR_HPP
 #define HEYOKA_TAYLOR_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -43,6 +44,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 public:
     enum class outcome {
         success,       // Integration step was successful.
+        step_limit,    // Maximum number of steps reached.
         nf_state,      // Non-finite initial state detected.
         nf_derivative, // Non-finite derivative detected.
         nan_rho        // NaN estimation of the convergence radius.
@@ -86,8 +88,8 @@ public:
 
     std::pair<outcome, T> step();
     std::pair<outcome, T> step_backward();
-    outcome propagate_for(T);
-    outcome propagate_until(T);
+    outcome propagate_for(T, std::size_t = 0);
+    outcome propagate_until(T, std::size_t = 0);
 };
 
 } // namespace detail
