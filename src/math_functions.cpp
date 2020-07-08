@@ -647,6 +647,10 @@ expression pow(expression e1, expression e2)
     fc.dbl_name() = "llvm.pow";
     fc.ldbl_name() = "llvm.pow";
     fc.display_name() = "pow";
+    // Disable verification whenever
+    // we codegen the pow() function, due
+    // to what looks like an LLVM verification bug.
+    fc.disable_verify() = true;
     fc.ty() = function::type::builtin;
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 2u) {
@@ -658,7 +662,6 @@ expression pow(expression e1, expression e2)
         return args[1] * pow(args[0], args[1] - expression{number(1.)}) * diff(args[0], s)
                + pow(args[0], args[1]) * log(args[0]) * diff(args[1], s);
     };
-
     fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
         if (args.size() != 2u) {
             throw std::invalid_argument(
