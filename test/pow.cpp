@@ -19,7 +19,7 @@
 
 using namespace heyoka;
 
-TEST_CASE("taylor")
+TEST_CASE("taylor dbl")
 {
     using Catch::Matchers::Message;
 
@@ -142,6 +142,134 @@ TEST_CASE("taylor")
 
         REQUIRE_THROWS_MATCHES(
             s.add_taylor_jet_dbl("jet", {y, pow(y, x)}, 3), std::invalid_argument,
+            Message("An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+    }
+}
+
+TEST_CASE("taylor ldbl")
+{
+    using Catch::Matchers::Message;
+
+    auto x = "x"_var, y = "y"_var;
+
+    // Variable-number tests.
+    {
+        llvm_state s{"", 0};
+
+        s.add_taylor_jet_ldbl("jet", {pow(y, 3_ldbl / 2_ldbl), pow(x, -3_ldbl / 2_ldbl)}, 1);
+
+        s.compile();
+
+        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+
+        long double jet[4] = {2, 3};
+
+        jptr(jet, 1);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+    }
+
+    {
+        llvm_state s{"", 0};
+
+        s.add_taylor_jet_ldbl("jet", {pow(y, 3_ldbl / 2_ldbl), pow(x, -3_ldbl / 2_ldbl)}, 3);
+
+        s.compile();
+
+        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+
+        long double jet[8] = {2, 3};
+
+        jptr(jet, 1);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+
+        jptr(jet, 2);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
+        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
+
+        jptr(jet, 3);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
+        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
+        REQUIRE(jet[6]
+                == Approx(1 / 6.l * 3 / 2.
+                          * (1 / 2. * 1 / std::sqrt(3.l) * jet[3] * jet[3] + std::sqrt(3.l) * jet[5] * 2)));
+        REQUIRE(jet[7]
+                == Approx(1 / 6.l
+                          * (15 / 4. * std::pow(2, -7 / 2.l) * jet[2] * jet[2]
+                             - 3 / 2. * std::pow(2, -5 / 2.l) * jet[4] * 2)));
+    }
+
+    {
+        // Number-number test.
+        llvm_state s{"", 0};
+
+        s.add_taylor_jet_ldbl("jet", {pow(3_ldbl, 3_ldbl / 2_ldbl), x + y}, 3);
+
+        s.compile();
+
+        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+
+        long double jet[8] = {2, 3};
+
+        jptr(jet, 1);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == 5);
+
+        jptr(jet, 2);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == 5);
+        REQUIRE(jet[4] == 0);
+        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
+
+        jptr(jet, 3);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == 5);
+        REQUIRE(jet[4] == 0);
+        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
+        REQUIRE(jet[6] == 0);
+        REQUIRE(jet[7] == Approx(1 / 6.l * jet[5] * 2));
+    }
+
+    // Failure modes for non-implemented cases.
+    {
+        llvm_state s{"", 0};
+
+        REQUIRE_THROWS_MATCHES(
+            s.add_taylor_jet_ldbl("jet", {pow(1_ldbl, x)}, 3), std::invalid_argument,
+            Message("An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+    }
+
+    {
+        llvm_state s{"", 0};
+
+        REQUIRE_THROWS_MATCHES(
+            s.add_taylor_jet_ldbl("jet", {y, pow(y, x)}, 3), std::invalid_argument,
             Message("An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
     }
 }
