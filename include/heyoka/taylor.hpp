@@ -103,9 +103,8 @@ public:
     // - max Taylor order,
     // - total number of steps successfully
     //   undertaken.
-    // NOTE: the min/max timestep values are well-defined
-    // only if at least 2 steps were taken successfully. Otherwise,
-    // they are infinity and zero respectively.
+    // NOTE: the min/max timesteps and orders are well-defined
+    // only if at least 1-2 steps were taken successfully.
     std::tuple<outcome, T, T, std::uint32_t, std::uint32_t, std::size_t> propagate_for(T, std::size_t = 0);
     std::tuple<outcome, T, T, std::uint32_t, std::uint32_t, std::size_t> propagate_until(T, std::size_t = 0);
 };
