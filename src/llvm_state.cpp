@@ -863,31 +863,37 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
         m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
     }
 
-    // The for loop to fill the derivatives array. We will iterate
-    // in the [1, order) range.
-    // Init the variable for the start of the loop (i = 1).
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop");
+    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop");
+
+    // NOTE: because we want to iterate in the [1, order) range,
+    // we don't want to ever execute the loop body if order is 1.
+    // Thus, check the condition and jump to the afterloop
+    // if needed.
+    auto *skip_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_EQ, m_builder->getInt32(1), order_arg, "skipcond");
+    m_builder->CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Initial value for the loop variable (i = 1).
     auto start_val = m_builder->getInt32(1);
     assert(start_val != nullptr);
 
-    // Make the new basic block for the loop header,
-    // inserting after current block.
+    // Get a reference to the current block for
+    // later usage in the phi node.
     auto *preheader_bb = m_builder->GetInsertBlock();
     assert(preheader_bb != nullptr);
-    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop", f);
 
-    // Insert an explicit fall through from the current block to the loop_bb.
-    m_builder->CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
     m_builder->SetInsertPoint(loop_bb);
 
-    // Start the PHI node with an entry for Start.
+    // Create the phi node and add the first pair of arguments.
     auto *cur_order = m_builder->CreatePHI(m_builder->getInt32Ty(), 2, "i");
     assert(cur_order != nullptr);
     cur_order->addIncoming(start_val, preheader_bb);
 
     // Loop body.
-
     // For each u var, we invoke the function to
     // compute its derivative at the current order.
     for (std::uint32_t i = 0; i < n_uvars; ++i) {
@@ -931,10 +937,11 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
     auto *end_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_ULT, next_order, order_arg, "loopcond");
     assert(end_cond != nullptr);
 
-    // Create the "after loop" block and insert it.
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
     auto *loop_end_bb = m_builder->GetInsertBlock();
     assert(loop_end_bb != nullptr);
-    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop", f);
+    f->getBasicBlockList().push_back(after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     m_builder->CreateCondBr(end_cond, loop_bb, after_bb);
@@ -1138,31 +1145,37 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
         m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
     }
 
-    // The for loop to fill the derivatives array. We will iterate
-    // in the [1, order) range.
-    // Init the variable for the start of the loop (i = 1).
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop");
+    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop");
+
+    // NOTE: because we want to iterate in the [1, order) range,
+    // we don't want to ever execute the loop body if order is 1.
+    // Thus, check the condition and jump to the afterloop
+    // if needed.
+    auto *skip_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_EQ, m_builder->getInt32(1), order_arg, "skipcond");
+    m_builder->CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Initial value for the loop variable (i = 1).
     auto start_val = m_builder->getInt32(1);
     assert(start_val != nullptr);
 
-    // Make the new basic block for the loop header,
-    // inserting after current block.
+    // Get a reference to the current block for
+    // later usage in the phi node.
     auto *preheader_bb = m_builder->GetInsertBlock();
     assert(preheader_bb != nullptr);
-    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop", f);
 
-    // Insert an explicit fall through from the current block to the loop_bb.
-    m_builder->CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
     m_builder->SetInsertPoint(loop_bb);
 
-    // Start the PHI node with an entry for Start.
+    // Create the phi node and add the first pair of arguments.
     auto *cur_order = m_builder->CreatePHI(m_builder->getInt32Ty(), 2, "i");
     assert(cur_order != nullptr);
     cur_order->addIncoming(start_val, preheader_bb);
 
     // Loop body.
-
     // For each u var, we invoke the function to
     // compute its derivative at the current order.
     for (std::uint32_t i = 0; i < n_uvars; ++i) {
@@ -1210,10 +1223,11 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
     auto *end_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_ULT, next_order, order_arg, "loopcond");
     assert(end_cond != nullptr);
 
-    // Create the "after loop" block and insert it.
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
     auto *loop_end_bb = m_builder->GetInsertBlock();
     assert(loop_end_bb != nullptr);
-    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop", f);
+    f->getBasicBlockList().push_back(after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     m_builder->CreateCondBr(end_cond, loop_bb, after_bb);

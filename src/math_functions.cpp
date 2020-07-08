@@ -117,6 +117,11 @@ llvm::Function *taylor_diff_sin_impl(llvm_state &s, const variable &var, std::ui
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).
+    // NOTE: because we are always assuming that order
+    // is at least 1, we can leave the for-loop
+    // in the do-while form from the original
+    // LLVM docs, as we are sure the loop body
+    // is always evaluated at least once.
     auto start_val = builder.getInt32(1);
 
     // Make the new basic block for the loop header,
@@ -389,6 +394,11 @@ llvm::Function *taylor_diff_cos_impl(llvm_state &s, const variable &var, std::ui
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).
+    // NOTE: because we are always assuming that order
+    // is at least 1, we can leave the for-loop
+    // in the do-while form from the original
+    // LLVM docs, as we are sure the loop body
+    // is always evaluated at least once.
     auto start_val = builder.getInt32(1);
 
     // Make the new basic block for the loop header,
@@ -733,6 +743,11 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const n
 
     // Initial value for the for-loop. We will be operating
     // in the range [0, order) (i.e., order *not* included).
+    // NOTE: because we are always assuming that order
+    // is at least 1, we can leave the for-loop
+    // in the do-while form from the original
+    // LLVM docs, as we are sure the loop body
+    // is always evaluated at least once.
     auto start_val = builder.getInt32(0);
 
     // Make the new basic block for the loop header,
