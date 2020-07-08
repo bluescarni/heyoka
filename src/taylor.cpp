@@ -234,6 +234,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
         static_assert(always_false_v<T>, "Unhandled type.");
     }
 
+    // Store the IR before compiling.
+    m_ir = m_llvm.dump();
+
     // Run the jit.
     m_llvm.compile();
 
@@ -523,6 +526,12 @@ void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
 
     // Do the copy.
     std::copy(state.begin(), state.end(), m_state.begin());
+}
+
+template <typename T>
+std::string taylor_adaptive_impl<T>::dump_ir() const
+{
+    return m_ir;
 }
 
 // Explicit instantiation of the implementation classes.

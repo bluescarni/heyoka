@@ -61,6 +61,7 @@ private:
     std::vector<T> m_jet;
     using jet_f_t = void (*)(T *, std::uint32_t);
     jet_f_t m_jet_f;
+    std::string m_ir;
 
     template <bool, bool>
     HEYOKA_DLL_LOCAL std::pair<outcome, T> step_impl(T);
@@ -74,6 +75,8 @@ public:
     taylor_adaptive_impl &operator=(taylor_adaptive_impl &&) = delete;
 
     ~taylor_adaptive_impl();
+
+    std::string dump_ir() const;
 
     T get_time() const
     {
