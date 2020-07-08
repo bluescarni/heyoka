@@ -55,31 +55,6 @@ const number::value_type &number::value() const
     return m_value;
 }
 
-inline namespace literals
-{
-
-expression operator""_dbl(long double x)
-{
-    return expression{number{static_cast<double>(x)}};
-}
-
-expression operator""_dbl(unsigned long long n)
-{
-    return expression{number{static_cast<double>(n)}};
-}
-
-expression operator""_ldbl(long double x)
-{
-    return expression{number{x}};
-}
-
-expression operator""_ldbl(unsigned long long n)
-{
-    return expression{number{static_cast<long double>(n)}};
-}
-
-} // namespace literals
-
 void swap(number &n0, number &n1) noexcept
 {
     using std::swap;

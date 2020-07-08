@@ -49,16 +49,6 @@ const std::string &variable::name() const
     return m_name;
 }
 
-inline namespace literals
-{
-
-expression operator""_var(const char *s, std::size_t n)
-{
-    return expression{variable{std::string{s, n}}};
-}
-
-} // namespace literals
-
 void swap(variable &v0, variable &v1) noexcept
 {
     using std::swap;

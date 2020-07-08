@@ -53,6 +53,19 @@ public:
     const value_type &value() const;
 };
 
+inline namespace literals
+{
+
+HEYOKA_DLL_PUBLIC expression operator""_dbl(long double);
+HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
+
+HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
+HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
+
+HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
+
+} // namespace literals
+
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);

@@ -27,7 +27,6 @@
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
