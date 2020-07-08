@@ -766,10 +766,11 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const n
     auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
     auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
     // Compute the scalar factor: order * num - j * (num + 1).
-    auto scal_f = builder.CreateFSub(ord_num,
-                                     builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context())),
-                                                        invoke_codegen<T>(s, num + number{T(1)})),
-                                     "scal_f");
+    auto scal_f
+        = builder.CreateFSub(ord_num,
+                             builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context()), "j_float"),
+                                                invoke_codegen<T>(s, num + number{T(1)})),
+                             "scal_f");
     // Update ret_acc: ret_acc = ret_acc + scal_f*v0*v1.
     builder.CreateStore(
         builder.CreateFAdd(builder.CreateLoad(ret_acc), builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1))),
@@ -798,7 +799,7 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const n
 
     // Compute the final divisor: ord_f * (zero-th derivative of u_idx).
     auto div = builder.CreateFMul(
-        ord_f, builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, builder.getInt32(u_idx))), "div");
+        ord_f, builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, builder.getInt32(u_idx))), "divisor");
 
     // Compute and return the result: ret_acc / div.
     builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(ret_acc), div));
