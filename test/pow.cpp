@@ -19,7 +19,7 @@
 
 using namespace heyoka;
 
-TEST_CASE("taylor diff")
+TEST_CASE("taylor")
 {
     using Catch::Matchers::Message;
 
