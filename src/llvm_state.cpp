@@ -22,7 +22,6 @@
 #include <variant>
 #include <vector>
 
-#include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -91,18 +90,12 @@ class llvm_state::jit
     // llvm/ExecutionEngine/Orc/Mangling.h.
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
     llvm::orc::ThreadSafeContext m_ctx;
-#if LLVM_VERSION_MAJOR == 10
     llvm::orc::JITDylib &m_main_jd;
-#endif
 
 public:
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
-          m_ctx(std::make_unique<llvm::LLVMContext>())
-#if LLVM_VERSION_MAJOR == 10
-          ,
-          m_main_jd(m_es.createJITDylib("<main>"))
-#endif
+          m_ctx(std::make_unique<llvm::LLVMContext>()), m_main_jd(m_es.createJITDylib("<main>"))
     {
         // NOTE: the native target initialization needs to be done only once
         std::call_once(detail::nt_inited, []() {
@@ -122,13 +115,7 @@ public:
         }
 
         m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
-            m_es, m_object_layer,
-#if LLVM_VERSION_MAJOR == 10
-            std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb))
-#else
-            llvm::orc::ConcurrentIRCompiler(std::move(*jtmb))
-#endif
-        );
+            m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
 
         m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
 
@@ -139,11 +126,7 @@ public:
             throw std::invalid_argument("Could not create the dynamic library search generator");
         }
 
-#if LLVM_VERSION_MAJOR == 10
         m_main_jd.addGenerator(std::move(*dlsg));
-#else
-        m_es.getMainJITDylib().setGenerator(std::move(*dlsg));
-#endif
     }
 
     jit(const jit &) = delete;
@@ -169,13 +152,7 @@ public:
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
-        auto handle = m_compile_layer->add(
-#if LLVM_VERSION_MAJOR == 10
-            m_main_jd,
-#else
-            m_es.getMainJITDylib(),
-#endif
-            llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
+        auto handle = m_compile_layer->add(m_main_jd, llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
 
         if (handle) {
             throw std::invalid_argument("The function for adding a module to the jit failed");
@@ -185,13 +162,7 @@ public:
     // Symbol lookup.
     llvm::Expected<llvm::JITEvaluatedSymbol> lookup(const std::string &name)
     {
-        return m_es.lookup(
-#if LLVM_VERSION_MAJOR == 10
-            {&m_main_jd},
-#else
-            {&m_es.getMainJITDylib()},
-#endif
-            (*m_mangle)(name));
+        return m_es.lookup({&m_main_jd}, (*m_mangle)(name));
     }
 };
 
