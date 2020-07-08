@@ -9,6 +9,7 @@
 #include <cmath>
 #include <initializer_list>
 #include <limits>
+#include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -20,6 +21,8 @@ using namespace heyoka;
 
 TEST_CASE("taylor diff")
 {
+    using Catch::Matchers::Message;
+
     auto x = "x"_var, y = "y"_var;
 
     {
@@ -104,5 +107,22 @@ TEST_CASE("taylor diff")
         REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.) + jet[3])));
         REQUIRE(jet[6] == 0);
         REQUIRE(jet[7] == Approx(1 / 6. * jet[5] * 2));
+    }
+
+    // Failure modes for non-implemented cases.
+    {
+        llvm_state s{"", 0};
+
+        REQUIRE_THROWS_MATCHES(
+            s.add_taylor_jet_dbl("jet", {pow(1_dbl, x)}, 3), std::invalid_argument,
+            Message("An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+    }
+
+    {
+        llvm_state s{"", 0};
+
+        REQUIRE_THROWS_MATCHES(
+            s.add_taylor_jet_dbl("jet", {y, pow(y, x)}, 3), std::invalid_argument,
+            Message("An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
     }
 }
