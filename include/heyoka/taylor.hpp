@@ -14,7 +14,6 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <llvm/IR/Function.h>
@@ -68,7 +67,7 @@ private:
     std::string m_ir;
 
     template <bool, bool>
-    HEYOKA_DLL_LOCAL std::pair<outcome, T> step_impl(T);
+    HEYOKA_DLL_LOCAL std::tuple<outcome, T, std::uint32_t> step_impl(T);
 
 public:
     explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T, unsigned = 3);
@@ -94,19 +93,21 @@ public:
     void set_state(const std::vector<T> &);
     void set_time(T);
 
-    std::pair<outcome, T> step();
-    std::pair<outcome, T> step_backward();
+    std::tuple<outcome, T, std::uint32_t> step();
+    std::tuple<outcome, T, std::uint32_t> step_backward();
     // NOTE: return values:
     // - outcome,
     // - min abs(timestep),
     // - max abs(timestep),
+    // - min Taylor order,
+    // - max Taylor order,
     // - total number of steps successfully
     //   undertaken.
     // NOTE: the min/max timestep values are well-defined
     // only if at least 2 steps were taken successfully. Otherwise,
     // they are infinity and zero respectively.
-    std::tuple<outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
-    std::tuple<outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
+    std::tuple<outcome, T, T, std::uint32_t, std::uint32_t, std::size_t> propagate_for(T, std::size_t = 0);
+    std::tuple<outcome, T, T, std::uint32_t, std::uint32_t, std::size_t> propagate_until(T, std::size_t = 0);
 };
 
 } // namespace detail
