@@ -25,8 +25,27 @@ TEST_CASE("taylor")
 
     auto x = "x"_var, y = "y"_var;
 
+    // Variable-number tests.
     {
-        // Variable-number test.
+        llvm_state s{"", 0};
+
+        s.add_taylor_jet_dbl("jet", {pow(y, 3_dbl / 2_dbl), pow(x, -3_dbl / 2_dbl)}, 1);
+
+        s.compile();
+
+        auto jptr = s.fetch_taylor_jet_dbl("jet");
+
+        double jet[4] = {2, 3};
+
+        jptr(jet, 1);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.)));
+    }
+
+    {
         llvm_state s{"", 0};
 
         s.add_taylor_jet_dbl("jet", {pow(y, 3_dbl / 2_dbl), pow(x, -3_dbl / 2_dbl)}, 3);
