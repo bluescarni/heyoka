@@ -362,6 +362,28 @@ void llvm_state::compile()
     m_jitter->add_module(std::move(m_module));
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// RAII helper to reset the verify
+// flag of an LLVM state to true
+// upon destruction.
+struct verify_resetter {
+    explicit verify_resetter(llvm_state &s) : m_s(s) {}
+    ~verify_resetter()
+    {
+        m_s.verify() = true;
+    }
+    llvm_state &m_s;
+};
+
+} // namespace
+
+} // namespace detail
+
 template <typename T>
 void llvm_state::add_varargs_expression(const std::string &name, const expression &e,
                                         const std::vector<std::string> &vars)
@@ -421,6 +443,8 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
 
 void llvm_state::add_dbl(const std::string &name, const expression &e)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -437,6 +461,8 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
 
 void llvm_state::add_ldbl(const std::string &name, const expression &e)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -960,6 +986,8 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
 template <typename T>
 void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -1239,6 +1267,8 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
 template <typename T>
 void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
