@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -637,6 +638,206 @@ expression log(expression e)
     return expression{std::move(fc)};
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    if (f.args().size() != 2u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the pow() function (2 arguments were expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    // Lookup the intrinsic ID.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.pow");
+    if (intrinsic_ID == 0) {
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.pow'");
+    }
+
+    // Fetch the function.
+    const std::vector<llvm::Type *> arg_types(2, to_llvm_type<T>(s.context()));
+    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+    if (!callee_f) {
+        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.pow'");
+    }
+    if (!callee_f->empty()) {
+        // It does not make sense to have a definition of a builtin.
+        throw std::invalid_argument("The intrinsic 'llvm.pow' must be an empty function");
+    }
+
+    // Create the function arguments. The codegen for the arguments
+    // comes from taylor_init.
+    std::vector<llvm::Value *> args_v{invoke_taylor_init<T>(s, f.args()[0], arr),
+                                      invoke_taylor_init<T>(s, f.args()[1], arr)};
+    assert(args_v[0] != nullptr);
+    assert(args_v[1] != nullptr);
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_pow_tmp");
+    assert(r != nullptr);
+    r->setTailCall(true);
+
+    // Disable verification in the llvm
+    // machinery when we are generating code
+    // for the Taylor init phase. This is due
+    // to the verification issue with the
+    // pow intrinsic mangling.
+    s.verify() = false;
+
+    return r;
+}
+
+// Derivative of pow(number, number).
+template <typename T>
+llvm::Function *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, std::uint32_t,
+                                     const std::string &name, std::uint32_t,
+                                     const std::unordered_map<std::uint32_t, number> &)
+{
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
+
+    // The derivative of a constant is always zero.
+    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// Derivative of pow(variable, number).
+template <typename T>
+llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num, std::uint32_t idx,
+                                     const std::string &name, std::uint32_t n_uvars,
+                                     const std::unordered_map<std::uint32_t, number> &)
+{
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
+
+    // Accumulator for the result.
+    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
+    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+
+    // Pre-convert the order to a float and compute order * num (n * alpha
+    // in the AD formulae).
+    auto ord_f = builder.CreateUIToFP(order, to_llvm_type<T>(s.context()), "ord_f");
+    assert(ord_f != nullptr);
+    auto ord_num = builder.CreateFMul(ord_f, invoke_codegen<T>(s, num), "ord_num");
+    assert(ord_num != nullptr);
+
+    // Initial value for the for-loop. We will be operating
+    // in the range [0, order) (i.e., order *not* included).
+    auto start_val = builder.getInt32(0);
+
+    // Make the new basic block for the loop header,
+    // inserting after current block.
+    auto *preheader_bb = builder.GetInsertBlock();
+    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop", f);
+
+    // Insert an explicit fall through from the current block to the loop_bb.
+    builder.CreateBr(loop_bb);
+
+    // Start insertion in loop_bb.
+    builder.SetInsertPoint(loop_bb);
+
+    // Start the PHI node with an entry for Start.
+    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "j");
+    j_var->addIncoming(start_val, preheader_bb);
+
+    // Loop body.
+    // Compute the indices for accessing the derivatives in this loop iteration.
+    // The indices are:
+    // - (order - j_var) * n_uvars + u_idx,
+    // - j_var * n_uvars + idx.
+    const auto u_idx = uname_to_index(var.name());
+    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
+                                      builder.getInt32(u_idx));
+    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(idx));
+    // Convert into pointers.
+    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
+    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
+    // Load the values.
+    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
+    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
+    // Compute the scalar factor: order * num - j * (num + 1).
+    auto scal_f = builder.CreateFSub(ord_num,
+                                     builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context())),
+                                                        invoke_codegen<T>(s, num + number{T(1)})),
+                                     "scal_f");
+    // Update ret_acc: ret_acc = ret_acc + scal_f*v0*v1.
+    builder.CreateStore(
+        builder.CreateFAdd(builder.CreateLoad(ret_acc), builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1))),
+        ret_acc);
+
+    // Compute the next value of the iteration.
+    // NOTE: addition works regardless of integral signedness.
+    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+
+    // Compute the end condition.
+    // NOTE: we use the unsigned less-than predicate, because order is *not* included.
+    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next_j_var, order, "loopcond");
+
+    // Create the "after loop" block and insert it.
+    auto *loop_end_bb = builder.GetInsertBlock();
+    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop", f);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    builder.SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    j_var->addIncoming(next_j_var, loop_end_bb);
+
+    // Compute the final divisor: ord_f * (zero-th derivative of u_idx).
+    auto div = builder.CreateFMul(
+        ord_f, builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, builder.getInt32(u_idx))), "div");
+
+    // Compute and return the result: ret_acc / div.
+    builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(ret_acc), div));
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// All the other cases.
+template <typename T, typename U1, typename U2>
+llvm::Function *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, std::uint32_t, const std::string &,
+                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
+}
+
+template <typename T>
+llvm::Function *taylor_diff_pow(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
+                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if (func.args().size() != 2u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "pow() (2 arguments were expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&s, idx, &name, n_uvars, &cd_uvars](const auto &v1, const auto &v2) {
+            return taylor_diff_pow_impl<T>(s, v1, v2, idx, name, n_uvars, cd_uvars);
+        },
+        func.args()[0].value(), func.args()[1].value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression pow(expression e1, expression e2)
 {
     std::vector<expression> args;
@@ -701,6 +902,10 @@ expression pow(expression e1, expression e2)
         }
         return args[1] * std::pow(args[0], args[1] - 1.) + std::log(args[0]) * std::pow(args[0], args[1]);
     };
+    fc.taylor_init_dbl_f() = detail::taylor_init_pow<double>;
+    fc.taylor_init_ldbl_f() = detail::taylor_init_pow<long double>;
+    fc.taylor_diff_dbl_f() = detail::taylor_diff_pow<double>;
+    fc.taylor_diff_ldbl_f() = detail::taylor_diff_pow<long double>;
 
     return expression{std::move(fc)};
 }
