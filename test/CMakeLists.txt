@@ -32,5 +32,5 @@ function(ADD_HEYOKA_TESTCASE arg1)
 endfunction()
 
 ADD_HEYOKA_TESTCASE(expression)
+ADD_HEYOKA_TESTCASE(pow)
 #ADD_HEYOKA_TESTCASE(gp)
-

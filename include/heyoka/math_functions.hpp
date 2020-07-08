@@ -9,8 +9,8 @@
 #ifndef HEYOKA_MATH_FUNCTIONS_HPP
 #define HEYOKA_MATH_FUNCTIONS_HPP
 
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 
 namespace heyoka
 {

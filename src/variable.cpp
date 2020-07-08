@@ -15,7 +15,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/assert_nonnull_ret.hpp>

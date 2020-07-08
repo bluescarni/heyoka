@@ -18,11 +18,18 @@
 #include <unordered_map>
 #include <vector>
 
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 
 namespace heyoka
 {
+
+class binary_operator;
 
 HEYOKA_DLL_PUBLIC void swap(binary_operator &, binary_operator &) noexcept;
 

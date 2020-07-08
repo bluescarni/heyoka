@@ -17,9 +17,13 @@
 #include <utility>
 #include <vector>
 
-#include <heyoka/detail/fwd_decl.hpp>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 
 namespace heyoka
 {

@@ -15,8 +15,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {

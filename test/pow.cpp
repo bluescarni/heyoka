@@ -6,17 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_FWD_DECL_HPP
-#define HEYOKA_DETAIL_FWD_DECL_HPP
+#include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/math_functions.hpp>
+#include <heyoka/variable.hpp>
 
-namespace heyoka
+#include "catch.hpp"
+
+using namespace heyoka;
+
+TEST_CASE("taylor diff")
 {
-
-// Fwd declaration of heyoka classes.
-class expression;
-class variable;
-class number;
-
-} // namespace heyoka
-
-#endif
+    auto x = "x"_var, y = "y"_var;
+}

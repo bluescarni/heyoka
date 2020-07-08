@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>

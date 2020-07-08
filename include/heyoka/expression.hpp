@@ -16,10 +16,13 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 

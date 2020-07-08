@@ -198,9 +198,6 @@ public:
 llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
 {
-    static_assert(std::is_same_v<llvm::IRBuilder<>, decltype(m_builder)::element_type>,
-                  "Inconsistent llvm::IRBuilder<> type.");
-
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
     m_module->setDataLayout(m_jitter->get_data_layout());
