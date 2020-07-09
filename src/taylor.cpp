@@ -466,8 +466,9 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
             }
 
             // Update min_h/max_h.
-            min_h = std::min(min_h, std::abs(h));
-            max_h = std::max(max_h, std::abs(h));
+            assert(h >= 0);
+            min_h = std::min(min_h, h);
+            max_h = std::max(max_h, h);
 
             // Check the max number of steps stopping criterion.
             if (max_steps != 0u && step_counter == max_steps) {
