@@ -22,7 +22,6 @@
 #include <variant>
 #include <vector>
 
-#include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -91,18 +90,12 @@ class llvm_state::jit
     // llvm/ExecutionEngine/Orc/Mangling.h.
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
     llvm::orc::ThreadSafeContext m_ctx;
-#if LLVM_VERSION_MAJOR == 10
     llvm::orc::JITDylib &m_main_jd;
-#endif
 
 public:
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
-          m_ctx(std::make_unique<llvm::LLVMContext>())
-#if LLVM_VERSION_MAJOR == 10
-          ,
-          m_main_jd(m_es.createJITDylib("<main>"))
-#endif
+          m_ctx(std::make_unique<llvm::LLVMContext>()), m_main_jd(m_es.createJITDylib("<main>"))
     {
         // NOTE: the native target initialization needs to be done only once
         std::call_once(detail::nt_inited, []() {
@@ -122,13 +115,7 @@ public:
         }
 
         m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
-            m_es, m_object_layer,
-#if LLVM_VERSION_MAJOR == 10
-            std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb))
-#else
-            llvm::orc::ConcurrentIRCompiler(std::move(*jtmb))
-#endif
-        );
+            m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
 
         m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
 
@@ -139,11 +126,7 @@ public:
             throw std::invalid_argument("Could not create the dynamic library search generator");
         }
 
-#if LLVM_VERSION_MAJOR == 10
         m_main_jd.addGenerator(std::move(*dlsg));
-#else
-        m_es.getMainJITDylib().setGenerator(std::move(*dlsg));
-#endif
     }
 
     jit(const jit &) = delete;
@@ -169,13 +152,7 @@ public:
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
-        auto handle = m_compile_layer->add(
-#if LLVM_VERSION_MAJOR == 10
-            m_main_jd,
-#else
-            m_es.getMainJITDylib(),
-#endif
-            llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
+        auto handle = m_compile_layer->add(m_main_jd, llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
 
         if (handle) {
             throw std::invalid_argument("The function for adding a module to the jit failed");
@@ -185,22 +162,13 @@ public:
     // Symbol lookup.
     llvm::Expected<llvm::JITEvaluatedSymbol> lookup(const std::string &name)
     {
-        return m_es.lookup(
-#if LLVM_VERSION_MAJOR == 10
-            {&m_main_jd},
-#else
-            {&m_es.getMainJITDylib()},
-#endif
-            (*m_mangle)(name));
+        return m_es.lookup({&m_main_jd}, (*m_mangle)(name));
     }
 };
 
 llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
 {
-    static_assert(std::is_same_v<llvm::IRBuilder<>, decltype(m_builder)::element_type>,
-                  "Inconsistent llvm::IRBuilder<> type.");
-
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
     m_module->setDataLayout(m_jitter->get_data_layout());
@@ -334,8 +302,10 @@ void llvm_state::verify_function_impl(llvm::Function *f)
     llvm::raw_string_ostream ostr(err_report);
     if (llvm::verifyFunction(*f, &ostr) && m_verify) {
         // Remove function before throwing.
+        const auto fname = std::string(f->getName());
         f->eraseFromParent();
-        throw std::invalid_argument("Function verification failed. The full error message:\n" + ostr.str());
+        throw std::invalid_argument("The verification of the function '" + fname + "' failed. The full error message:\n"
+                                    + ostr.str());
     }
 }
 
@@ -359,6 +329,28 @@ void llvm_state::compile()
 
     m_jitter->add_module(std::move(m_module));
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// RAII helper to reset the verify
+// flag of an LLVM state to true
+// upon destruction.
+struct verify_resetter {
+    explicit verify_resetter(llvm_state &s) : m_s(s) {}
+    ~verify_resetter()
+    {
+        m_s.verify() = true;
+    }
+    llvm_state &m_s;
+};
+
+} // namespace
+
+} // namespace detail
 
 template <typename T>
 void llvm_state::add_varargs_expression(const std::string &name, const expression &e,
@@ -419,6 +411,8 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
 
 void llvm_state::add_dbl(const std::string &name, const expression &e)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -435,6 +429,8 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
 
 void llvm_state::add_ldbl(const std::string &name, const expression &e)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -838,31 +834,37 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
         m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
     }
 
-    // The for loop to fill the derivatives array. We will iterate
-    // in the [1, order) range.
-    // Init the variable for the start of the loop (i = 1).
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop");
+    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop");
+
+    // NOTE: because we want to iterate in the [1, order) range,
+    // we don't want to ever execute the loop body if order is 1.
+    // Thus, check the condition and jump to the afterloop
+    // if needed.
+    auto *skip_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_EQ, m_builder->getInt32(1), order_arg, "skipcond");
+    m_builder->CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Initial value for the loop variable (i = 1).
     auto start_val = m_builder->getInt32(1);
     assert(start_val != nullptr);
 
-    // Make the new basic block for the loop header,
-    // inserting after current block.
+    // Get a reference to the current block for
+    // later usage in the phi node.
     auto *preheader_bb = m_builder->GetInsertBlock();
     assert(preheader_bb != nullptr);
-    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop", f);
 
-    // Insert an explicit fall through from the current block to the loop_bb.
-    m_builder->CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
     m_builder->SetInsertPoint(loop_bb);
 
-    // Start the PHI node with an entry for Start.
+    // Create the phi node and add the first pair of arguments.
     auto *cur_order = m_builder->CreatePHI(m_builder->getInt32Ty(), 2, "i");
     assert(cur_order != nullptr);
     cur_order->addIncoming(start_val, preheader_bb);
 
     // Loop body.
-
     // For each u var, we invoke the function to
     // compute its derivative at the current order.
     for (std::uint32_t i = 0; i < n_uvars; ++i) {
@@ -906,10 +908,11 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
     auto *end_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_ULT, next_order, order_arg, "loopcond");
     assert(end_cond != nullptr);
 
-    // Create the "after loop" block and insert it.
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
     auto *loop_end_bb = m_builder->GetInsertBlock();
     assert(loop_end_bb != nullptr);
-    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop", f);
+    f->getBasicBlockList().push_back(after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     m_builder->CreateCondBr(end_cond, loop_bb, after_bb);
@@ -958,6 +961,8 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
 template <typename T>
 void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -976,12 +981,14 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
     const auto n_uvars = dc.size() - n_eq;
 
     // Overflow checking. We want to make sure we can do all computations
-    // using uint32_t.
+    // using uint32_t. We need to be able to:
+    // - index into the in_out array (size n_eq),
+    // - index into the internal derivatives array (size n_uvars * max_order).
     // NOTE: even though some automatic differentiation formulae have
-    // sums up to i = order (and thus could formally overflow in a
+    // sums up to i = order inclusive (and thus could formally overflow in a
     // for loop), we never invoke them with order = max_order, only
     // up to order = max_order - 1.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+    if (n_eq > std::numeric_limits<std::uint32_t>::max()
         || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
         throw std::overflow_error(
             "An overflow condition was detected in the number of variables while adding a Taylor stepper");
@@ -1109,31 +1116,37 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
         m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
     }
 
-    // The for loop to fill the derivatives array. We will iterate
-    // in the [1, order) range.
-    // Init the variable for the start of the loop (i = 1).
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop");
+    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop");
+
+    // NOTE: because we want to iterate in the [1, order) range,
+    // we don't want to ever execute the loop body if order is 1.
+    // Thus, check the condition and jump to the afterloop
+    // if needed.
+    auto *skip_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_EQ, m_builder->getInt32(1), order_arg, "skipcond");
+    m_builder->CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Initial value for the loop variable (i = 1).
     auto start_val = m_builder->getInt32(1);
     assert(start_val != nullptr);
 
-    // Make the new basic block for the loop header,
-    // inserting after current block.
+    // Get a reference to the current block for
+    // later usage in the phi node.
     auto *preheader_bb = m_builder->GetInsertBlock();
     assert(preheader_bb != nullptr);
-    auto *loop_bb = llvm::BasicBlock::Create(context(), "loop", f);
 
-    // Insert an explicit fall through from the current block to the loop_bb.
-    m_builder->CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
     m_builder->SetInsertPoint(loop_bb);
 
-    // Start the PHI node with an entry for Start.
+    // Create the phi node and add the first pair of arguments.
     auto *cur_order = m_builder->CreatePHI(m_builder->getInt32Ty(), 2, "i");
     assert(cur_order != nullptr);
     cur_order->addIncoming(start_val, preheader_bb);
 
     // Loop body.
-
     // For each u var, we invoke the function to
     // compute its derivative at the current order.
     for (std::uint32_t i = 0; i < n_uvars; ++i) {
@@ -1181,10 +1194,11 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
     auto *end_cond = m_builder->CreateICmp(llvm::CmpInst::ICMP_ULT, next_order, order_arg, "loopcond");
     assert(end_cond != nullptr);
 
-    // Create the "after loop" block and insert it.
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
     auto *loop_end_bb = m_builder->GetInsertBlock();
     assert(loop_end_bb != nullptr);
-    auto *after_bb = llvm::BasicBlock::Create(context(), "afterloop", f);
+    f->getBasicBlockList().push_back(after_bb);
 
     // Insert the conditional branch into the end of loop_end_bb.
     m_builder->CreateCondBr(end_cond, loop_bb, after_bb);
@@ -1235,6 +1249,8 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
 template <typename T>
 void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
+    detail::verify_resetter vr{*this};
+
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -1253,12 +1269,15 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
     const auto n_uvars = dc.size() - n_eq;
 
     // Overflow checking. We want to make sure we can do all computations
-    // using uint32_t.
+    // using uint32_t. We need to be able to:
+    // - index into the jet array (size n_eq * (max_order + 1)),
+    // - index into the internal derivatives array (size n_uvars * max_order).
     // NOTE: even though some automatic differentiation formulae have
     // sums up to i = order (and thus could formally overflow in a
     // for loop), we never invoke them with order = max_order, only
     // up to order = max_order - 1.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() || n_uvars > std::numeric_limits<std::uint32_t>::max()
+    if (max_order == std::numeric_limits<std::uint32_t>::max()
+        || n_eq > std::numeric_limits<std::uint32_t>::max() / (max_order + 1u)
         || n_uvars > std::numeric_limits<std::uint32_t>::max() / max_order) {
         throw std::overflow_error(
             "An overflow condition was detected in the number of variables while adding a Taylor jet");

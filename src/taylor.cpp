@@ -8,21 +8,25 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -159,5 +163,392 @@ llvm::Function *taylor_diff_ldbl(llvm_state &s, const expression &e, std::uint32
 
     heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
 }
+
+namespace detail
+{
+
+template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
+                                              unsigned opt_level)
+    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
+      m_llvm("adaptive taylor integrator", opt_level)
+{
+    // Check input params.
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !std::isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
+    }
+
+    if (m_state.size() != sys.size()) {
+        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                                    "integrator: the state vector has a size of "
+                                    + std::to_string(m_state.size()) + ", while the number of equations is "
+                                    + std::to_string(sys.size()));
+    }
+
+    if (!std::isfinite(m_time)) {
+        throw std::invalid_argument("Cannot initialise an adaptive Taylor integrator with a non-finite initial time");
+    }
+
+    if (!std::isfinite(m_rtol) || m_rtol <= 0) {
+        throw std::invalid_argument(
+            "The relative tolerance in an adaptive Taylor integrator must be finite and positive, but it is "
+            + std::to_string(m_rtol) + " instead");
+    }
+
+    if (!std::isfinite(m_atol) || m_atol <= 0) {
+        throw std::invalid_argument(
+            "The absolute tolerance in an adaptive Taylor integrator must be finite and positive, but it is "
+            + std::to_string(m_atol) + " instead");
+    }
+
+    // Compute the max order for the integration.
+    const auto mo_r = std::ceil(-std::log(m_rtol) / 2 + 1);
+    const auto mo_a = std::ceil(-std::log(m_atol) / 2 + 1);
+    if (!std::isfinite(mo_r) || !std::isfinite(mo_a)) {
+        throw std::invalid_argument(
+            "The computation of the max Taylor order in an adaptive Taylor integrator produced non-finite values");
+    }
+    // NOTE: make sure the max order is at least 2.
+    const auto mo_f = std::max(T(2), std::max(mo_r, mo_a));
+    // NOTE: static cast is safe because we now that T is at least
+    // a double-precision IEEE type.
+    if (mo_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::overflow_error(
+            "The computation of the max Taylor order in an adaptive Taylor integrator produced the value "
+            + std::to_string(mo_f) + ", which results in an overflow condition");
+    }
+    m_max_order = static_cast<std::uint32_t>(mo_f);
+
+    // Record the number of variables
+    // before consuming sys.
+    const auto n_vars = sys.size();
+
+    // Add the function for computing the jet
+    // of derivatives.
+    if constexpr (std::is_same_v<T, double>) {
+        m_llvm.add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+
+    // Store the IR before compiling.
+    m_ir = m_llvm.dump();
+
+    // Run the jit.
+    m_llvm.compile();
+
+    // Fetch the compiled function for computing
+    // the jet of derivatives.
+    if constexpr (std::is_same_v<T, double>) {
+        m_jet_f = m_llvm.fetch_taylor_jet_dbl("jet");
+    } else if constexpr (std::is_same_v<T, long double>) {
+        m_jet_f = m_llvm.fetch_taylor_jet_ldbl("jet");
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+
+    // Init the jet vector. Its maximum size is n_vars * (max_order + 1).
+    // NOTE: n_vars must be nonzero because we successfully
+    // created a Taylor jet function from sys.
+    using jet_size_t = decltype(m_jet.size());
+    if (m_max_order >= std::numeric_limits<jet_size_t>::max()
+        || (static_cast<jet_size_t>(m_max_order) + 1u) > std::numeric_limits<jet_size_t>::max() / n_vars) {
+        throw std::overflow_error("The computation of the size of the jet of derivatives in an adaptive Taylor "
+                                  "integrator resulted in an overflow condition");
+    }
+    m_jet.resize((static_cast<jet_size_t>(m_max_order) + 1u) * n_vars);
+
+    // Check the values of the derivatives
+    // for the initial state.
+
+    // Copy the current state to the order zero
+    // of the jet of derivatives.
+    std::copy(m_state.begin(), m_state.end(), m_jet.begin());
+
+    // Compute the jet of derivatives at max order.
+    auto jet_ptr = m_jet.data();
+    m_jet_f(jet_ptr, m_max_order);
+
+    // Check the computed derivatives, starting from order 1.
+    if (std::any_of(jet_ptr + n_vars, jet_ptr + m_jet.size(), [](const T &x) { return !std::isfinite(x); })) {
+        throw std::invalid_argument(
+            "Non-finite value(s) detected in the jet of derivatives corresponding to the initial "
+            "state of an adaptive Taylor integrator");
+    }
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
+
+// Implementation detail to make a single integration timestep.
+// The size of the timestep is automatically deduced. If
+// LimitTimestep is true, then the integration timestep will be
+// limited not to be greater than delta_t in absolute value.
+// If Direction is true then the propagation is done forward
+// in time, otherwise backwards. In any case delta_t can never
+// be negative.
+// The function will return a triple, containing
+// a flag describing the outcome of the integration,
+// the integration timestep that was used and the
+// Taylor order that was used.
+// NOTE: perhaps there's performance to be gained
+// by moving the timestep deduction logic and the
+// actual propagation in LLVM (e.g., unrolling
+// over the number of variables).
+// NOTE: the safer adaptive timestep from
+// Jorba still needs to be implemented.
+template <typename T>
+template <bool LimitTimestep, bool Direction>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t>
+taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T delta_t)
+{
+    assert(std::isfinite(delta_t));
+    if constexpr (LimitTimestep) {
+        assert(delta_t > 0);
+    } else {
+        assert(delta_t == 0);
+    }
+
+    // Store the number of variables in the system.
+    const auto nvars = static_cast<std::uint32_t>(m_state.size());
+
+    // The tolerance for the timestep is either m_rtol or m_atol,
+    // depending on the current values in the state vector.
+
+    // Compute the norm infinity in the state vector.
+    T max_abs_state = 0;
+    for (const auto &x : m_state) {
+        if (!std::isfinite(x)) {
+            return std::tuple{outcome::nf_state, T(0), std::uint32_t(0)};
+        }
+
+        max_abs_state = std::max(max_abs_state, std::abs(x));
+    }
+
+    // Compute the tolerance for this timestep.
+    const auto use_abs = m_rtol * max_abs_state <= m_atol;
+    const auto tol = use_abs ? m_atol : m_rtol;
+
+    // Compute the current Taylor order, ensuring it is at least 2.
+    // NOTE: the static cast here is ok, as we checked in the constructor
+    // that m_max_order is representable.
+    const auto order = std::max(std::uint32_t(2), static_cast<std::uint32_t>(std::ceil(-std::log(tol) / 2 + 1)));
+    assert(order <= m_max_order);
+
+    // Copy the current state to the order zero
+    // of the jet of derivatives.
+    std::copy(m_state.begin(), m_state.end(), m_jet.begin());
+
+    // Compute the jet of derivatives at the given order.
+    auto jet_ptr = m_jet.data();
+    m_jet_f(jet_ptr, order);
+
+    // Check the computed derivatives, starting from order 1.
+    for (std::uint32_t i = nvars; i < (order + 1u) * nvars; ++i) {
+        if (!std::isfinite(jet_ptr[i])) {
+            return std::tuple{outcome::nf_derivative, T(0), std::uint32_t(0)};
+        }
+    }
+
+    // Now we compute an estimation of the radius of convergence of the Taylor
+    // series at orders order and order - 1.
+
+    // First step is to determine the norm infinity of the derivatives
+    // at orders order and order - 1.
+    T max_abs_diff_o = 0, max_abs_diff_om1 = 0;
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        max_abs_diff_om1 = std::max(max_abs_diff_om1, jet_ptr[(order - 1u) * nvars + i]);
+        max_abs_diff_o = std::max(max_abs_diff_o, jet_ptr[order * nvars + i]);
+    }
+
+    // Estimate rho at orders order and order - 1.
+    const auto rho_om1 = use_abs ? std::pow(1 / max_abs_diff_om1, 1 / static_cast<T>(order - 1u))
+                                 : std::pow(max_abs_state / max_abs_diff_om1, 1 / static_cast<T>(order - 1u));
+    const auto rho_o = use_abs ? std::pow(1 / max_abs_diff_o, 1 / static_cast<T>(order))
+                               : std::pow(max_abs_state / max_abs_diff_o, 1 / static_cast<T>(order));
+    if (std::isnan(rho_om1) || std::isnan(rho_o)) {
+        return std::tuple{outcome::nan_rho, T(0), std::uint32_t(0)};
+    }
+
+    // Take the minimum.
+    const auto rho_m = std::min(rho_o, rho_om1);
+
+    // Now determine the step size using the formula with safety factors.
+    auto h = rho_m / (std::exp(T(1)) * std::exp(T(1))) * std::exp(-0.7 / (order - 1u));
+    if constexpr (LimitTimestep) {
+        // Make sure h does not exceed delta_t.
+        h = std::min(h, delta_t);
+    }
+    if constexpr (!Direction) {
+        // When propagating backwards, invert the sign of the timestep.
+        h = -h;
+    }
+
+    // Update the state.
+    auto cur_h = h;
+    for (std::uint32_t o = 1; o < order + 1u; ++o, cur_h *= h) {
+        const auto d_ptr = jet_ptr + o * nvars;
+
+        for (std::uint32_t i = 0; i < nvars; ++i) {
+            // NOTE: use FMA wrappers here?
+            m_state[i] += cur_h * d_ptr[i];
+        }
+    }
+
+    // Update the time.
+    m_time += h;
+
+    return std::tuple{outcome::success, h, order};
+}
+
+template <typename T>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step()
+{
+    return step_impl<false, true>(0);
+}
+
+template <typename T>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_backward()
+{
+    return step_impl<false, false>(0);
+}
+
+template <typename T>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
+taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
+{
+    return propagate_until(m_time + delta_t, max_steps);
+}
+
+template <typename T>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
+taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+{
+    if (!std::isfinite(t)) {
+        throw std::invalid_argument(
+            "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
+    }
+
+    // Initial values for the counter,
+    // the min/max abs of the integration
+    // timesteps, and min/max Taylor orders.
+    std::size_t step_counter = 0;
+    T min_h = std::numeric_limits<T>::infinity(), max_h = 0;
+    std::uint32_t min_order = std::numeric_limits<std::uint32_t>::max(), max_order = 0;
+
+    if (t == m_time) {
+        return std::tuple{outcome::success, min_h, max_h, min_order, max_order, step_counter};
+    }
+
+    if (t > m_time) {
+        while (true) {
+            const auto [res, h, t_order] = step_impl<true, true>(t - m_time);
+
+            if (res != outcome::success) {
+                return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
+            }
+
+            // Update the number of steps
+            // completed successfully.
+            ++step_counter;
+
+            // Update min/max Taylor orders.
+            min_order = std::min(min_order, t_order);
+            max_order = std::max(max_order, t_order);
+
+            // Break out if the time limit is reached,
+            // *before* updating the min_h/max_h values.
+            if (t <= m_time) {
+                break;
+            }
+
+            // Update min_h/max_h.
+            min_h = std::min(min_h, std::abs(h));
+            max_h = std::max(max_h, std::abs(h));
+
+            // Check the max number of steps stopping criterion.
+            if (max_steps != 0u && step_counter == max_steps) {
+                return std::tuple{outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
+            }
+        }
+    } else {
+        while (true) {
+            const auto [res, h, t_order] = step_impl<true, false>(m_time - t);
+
+            if (res != outcome::success) {
+                return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
+            }
+
+            ++step_counter;
+
+            min_order = std::min(min_order, t_order);
+            max_order = std::max(max_order, t_order);
+
+            if (t >= m_time) {
+                break;
+            }
+
+            min_h = std::min(min_h, std::abs(h));
+            max_h = std::max(max_h, std::abs(h));
+
+            if (max_steps != 0u && step_counter == max_steps) {
+                return std::tuple{outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
+            }
+        }
+    }
+
+    return std::tuple{outcome::success, min_h, max_h, min_order, max_order, step_counter};
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::set_time(T t)
+{
+    if (!std::isfinite(t)) {
+        throw std::invalid_argument("Non-finite time " + std::to_string(t)
+                                    + " passed to the set_time() function of an adaptive Taylor integrator");
+    }
+
+    m_time = t;
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
+{
+    if (&state == &m_state) {
+        // Check that state and m_state are not the same object,
+        // otherwise std::copy() cannot be used.
+        return;
+    }
+
+    if (state.size() != m_state.size()) {
+        throw std::invalid_argument(
+            "The state vector passed to the set_state() function of an adaptive Taylor integrator has a size of "
+            + std::to_string(state.size()) + ", which is inconsistent with the size of the current state vector ("
+            + std::to_string(m_state.size()) + ")");
+    }
+
+    if (std::any_of(state.begin(), state.end(), [](const T &x) { return !std::isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite state vector was passed to the set_state() function of an adaptive Taylor integrator");
+    }
+
+    // Do the copy.
+    std::copy(state.begin(), state.end(), m_state.begin());
+}
+
+template <typename T>
+std::string taylor_adaptive_impl<T>::dump_ir() const
+{
+    return m_ir;
+}
+
+// Explicit instantiation of the implementation classes.
+template class taylor_adaptive_impl<double>;
+template class taylor_adaptive_impl<long double>;
+
+} // namespace detail
 
 } // namespace heyoka

@@ -15,8 +15,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {
@@ -37,13 +40,6 @@ public:
     std::string &name();
     const std::string &name() const;
 };
-
-inline namespace literals
-{
-
-HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
-
-}
 
 HEYOKA_DLL_PUBLIC void swap(variable &, variable &) noexcept;
 

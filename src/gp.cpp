@@ -229,11 +229,11 @@ void expression_generator::set_vars(const std::vector<std::string> &vars)
 }
 
 void mutate(expression &e, const expression_generator &generator, const double mut_p,
-            detail::random_engine_type &engine, const unsigned depth)
+            detail::random_engine_type &engine, const unsigned min_depth, const unsigned max_depth, unsigned depth)
 {
     std::uniform_real_distribution<> rng01(0., 1.);
     if (rng01(engine) < mut_p) {
-        e = generator(2, 4, depth);
+        e = generator(min_depth, max_depth, depth);
     } else {
         std::visit(
             [&e, &generator, &mut_p, &depth, &engine](auto &node) {

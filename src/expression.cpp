@@ -57,6 +57,36 @@ const expression::value_type &expression::value() const
     return m_value;
 }
 
+inline namespace literals
+{
+
+expression operator""_dbl(long double x)
+{
+    return expression{number{static_cast<double>(x)}};
+}
+
+expression operator""_dbl(unsigned long long n)
+{
+    return expression{number{static_cast<double>(n)}};
+}
+
+expression operator""_ldbl(long double x)
+{
+    return expression{number{x}};
+}
+
+expression operator""_ldbl(unsigned long long n)
+{
+    return expression{number{static_cast<long double>(n)}};
+}
+
+expression operator""_var(const char *s, std::size_t n)
+{
+    return expression{variable{std::string{s, n}}};
+}
+
+} // namespace literals
+
 std::vector<std::string> get_variables(const expression &e)
 {
     return std::visit([](const auto &arg) { return get_variables(arg); }, e.value());

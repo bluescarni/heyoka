@@ -16,8 +16,11 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {
@@ -43,17 +46,6 @@ public:
     value_type &value();
     const value_type &value() const;
 };
-
-inline namespace literals
-{
-
-HEYOKA_DLL_PUBLIC expression operator""_dbl(long double);
-HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
-
-HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
-HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
-
-} // namespace literals
 
 HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
 

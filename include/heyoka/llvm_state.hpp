@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -21,6 +22,13 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Value.h>
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -34,7 +42,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
-    std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> m_builder;
+    std::unique_ptr<llvm::IRBuilder<>> m_builder;
     std::unique_ptr<llvm::legacy::FunctionPassManager> m_fpm;
     std::unique_ptr<llvm::legacy::PassManager> m_pm;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
@@ -83,13 +91,13 @@ public:
     ~llvm_state();
 
     llvm::Module &module();
-    llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> &builder();
+    llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
     bool &verify();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
-    const llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> &builder() const;
+    const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
     const bool &verify() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;

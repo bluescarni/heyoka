@@ -24,7 +24,6 @@
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Value.h>
 
@@ -614,6 +613,11 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, con
 
     // Initial value for the for-loop. We will be operating
     // in the range [0, order] (i.e., order inclusive).
+    // NOTE: because we are always assuming that order
+    // is at least 1, we can leave the for-loop
+    // in the do-while form from the original
+    // LLVM docs, as we are sure the loop body
+    // is always evaluated at least once.
     auto start_val = builder.getInt32(0);
 
     // Make the new basic block for the loop header,
@@ -736,6 +740,11 @@ llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t idx, const 
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).
+    // NOTE: because we are always assuming that order
+    // is at least 1, we can leave the for-loop
+    // in the do-while form from the original
+    // LLVM docs, as we are sure the loop body
+    // is always evaluated at least once.
     auto start_val = builder.getInt32(1);
 
     // Make the new basic block for the loop header,

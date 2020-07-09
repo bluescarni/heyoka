@@ -167,29 +167,13 @@ endif()
 
 find_package(LLVM REQUIRED)
 
+if(${LLVM_VERSION_MAJOR} LESS 10)
+  message(FATAL_ERROR "LLVM >= 10 is required.")
+endif()
+
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
-
-if(${LLVM_VERSION_MAJOR} EQUAL 10)
-  target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
-else()
-  llvm_map_components_to_libnames(HEYOKA_LLVM_LIBS
-    core
-    support
-    instcombine
-    scalaropts
-    orcjit
-    executionengine
-    x86codegen
-    x86info
-    x86desc
-    x86asmparser
-    transformutils
-    vectorize
-    ipo
-  )
-  target_link_libraries(heyoka PUBLIC heyoka::llvm_headers ${HEYOKA_LLVM_LIBS})
-endif()
+target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()

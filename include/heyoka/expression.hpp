@@ -16,10 +16,13 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Value.h>
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -49,6 +52,19 @@ public:
     value_type &value();
     const value_type &value() const;
 };
+
+inline namespace literals
+{
+
+HEYOKA_DLL_PUBLIC expression operator""_dbl(long double);
+HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
+
+HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
+HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
+
+HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
+
+} // namespace literals
 
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 

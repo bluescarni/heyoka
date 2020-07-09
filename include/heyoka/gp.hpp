@@ -58,9 +58,9 @@ public:
 
 // expression manipulators
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
-HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
-                              const unsigned = 0u);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
+HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
+                              const unsigned = 2u, const unsigned = 4u, const unsigned = 0u);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::random_engine_type &);
 

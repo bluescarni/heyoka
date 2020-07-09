@@ -366,6 +366,31 @@ TEST_CASE("basic")
         std::cout << v << '\n';
     }
 
+    taylor_adaptive_dbl tad({y, -x}, {0, -1}, 0, 1E-19, 1E-19);
+
+    const auto &st = tad.get_state();
+
+    std::cout << "Initial time: " << tad.get_time() << '\n';
+    std::cout << "Initial state: " << st[0] << ", " << st[1] << '\n';
+    std::cout << "Exact initial state: " << std::cos(tad.get_time() + 3.14159265358979323846 / 2) << ", "
+              << -std::sin(tad.get_time() + 3.14159265358979323846 / 2) << "\n\n";
+
+#if 0
+    for (auto i = 0; i < 10; ++i) {
+        tad.step();
+        std::cout << "Cur time: " << tad.get_time() << '\n';
+        std::cout << "Cur state: " << st[0] << ", " << st[1] << '\n';
+        std::cout << "Exact state: " << std::cos(tad.get_time() + 3.14159265358979323846 / 2) << ", "
+                  << -std::sin(tad.get_time() + 3.14159265358979323846 / 2) << "\n\n";
+    }
+#endif
+
+    tad.propagate_until(100);
+    std::cout << "Final state: " << st[0] << ", " << st[1] << '\n';
+    std::cout << "Final time: " << tad.get_time() << '\n';
+    tad.propagate_until(0);
+    std::cout << "Final state: " << st[0] << ", " << st[1] << '\n';
+    std::cout << "Final time: " << tad.get_time() << '\n';
 #if 0
     s.compile();
 
