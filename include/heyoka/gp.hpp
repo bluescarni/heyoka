@@ -33,10 +33,11 @@ public:
     enum node_type { num, var, bo, u_fun, b_fun };
 
 private:
+    std::vector<std::string> m_vars;
     std::vector<binary_operator::type> m_bos;
     std::vector<expression (*)(expression)> m_u_funcs;
     std::vector<expression (*)(expression, expression)> m_b_funcs;
-    std::vector<std::string> m_vars;
+    double m_range_dbl;
     mutable detail::random_engine_type m_e;
 
 public:
@@ -48,13 +49,18 @@ public:
     const std::vector<expression (*)(expression)> &get_u_funcs() const;
     const std::vector<expression (*)(expression, expression)> &get_b_funcs() const;
     const std::vector<std::string> &get_vars() const;
+    const double &get_range_dbl() const;
 
     // setters
     void set_bos(const std::vector<binary_operator::type> &);
     void set_u_funcs(const std::vector<expression (*)(expression)> &);
     void set_b_funcs(const std::vector<expression (*)(expression, expression)> &);
     void set_vars(const std::vector<std::string> &);
+    void set_range_dbl(const double &);
 };
+
+// Streaming operators
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression_generator &);
 
 // expression manipulators
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
@@ -63,7 +69,6 @@ HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const 
                               const unsigned = 2u, const unsigned = 4u, const unsigned = 0u);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::random_engine_type &);
-
 
 } // namespace heyoka
 

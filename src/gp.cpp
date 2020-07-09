@@ -85,13 +85,14 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
 } // namespace detail
 
 expression_generator::expression_generator(const std::vector<std::string> &vars, ::std::uint64_t seed)
-    : m_vars(vars), m_e(seed), m_b_funcs()
+    : m_vars(vars), m_b_funcs(), m_e(seed)
 {
     // These are the default blocks for a random expression.
     m_bos = {binary_operator::type::add, binary_operator::type::sub, binary_operator::type::mul,
              binary_operator::type::div};
     m_u_funcs = {heyoka::sin, heyoka::cos};
     m_b_funcs = {};
+    m_range_dbl = 10;
 };
 
 expression expression_generator::operator()(unsigned min_depth, unsigned max_depth, unsigned depth) const
@@ -158,8 +159,8 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
     // Once we know the node type we create one at random out of the user defined possible choices
     switch (type) {
         case node_type::num: {
-            // We return a random number in -10, 10
-            auto value = rngm11(m_e) * 10.;
+            // We return a random number in -m_range_dbl, m_range_dbl
+            auto value = rngm11(m_e) * m_range_dbl;
             return expression{number{value}};
             break;
         }
@@ -210,6 +211,10 @@ const std::vector<std::string> &expression_generator::get_vars() const
 {
     return m_vars;
 }
+const double &expression_generator::get_range_dbl() const
+{
+    return m_range_dbl;
+}
 
 void expression_generator::set_bos(const std::vector<binary_operator::type> &bos)
 {
@@ -226,6 +231,56 @@ void expression_generator::set_b_funcs(const std::vector<expression (*)(expressi
 void expression_generator::set_vars(const std::vector<std::string> &vars)
 {
     m_vars = vars;
+}
+void expression_generator::set_range_dbl(const double &rd)
+{
+    m_range_dbl = rd;
+}
+
+std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
+{
+    os << "Expression Generator:";
+    auto vars = eg.get_vars();
+
+    os << "\nVariables: ";
+    for (const auto &var : vars) {
+        os << var << " ";
+    }
+    os << "\nBinary Operators: ";
+    auto bos = eg.get_bos();
+    for (const auto &bo : bos) {
+        switch (bo) {
+            case binary_operator::type::add:
+                os << "+ ";
+                break;
+            case binary_operator::type::sub:
+                os << "- ";
+                break;
+            case binary_operator::type::mul:
+                os << "* ";
+                break;
+            case binary_operator::type::div:
+                os << "/ ";
+                break;
+        }
+    }
+    auto u_funcs = eg.get_u_funcs();
+    if (u_funcs.size()) {
+        os << "\nUnary Functions: ";
+        for (const auto &u_func : u_funcs) {
+            os << u_func("."_var) << " ";
+        }
+    }
+    auto b_funcs = eg.get_b_funcs();
+    if (b_funcs.size()) {
+        os << "\nBinary Functions: ";
+        for (const auto &b_func : b_funcs) {
+            os << b_func("."_var, "."_var) << " ";
+        }
+    }
+    os << "\nRandom double constants range: ";
+    os << "[-" << eg.get_range_dbl() << ", " << eg.get_range_dbl() << "]";
+    return os << "\n";
 }
 
 void mutate(expression &e, const expression_generator &generator, const double mut_p,
@@ -284,16 +339,17 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
 }
 
 // Crossover targeting specific node_ids
-void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, detail::random_engine_type &engine)
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2,
+               detail::random_engine_type &engine)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
     if (!e1_sub_ptr) {
-        throw std::invalid_argument(
-            "The node id requested: " + std::to_string(node_id1) + " was not found in the expression e1: ");
+        throw std::invalid_argument("The node id requested: " + std::to_string(node_id1)
+                                    + " was not found in the expression e1: ");
     } else if (!e2_sub_ptr) {
-        throw std::invalid_argument(
-            "The node id requested: " + std::to_string(node_id2) + " was not found in the expression e2: ");
+        throw std::invalid_argument("The node id requested: " + std::to_string(node_id2)
+                                    + " was not found in the expression e2: ");
     }
     swap(*e2_sub_ptr, *e1_sub_ptr);
 }

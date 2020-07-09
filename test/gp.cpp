@@ -21,22 +21,28 @@ using namespace Catch::literals;
 
 #include <iostream>
 
-TEST_CASE("basic")
+TEST_CASE("expression_generator")
 {
     std::random_device rd;
     detail::random_engine_type engine(rd());
     expression_generator generator({"x", "y"}, engine());
-    auto ex = generator(2, 4);
-    auto ex2 = generator(2, 4);
-    std::cout << "Random: " << ex << "\n";
-    mutate(ex, generator, 0.1, engine);
-    std::cout << "Mutated: " << ex << "\n";
-    std::uniform_int_distribution<> node_target(0, count_nodes(ex) - 1u);
-    std::cout << "\nParent 1: " << ex << "\n";
-    std::cout << "Parent 2: " << ex2 << "\n";
-    crossover(ex, ex2, engine);
-    std::cout << "Crossovered 1: " << ex << "\n";
-    std::cout << "Crossovered 2: " << ex2 << "\n";
-
-
+    std::cout << generator << "\n";
 }
+
+//TEST_CASE("basic")
+//{
+//    std::random_device rd;
+//    detail::random_engine_type engine(rd());
+//    expression_generator generator({"x", "y"}, engine());
+//    auto ex = generator(2, 4);
+//    auto ex2 = generator(2, 4);
+//    std::cout << "Random: " << ex << "\n";
+//    mutate(ex, generator, 0.1, engine);
+//    std::cout << "Mutated: " << ex << "\n";
+//    std::uniform_int_distribution<> node_target(0, count_nodes(ex) - 1u);
+//    std::cout << "\nParent 1: " << ex << "\n";
+//    std::cout << "Parent 2: " << ex2 << "\n";
+//    crossover(ex, ex2, engine);
+//    std::cout << "Crossovered 1: " << ex << "\n";
+//    std::cout << "Crossovered 2: " << ex2 << "\n";
+//}
