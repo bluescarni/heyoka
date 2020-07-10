@@ -122,7 +122,8 @@ private:
         std::uint32_t min_order = std::numeric_limits<std::uint32_t>::max(), max_order = 0;
 
         while (true) {
-            const auto [res, h, t_order] = Direction ? step() : step_backward();
+            const auto sres = Direction ? step() : step_backward();
+            const auto &[res, h, t_order] = sres;
 
             if (res != outcome::success) {
                 return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
@@ -147,8 +148,7 @@ private:
             }
 
             // Check the stopping criterion.
-            auto cur_ret = std::tuple{outcome::success, min_h, max_h, min_order, max_order, step_counter};
-            if (f(cur_ret, *this)) {
+            if (f(sres, *this)) {
                 break;
             }
         }
