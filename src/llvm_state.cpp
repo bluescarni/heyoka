@@ -216,6 +216,10 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     }
 }
 
+llvm_state::llvm_state(llvm_state &&) noexcept = default;
+
+llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
+
 llvm_state::~llvm_state() = default;
 
 llvm::Module &llvm_state::module()

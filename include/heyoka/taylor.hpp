@@ -12,7 +12,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -60,7 +59,7 @@ public:
 private:
     std::vector<T> m_state;
     T m_time, m_rtol, m_atol;
-    std::unique_ptr<llvm_state> m_llvm;
+    llvm_state m_llvm;
     std::uint32_t m_max_order;
     std::vector<T> m_jet;
     using jet_f_t = void (*)(T *, std::uint32_t);

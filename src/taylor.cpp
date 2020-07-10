@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
-#include <memory>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -171,8 +170,8 @@ namespace detail
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
                                               unsigned opt_level)
-    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
-      m_llvm(std::make_unique<llvm_state>("adaptive taylor integrator", opt_level))
+    : m_state(std::move(state)), m_time(time), m_rtol(rtol),
+      m_atol(atol), m_llvm{"adaptive taylor integrator", opt_level}
 {
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !std::isfinite(x); })) {
@@ -228,25 +227,25 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     // Add the function for computing the jet
     // of derivatives.
     if constexpr (std::is_same_v<T, double>) {
-        m_llvm->add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
+        m_llvm.add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
     } else if constexpr (std::is_same_v<T, long double>) {
-        m_llvm->add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
+        m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
 
     // Store the IR before compiling.
-    m_ir = m_llvm->dump();
+    m_ir = m_llvm.dump();
 
     // Run the jit.
-    m_llvm->compile();
+    m_llvm.compile();
 
     // Fetch the compiled function for computing
     // the jet of derivatives.
     if constexpr (std::is_same_v<T, double>) {
-        m_jet_f = m_llvm->fetch_taylor_jet_dbl("jet");
+        m_jet_f = m_llvm.fetch_taylor_jet_dbl("jet");
     } else if constexpr (std::is_same_v<T, long double>) {
-        m_jet_f = m_llvm->fetch_taylor_jet_ldbl("jet");
+        m_jet_f = m_llvm.fetch_taylor_jet_ldbl("jet");
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
