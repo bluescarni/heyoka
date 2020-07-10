@@ -9,6 +9,7 @@
 #ifndef HEYOKA_EXPRESSION_HPP
 #define HEYOKA_EXPRESSION_HPP
 
+#include <array>
 #include <cstddef>
 #include <ostream>
 #include <string>
@@ -113,6 +114,12 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const expression &);
+
+template <typename... Args>
+inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
+{
+    return std::array{expression{variable{strs}}...};
+}
 
 } // namespace heyoka
 
