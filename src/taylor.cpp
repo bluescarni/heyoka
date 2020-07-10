@@ -52,6 +52,157 @@ std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, st
         std::move(ex.value()));
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Simplify a Taylor decomposition by removing
+// common subexpressions.
+std::vector<expression> taylor_decompose_cse(std::vector<expression> &v_ex, std::vector<expression>::size_type n_eq)
+{
+    // A Taylor decomposition is supposed
+    // to have n_eq variables at the beginning,
+    // n_eq variables at the end and possibly
+    // extra variables in the middle.
+    assert(v_ex.size() >= n_eq * 2u);
+
+    using idx_t = std::vector<expression>::size_type;
+
+    std::vector<expression> retval;
+
+    // expression -> idx map. This will end up containing
+    // all the unique expressions from v_ex, and it will
+    // map them to their indices in retval (which will
+    // in general differ from their indices in v_ex).
+    std::unordered_map<expression, idx_t> ex_map;
+
+    // Map for the renaming of u variables
+    // in the expressions.
+    std::unordered_map<std::string, std::string> uvars_rename;
+
+    // Add the definitions of the first n_eq
+    // variables in terms of u variables.
+    // No need to modify anything here.
+    for (idx_t i = 0; i < n_eq; ++i) {
+        retval.emplace_back(std::move(v_ex[i]));
+    }
+
+    for (auto i = n_eq; i < v_ex.size() - n_eq; ++i) {
+        auto &ex = v_ex[i];
+
+        // Rename the u variables in ex.
+        rename_variables(ex, uvars_rename);
+
+        if (auto it = ex_map.find(ex); it == ex_map.end()) {
+            // This is the first occurrence of ex in the
+            // decomposition. Add it to retval.
+            retval.emplace_back(ex);
+
+            // Add ex to ex_map, mapping it to
+            // the index it corresponds to in retval
+            // (let's call it j).
+            ex_map.emplace(std::move(ex), retval.size() - 1u);
+
+            // Update uvars_rename. This will ensure that
+            // occurrences of the variable 'u_i' in the next
+            // elements of v_ex will be renamed to 'u_j'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(retval.size() - 1u));
+            assert(res.second);
+        } else {
+            // ex is a redundant expression. This means
+            // that it already appears in retval at index
+            // it->second. Don't add anything to retval,
+            // and remap the variable name 'u_i' to
+            // 'u_{it->second}'.
+            [[maybe_unused]] const auto res
+                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(it->second));
+            assert(res.second);
+        }
+    }
+
+    // Handle the derivatives of the state variables at the
+    // end of the decomposition. We just need to ensure that
+    // the u variables in their definitions are renamed with
+    // the new indices.
+    for (auto i = v_ex.size() - n_eq; i < v_ex.size(); ++i) {
+        auto &ex = v_ex[i];
+
+        rename_variables(ex, uvars_rename);
+
+        retval.emplace_back(std::move(ex));
+    }
+
+    return retval;
+}
+
+#if !defined(NDEBUG)
+
+// Helper to verify a Taylor decomposition.
+void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<expression> &dc)
+{
+    using idx_t = std::vector<expression>::size_type;
+
+    const auto n_eq = orig.size();
+
+    assert(dc.size() >= n_eq * 2u);
+
+    // The first n_eq expressions of u variables
+    // must be just variables.
+    for (idx_t i = 0; i < n_eq; ++i) {
+        assert(std::holds_alternative<variable>(dc[i].value()));
+    }
+
+    // From n_eq to dc.size() - n_eq, the expressions
+    // must contain variables only in the u_n form,
+    // where n < i.
+    for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
+        for (const auto &var : get_variables(dc[i])) {
+            assert(var.rfind("u_", 0) == 0);
+            assert(uname_to_index(var) < i);
+        }
+    }
+
+    // From dc.size() - n_eq to dc.size(), the expressions
+    // must be variables in the u_n form,
+    // where n < i.
+    for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
+        std::visit(
+            [i](const auto &v) {
+                if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                    assert(v.name().rfind("u_", 0) == 0);
+                    assert(uname_to_index(v.name()) < i);
+                } else {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    std::unordered_map<std::string, expression> subs_map;
+
+    // For each u variable, expand its definition
+    // in terms of state variables or other u variables,
+    // and store it in subs_map.
+    for (idx_t i = 0; i < dc.size() - n_eq; ++i) {
+        subs_map.emplace("u_" + li_to_string(i), subs(dc[i], subs_map));
+    }
+
+    // Reconstruct the right-hand sides of the system
+    // and compare them to the original ones.
+    for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
+        assert(subs(dc[i], subs_map) == orig[i - (dc.size() - n_eq)]);
+    }
+}
+
+#endif
+
+} // namespace
+
+} // namespace detail
+
 std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 {
     if (v_ex.empty()) {
@@ -72,6 +223,10 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
                                     + ") differs from the number of equations (" + std::to_string(v_ex.size()) + ")");
     }
 
+    // Cache the number of equations/variables
+    // for later use.
+    const auto n_eq = v_ex.size();
+
     // Create the map for renaming the variables to u_i.
     // The renaming will be done in alphabetical order.
     std::unordered_map<std::string, std::string> repl_map;
@@ -79,6 +234,11 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
         [[maybe_unused]] const auto eres = repl_map.emplace(vars[i], "u_" + detail::li_to_string(i));
         assert(eres.second);
     }
+
+#if !defined(NDEBUG)
+    // Store a copy of the original system for checking later.
+    const auto orig_v_ex = v_ex;
+#endif
 
     // Rename the variables in the original equations.
     for (auto &ex : v_ex) {
@@ -116,6 +276,19 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
     for (auto &ex : v_ex_copy) {
         u_vars_defs.emplace_back(std::move(ex));
     }
+
+#if !defined(NDEBUG)
+    // Verify the decomposition.
+    detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+#endif
+
+    // Simplify the decomposition.
+    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, n_eq);
+
+#if !defined(NDEBUG)
+    // Verify the simplified decomposition.
+    detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+#endif
 
     return u_vars_defs;
 }
