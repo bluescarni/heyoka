@@ -61,6 +61,8 @@ public:
     const type &op() const;
 };
 
+HEYOKA_DLL_PUBLIC std::size_t hash(const binary_operator &);
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const binary_operator &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const binary_operator &);

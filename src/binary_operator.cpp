@@ -111,6 +111,11 @@ void swap(binary_operator &bo0, binary_operator &bo1) noexcept
     swap(bo0.m_ops, bo1.m_ops);
 }
 
+std::size_t hash(const binary_operator &bo)
+{
+    return std::hash<binary_operator::type>{}(bo.op()) + hash(bo.lhs()) + hash(bo.rhs());
+}
+
 std::ostream &operator<<(std::ostream &os, const binary_operator &bo)
 {
     os << '(' << bo.lhs() << ' ';

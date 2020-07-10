@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -311,6 +312,39 @@ void swap(function &f0, function &f1) noexcept
     swap(f0.taylor_init_ldbl_f(), f1.taylor_init_ldbl_f());
     swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
     swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
+}
+
+std::size_t hash(const function &f)
+{
+    auto retval = std::hash<bool>{}(f.disable_verify());
+    retval += std::hash<std::string>{}(f.dbl_name());
+    retval += std::hash<std::string>{}(f.ldbl_name());
+    retval += std::hash<std::string>{}(f.display_name());
+
+    for (const auto &arg : f.args()) {
+        retval += hash(arg);
+    }
+
+    for (const auto &attr : f.attributes()) {
+        retval += std::hash<llvm::Attribute::AttrKind>{}(attr);
+    }
+
+    retval += std::hash<function::type>{}(f.ty());
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.diff_f()));
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_batch_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_num_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.deval_num_dbl_f()));
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_decompose_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_ldbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_ldbl_f()));
+
+    return retval;
 }
 
 std::vector<std::string> get_variables(const function &f)

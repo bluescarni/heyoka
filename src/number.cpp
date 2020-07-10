@@ -6,7 +6,9 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <ostream>
 #include <string>
@@ -59,6 +61,20 @@ void swap(number &n0, number &n1) noexcept
 {
     using std::swap;
     swap(n0.value(), n1.value());
+}
+
+std::size_t hash(const number &n)
+{
+    return std::visit(
+        [](const auto &v) {
+            if (std::isnan(v)) {
+                // Make all nan return the same hash value.
+                return std::size_t(0);
+            } else {
+                return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+            }
+        },
+        n.value());
 }
 
 std::ostream &operator<<(std::ostream &os, const number &n)
@@ -131,7 +147,13 @@ bool operator==(const number &n1, const number &n2)
         using type2 = detail::uncvref_t<decltype(v2)>;
 
         if constexpr (std::is_same_v<type1, type2>) {
-            return v1 == v2;
+            // NOTE: make nan compare equal, for consistency
+            // with hashing.
+            if (std::isnan(v1) && std::isnan(v2)) {
+                return true;
+            } else {
+                return v1 == v2;
+            }
         } else {
             return false;
         }

@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
@@ -69,6 +70,8 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 
+HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
@@ -122,5 +125,19 @@ inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
 }
 
 } // namespace heyoka
+
+namespace std
+{
+
+// Specialisation of std::hash for expression.
+template <>
+struct hash<heyoka::expression> {
+    size_t operator()(const heyoka::expression &ex) const
+    {
+        return heyoka::hash(ex);
+    }
+};
+
+} // namespace std
 
 #endif

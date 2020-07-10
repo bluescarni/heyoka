@@ -103,6 +103,11 @@ void swap(expression &ex0, expression &ex1) noexcept
     swap(ex0.value(), ex1.value());
 }
 
+std::size_t hash(const expression &ex)
+{
+    return std::visit([](const auto &v) { return hash(v); }, ex.value());
+}
+
 std::ostream &operator<<(std::ostream &os, const expression &e)
 {
     return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, e.value());

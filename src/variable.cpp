@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -53,6 +54,11 @@ void swap(variable &v0, variable &v1) noexcept
 {
     using std::swap;
     swap(v0.name(), v1.name());
+}
+
+std::size_t hash(const variable &v)
+{
+    return std::hash<std::string>{}(v.name());
 }
 
 std::ostream &operator<<(std::ostream &os, const variable &var)

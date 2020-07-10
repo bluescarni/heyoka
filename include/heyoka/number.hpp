@@ -49,6 +49,8 @@ public:
 
 HEYOKA_DLL_PUBLIC void swap(number &, number &) noexcept;
 
+HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
