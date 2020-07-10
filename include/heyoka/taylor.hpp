@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -58,10 +59,8 @@ public:
 
 private:
     std::vector<T> m_state;
-    T m_time;
-    const T m_rtol;
-    const T m_atol;
-    llvm_state m_llvm;
+    T m_time, m_rtol, m_atol;
+    std::unique_ptr<llvm_state> m_llvm;
     std::uint32_t m_max_order;
     std::vector<T> m_jet;
     using jet_f_t = void (*)(T *, std::uint32_t);
@@ -75,9 +74,10 @@ public:
     explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T, unsigned = 3);
 
     taylor_adaptive_impl(const taylor_adaptive_impl &) = delete;
-    taylor_adaptive_impl(taylor_adaptive_impl &&) = delete;
+    taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept;
+
     taylor_adaptive_impl &operator=(const taylor_adaptive_impl &) = delete;
-    taylor_adaptive_impl &operator=(taylor_adaptive_impl &&) = delete;
+    taylor_adaptive_impl &operator=(taylor_adaptive_impl &&) noexcept;
 
     ~taylor_adaptive_impl();
 
