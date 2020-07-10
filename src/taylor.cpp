@@ -286,9 +286,9 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 // Implementation detail to make a single integration timestep.
 // The size of the timestep is automatically deduced. If
 // LimitTimestep is true, then the integration timestep will be
-// limited not to be greater than delta_t in absolute value.
+// limited not to be greater than max_delta_t in absolute value.
 // If Direction is true then the propagation is done forward
-// in time, otherwise backwards. In any case delta_t can never
+// in time, otherwise backwards. In any case max_delta_t can never
 // be negative.
 // The function will return a triple, containing
 // a flag describing the outcome of the integration,
@@ -303,13 +303,13 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 template <typename T>
 template <bool LimitTimestep, bool Direction>
 std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t>
-taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T delta_t)
+taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
 {
-    assert(std::isfinite(delta_t));
+    assert(std::isfinite(max_delta_t));
     if constexpr (LimitTimestep) {
-        assert(delta_t > 0);
+        assert(max_delta_t >= 0);
     } else {
-        assert(delta_t == 0);
+        assert(max_delta_t == 0);
     }
 
     // Store the number of variables in the system.
@@ -321,6 +321,8 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T delta_t)
     // Compute the norm infinity in the state vector.
     T max_abs_state = 0;
     for (const auto &x : m_state) {
+        // NOTE: can we do this check just once at the end of the loop?
+        // Need to reason about NaNs.
         if (!std::isfinite(x)) {
             return std::tuple{outcome::nf_state, T(0), std::uint32_t(0)};
         }
@@ -347,10 +349,8 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T delta_t)
     m_jet_f(jet_ptr, order);
 
     // Check the computed derivatives, starting from order 1.
-    for (std::uint32_t i = nvars; i < (order + 1u) * nvars; ++i) {
-        if (!std::isfinite(jet_ptr[i])) {
-            return std::tuple{outcome::nf_derivative, T(0), std::uint32_t(0)};
-        }
+    if (std::any_of(jet_ptr + nvars, jet_ptr + (order + 1u) * nvars, [](const T &x) { return !std::isfinite(x); })) {
+        return std::tuple{outcome::nf_derivative, T(0), std::uint32_t(0)};
     }
 
     // Now we compute an estimation of the radius of convergence of the Taylor
@@ -379,8 +379,8 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T delta_t)
     // Now determine the step size using the formula with safety factors.
     auto h = rho_m / (std::exp(T(1)) * std::exp(T(1))) * std::exp(-0.7 / (order - 1u));
     if constexpr (LimitTimestep) {
-        // Make sure h does not exceed delta_t.
-        h = std::min(h, delta_t);
+        // Make sure h does not exceed max_delta_t.
+        h = std::min(h, max_delta_t);
     }
     if constexpr (!Direction) {
         // When propagating backwards, invert the sign of the timestep.
@@ -417,6 +417,21 @@ std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_a
 }
 
 template <typename T>
+std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step(T max_delta_t)
+{
+    if (!std::isfinite(max_delta_t)) {
+        throw std::invalid_argument(
+            "A non-finite max_delta_t was passed to the step() function of an adaptive Taylor integrator");
+    }
+
+    if (max_delta_t >= 0) {
+        return step_impl<true, true>(max_delta_t);
+    } else {
+        return step_impl<true, false>(-max_delta_t);
+    }
+}
+
+template <typename T>
 std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
 taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
 {
@@ -441,6 +456,11 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 
     if (t == m_time) {
         return std::tuple{outcome::success, min_h, max_h, min_order, max_order, step_counter};
+    }
+
+    if ((t > m_time && !std::isfinite(t - m_time)) || (t < m_time && !std::isfinite(m_time - t))) {
+        throw std::overflow_error("The time limit passed to the propagate_until() function is too large and it "
+                                  "results in an overflow condition");
     }
 
     if (t > m_time) {

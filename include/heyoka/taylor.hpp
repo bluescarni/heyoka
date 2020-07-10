@@ -97,6 +97,7 @@ public:
 
     std::tuple<outcome, T, std::uint32_t> step();
     std::tuple<outcome, T, std::uint32_t> step_backward();
+    std::tuple<outcome, T, std::uint32_t> step(T);
     // NOTE: return values:
     // - outcome,
     // - min abs(timestep),
