@@ -167,6 +167,11 @@ bool operator!=(const binary_operator &o1, const binary_operator &o2)
     return !(o1 == o2);
 }
 
+expression subs(const binary_operator &bo, const std::unordered_map<std::string, expression> &smap)
+{
+    return expression{binary_operator{bo.op(), subs(bo.lhs(), smap), subs(bo.rhs(), smap)}};
+}
+
 expression diff(const binary_operator &bo, const std::string &s)
 {
     switch (bo.op()) {

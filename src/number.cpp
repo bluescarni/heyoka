@@ -167,6 +167,11 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
+expression subs(const number &n, const std::unordered_map<std::string, expression> &)
+{
+    return expression{n};
+}
+
 expression diff(const number &n, const std::string &)
 {
     return std::visit(

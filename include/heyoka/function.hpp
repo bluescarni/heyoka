@@ -131,6 +131,8 @@ HEYOKA_DLL_PUBLIC void rename_variables(function &, const std::unordered_map<std
 HEYOKA_DLL_PUBLIC bool operator==(const function &, const function &);
 HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);
 
+HEYOKA_DLL_PUBLIC expression subs(const function &, const std::unordered_map<std::string, expression> &);
+
 HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const function &, const std::unordered_map<std::string, double> &);

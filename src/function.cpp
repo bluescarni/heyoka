@@ -392,6 +392,21 @@ bool operator!=(const function &f1, const function &f2)
     return !(f1 == f2);
 }
 
+expression subs(const function &f, const std::unordered_map<std::string, expression> &smap)
+{
+    // NOTE: not the most efficient implementation, as we end up
+    // copying arguments which we will be discarding anyway later.
+    // The only alternative seems to be copying manually all the function
+    // members one by one however...
+    auto tmp = f;
+
+    for (auto &arg : tmp.args()) {
+        arg = subs(arg, smap);
+    }
+
+    return expression{std::move(tmp)};
+}
+
 expression diff(const function &f, const std::string &s)
 {
     auto &df = f.diff_f();

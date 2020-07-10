@@ -286,6 +286,11 @@ expression diff(const expression &e, const std::string &s)
     return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
 }
 
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+{
+    return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
+}
+
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
 {
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
