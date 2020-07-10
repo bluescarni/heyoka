@@ -22,6 +22,8 @@
 
 using namespace heyoka;
 
+// Small helper to compute the angular momentum
+// wrt the origin given a state vector.
 template <typename T>
 T compute_am(const std::vector<T> &st)
 {
@@ -46,6 +48,7 @@ T compute_am(const std::vector<T> &st)
     return std::sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
 }
 
+// Two-body problem energy from the state vector.
 template <typename T>
 T tbp_energy(const std::vector<T> &st)
 {
@@ -96,6 +99,7 @@ TEST_CASE("two body")
     }
 }
 
+// Energy of two uniform overlapping spheres.
 template <typename T>
 T tus_energy(T rs, const std::vector<T> &st)
 {
@@ -175,22 +179,26 @@ TEST_CASE("mixed tb/spheres")
     auto rs6 = rs3 * rs3;
     auto fac = (r01 * r01 * r01 - 18_dbl * rs2 * r01 + 32_dbl * rs3) / (32_dbl * rs6);
 
-    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.0001, 1.0001, -1, 1, 0, 0};
+    std::vector<double> init_state{0.595, -0.595, 0, 0, 0, 0, -1.0001, 1.0001, -1, 1, 0, 0};
 
-    taylor_adaptive_dbl t0{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3, vx0,
-                            vx1, vy0, vy1, vz0, vz1},
-                           init_state,
-                           0,
-                           1E-16,
-                           1E-16};
+    // 2BP integrator.
+    taylor_adaptive_dbl t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
+                               vx0, vx1, vy0, vy1, vz0, vz1},
+                              init_state,
+                              0,
+                              1E-16,
+                              1E-16};
 
-    taylor_adaptive_dbl t1{
+    // 2US integrator.
+    taylor_adaptive_dbl t_2us{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
         std::move(init_state),
         0,
         1E-16,
         1E-16};
 
+    // Helper to compute the distance**2 between
+    // the sphere's centres given a state vector.
     auto compute_dist2 = [](const auto &st) {
         auto Dx = st[6] - st[7];
         auto Dy = st[8] - st[9];
@@ -198,19 +206,82 @@ TEST_CASE("mixed tb/spheres")
         return Dx * Dx + Dy * Dy + Dz * Dz;
     };
 
+    // Helper to get the dynamical regime given an input state vector:
+    // this returns true for the Keplerian regime (non-overlapping spheres),
+    // false for the 2US regime (overlapping spheres).
     auto get_regime = [rs_val, compute_dist2](const auto &st) { return compute_dist2(st) > 4 * rs_val * rs_val; };
 
-    auto cur_regime = get_regime(t0.get_state());
+    // The simulation is set up to start in the Keplerian regime.
+    auto cur_regime = get_regime(t_2bp.get_state());
     REQUIRE(cur_regime);
 
-    std::cout << "initial energy: " << tbp_energy(t0.get_state()) << '\n';
-    std::cout << "initial energy: " << tus_energy(rs_val, t0.get_state()) << '\n';
-    std::cout << "Energy difference: " << tbp_energy(t0.get_state()) - tus_energy(rs_val, t0.get_state()) << '\n';
-
-    taylor_adaptive_dbl *cur_t = &t0;
-    taylor_adaptive_dbl *other_t = &t1;
+    // Pointers to the current and other integrators.
+    taylor_adaptive_dbl *cur_t = &t_2bp, *other_t = &t_2us;
 
     while (true) {
+        // Compute the max velocity in the system.
+        const auto &st = cur_t->get_state();
+        auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
+        auto v2_1 = st[1] * st[1] + st[3] * st[3] + st[5] * st[5];
+        auto max_v = std::max(std::sqrt(v2_0), std::sqrt(v2_1));
+
+        // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
+        auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
+        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
+
+        if (get_regime(cur_t->get_state()) != cur_regime) {
+            std::cout << "Regime CHANGE\n";
+
+            auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));
+
+            while (std::abs(cur_dist - 2 * rs_val) > 1E-12 && h > 1E-12) {
+                std::cout << "Flappo: " << std::abs(cur_dist - 2 * rs_val) << '\n';
+
+                if (cur_regime) {
+                    // Keplerian regime -> sphere regime.
+                    if (cur_dist < 2 * rs_val) {
+                        // Spheres are overlapping, integrate
+                        // backward.
+                        cur_t->propagate_for(-h / 2);
+                    } else {
+                        // Spheres are apart, integrate forward.
+                        cur_t->propagate_for(h / 2);
+                    }
+                } else {
+                    // Sphere regime -> Kepler regime.
+                    if (cur_dist < 2 * rs_val) {
+                        // Spheres are overlapping, integrate
+                        // forward.
+                        cur_t->propagate_for(h / 2);
+                    } else {
+                        // Spheres are apart, integrate backward.
+                        cur_t->propagate_for(-h / 2);
+                    }
+                }
+                // Update h and cur_dist.
+                h /= 2;
+                cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));
+            }
+
+            // Copy the current state to the other integrator.
+            other_t->set_time(cur_t->get_time());
+            other_t->set_state(cur_t->get_state());
+
+            // Swap around, update regime.
+            std::swap(other_t, cur_t);
+            cur_regime = !cur_regime;
+        } else {
+            std::cout << "State: ";
+            for (auto j = 6; j < 12; ++j) {
+                std::cout << cur_t->get_state()[j] << ", ";
+            }
+            std::cout << '\n';
+            std::cout << "Current energy: "
+                      << (cur_regime ? tbp_energy(cur_t->get_state()) : tus_energy(rs_val, cur_t->get_state())) << '\n';
+            std::cout << "Current am: " << compute_am(cur_t->get_state()) << '\n';
+        }
+
+#if 0
         auto ret = cur_t->propagate_pred([get_regime, compute_dist2, cur_regime, rs_val](const auto &cur_ret, auto &t) {
             if (get_regime(t.get_state()) != cur_regime) {
                 std::cout << "Regime CHANGE\n";
@@ -276,5 +347,6 @@ TEST_CASE("mixed tb/spheres")
         cur_regime = !cur_regime;
 
         std::cout << "Current regime is now: " << cur_regime << '\n';
+#endif
     }
 }
