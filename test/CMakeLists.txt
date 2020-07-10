@@ -33,4 +33,5 @@ endfunction()
 
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(pow)
+ADD_HEYOKA_TESTCASE(two_body)
 #ADD_HEYOKA_TESTCASE(gp)
