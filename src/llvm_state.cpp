@@ -963,7 +963,7 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
 }
 
 template <typename T>
-void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+auto llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
     detail::verify_resetter vr{*this};
 
@@ -978,7 +978,7 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
     const auto n_eq = sys.size();
 
     // Decompose the system of equations.
-    const auto dc = taylor_decompose(std::move(sys));
+    auto dc = taylor_decompose(std::move(sys));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -1012,16 +1012,20 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
     if (m_opt_level > 0u) {
         m_pm->run(*m_module);
     }
+
+    return dc;
 }
 
-void llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<expression> sys,
+                                                           std::uint32_t max_order)
 {
-    add_taylor_stepper_impl<double>(name, std::move(sys), max_order);
+    return add_taylor_stepper_impl<double>(name, std::move(sys), max_order);
 }
 
-void llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys,
+                                                            std::uint32_t max_order)
 {
-    add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
+    return add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
 }
 
 template <typename T>
@@ -1251,7 +1255,7 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
 }
 
 template <typename T>
-void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+auto llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
     detail::verify_resetter vr{*this};
 
@@ -1266,7 +1270,7 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
     const auto n_eq = sys.size();
 
     // Decompose the system of equations.
-    const auto dc = taylor_decompose(std::move(sys));
+    auto dc = taylor_decompose(std::move(sys));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -1301,16 +1305,20 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
     if (m_opt_level > 0u) {
         m_pm->run(*m_module);
     }
+
+    return dc;
 }
 
-void llvm_state::add_taylor_jet_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name, std::vector<expression> sys,
+                                                       std::uint32_t max_order)
 {
-    add_taylor_jet_impl<double>(name, std::move(sys), max_order);
+    return add_taylor_jet_impl<double>(name, std::move(sys), max_order);
 }
 
-void llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys,
+                                                        std::uint32_t max_order)
 {
-    add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
+    return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
 llvm_state::tj_dbl_t llvm_state::fetch_taylor_jet_dbl(const std::string &name)

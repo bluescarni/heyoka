@@ -65,6 +65,7 @@ private:
     using jet_f_t = void (*)(T *, std::uint32_t);
     jet_f_t m_jet_f;
     std::string m_ir;
+    std::vector<expression> m_dc;
 
     template <bool, bool>
     HEYOKA_DLL_LOCAL std::tuple<outcome, T, std::uint32_t> step_impl(T);
@@ -80,7 +81,8 @@ public:
 
     ~taylor_adaptive_impl();
 
-    std::string dump_ir() const;
+    const std::string &get_ir() const;
+    const std::vector<expression> &get_decomposition() const;
 
     T get_time() const
     {

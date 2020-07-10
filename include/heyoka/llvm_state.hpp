@@ -63,7 +63,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     // Implementation details for Taylor integration.
     template <typename T>
-    HEYOKA_DLL_LOCAL void add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
+    HEYOKA_DLL_LOCAL auto add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL auto taylor_add_uvars_diff(const std::string &, const std::vector<expression> &, std::uint32_t,
                                                 std::uint32_t);
@@ -76,7 +76,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
                                                   const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
                                                   std::uint32_t);
     template <typename T>
-    HEYOKA_DLL_LOCAL void add_taylor_jet_impl(const std::string &, std::vector<expression>, std::uint32_t);
+    HEYOKA_DLL_LOCAL auto add_taylor_jet_impl(const std::string &, std::vector<expression>, std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL void taylor_add_jet_func(const std::string &, const std::vector<expression> &,
                                               const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
@@ -110,10 +110,10 @@ public:
     void add_dbl(const std::string &, const expression &);
     void add_ldbl(const std::string &, const expression &);
 
-    void add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
 
     void compile();
 

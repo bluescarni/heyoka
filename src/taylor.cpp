@@ -227,9 +227,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     // Add the function for computing the jet
     // of derivatives.
     if constexpr (std::is_same_v<T, double>) {
-        m_llvm.add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
+        m_dc = m_llvm.add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
     } else if constexpr (std::is_same_v<T, long double>) {
-        m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
+        m_dc = m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
@@ -567,9 +567,15 @@ void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
 }
 
 template <typename T>
-std::string taylor_adaptive_impl<T>::dump_ir() const
+const std::string &taylor_adaptive_impl<T>::get_ir() const
 {
     return m_ir;
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_impl<T>::get_decomposition() const
+{
+    return m_dc;
 }
 
 // Explicit instantiation of the implementation classes.
