@@ -539,8 +539,8 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     // at orders order and order - 1.
     T max_abs_diff_o = 0, max_abs_diff_om1 = 0;
     for (std::uint32_t i = 0; i < nvars; ++i) {
-        max_abs_diff_om1 = std::max(max_abs_diff_om1, jet_ptr[(order - 1u) * nvars + i]);
-        max_abs_diff_o = std::max(max_abs_diff_o, jet_ptr[order * nvars + i]);
+        max_abs_diff_om1 = std::max(max_abs_diff_om1, std::abs(jet_ptr[(order - 1u) * nvars + i]));
+        max_abs_diff_o = std::max(max_abs_diff_o, std::abs(jet_ptr[order * nvars + i]));
     }
 
     // Estimate rho at orders order and order - 1.
