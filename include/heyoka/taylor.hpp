@@ -57,14 +57,36 @@ public:
     };
 
 private:
+    // State vector.
     std::vector<T> m_state;
-    T m_time, m_rtol, m_atol;
+    // Time.
+    T m_time;
+    // Relative and absolute tolerances.
+    T m_rtol, m_atol;
+    // Taylor orders corresponding to the
+    // above tolerances.
+    std::uint32_t m_order_r, m_order_a;
+    // Vector of pre-computed inverse orders
+    // (that is, for i >= 1, m_inv_order[i] = 1 / i).
+    std::vector<T> m_inv_order;
+    // The factor by which rho must
+    // be multiplied in order to determine
+    // the integration timestep.
+    // There are two versions of this
+    // factor, one for the relative Taylor
+    // order and the other for the absolute
+    // Taylor order.
+    T m_rhofac_r, m_rhofac_a;
+    // The LLVM machinery.
     llvm_state m_llvm;
-    std::uint32_t m_max_order;
+    // The jet of normalised derivatives.
     std::vector<T> m_jet;
+    // The function to compute the derivatives.
     using jet_f_t = void (*)(T *, std::uint32_t);
     jet_f_t m_jet_f;
+    // LLVM IR.
     std::string m_ir;
+    // Taylor decomposition.
     std::vector<expression> m_dc;
 
     template <bool, bool>

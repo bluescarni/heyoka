@@ -391,7 +391,14 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
             "The computation of the max Taylor order in an adaptive Taylor integrator produced the value "
             + std::to_string(mo_f) + ", which results in an overflow condition");
     }
-    m_max_order = static_cast<std::uint32_t>(mo_f);
+    const auto max_order = static_cast<std::uint32_t>(mo_f);
+
+    // Record the Taylor orders corresponding to
+    // the relative and absolute tolerances.
+    m_order_r = static_cast<std::uint32_t>(std::max(T(2), mo_r));
+    m_order_a = static_cast<std::uint32_t>(std::max(T(2), mo_a));
+    assert(m_order_r <= max_order);
+    assert(m_order_a <= max_order);
 
     // Record the number of variables
     // before consuming sys.
@@ -400,9 +407,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     // Add the function for computing the jet
     // of derivatives.
     if constexpr (std::is_same_v<T, double>) {
-        m_dc = m_llvm.add_taylor_jet_dbl("jet", std::move(sys), m_max_order);
+        m_dc = m_llvm.add_taylor_jet_dbl("jet", std::move(sys), max_order);
     } else if constexpr (std::is_same_v<T, long double>) {
-        m_dc = m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), m_max_order);
+        m_dc = m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), max_order);
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
@@ -427,23 +434,23 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     // NOTE: n_vars must be nonzero because we successfully
     // created a Taylor jet function from sys.
     using jet_size_t = decltype(m_jet.size());
-    if (m_max_order >= std::numeric_limits<jet_size_t>::max()
-        || (static_cast<jet_size_t>(m_max_order) + 1u) > std::numeric_limits<jet_size_t>::max() / n_vars) {
+    if (max_order >= std::numeric_limits<jet_size_t>::max()
+        || (static_cast<jet_size_t>(max_order) + 1u) > std::numeric_limits<jet_size_t>::max() / n_vars) {
         throw std::overflow_error("The computation of the size of the jet of derivatives in an adaptive Taylor "
                                   "integrator resulted in an overflow condition");
     }
-    m_jet.resize((static_cast<jet_size_t>(m_max_order) + 1u) * n_vars);
+    m_jet.resize((static_cast<jet_size_t>(max_order) + 1u) * n_vars);
 
     // Check the values of the derivatives
     // for the initial state.
 
     // Copy the current state to the order zero
     // of the jet of derivatives.
-    std::copy(m_state.begin(), m_state.end(), m_jet.begin());
+    auto jet_ptr = m_jet.data();
+    std::copy(m_state.begin(), m_state.end(), jet_ptr);
 
     // Compute the jet of derivatives at max order.
-    auto jet_ptr = m_jet.data();
-    m_jet_f(jet_ptr, m_max_order);
+    m_jet_f(jet_ptr, max_order);
 
     // Check the computed derivatives, starting from order 1.
     if (std::any_of(jet_ptr + n_vars, jet_ptr + m_jet.size(), [](const T &x) { return !std::isfinite(x); })) {
@@ -451,6 +458,19 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
             "Non-finite value(s) detected in the jet of derivatives corresponding to the initial "
             "state of an adaptive Taylor integrator");
     }
+
+    // Pre-compute the inverse orders. This spares
+    // us a few divisions in the stepping function.
+    m_inv_order.resize(static_cast<jet_size_t>(max_order) + 1u);
+    for (jet_size_t i = 1; i < max_order + 1u; ++i) {
+        m_inv_order[i] = 1 / static_cast<T>(i);
+    }
+
+    // Pre-compute the factors by which rho must
+    // be multiplied in order to determine the
+    // integration timestep.
+    m_rhofac_r = 1 / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (m_order_r - 1u));
+    m_rhofac_a = 1 / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (m_order_a - 1u));
 }
 
 template <typename T>
@@ -509,15 +529,10 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         max_abs_state = std::max(max_abs_state, std::abs(x));
     }
 
-    // Compute the tolerance for this timestep.
-    const auto use_abs = m_rtol * max_abs_state <= m_atol;
-    const auto tol = use_abs ? m_atol : m_rtol;
-
-    // Compute the current Taylor order, ensuring it is at least 2.
-    // NOTE: the static cast here is ok, as we checked in the constructor
-    // that m_max_order is representable.
-    const auto order = std::max(std::uint32_t(2), static_cast<std::uint32_t>(std::ceil(-std::log(tol) / 2 + 1)));
-    assert(order <= m_max_order);
+    // Fetch the Taylor order for this timestep.
+    const auto use_abs_tol = m_rtol * max_abs_state <= m_atol;
+    const auto order = use_abs_tol ? m_order_a : m_order_r;
+    assert(order >= 2u);
 
     // Copy the current state to the order zero
     // of the jet of derivatives.
@@ -543,11 +558,11 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         max_abs_diff_o = std::max(max_abs_diff_o, std::abs(jet_ptr[order * nvars + i]));
     }
 
-    // Estimate rho at orders order and order - 1.
-    const auto rho_om1 = use_abs ? std::pow(1 / max_abs_diff_om1, 1 / static_cast<T>(order - 1u))
-                                 : std::pow(max_abs_state / max_abs_diff_om1, 1 / static_cast<T>(order - 1u));
-    const auto rho_o = use_abs ? std::pow(1 / max_abs_diff_o, 1 / static_cast<T>(order))
-                               : std::pow(max_abs_state / max_abs_diff_o, 1 / static_cast<T>(order));
+    // Estimate rho at orders order - 1 and order.
+    const auto rho_om1 = use_abs_tol ? std::pow(1 / max_abs_diff_om1, m_inv_order[order - 1u])
+                                     : std::pow(max_abs_state / max_abs_diff_om1, m_inv_order[order - 1u]);
+    const auto rho_o = use_abs_tol ? std::pow(1 / max_abs_diff_o, m_inv_order[order])
+                                   : std::pow(max_abs_state / max_abs_diff_o, m_inv_order[order]);
     if (std::isnan(rho_om1) || std::isnan(rho_o)) {
         return std::tuple{outcome::nan_rho, T(0), std::uint32_t(0)};
     }
@@ -556,7 +571,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     const auto rho_m = std::min(rho_o, rho_om1);
 
     // Now determine the step size using the formula with safety factors.
-    auto h = rho_m / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (order - 1u));
+    auto h = rho_m * (use_abs_tol ? m_rhofac_a : m_rhofac_r);
     if constexpr (LimitTimestep) {
         // Make sure h does not exceed max_delta_t.
         h = std::min(h, max_delta_t);
