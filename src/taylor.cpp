@@ -521,10 +521,10 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
 
     // Copy the current state to the order zero
     // of the jet of derivatives.
-    std::copy(m_state.begin(), m_state.end(), m_jet.begin());
+    auto jet_ptr = m_jet.data();
+    std::copy(m_state.begin(), m_state.end(), jet_ptr);
 
     // Compute the jet of derivatives at the given order.
-    auto jet_ptr = m_jet.data();
     m_jet_f(jet_ptr, order);
 
     // Check the computed derivatives, starting from order 1.
@@ -556,7 +556,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     const auto rho_m = std::min(rho_o, rho_om1);
 
     // Now determine the step size using the formula with safety factors.
-    auto h = rho_m / (std::exp(T(1)) * std::exp(T(1))) * std::exp(-0.7 / (order - 1u));
+    auto h = rho_m / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (order - 1u));
     if constexpr (LimitTimestep) {
         // Make sure h does not exceed max_delta_t.
         h = std::min(h, max_delta_t);
