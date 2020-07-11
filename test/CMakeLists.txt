@@ -31,6 +31,7 @@ function(ADD_HEYOKA_TESTCASE arg1)
   add_test(${arg1} ${arg1})
 endfunction()
 
+ADD_HEYOKA_TESTCASE(div)
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(pow)
 ADD_HEYOKA_TESTCASE(two_body)
