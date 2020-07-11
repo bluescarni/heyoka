@@ -18,8 +18,6 @@
 
 #include "catch.hpp"
 
-#include <iostream>
-
 using namespace heyoka;
 
 // Small helper to compute the angular momentum
@@ -66,8 +64,6 @@ T tbp_energy(const std::vector<T> &st)
 
 TEST_CASE("two body")
 {
-    std::cout.precision(14);
-
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -76,7 +72,8 @@ TEST_CASE("two body")
     auto z01 = z1 - z0;
     auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
 
-    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1, 1, -1, 1, 0, 0};
+    // NOTE: this corresponds to a highly elliptic orbit.
+    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
     taylor_adaptive_dbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3, vx0,
                              vx1, vy0, vy1, vz0, vz1},
@@ -87,15 +84,14 @@ TEST_CASE("two body")
 
     const auto &st = tad.get_state();
 
+    const auto en = tbp_energy(st);
+    const auto am = compute_am(st);
+
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
         REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
-
-        std::cout << "h=" << h << ", order=" << ord << ", pos=";
-        for (auto j = 6; j < 12; ++j) {
-            std::cout << st[j] << ", ";
-        }
-        std::cout << "energy=" << tbp_energy(st) << ", am=" << compute_am(st) << '\n';
+        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= 1E-11);
+        REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
     }
 }
 
@@ -121,8 +117,6 @@ T tus_energy(T rs, const std::vector<T> &st)
 
 TEST_CASE("two uniform spheres")
 {
-    std::cout.precision(14);
-
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -137,7 +131,7 @@ TEST_CASE("two uniform spheres")
     auto rs6 = rs3 * rs3;
     auto fac = (r01 * r01 * r01 - 18_dbl * rs2 * r01 + 32_dbl * rs3) / (32_dbl * rs6);
 
-    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1, 1, -1, 1, 0, 0};
+    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
     taylor_adaptive_dbl tad{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
@@ -148,22 +142,19 @@ TEST_CASE("two uniform spheres")
 
     const auto &st = tad.get_state();
 
+    const auto en = tbp_energy(st);
+    const auto am = compute_am(st);
+
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
         REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
-
-        std::cout << "h=" << h << ", order=" << ord << ", pos=";
-        for (auto j = 6; j < 12; ++j) {
-            std::cout << st[j] << ", ";
-        }
-        std::cout << "energy=" << tus_energy(rs_val, st) << ", am=" << compute_am(st) << '\n';
+        REQUIRE(std::abs((en - tus_energy(rs_val, st)) / en) <= 1E-11);
+        REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
     }
 }
 
 TEST_CASE("mixed tb/spheres")
 {
-    std::cout.precision(14);
-
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -179,7 +170,7 @@ TEST_CASE("mixed tb/spheres")
     auto rs6 = rs3 * rs3;
     auto fac = (r01 * r01 * r01 - 18_dbl * rs2 * r01 + 32_dbl * rs3) / (32_dbl * rs6);
 
-    std::vector<double> init_state{0.595, -0.595, 0, 0, 0, 0, -1.0001, 1.0001, -1, 1, 0, 0};
+    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
     // 2BP integrator.
     taylor_adaptive_dbl t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
@@ -218,7 +209,10 @@ TEST_CASE("mixed tb/spheres")
     // Pointers to the current and other integrators.
     taylor_adaptive_dbl *cur_t = &t_2bp, *other_t = &t_2us;
 
-    while (true) {
+    const auto en = tbp_energy(cur_t->get_state());
+    const auto am = compute_am(cur_t->get_state());
+
+    for (auto i = 0; i < 200; ++i) {
         // Compute the max velocity in the system.
         const auto &st = cur_t->get_state();
         auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
@@ -230,13 +224,9 @@ TEST_CASE("mixed tb/spheres")
         REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
 
         if (get_regime(cur_t->get_state()) != cur_regime) {
-            std::cout << "Regime CHANGE\n";
-
             auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));
 
             while (std::abs(cur_dist - 2 * rs_val) > 1E-12 && h > 1E-12) {
-                std::cout << "Flappo: " << std::abs(cur_dist - 2 * rs_val) << '\n';
-
                 if (cur_regime) {
                     // Keplerian regime -> sphere regime.
                     if (cur_dist < 2 * rs_val) {
@@ -271,14 +261,10 @@ TEST_CASE("mixed tb/spheres")
             std::swap(other_t, cur_t);
             cur_regime = !cur_regime;
         } else {
-            std::cout << "State: ";
-            for (auto j = 6; j < 12; ++j) {
-                std::cout << cur_t->get_state()[j] << ", ";
-            }
-            std::cout << '\n';
-            std::cout << "Current energy: "
-                      << (cur_regime ? tbp_energy(cur_t->get_state()) : tus_energy(rs_val, cur_t->get_state())) << '\n';
-            std::cout << "Current am: " << compute_am(cur_t->get_state()) << '\n';
+            const auto cur_energy
+                = cur_regime ? tbp_energy(cur_t->get_state()) : tus_energy(rs_val, cur_t->get_state());
+            REQUIRE(std::abs((en - cur_energy) / en) <= 1E-8);
+            REQUIRE(std::abs((am - compute_am(cur_t->get_state())) / am) <= 1E-8);
         }
     }
 }
