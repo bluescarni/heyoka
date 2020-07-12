@@ -259,6 +259,26 @@ expression operator/(expression e1, expression e2)
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
 
+expression &operator+=(expression &x, expression e)
+{
+    return x = std::move(x) + std::move(e);
+}
+
+expression &operator-=(expression &x, expression e)
+{
+    return x = std::move(x) - std::move(e);
+}
+
+expression &operator*=(expression &x, expression e)
+{
+    return x = std::move(x) * std::move(e);
+}
+
+expression &operator/=(expression &x, expression e)
+{
+    return x = std::move(x) / std::move(e);
+}
+
 bool operator==(const expression &e1, const expression &e2)
 {
     auto visitor = [](const auto &v1, const auto &v2) {
