@@ -16,7 +16,7 @@
 
 using namespace heyoka;
 
-TEST_CASE("taylor dbl")
+TEST_CASE("dbl")
 {
     using Catch::Matchers::Message;
 
@@ -379,7 +379,7 @@ TEST_CASE("taylor dbl")
     }
 }
 
-TEST_CASE("taylor ldbl")
+TEST_CASE("ldbl")
 {
     using Catch::Matchers::Message;
 
