@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cmath>
+#include <fstream>
 #include <initializer_list>
 #include <tuple>
 #include <utility>
@@ -64,6 +65,9 @@ T tbp_energy(const std::vector<T> &st)
 
 TEST_CASE("two body")
 {
+    std::ofstream of("res_kep.txt");
+    of.precision(14);
+
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -88,6 +92,11 @@ TEST_CASE("two body")
     const auto am = compute_am(st);
 
     for (auto i = 0; i < 200; ++i) {
+        for (const auto &x : st) {
+            of << x << ' ';
+        }
+        of << '\n';
+
         const auto [oc, h, ord] = tad.step();
         REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
         REQUIRE(std::abs((en - tbp_energy(st)) / en) <= 1E-11);
@@ -155,6 +164,9 @@ TEST_CASE("two uniform spheres")
 
 TEST_CASE("mixed tb/spheres")
 {
+    std::ofstream of("res.txt");
+    of.precision(14);
+
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -212,9 +224,15 @@ TEST_CASE("mixed tb/spheres")
     const auto en = tbp_energy(cur_t->get_state());
     const auto am = compute_am(cur_t->get_state());
 
-    for (auto i = 0; i < 200; ++i) {
+    for (auto i = 0; i < 20000; ++i) {
         // Compute the max velocity in the system.
         const auto &st = cur_t->get_state();
+
+        for (const auto &x : st) {
+            of << x << ' ';
+        }
+        of << '\n';
+
         auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
         auto v2_1 = st[1] * st[1] + st[3] * st[3] + st[5] * st[5];
         auto max_v = std::max(std::sqrt(v2_0), std::sqrt(v2_1));
