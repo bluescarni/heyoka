@@ -59,8 +59,7 @@ const number::value_type &number::value() const
 
 void swap(number &n0, number &n1) noexcept
 {
-    using std::swap;
-    swap(n0.value(), n1.value());
+    std::swap(n0.value(), n1.value());
 }
 
 std::size_t hash(const number &n)

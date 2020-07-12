@@ -290,28 +290,26 @@ std::ostream &operator<<(std::ostream &os, const function &f)
 
 void swap(function &f0, function &f1) noexcept
 {
-    using std::swap;
+    std::swap(f0.disable_verify(), f1.disable_verify());
+    std::swap(f0.dbl_name(), f1.dbl_name());
+    std::swap(f0.ldbl_name(), f1.ldbl_name());
+    std::swap(f0.display_name(), f1.display_name());
+    std::swap(f0.args(), f1.args());
+    std::swap(f0.attributes(), f1.attributes());
+    std::swap(f0.ty(), f1.ty());
 
-    swap(f0.disable_verify(), f1.disable_verify());
-    swap(f0.dbl_name(), f1.dbl_name());
-    swap(f0.ldbl_name(), f1.ldbl_name());
-    swap(f0.display_name(), f1.display_name());
-    swap(f0.args(), f1.args());
-    swap(f0.attributes(), f1.attributes());
-    swap(f0.ty(), f1.ty());
+    std::swap(f0.diff_f(), f1.diff_f());
 
-    swap(f0.diff_f(), f1.diff_f());
+    std::swap(f0.eval_dbl_f(), f1.eval_dbl_f());
+    std::swap(f0.eval_batch_dbl_f(), f1.eval_batch_dbl_f());
+    std::swap(f0.eval_num_dbl_f(), f1.eval_num_dbl_f());
+    std::swap(f0.deval_num_dbl_f(), f1.deval_num_dbl_f());
 
-    swap(f0.eval_dbl_f(), f1.eval_dbl_f());
-    swap(f0.eval_batch_dbl_f(), f1.eval_batch_dbl_f());
-    swap(f0.eval_num_dbl_f(), f1.eval_num_dbl_f());
-    swap(f0.deval_num_dbl_f(), f1.deval_num_dbl_f());
-
-    swap(f0.taylor_decompose_f(), f1.taylor_decompose_f());
-    swap(f0.taylor_init_dbl_f(), f1.taylor_init_dbl_f());
-    swap(f0.taylor_init_ldbl_f(), f1.taylor_init_ldbl_f());
-    swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
-    swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
+    std::swap(f0.taylor_decompose_f(), f1.taylor_decompose_f());
+    std::swap(f0.taylor_init_dbl_f(), f1.taylor_init_dbl_f());
+    std::swap(f0.taylor_init_ldbl_f(), f1.taylor_init_ldbl_f());
+    std::swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
+    std::swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
 }
 
 std::size_t hash(const function &f)

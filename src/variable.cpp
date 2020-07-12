@@ -52,8 +52,7 @@ const std::string &variable::name() const
 
 void swap(variable &v0, variable &v1) noexcept
 {
-    using std::swap;
-    swap(v0.name(), v1.name());
+    std::swap(v0.name(), v1.name());
 }
 
 std::size_t hash(const variable &v)

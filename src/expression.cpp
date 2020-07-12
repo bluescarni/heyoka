@@ -99,8 +99,7 @@ void rename_variables(expression &e, const std::unordered_map<std::string, std::
 
 void swap(expression &ex0, expression &ex1) noexcept
 {
-    using std::swap;
-    swap(ex0.value(), ex1.value());
+    std::swap(ex0.value(), ex1.value());
 }
 
 std::size_t hash(const expression &ex)
