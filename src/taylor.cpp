@@ -514,9 +514,6 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     // Store the number of variables in the system.
     const auto nvars = static_cast<std::uint32_t>(m_state.size());
 
-    // The tolerance for the timestep is either m_rtol or m_atol,
-    // depending on the current values in the state vector.
-
     // Compute the norm infinity in the state vector.
     T max_abs_state = 0;
     for (const auto &x : m_state) {
@@ -529,7 +526,9 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         max_abs_state = std::max(max_abs_state, std::abs(x));
     }
 
-    // Fetch the Taylor order for this timestep.
+    // Fetch the Taylor order for this timestep, which will be
+    // either the absolute or relative one depending on the
+    // norm infinity of the state vector.
     const auto use_abs_tol = m_rtol * max_abs_state <= m_atol;
     const auto order = use_abs_tol ? m_order_a : m_order_r;
     assert(order >= 2u);
