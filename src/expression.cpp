@@ -238,7 +238,7 @@ expression operator/(expression e1, expression e2)
             return expression{std::forward<decltype(v1)>(v1) / std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type2, number>) {
             // e1 is symbolic, e2 a number.
-            if (is_one(v2) == 1) {
+            if (is_one(v2)) {
                 // e1 / 1 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
             } else if (is_negative_one(v2)) {
@@ -249,11 +249,17 @@ expression operator/(expression e1, expression e2)
                 return expression{std::forward<decltype(v1)>(v1)}
                        * expression{number{1.} / std::forward<decltype(v2)>(v2)};
             }
-        } else {
-            // The standard case.
-            return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
-                                              expression{std::forward<decltype(v2)>(v2)}}};
+        } else if constexpr (std::is_same_v<type1, number>) {
+            // e1 is a number, e2 is symbolic.
+            if (is_zero(v1)) {
+                // 0 / e2 == 0.
+                return expression{number{0.}};
+            }
+            // NOTE: fall through to the standard case.
         }
+        // The standard case.
+        return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
+                                          expression{std::forward<decltype(v2)>(v2)}}};
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
