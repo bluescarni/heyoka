@@ -384,7 +384,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     }
     // NOTE: make sure the max order is at least 2.
     const auto mo_f = std::max(T(2), std::max(mo_r, mo_a));
-    // NOTE: static cast is safe because we now that T is at least
+    // NOTE: static cast is safe because we know that T is at least
     // a double-precision IEEE type.
     if (mo_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
         throw std::overflow_error(
