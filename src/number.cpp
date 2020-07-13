@@ -173,13 +173,7 @@ expression subs(const number &n, const std::unordered_map<std::string, expressio
 
 expression diff(const number &n, const std::string &)
 {
-    return std::visit(
-        [](const auto &v) {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            return expression{number{type(0)}};
-        },
-        n.value());
+    return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
 }
 
 double eval_dbl(const number &n, const std::unordered_map<std::string, double> &)
