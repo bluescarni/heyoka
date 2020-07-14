@@ -305,23 +305,29 @@ void llvm_state::set_opt_level(unsigned opt_level)
 {
     check_uncompiled(__func__);
 
-    if (opt_level > 0u) {
-        // Create the function pass manager.
-        m_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-        m_fpm->add(llvm::createPromoteMemoryToRegisterPass());
-        m_fpm->add(llvm::createInstructionCombiningPass());
-        m_fpm->add(llvm::createReassociatePass());
-        m_fpm->add(llvm::createGVNPass());
-        m_fpm->add(llvm::createCFGSimplificationPass());
-        m_fpm->add(llvm::createLoopVectorizePass());
-        m_fpm->add(llvm::createSLPVectorizerPass());
-        m_fpm->add(llvm::createLoadStoreVectorizerPass());
-        m_fpm->add(llvm::createLoopUnrollPass());
-        m_fpm->doInitialization();
+    if (opt_level == m_opt_level) {
+        // Don't do anything if the optimisation
+        // level is not changing.
+        return;
+    }
 
-        // The module-level optimizer. See:
+    if (opt_level > 0u) {
+        // Create a new function pass manager.
+        auto new_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
+        new_fpm->add(llvm::createPromoteMemoryToRegisterPass());
+        new_fpm->add(llvm::createInstructionCombiningPass());
+        new_fpm->add(llvm::createReassociatePass());
+        new_fpm->add(llvm::createGVNPass());
+        new_fpm->add(llvm::createCFGSimplificationPass());
+        new_fpm->add(llvm::createLoopVectorizePass());
+        new_fpm->add(llvm::createSLPVectorizerPass());
+        new_fpm->add(llvm::createLoadStoreVectorizerPass());
+        new_fpm->add(llvm::createLoopUnrollPass());
+        new_fpm->doInitialization();
+
+        // Create a new module-level optimizer. See:
         // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
-        m_pm = std::make_unique<llvm::legacy::PassManager>();
+        auto new_pm = std::make_unique<llvm::legacy::PassManager>();
         llvm::PassManagerBuilder pm_builder;
         // See here for the defaults:
         // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
@@ -333,8 +339,12 @@ void llvm_state::set_opt_level(unsigned opt_level)
             pm_builder.SLPVectorize = true;
             pm_builder.MergeFunctions = true;
         }
-        pm_builder.populateModulePassManager(*m_pm);
-        pm_builder.populateFunctionPassManager(*m_fpm);
+        pm_builder.populateModulePassManager(*new_pm);
+        pm_builder.populateFunctionPassManager(*new_fpm);
+
+        // Move them in.
+        m_fpm = std::move(new_fpm);
+        m_pm = std::move(new_pm);
     } else {
         // If the optimisation level is set to zero,
         // clear out the optimisation pass managers.
@@ -342,7 +352,7 @@ void llvm_state::set_opt_level(unsigned opt_level)
         m_pm.reset();
     }
 
-    // Record the optimisation level.
+    // Record the new optimisation level.
     m_opt_level = opt_level;
 }
 
