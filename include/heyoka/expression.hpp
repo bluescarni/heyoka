@@ -124,6 +124,7 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
 

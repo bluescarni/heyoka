@@ -361,6 +361,24 @@ expression diff(const expression &e, const std::string &s)
     return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
 }
 
+expression diff(const expression &e, const expression &x)
+{
+    return std::visit(
+        [&e](const auto &v) -> expression {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                return diff(e, v.name());
+            } else {
+                std::ostringstream oss;
+                oss << e;
+
+                throw std::invalid_argument(
+                    "Cannot differentiate an expression with respect to the non-variable expression '" + oss.str()
+                    + "'");
+            }
+        },
+        x.value());
+}
+
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
     return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
