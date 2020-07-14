@@ -13,11 +13,13 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -293,6 +295,146 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+#endif
+
+    return u_vars_defs;
+}
+
+// Taylor decomposition from lhs and rhs
+// of a system of equations.
+std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>> sys)
+{
+    if (sys.empty()) {
+        throw std::invalid_argument("Cannot decompose a system of zero equations");
+    }
+
+    // Determine the variables in the system of equations
+    // from the lhs of the equations. We need to ensure that:
+    // - all the lhs expressions are variables
+    //   and there are no duplicates,
+    // - all the variables in the rhs expressions
+    //   appear in the lhs expressions.
+    // Note that not all variables in the lhs
+    // need to appear in the rhs.
+
+    // This will eventually contain the list
+    // of all variables in the system.
+    std::vector<std::string> lhs_vars;
+    // Maintain a set as well to check for duplicates.
+    std::unordered_set<std::string> lhs_vars_set;
+    // The set of variables in the rhs.
+    std::unordered_set<std::string> rhs_vars_set;
+
+    for (const auto &[lhs, rhs] : sys) {
+        // Infer the variable from the current lhs.
+        std::visit(
+            [&lhs, &lhs_vars, &lhs_vars_set](const auto &v) {
+                if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                    // Check if this is a duplicate variable.
+                    if (auto res = lhs_vars_set.emplace(v.name()); res.second) {
+                        // Not a duplicate, add it to lhs_vars.
+                        lhs_vars.emplace_back(v.name());
+                    } else {
+                        // Duplicate, error out.
+                        throw std::invalid_argument(
+                            "Error in the Taylor decomposition of a system of equations: the variable '" + v.name()
+                            + "' appears in the left-hand side twice");
+                    }
+                } else {
+                    std::ostringstream oss;
+                    oss << lhs;
+
+                    throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the "
+                                                "left-hand side contains the expression '"
+                                                + oss.str() + "', which is not a variable");
+                }
+            },
+            lhs.value());
+
+        // Update the global list of variables
+        // for the rhs.
+        for (auto &var : get_variables(rhs)) {
+            rhs_vars_set.emplace(std::move(var));
+        }
+    }
+
+    // Check that all variables in the rhs appear in the lhs.
+    for (const auto &var : rhs_vars_set) {
+        if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
+            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '"
+                                        + var + "' appears in the right-hand side but not in the left-hand side");
+        }
+    }
+
+    // Cache the number of equations/variables.
+    const auto n_eq = sys.size();
+    assert(n_eq == lhs_vars.size());
+
+    // Create the map for renaming the variables to u_i.
+    // The renaming will be done following the order of the lhs
+    // variables.
+    std::unordered_map<std::string, std::string> repl_map;
+    for (decltype(lhs_vars.size()) i = 0; i < lhs_vars.size(); ++i) {
+        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_" + detail::li_to_string(i));
+        assert(eres.second);
+    }
+
+#if !defined(NDEBUG)
+    // Store a copy of the original rhs for checking later.
+    std::vector<expression> orig_rhs;
+    for (const auto &[_, rhs_ex] : sys) {
+        orig_rhs.push_back(rhs_ex);
+    }
+#endif
+
+    // Rename the variables in the original equations.
+    for (auto &[_, rhs_ex] : sys) {
+        rename_variables(rhs_ex, repl_map);
+    }
+
+    // Init the vector containing the definitions
+    // of the u variables. It begins with a list
+    // of the original lhs variables of the system.
+    std::vector<expression> u_vars_defs;
+    for (const auto &var : lhs_vars) {
+        u_vars_defs.emplace_back(variable{var});
+    }
+
+    // Create a copy of the original equations in terms of u variables.
+    // We will be reusing this below.
+    auto sys_copy = sys;
+
+    // Run the decomposition on each equation.
+    for (decltype(sys.size()) i = 0; i < sys.size(); ++i) {
+        // Decompose the current equation.
+        if (const auto dres = taylor_decompose_in_place(std::move(sys[i].second), u_vars_defs)) {
+            // NOTE: if the equation was decomposed
+            // (that is, it is not constant or a single variable),
+            // we have to update the original definition
+            // of the equation in sys_copy
+            // so that it points to the u variable
+            // that now represents it.
+            sys_copy[i].second = expression{variable{"u_" + detail::li_to_string(dres)}};
+        }
+    }
+
+    // Append the (possibly updated) definitions of the diff equations
+    // in terms of u variables.
+    for (auto &[_, rhs] : sys_copy) {
+        u_vars_defs.emplace_back(std::move(rhs));
+    }
+
+#if !defined(NDEBUG)
+    // Verify the decomposition.
+    detail::verify_taylor_dec(orig_rhs, u_vars_defs);
+#endif
+
+    // Simplify the decomposition.
+    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, n_eq);
+
+#if !defined(NDEBUG)
+    // Verify the simplified decomposition.
+    detail::verify_taylor_dec(orig_rhs, u_vars_defs);
 #endif
 
     return u_vars_defs;
