@@ -63,6 +63,7 @@ TEST_CASE("e3bp")
     ham_llvm.compile();
     auto h_trace = ham_llvm.fetch_dbl<5>("ham");
 
+    // NOTE: initial conditions for the periodic orbit from the paper.
     std::vector<double> init_state
         = cart_to_ham_ec(std::vector{1.20793759666736, -0.493320558636725, 1.19760678594565, -0.498435147674914,
                                      0.548228167205306, 0.49662691628363});
