@@ -166,8 +166,7 @@ public:
     }
 };
 
-llvm_state::llvm_state(const std::string &name, unsigned opt_level)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
+llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(std::make_unique<jit>())
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
@@ -182,38 +181,8 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     fmf.setFast();
     m_builder->setFastMathFlags(fmf);
 
-    // Create the optimization passes.
-    if (m_opt_level > 0u) {
-        // Create the function pass manager.
-        m_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-        m_fpm->add(llvm::createPromoteMemoryToRegisterPass());
-        m_fpm->add(llvm::createInstructionCombiningPass());
-        m_fpm->add(llvm::createReassociatePass());
-        m_fpm->add(llvm::createGVNPass());
-        m_fpm->add(llvm::createCFGSimplificationPass());
-        m_fpm->add(llvm::createLoopVectorizePass());
-        m_fpm->add(llvm::createSLPVectorizerPass());
-        m_fpm->add(llvm::createLoadStoreVectorizerPass());
-        m_fpm->add(llvm::createLoopUnrollPass());
-        m_fpm->doInitialization();
-
-        // The module-level optimizer. See:
-        // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
-        m_pm = std::make_unique<llvm::legacy::PassManager>();
-        llvm::PassManagerBuilder pm_builder;
-        // See here for the defaults:
-        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
-        pm_builder.OptLevel = m_opt_level;
-        pm_builder.VerifyInput = true;
-        pm_builder.VerifyOutput = true;
-        pm_builder.Inliner = llvm::createFunctionInliningPass();
-        if (m_opt_level >= 3u) {
-            pm_builder.SLPVectorize = true;
-            pm_builder.MergeFunctions = true;
-        }
-        pm_builder.populateModulePassManager(*m_pm);
-        pm_builder.populateFunctionPassManager(*m_fpm);
-    }
+    // Setup the optimisation level.
+    set_opt_level(opt_level);
 }
 
 llvm_state::llvm_state(llvm_state &&) noexcept = default;
@@ -327,6 +296,68 @@ void llvm_state::verify_function(const std::string &name)
     verify_function_impl(f);
 }
 
+unsigned llvm_state::get_opt_level() const
+{
+    return m_opt_level;
+}
+
+void llvm_state::set_opt_level(unsigned opt_level)
+{
+    check_uncompiled(__func__);
+
+    if (opt_level > 0u) {
+        // Create the function pass manager.
+        m_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
+        m_fpm->add(llvm::createPromoteMemoryToRegisterPass());
+        m_fpm->add(llvm::createInstructionCombiningPass());
+        m_fpm->add(llvm::createReassociatePass());
+        m_fpm->add(llvm::createGVNPass());
+        m_fpm->add(llvm::createCFGSimplificationPass());
+        m_fpm->add(llvm::createLoopVectorizePass());
+        m_fpm->add(llvm::createSLPVectorizerPass());
+        m_fpm->add(llvm::createLoadStoreVectorizerPass());
+        m_fpm->add(llvm::createLoopUnrollPass());
+        m_fpm->doInitialization();
+
+        // The module-level optimizer. See:
+        // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
+        m_pm = std::make_unique<llvm::legacy::PassManager>();
+        llvm::PassManagerBuilder pm_builder;
+        // See here for the defaults:
+        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
+        pm_builder.OptLevel = opt_level;
+        pm_builder.VerifyInput = true;
+        pm_builder.VerifyOutput = true;
+        pm_builder.Inliner = llvm::createFunctionInliningPass();
+        if (opt_level >= 3u) {
+            pm_builder.SLPVectorize = true;
+            pm_builder.MergeFunctions = true;
+        }
+        pm_builder.populateModulePassManager(*m_pm);
+        pm_builder.populateFunctionPassManager(*m_fpm);
+    } else {
+        // If the optimisation level is set to zero,
+        // clear out the optimisation pass managers.
+        m_fpm.reset();
+        m_pm.reset();
+    }
+
+    // Record the optimisation level.
+    m_opt_level = opt_level;
+}
+
+void llvm_state::optimise()
+{
+    check_uncompiled(__func__);
+
+    if (m_opt_level > 0u) {
+        m_pm->run(*m_module);
+    } else {
+        assert(!m_fpm);
+        assert(!m_pm);
+    }
+}
+
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
@@ -426,9 +457,7 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
     add_varargs_expression<double>(name, e, vars);
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 }
 
 void llvm_state::add_ldbl(const std::string &name, const expression &e)
@@ -444,9 +473,7 @@ void llvm_state::add_ldbl(const std::string &name, const expression &e)
     add_varargs_expression<long double>(name, e, vars);
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 }
 
 // NOTE: this function will lookup symbol names,
@@ -1009,9 +1036,7 @@ auto llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
                                static_cast<std::uint32_t>(n_eq));
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 
     return dc;
 }
@@ -1302,9 +1327,7 @@ auto llvm_state::add_taylor_jet_impl(const std::string &name, U sys, std::uint32
                            static_cast<std::uint32_t>(n_eq));
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 
     return dc;
 }

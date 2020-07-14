@@ -107,6 +107,10 @@ public:
 
     void verify_function(const std::string &);
 
+    unsigned get_opt_level() const;
+    void set_opt_level(unsigned);
+    void optimise();
+
     void add_dbl(const std::string &, const expression &);
     void add_ldbl(const std::string &, const expression &);
 
