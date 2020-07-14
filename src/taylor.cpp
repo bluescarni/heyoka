@@ -590,6 +590,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     // The relative tolerance function.
     auto *fr = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_r", &m_llvm.module());
     assert(fr != nullptr);
+    fr->args().begin()->setName("in_out_ptr");
     auto *bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fr);
     assert(bb != nullptr);
     m_llvm.builder().SetInsertPoint(bb);
@@ -602,6 +603,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     // The absolute tolerance function.
     auto *fa = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_a", &m_llvm.module());
     assert(fa != nullptr);
+    fa->args().begin()->setName("in_out_ptr");
     bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fa);
     assert(bb != nullptr);
     m_llvm.builder().SetInsertPoint(bb);
