@@ -94,8 +94,16 @@ private:
     template <bool, bool>
     HEYOKA_DLL_LOCAL std::tuple<outcome, T, std::uint32_t> step_impl(T);
 
+    // Private implementation-detail constructor machinery.
+    struct p_tag {
+    };
+    template <typename U>
+    HEYOKA_DLL_LOCAL explicit taylor_adaptive_impl(p_tag, U, std::vector<T>, T, T, T, unsigned);
+
 public:
     explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T, unsigned = 3);
+    explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, T, T, T,
+                                  unsigned = 3);
 
     taylor_adaptive_impl(const taylor_adaptive_impl &) = delete;
     taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept;

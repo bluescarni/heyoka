@@ -488,7 +488,8 @@ namespace detail
 {
 
 template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
+template <typename U>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state, T time, T rtol, T atol,
                                               unsigned opt_level)
     : m_state(std::move(state)), m_time(time), m_rtol(rtol),
       m_atol(atol), m_llvm{"adaptive taylor integrator", opt_level}
@@ -618,6 +619,20 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::
     // integration timestep.
     m_rhofac_r = 1 / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (m_order_r - 1u));
     m_rhofac_a = 1 / (std::exp(T(1)) * std::exp(T(1))) * std::exp((T(-7) / T(10)) / (m_order_a - 1u));
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
+                                              unsigned opt_level)
+    : taylor_adaptive_impl(p_tag{}, std::move(sys), std::move(state), time, rtol, atol, opt_level)
+{
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
+                                              T time, T rtol, T atol, unsigned opt_level)
+    : taylor_adaptive_impl(p_tag{}, std::move(sys), std::move(state), time, rtol, atol, opt_level)
+{
 }
 
 template <typename T>
