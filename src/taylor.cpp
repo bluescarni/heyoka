@@ -24,11 +24,15 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -325,7 +329,10 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
     // The set of variables in the rhs.
     std::unordered_set<std::string> rhs_vars_set;
 
-    for (const auto &[lhs, rhs] : sys) {
+    for (const auto &p : sys) {
+        const auto &lhs = p.first;
+        const auto &rhs = p.second;
+
         // Infer the variable from the current lhs.
         std::visit(
             [&lhs, &lhs_vars, &lhs_vars_set](const auto &v) {
@@ -491,8 +498,10 @@ template <typename T>
 template <typename U>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state, T time, T rtol, T atol,
                                               unsigned opt_level)
-    : m_state(std::move(state)), m_time(time), m_rtol(rtol),
-      m_atol(atol), m_llvm{"adaptive taylor integrator", opt_level}
+    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
+      // NOTE: init to optimisation level 0 in order
+      // to delay the optimisation pass.
+      m_llvm{"adaptive taylor integrator", 0u}
 {
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !std::isfinite(x); })) {
@@ -523,44 +532,89 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
             + std::to_string(m_atol) + " instead");
     }
 
-    // Compute the max order for the integration.
-    const auto mo_r = std::ceil(-std::log(m_rtol) / 2 + 1);
-    const auto mo_a = std::ceil(-std::log(m_atol) / 2 + 1);
-    if (!std::isfinite(mo_r) || !std::isfinite(mo_a)) {
+    // Compute the two possible orders for the integration, ensuring that
+    // they are at least 2.
+    const auto order_r_f = std::max(T(2), std::ceil(-std::log(m_rtol) / 2 + 1));
+    const auto order_a_f = std::max(T(2), std::ceil(-std::log(m_atol) / 2 + 1));
+    if (!std::isfinite(order_r_f) || !std::isfinite(order_a_f)) {
         throw std::invalid_argument(
-            "The computation of the max Taylor order in an adaptive Taylor integrator produced non-finite values");
+            "The computation of the Taylor orders in an adaptive Taylor integrator produced non-finite values");
     }
-    // NOTE: make sure the max order is at least 2.
-    const auto mo_f = std::max(T(2), std::max(mo_r, mo_a));
     // NOTE: static cast is safe because we know that T is at least
     // a double-precision IEEE type.
-    if (mo_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
-        throw std::overflow_error(
-            "The computation of the max Taylor order in an adaptive Taylor integrator produced the value "
-            + std::to_string(mo_f) + ", which results in an overflow condition");
+    if (order_r_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())
+        || order_a_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::overflow_error("The computation of the max Taylor orders in an adaptive Taylor integrator resulted "
+                                  "in an overflow condition");
     }
-    const auto max_order = static_cast<std::uint32_t>(mo_f);
-
-    // Record the Taylor orders corresponding to
-    // the relative and absolute tolerances.
-    m_order_r = static_cast<std::uint32_t>(std::max(T(2), mo_r));
-    m_order_a = static_cast<std::uint32_t>(std::max(T(2), mo_a));
-    assert(m_order_r <= max_order);
-    assert(m_order_a <= max_order);
+    // Record the Taylor orders.
+    m_order_r = static_cast<std::uint32_t>(order_r_f);
+    m_order_a = static_cast<std::uint32_t>(order_a_f);
 
     // Record the number of variables
     // before consuming sys.
     const auto n_vars = sys.size();
 
-    // Add the function for computing the jet
-    // of derivatives.
+    // Add the variable-order functions for computing
+    // the jet of normalised derivatives.
+    // NOTE: in many cases m_order_r == m_order_a,
+    // thus we could probably save some time by
+    // creating (and optimising) only one function rather than 2.
     if constexpr (std::is_same_v<T, double>) {
-        m_dc = m_llvm.add_taylor_jet_dbl("jet", std::move(sys), max_order);
+        m_dc = m_llvm.add_taylor_jet_dbl("jet_r", sys, m_order_r);
+        m_llvm.add_taylor_jet_dbl("jet_a", std::move(sys), m_order_a);
     } else if constexpr (std::is_same_v<T, long double>) {
-        m_dc = m_llvm.add_taylor_jet_ldbl("jet", std::move(sys), max_order);
+        m_dc = m_llvm.add_taylor_jet_ldbl("jet_r", sys, m_order_r);
+        m_llvm.add_taylor_jet_ldbl("jet_a", std::move(sys), m_order_a);
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");
     }
+
+    // Fetch the functions we just added.
+    auto orig_jet_r = m_llvm.module().getFunction("jet_r");
+    assert(orig_jet_r != nullptr);
+    auto orig_jet_a = m_llvm.module().getFunction("jet_a");
+    assert(orig_jet_a != nullptr);
+
+    // Change their linkage to internal, as we don't
+    // need to invoke them from outside the module.
+    orig_jet_r->setLinkage(llvm::Function::InternalLinkage);
+    orig_jet_a->setLinkage(llvm::Function::InternalLinkage);
+
+    // Add the wrappers with fixed order.
+    // The prototypes are both void(T *).
+    std::vector<llvm::Type *> f_args(1u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(m_llvm.context())));
+    auto *ft = llvm::FunctionType::get(m_llvm.builder().getVoidTy(), f_args, false);
+    assert(ft != nullptr);
+
+    // The relative tolerance function.
+    auto *fr = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_r", &m_llvm.module());
+    assert(fr != nullptr);
+    auto *bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fr);
+    assert(bb != nullptr);
+    m_llvm.builder().SetInsertPoint(bb);
+    auto jet_call = m_llvm.builder().CreateCall(orig_jet_r, {fr->args().begin(), m_llvm.builder().getInt32(m_order_r)});
+    assert(jet_call != nullptr);
+    jet_call->setTailCall(true);
+    m_llvm.builder().CreateRetVoid();
+    m_llvm.verify_function("jet_f_r");
+
+    // The absolute tolerance function.
+    auto *fa = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_a", &m_llvm.module());
+    assert(fa != nullptr);
+    bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fa);
+    assert(bb != nullptr);
+    m_llvm.builder().SetInsertPoint(bb);
+    jet_call = m_llvm.builder().CreateCall(orig_jet_a, {fa->args().begin(), m_llvm.builder().getInt32(m_order_a)});
+    assert(jet_call != nullptr);
+    jet_call->setTailCall(true);
+    m_llvm.builder().CreateRetVoid();
+    m_llvm.verify_function("jet_f_a");
+
+    // Change the optimisation level
+    // and run the optimisation pass.
+    m_llvm.set_opt_level(opt_level);
+    m_llvm.optimise();
 
     // Store the IR before compiling.
     m_ir = m_llvm.dump();
@@ -570,18 +624,14 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
 
     // Fetch the compiled function for computing
     // the jet of derivatives.
-    if constexpr (std::is_same_v<T, double>) {
-        m_jet_f = m_llvm.fetch_taylor_jet_dbl("jet");
-    } else if constexpr (std::is_same_v<T, long double>) {
-        m_jet_f = m_llvm.fetch_taylor_jet_ldbl("jet");
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
+    m_jet_f_r = reinterpret_cast<jet_f_t>(m_llvm.jit_lookup("jet_f_r"));
+    m_jet_f_a = reinterpret_cast<jet_f_t>(m_llvm.jit_lookup("jet_f_a"));
 
     // Init the jet vector. Its maximum size is n_vars * (max_order + 1).
     // NOTE: n_vars must be nonzero because we successfully
     // created a Taylor jet function from sys.
     using jet_size_t = decltype(m_jet.size());
+    const auto max_order = std::max(m_order_r, m_order_a);
     if (max_order >= std::numeric_limits<jet_size_t>::max()
         || (static_cast<jet_size_t>(max_order) + 1u) > std::numeric_limits<jet_size_t>::max() / n_vars) {
         throw std::overflow_error("The computation of the size of the jet of derivatives in an adaptive Taylor "
@@ -598,7 +648,11 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     std::copy(m_state.begin(), m_state.end(), jet_ptr);
 
     // Compute the jet of derivatives at max order.
-    m_jet_f(jet_ptr, max_order);
+    if (m_order_r > m_order_a) {
+        m_jet_f_r(jet_ptr);
+    } else {
+        m_jet_f_a(jet_ptr);
+    }
 
     // Check the computed derivatives, starting from order 1.
     if (std::any_of(jet_ptr + n_vars, jet_ptr + m_jet.size(), [](const T &x) { return !std::isfinite(x); })) {
@@ -701,7 +755,11 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     std::copy(m_state.begin(), m_state.end(), jet_ptr);
 
     // Compute the jet of derivatives at the given order.
-    m_jet_f(jet_ptr, order);
+    if (use_abs_tol) {
+        m_jet_f_a(jet_ptr);
+    } else {
+        m_jet_f_r(jet_ptr);
+    }
 
     // Check the computed derivatives, starting from order 1.
     if (std::any_of(jet_ptr + nvars, jet_ptr + (order + 1u) * nvars, [](const T &x) { return !std::isfinite(x); })) {

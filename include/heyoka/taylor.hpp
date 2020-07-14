@@ -83,9 +83,9 @@ private:
     llvm_state m_llvm;
     // The jet of normalised derivatives.
     std::vector<T> m_jet;
-    // The function to compute the derivatives.
-    using jet_f_t = void (*)(T *, std::uint32_t);
-    jet_f_t m_jet_f;
+    // The functions to compute the derivatives.
+    using jet_f_t = void (*)(T *);
+    jet_f_t m_jet_f_r, m_jet_f_a;
     // LLVM IR.
     std::string m_ir;
     // Taylor decomposition.
