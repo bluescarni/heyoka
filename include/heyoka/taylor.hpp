@@ -50,12 +50,13 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
 public:
     enum class outcome {
-        success,       // Integration step was successful.
-        step_limit,    // Maximum number of steps reached.
-        interrupted,   // Interrupted by user-provided stopping criterion.
-        nf_state,      // Non-finite initial state detected.
-        nf_derivative, // Non-finite derivative detected.
-        nan_rho        // NaN estimation of the convergence radius.
+        success,           // Integration step was successful, no time/step limits were reached.
+        step_limit,        // Maximum number of steps reached.
+        time_limit,        // Time limit reached.
+        interrupted,       // Interrupted by user-provided stopping criterion.
+        err_nf_state,      // Non-finite initial state detected.
+        err_nf_derivative, // Non-finite derivative detected.
+        err_nan_rho        // NaN estimation of the convergence radius.
     };
 
 private:

@@ -221,7 +221,7 @@ TEST_CASE("mixed tb/spheres")
 
         // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
         auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
+        REQUIRE((oc == taylor_adaptive_dbl::outcome::success || oc == taylor_adaptive_dbl::outcome::time_limit));
 
         if (get_regime(cur_t->get_state()) != cur_regime) {
             auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));
