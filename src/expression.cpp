@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -82,7 +83,56 @@ expression operator""_ldbl(unsigned long long n)
 
 expression operator""_var(const char *s, std::size_t n)
 {
-    return expression{variable{std::string{s, n}}};
+    return expression{variable{std::string(s, n)}};
+}
+
+} // namespace literals
+
+namespace detail
+{
+
+prime_wrapper::prime_wrapper(std::string s) : m_str(std::move(s)) {}
+
+prime_wrapper::prime_wrapper(const prime_wrapper &) = default;
+
+prime_wrapper::prime_wrapper(prime_wrapper &&) noexcept = default;
+
+prime_wrapper &prime_wrapper::operator=(const prime_wrapper &) = default;
+
+prime_wrapper &prime_wrapper::operator=(prime_wrapper &&) noexcept = default;
+
+prime_wrapper::~prime_wrapper() = default;
+
+std::pair<expression, expression> prime_wrapper::operator=(expression e) &&
+{
+    return std::pair{expression{variable{std::move(m_str)}}, std::move(e)};
+}
+
+} // namespace detail
+
+detail::prime_wrapper prime(expression e)
+{
+    return std::visit(
+        [&e](auto &v) -> detail::prime_wrapper {
+            if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
+                return detail::prime_wrapper{std::move(v.name())};
+            } else {
+                std::ostringstream oss;
+                oss << e;
+
+                throw std::invalid_argument("Cannot apply the prime() operator to the non-variable expression '"
+                                            + oss.str() + "'");
+            }
+        },
+        e.value());
+}
+
+inline namespace literals
+{
+
+detail::prime_wrapper operator""_p(const char *s, std::size_t n)
+{
+    return detail::prime_wrapper{std::string(s, n)};
 }
 
 } // namespace literals

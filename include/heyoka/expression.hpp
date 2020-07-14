@@ -15,6 +15,7 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -65,6 +66,33 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 
 HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
+
+} // namespace literals
+
+namespace detail
+{
+
+struct HEYOKA_DLL_PUBLIC prime_wrapper {
+    std::string m_str;
+
+    explicit prime_wrapper(std::string);
+    prime_wrapper(const prime_wrapper &);
+    prime_wrapper(prime_wrapper &&) noexcept;
+    prime_wrapper &operator=(const prime_wrapper &);
+    prime_wrapper &operator=(prime_wrapper &&) noexcept;
+    ~prime_wrapper();
+
+    std::pair<expression, expression> operator=(expression) &&;
+};
+
+} // namespace detail
+
+HEYOKA_DLL_PUBLIC detail::prime_wrapper prime(expression);
+
+inline namespace literals
+{
+
+HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
 
 } // namespace literals
 
