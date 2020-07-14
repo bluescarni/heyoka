@@ -1254,8 +1254,8 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
     assert(eret.second);
 }
 
-template <typename T>
-auto llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+template <typename T, typename U>
+auto llvm_state::add_taylor_jet_impl(const std::string &name, U sys, std::uint32_t max_order)
 {
     detail::verify_resetter vr{*this};
 
@@ -1316,6 +1316,20 @@ std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name, 
 }
 
 std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name,
+                                                       std::vector<std::pair<expression, expression>> sys,
+                                                       std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<double>(name, std::move(sys), max_order);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
+                                                        std::vector<std::pair<expression, expression>> sys,
                                                         std::uint32_t max_order)
 {
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
