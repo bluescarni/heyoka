@@ -16,8 +16,6 @@
 
 #include "catch.hpp"
 
-#include <iostream>
-
 using namespace heyoka;
 
 template <typename T>
@@ -49,17 +47,16 @@ std::vector<T> cart_to_ham_ec(const std::vector<T> &s)
     return std::vector{xi, eta, phi, pxi, peta, pphi};
 }
 
-TEST_CASE("e3bp periodic")
+TEST_CASE("e3bp")
 {
-    // x0, x1, x2 = xi, eta, phi
-    // y0, y1, y2 = p_xi, p_eta, p_phi
-    auto [x0, x1, x2, y0, y1, y2] = make_vars("x0", "x1", "x2", "y0", "y1", "y2");
+    auto [xi, eta, phi, pxi, peta, pphi] = make_vars("xi", "eta", "phi", "pxi", "peta", "pphi");
 
     auto a = 1_dbl, mu1 = 1_dbl, mu2 = 0.05_dbl;
 
-    auto ham = (y0 * y0 * (x0 * x0 - 1_dbl) + y1 * y1 * (1_dbl - x1 * x1)) / (2_dbl * a * a * (x0 * x0 - y0 * y0))
-               + (y2 * y2) / (2_dbl * a * a * (x0 * x0 - 1_dbl) * (1_dbl - x1 * x1)) - mu1 / (a * (x0 - x1))
-               - mu2 / (a * (x0 + x1));
+    auto ham
+        = (pxi * pxi * (xi * xi - 1_dbl) + peta * peta * (1_dbl - eta * eta)) / (2_dbl * a * a * (xi * xi - eta * eta))
+          + (pphi * pphi) / (2_dbl * a * a * (xi * xi - 1_dbl) * (1_dbl - eta * eta)) - mu1 / (a * (xi - eta))
+          - mu2 / (a * (xi + eta));
 
     llvm_state ham_llvm{"ham tracing"};
     ham_llvm.add_dbl("ham", ham);
@@ -70,23 +67,34 @@ TEST_CASE("e3bp periodic")
         = cart_to_ham_ec(std::vector{1.20793759666736, -0.493320558636725, 1.19760678594565, -0.498435147674914,
                                      0.548228167205306, 0.49662691628363});
 
-    taylor_decompose({"x0"_p = diff(ham, "y0"), "x1"_p = diff(ham, "y1"), "x2"_p = diff(ham, "y2"),
-                      "y0"_p = -diff(ham, "x0"), "y1"_p = -diff(ham, "x1"), "y2"_p = -diff(ham, "x2")});
-
-    taylor_adaptive_dbl tad{
-        {diff(ham, "y0"), diff(ham, "y1"), diff(ham, "y2"), -diff(ham, "x0"), -diff(ham, "x1"), x2 - x2},
-        std::vector{init_state[0], init_state[1], init_state[2], init_state[3], init_state[4], init_state[5]},
-        0,
-        1E-16,
-        1E-16};
+    taylor_adaptive_dbl tad{{prime(xi) = diff(ham, pxi), prime(eta) = diff(ham, peta), prime(phi) = diff(ham, pphi),
+                             prime(pxi) = -diff(ham, xi), prime(peta) = -diff(ham, eta), prime(pphi) = -diff(ham, phi)},
+                            init_state,
+                            0,
+                            1E-16,
+                            1E-16};
 
     const auto &st = tad.get_state();
 
-    std::cout.precision(14);
-    std::cout << h_trace(init_state[0], init_state[1], init_state[3], init_state[4], init_state[5]) << '\n';
-    std::cout << h_trace(st[0], st[1], st[3], st[4], st[5]) << '\n';
+    // NOTE: need to pass the state variables in alphabetical order:
+    // eta, peta, pphi, pxi, xi.
+    const auto orig_en = h_trace(st[1], st[4], st[5], st[3], st[0]);
 
-    tad.step();
+    for (auto i = 0; i < 200; ++i) {
+        tad.step();
 
-    std::cout << h_trace(st[0], st[1], st[3], st[4], st[5]) << '\n';
+        REQUIRE(std::abs((orig_en - h_trace(st[1], st[4], st[5], st[3], st[0])) / orig_en) < 1E-12);
+    }
+
+    for (auto i = 0; i < 200; ++i) {
+        tad.step_backward();
+
+        REQUIRE(std::abs((orig_en - h_trace(st[1], st[4], st[5], st[3], st[0])) / orig_en) < 1E-12);
+    }
+
+    tad.propagate_until(0);
+
+    for (auto i = 0u; i < 6u; ++i) {
+        REQUIRE(std::abs((init_state[i] - st[i]) / init_state[i]) < 1E-11);
+    }
 }
