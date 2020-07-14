@@ -166,15 +166,17 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
     }
 
     // From dc.size() - n_eq to dc.size(), the expressions
-    // must be variables in the u_n form,
-    // where n < i.
+    // must be either variables in the u_n form, where n < i,
+    // or numbers.
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
         std::visit(
             [i](const auto &v) {
-                if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
                     assert(uname_to_index(v.name()) < i);
-                } else {
+                } else if (!std::is_same_v<type, number>) {
                     assert(false);
                 }
             },
@@ -203,6 +205,8 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
 
 } // namespace detail
 
+// Taylor decomposition with automatic deduction
+// of variables.
 std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
 {
     if (v_ex.empty()) {
@@ -219,8 +223,9 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
     }
 
     if (vars.size() != v_ex.size()) {
-        throw std::invalid_argument("The number of variables (" + std::to_string(vars.size())
-                                    + ") differs from the number of equations (" + std::to_string(v_ex.size()) + ")");
+        throw std::invalid_argument("The number of deduced variables for a Taylor decomposition ("
+                                    + std::to_string(vars.size()) + ") differs from the number of equations ("
+                                    + std::to_string(v_ex.size()) + ")");
     }
 
     // Cache the number of equations/variables
