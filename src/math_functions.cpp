@@ -270,7 +270,7 @@ expression sin(expression e)
 
         return std::sin(args[0]);
     };
-    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
         if (args.size() != 1u || i != 0u) {
             throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing "
                                         "the derivative of std::sin");
@@ -547,7 +547,7 @@ expression cos(expression e)
 
         return std::cos(args[0]);
     };
-    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
         if (args.size() != 1u || i != 0u) {
             throw std::invalid_argument(
                 "Inconsistent number of arguments or derivative requested when computing the derivative of std::cos");
@@ -636,7 +636,7 @@ expression log(expression e)
 
         return std::log(args[0]);
     };
-    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
         if (args.size() != 1u || i != 0u) {
             throw std::invalid_argument(
                 "Inconsistent number of arguments or derivative requested when computing the derivative of std::log");
@@ -911,7 +911,7 @@ expression pow(expression e1, expression e2)
 
         return std::pow(args[0], args[1]);
     };
-    fc.deval_num_dbl_f() = [](const std::vector<double> &args, unsigned i) {
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
         if (args.size() != 2u || i > 1u) {
             throw std::invalid_argument(
                 "Inconsistent number of arguments or derivative requested when computing the derivative of std::pow");

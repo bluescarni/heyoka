@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -289,28 +290,59 @@ std::ostream &operator<<(std::ostream &os, const function &f)
 
 void swap(function &f0, function &f1) noexcept
 {
-    using std::swap;
+    std::swap(f0.disable_verify(), f1.disable_verify());
+    std::swap(f0.dbl_name(), f1.dbl_name());
+    std::swap(f0.ldbl_name(), f1.ldbl_name());
+    std::swap(f0.display_name(), f1.display_name());
+    std::swap(f0.args(), f1.args());
+    std::swap(f0.attributes(), f1.attributes());
+    std::swap(f0.ty(), f1.ty());
 
-    swap(f0.disable_verify(), f1.disable_verify());
-    swap(f0.dbl_name(), f1.dbl_name());
-    swap(f0.ldbl_name(), f1.ldbl_name());
-    swap(f0.display_name(), f1.display_name());
-    swap(f0.args(), f1.args());
-    swap(f0.attributes(), f1.attributes());
-    swap(f0.ty(), f1.ty());
+    std::swap(f0.diff_f(), f1.diff_f());
 
-    swap(f0.diff_f(), f1.diff_f());
+    std::swap(f0.eval_dbl_f(), f1.eval_dbl_f());
+    std::swap(f0.eval_batch_dbl_f(), f1.eval_batch_dbl_f());
+    std::swap(f0.eval_num_dbl_f(), f1.eval_num_dbl_f());
+    std::swap(f0.deval_num_dbl_f(), f1.deval_num_dbl_f());
 
-    swap(f0.eval_dbl_f(), f1.eval_dbl_f());
-    swap(f0.eval_batch_dbl_f(), f1.eval_batch_dbl_f());
-    swap(f0.eval_num_dbl_f(), f1.eval_num_dbl_f());
-    swap(f0.deval_num_dbl_f(), f1.deval_num_dbl_f());
+    std::swap(f0.taylor_decompose_f(), f1.taylor_decompose_f());
+    std::swap(f0.taylor_init_dbl_f(), f1.taylor_init_dbl_f());
+    std::swap(f0.taylor_init_ldbl_f(), f1.taylor_init_ldbl_f());
+    std::swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
+    std::swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
+}
 
-    swap(f0.taylor_decompose_f(), f1.taylor_decompose_f());
-    swap(f0.taylor_init_dbl_f(), f1.taylor_init_dbl_f());
-    swap(f0.taylor_init_ldbl_f(), f1.taylor_init_ldbl_f());
-    swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
-    swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
+std::size_t hash(const function &f)
+{
+    auto retval = std::hash<bool>{}(f.disable_verify());
+    retval += std::hash<std::string>{}(f.dbl_name());
+    retval += std::hash<std::string>{}(f.ldbl_name());
+    retval += std::hash<std::string>{}(f.display_name());
+
+    for (const auto &arg : f.args()) {
+        retval += hash(arg);
+    }
+
+    for (const auto &attr : f.attributes()) {
+        retval += std::hash<llvm::Attribute::AttrKind>{}(attr);
+    }
+
+    retval += std::hash<function::type>{}(f.ty());
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.diff_f()));
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_batch_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.eval_num_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.deval_num_dbl_f()));
+
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_decompose_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_ldbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_ldbl_f()));
+
+    return retval;
 }
 
 std::vector<std::string> get_variables(const function &f)
@@ -356,6 +388,21 @@ bool operator==(const function &f1, const function &f2)
 bool operator!=(const function &f1, const function &f2)
 {
     return !(f1 == f2);
+}
+
+expression subs(const function &f, const std::unordered_map<std::string, expression> &smap)
+{
+    // NOTE: not the most efficient implementation, as we end up
+    // copying arguments which we will be discarding anyway later.
+    // The only alternative seems to be copying manually all the function
+    // members one by one however...
+    auto tmp = f;
+
+    for (auto &arg : tmp.args()) {
+        arg = subs(arg, smap);
+    }
+
+    return expression{std::move(tmp)};
 }
 
 expression diff(const function &f, const std::string &s)

@@ -63,7 +63,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     // Implementation details for Taylor integration.
     template <typename T>
-    HEYOKA_DLL_LOCAL void add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
+    HEYOKA_DLL_LOCAL auto add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL auto taylor_add_uvars_diff(const std::string &, const std::vector<expression> &, std::uint32_t,
                                                 std::uint32_t);
@@ -75,8 +75,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void taylor_add_stepper_func(const std::string &, const std::vector<expression> &,
                                                   const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
                                                   std::uint32_t);
-    template <typename T>
-    HEYOKA_DLL_LOCAL void add_taylor_jet_impl(const std::string &, std::vector<expression>, std::uint32_t);
+    template <typename T, typename U>
+    HEYOKA_DLL_LOCAL auto add_taylor_jet_impl(const std::string &, U, std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL void taylor_add_jet_func(const std::string &, const std::vector<expression> &,
                                               const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
@@ -85,9 +85,9 @@ class HEYOKA_DLL_PUBLIC llvm_state
 public:
     explicit llvm_state(const std::string &, unsigned = 3);
     llvm_state(const llvm_state &) = delete;
-    llvm_state(llvm_state &&) = delete;
+    llvm_state(llvm_state &&) noexcept;
     llvm_state &operator=(const llvm_state &) = delete;
-    llvm_state &operator=(llvm_state &&) = delete;
+    llvm_state &operator=(llvm_state &&) noexcept;
     ~llvm_state();
 
     llvm::Module &module();
@@ -107,13 +107,21 @@ public:
 
     void verify_function(const std::string &);
 
+    unsigned get_opt_level() const;
+    void set_opt_level(unsigned);
+    void optimise();
+
     void add_dbl(const std::string &, const expression &);
     void add_ldbl(const std::string &, const expression &);
 
-    void add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    void add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<std::pair<expression, expression>>,
+                                               std::uint32_t);
+    std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<std::pair<expression, expression>>,
+                                                std::uint32_t);
 
     void compile();
 

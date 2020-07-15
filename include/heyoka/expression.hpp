@@ -9,10 +9,13 @@
 #ifndef HEYOKA_EXPRESSION_HPP
 #define HEYOKA_EXPRESSION_HPP
 
+#include <array>
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -66,7 +69,36 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 
 } // namespace literals
 
+namespace detail
+{
+
+struct HEYOKA_DLL_PUBLIC prime_wrapper {
+    std::string m_str;
+
+    explicit prime_wrapper(std::string);
+    prime_wrapper(const prime_wrapper &);
+    prime_wrapper(prime_wrapper &&) noexcept;
+    prime_wrapper &operator=(const prime_wrapper &);
+    prime_wrapper &operator=(prime_wrapper &&) noexcept;
+    ~prime_wrapper();
+
+    std::pair<expression, expression> operator=(expression) &&;
+};
+
+} // namespace detail
+
+HEYOKA_DLL_PUBLIC detail::prime_wrapper prime(expression);
+
+inline namespace literals
+{
+
+HEYOKA_DLL_PUBLIC detail::prime_wrapper operator""_p(const char *, std::size_t);
+
+} // namespace literals
+
 HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
 
@@ -81,10 +113,18 @@ HEYOKA_DLL_PUBLIC expression operator-(expression, expression);
 HEYOKA_DLL_PUBLIC expression operator*(expression, expression);
 HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
 
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, expression);
+
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 
+HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
+
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
 
@@ -114,6 +154,26 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const expression &);
 
+template <typename... Args>
+inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
+{
+    return std::array{expression{variable{strs}}...};
+}
+
 } // namespace heyoka
+
+namespace std
+{
+
+// Specialisation of std::hash for expression.
+template <>
+struct hash<heyoka::expression> {
+    size_t operator()(const heyoka::expression &ex) const
+    {
+        return heyoka::hash(ex);
+    }
+};
+
+} // namespace std
 
 #endif

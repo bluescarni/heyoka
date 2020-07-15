@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -82,7 +83,56 @@ expression operator""_ldbl(unsigned long long n)
 
 expression operator""_var(const char *s, std::size_t n)
 {
-    return expression{variable{std::string{s, n}}};
+    return expression{variable{std::string(s, n)}};
+}
+
+} // namespace literals
+
+namespace detail
+{
+
+prime_wrapper::prime_wrapper(std::string s) : m_str(std::move(s)) {}
+
+prime_wrapper::prime_wrapper(const prime_wrapper &) = default;
+
+prime_wrapper::prime_wrapper(prime_wrapper &&) noexcept = default;
+
+prime_wrapper &prime_wrapper::operator=(const prime_wrapper &) = default;
+
+prime_wrapper &prime_wrapper::operator=(prime_wrapper &&) noexcept = default;
+
+prime_wrapper::~prime_wrapper() = default;
+
+std::pair<expression, expression> prime_wrapper::operator=(expression e) &&
+{
+    return std::pair{expression{variable{std::move(m_str)}}, std::move(e)};
+}
+
+} // namespace detail
+
+detail::prime_wrapper prime(expression e)
+{
+    return std::visit(
+        [&e](auto &v) -> detail::prime_wrapper {
+            if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
+                return detail::prime_wrapper{std::move(v.name())};
+            } else {
+                std::ostringstream oss;
+                oss << e;
+
+                throw std::invalid_argument("Cannot apply the prime() operator to the non-variable expression '"
+                                            + oss.str() + "'");
+            }
+        },
+        e.value());
+}
+
+inline namespace literals
+{
+
+detail::prime_wrapper operator""_p(const char *s, std::size_t n)
+{
+    return detail::prime_wrapper{std::string(s, n)};
 }
 
 } // namespace literals
@@ -99,8 +149,12 @@ void rename_variables(expression &e, const std::unordered_map<std::string, std::
 
 void swap(expression &ex0, expression &ex1) noexcept
 {
-    using std::swap;
-    swap(ex0.value(), ex1.value());
+    std::swap(ex0.value(), ex1.value());
+}
+
+std::size_t hash(const expression &ex)
+{
+    return std::visit([](const auto &v) { return hash(v); }, ex.value());
 }
 
 std::ostream &operator<<(std::ostream &os, const expression &e)
@@ -234,7 +288,7 @@ expression operator/(expression e1, expression e2)
             return expression{std::forward<decltype(v1)>(v1) / std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type2, number>) {
             // e1 is symbolic, e2 a number.
-            if (is_one(v2) == 1) {
+            if (is_one(v2)) {
                 // e1 / 1 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
             } else if (is_negative_one(v2)) {
@@ -245,14 +299,40 @@ expression operator/(expression e1, expression e2)
                 return expression{std::forward<decltype(v1)>(v1)}
                        * expression{number{1.} / std::forward<decltype(v2)>(v2)};
             }
-        } else {
-            // The standard case.
-            return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
-                                              expression{std::forward<decltype(v2)>(v2)}}};
+        } else if constexpr (std::is_same_v<type1, number>) {
+            // e1 is a number, e2 is symbolic.
+            if (is_zero(v1)) {
+                // 0 / e2 == 0.
+                return expression{number{0.}};
+            }
+            // NOTE: fall through to the standard case.
         }
+        // The standard case.
+        return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
+                                          expression{std::forward<decltype(v2)>(v2)}}};
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
+}
+
+expression &operator+=(expression &x, expression e)
+{
+    return x = std::move(x) + std::move(e);
+}
+
+expression &operator-=(expression &x, expression e)
+{
+    return x = std::move(x) - std::move(e);
+}
+
+expression &operator*=(expression &x, expression e)
+{
+    return x = std::move(x) * std::move(e);
+}
+
+expression &operator/=(expression &x, expression e)
+{
+    return x = std::move(x) / std::move(e);
 }
 
 bool operator==(const expression &e1, const expression &e2)
@@ -279,6 +359,29 @@ bool operator!=(const expression &e1, const expression &e2)
 expression diff(const expression &e, const std::string &s)
 {
     return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
+}
+
+expression diff(const expression &e, const expression &x)
+{
+    return std::visit(
+        [&e](const auto &v) -> expression {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
+                return diff(e, v.name());
+            } else {
+                std::ostringstream oss;
+                oss << e;
+
+                throw std::invalid_argument(
+                    "Cannot differentiate an expression with respect to the non-variable expression '" + oss.str()
+                    + "'");
+            }
+        },
+        x.value());
+}
+
+expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
+{
+    return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)

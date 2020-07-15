@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <functional>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -51,8 +52,12 @@ const std::string &variable::name() const
 
 void swap(variable &v0, variable &v1) noexcept
 {
-    using std::swap;
-    swap(v0.name(), v1.name());
+    std::swap(v0.name(), v1.name());
+}
+
+std::size_t hash(const variable &v)
+{
+    return std::hash<std::string>{}(v.name());
 }
 
 std::ostream &operator<<(std::ostream &os, const variable &var)
@@ -80,6 +85,15 @@ bool operator==(const variable &v1, const variable &v2)
 bool operator!=(const variable &v1, const variable &v2)
 {
     return !(v1 == v2);
+}
+
+expression subs(const variable &var, const std::unordered_map<std::string, expression> &smap)
+{
+    if (auto it = smap.find(var.name()); it == smap.end()) {
+        return expression{var};
+    } else {
+        return it->second;
+    }
 }
 
 expression diff(const variable &var, const std::string &s)

@@ -106,9 +106,13 @@ const binary_operator::type &binary_operator::op() const
 
 void swap(binary_operator &bo0, binary_operator &bo1) noexcept
 {
-    using std::swap;
-    swap(bo0.m_type, bo1.m_type);
-    swap(bo0.m_ops, bo1.m_ops);
+    std::swap(bo0.m_type, bo1.m_type);
+    std::swap(bo0.m_ops, bo1.m_ops);
+}
+
+std::size_t hash(const binary_operator &bo)
+{
+    return std::hash<binary_operator::type>{}(bo.op()) + hash(bo.lhs()) + hash(bo.rhs());
 }
 
 std::ostream &operator<<(std::ostream &os, const binary_operator &bo)
@@ -160,6 +164,11 @@ bool operator==(const binary_operator &o1, const binary_operator &o2)
 bool operator!=(const binary_operator &o1, const binary_operator &o2)
 {
     return !(o1 == o2);
+}
+
+expression subs(const binary_operator &bo, const std::unordered_map<std::string, expression> &smap)
+{
+    return expression{binary_operator{bo.op(), subs(bo.lhs(), smap), subs(bo.rhs(), smap)}};
 }
 
 expression diff(const binary_operator &bo, const std::string &s)

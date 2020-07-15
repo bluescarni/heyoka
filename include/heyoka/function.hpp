@@ -121,6 +121,8 @@ public:
 
 HEYOKA_DLL_PUBLIC void swap(function &, function &) noexcept;
 
+HEYOKA_DLL_PUBLIC std::size_t hash(const function &);
+
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const function &);
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const function &);
@@ -128,6 +130,8 @@ HEYOKA_DLL_PUBLIC void rename_variables(function &, const std::unordered_map<std
 
 HEYOKA_DLL_PUBLIC bool operator==(const function &, const function &);
 HEYOKA_DLL_PUBLIC bool operator!=(const function &, const function &);
+
+HEYOKA_DLL_PUBLIC expression subs(const function &, const std::unordered_map<std::string, expression> &);
 
 HEYOKA_DLL_PUBLIC expression diff(const function &, const std::string &);
 

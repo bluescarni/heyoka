@@ -166,8 +166,7 @@ public:
     }
 };
 
-llvm_state::llvm_state(const std::string &name, unsigned opt_level)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
+llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(std::make_unique<jit>())
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
@@ -182,39 +181,13 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     fmf.setFast();
     m_builder->setFastMathFlags(fmf);
 
-    // Create the optimization passes.
-    if (m_opt_level > 0u) {
-        // Create the function pass manager.
-        m_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-        m_fpm->add(llvm::createPromoteMemoryToRegisterPass());
-        m_fpm->add(llvm::createInstructionCombiningPass());
-        m_fpm->add(llvm::createReassociatePass());
-        m_fpm->add(llvm::createGVNPass());
-        m_fpm->add(llvm::createCFGSimplificationPass());
-        m_fpm->add(llvm::createLoopVectorizePass());
-        m_fpm->add(llvm::createSLPVectorizerPass());
-        m_fpm->add(llvm::createLoadStoreVectorizerPass());
-        m_fpm->add(llvm::createLoopUnrollPass());
-        m_fpm->doInitialization();
-
-        // The module-level optimizer. See:
-        // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
-        m_pm = std::make_unique<llvm::legacy::PassManager>();
-        llvm::PassManagerBuilder pm_builder;
-        // See here for the defaults:
-        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
-        pm_builder.OptLevel = m_opt_level;
-        pm_builder.VerifyInput = true;
-        pm_builder.VerifyOutput = true;
-        pm_builder.Inliner = llvm::createFunctionInliningPass();
-        if (m_opt_level >= 3u) {
-            pm_builder.SLPVectorize = true;
-            pm_builder.MergeFunctions = true;
-        }
-        pm_builder.populateModulePassManager(*m_pm);
-        pm_builder.populateFunctionPassManager(*m_fpm);
-    }
+    // Setup the optimisation level.
+    set_opt_level(opt_level);
 }
+
+llvm_state::llvm_state(llvm_state &&) noexcept = default;
+
+llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
 
 llvm_state::~llvm_state() = default;
 
@@ -323,6 +296,78 @@ void llvm_state::verify_function(const std::string &name)
     verify_function_impl(f);
 }
 
+unsigned llvm_state::get_opt_level() const
+{
+    return m_opt_level;
+}
+
+void llvm_state::set_opt_level(unsigned opt_level)
+{
+    check_uncompiled(__func__);
+
+    if (opt_level == m_opt_level) {
+        // Don't do anything if the optimisation
+        // level is not changing.
+        return;
+    }
+
+    if (opt_level > 0u) {
+        // Create a new function pass manager.
+        auto new_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
+        new_fpm->add(llvm::createPromoteMemoryToRegisterPass());
+        new_fpm->add(llvm::createInstructionCombiningPass());
+        new_fpm->add(llvm::createReassociatePass());
+        new_fpm->add(llvm::createGVNPass());
+        new_fpm->add(llvm::createCFGSimplificationPass());
+        new_fpm->add(llvm::createLoopVectorizePass());
+        new_fpm->add(llvm::createSLPVectorizerPass());
+        new_fpm->add(llvm::createLoadStoreVectorizerPass());
+        new_fpm->add(llvm::createLoopUnrollPass());
+        new_fpm->doInitialization();
+
+        // Create a new module-level optimizer. See:
+        // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
+        auto new_pm = std::make_unique<llvm::legacy::PassManager>();
+        llvm::PassManagerBuilder pm_builder;
+        // See here for the defaults:
+        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
+        pm_builder.OptLevel = opt_level;
+        pm_builder.VerifyInput = true;
+        pm_builder.VerifyOutput = true;
+        pm_builder.Inliner = llvm::createFunctionInliningPass();
+        if (opt_level >= 3u) {
+            pm_builder.SLPVectorize = true;
+            pm_builder.MergeFunctions = true;
+        }
+        pm_builder.populateModulePassManager(*new_pm);
+        pm_builder.populateFunctionPassManager(*new_fpm);
+
+        // Move them in.
+        m_fpm = std::move(new_fpm);
+        m_pm = std::move(new_pm);
+    } else {
+        // If the optimisation level is set to zero,
+        // clear out the optimisation pass managers.
+        m_fpm.reset();
+        m_pm.reset();
+    }
+
+    // Record the new optimisation level.
+    m_opt_level = opt_level;
+}
+
+void llvm_state::optimise()
+{
+    check_uncompiled(__func__);
+
+    if (m_opt_level > 0u) {
+        m_pm->run(*m_module);
+    } else {
+        assert(!m_fpm);
+        assert(!m_pm);
+    }
+}
+
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
@@ -422,9 +467,7 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
     add_varargs_expression<double>(name, e, vars);
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 }
 
 void llvm_state::add_ldbl(const std::string &name, const expression &e)
@@ -440,9 +483,7 @@ void llvm_state::add_ldbl(const std::string &name, const expression &e)
     add_varargs_expression<long double>(name, e, vars);
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
 }
 
 // NOTE: this function will lookup symbol names,
@@ -959,7 +1000,7 @@ void llvm_state::taylor_add_stepper_func(const std::string &name, const std::vec
 }
 
 template <typename T>
-void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+auto llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
 {
     detail::verify_resetter vr{*this};
 
@@ -974,7 +1015,7 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
     const auto n_eq = sys.size();
 
     // Decompose the system of equations.
-    const auto dc = taylor_decompose(std::move(sys));
+    auto dc = taylor_decompose(std::move(sys));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -1005,19 +1046,21 @@ void llvm_state::add_taylor_stepper_impl(const std::string &name, std::vector<ex
                                static_cast<std::uint32_t>(n_eq));
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
+
+    return dc;
 }
 
-void llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_stepper_dbl(const std::string &name, std::vector<expression> sys,
+                                                           std::uint32_t max_order)
 {
-    add_taylor_stepper_impl<double>(name, std::move(sys), max_order);
+    return add_taylor_stepper_impl<double>(name, std::move(sys), max_order);
 }
 
-void llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_stepper_ldbl(const std::string &name, std::vector<expression> sys,
+                                                            std::uint32_t max_order)
 {
-    add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
+    return add_taylor_stepper_impl<long double>(name, std::move(sys), max_order);
 }
 
 template <typename T>
@@ -1246,8 +1289,8 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
     assert(eret.second);
 }
 
-template <typename T>
-void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+template <typename T, typename U>
+auto llvm_state::add_taylor_jet_impl(const std::string &name, U sys, std::uint32_t max_order)
 {
     detail::verify_resetter vr{*this};
 
@@ -1262,7 +1305,7 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
     const auto n_eq = sys.size();
 
     // Decompose the system of equations.
-    const auto dc = taylor_decompose(std::move(sys));
+    auto dc = taylor_decompose(std::move(sys));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -1294,19 +1337,35 @@ void llvm_state::add_taylor_jet_impl(const std::string &name, std::vector<expres
                            static_cast<std::uint32_t>(n_eq));
 
     // Run the optimization pass.
-    if (m_opt_level > 0u) {
-        m_pm->run(*m_module);
-    }
+    optimise();
+
+    return dc;
 }
 
-void llvm_state::add_taylor_jet_dbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name, std::vector<expression> sys,
+                                                       std::uint32_t max_order)
 {
-    add_taylor_jet_impl<double>(name, std::move(sys), max_order);
+    return add_taylor_jet_impl<double>(name, std::move(sys), max_order);
 }
 
-void llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name, std::vector<expression> sys,
+                                                        std::uint32_t max_order)
 {
-    add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
+    return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name,
+                                                       std::vector<std::pair<expression, expression>> sys,
+                                                       std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<double>(name, std::move(sys), max_order);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
+                                                        std::vector<std::pair<expression, expression>> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
 llvm_state::tj_dbl_t llvm_state::fetch_taylor_jet_dbl(const std::string &name)
