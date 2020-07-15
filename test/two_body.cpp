@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -39,9 +40,9 @@ T compute_am(const std::vector<T> &st)
     auto z0 = st[10];
     auto z1 = st[11];
 
-    double am0[] = {y0 * vz0 - z0 * vy0, z0 * vx0 - x0 * vz0, x0 * vy0 - y0 * vx0};
-    double am1[] = {y1 * vz1 - z1 * vy1, z1 * vx1 - x1 * vz1, x1 * vy1 - y1 * vx1};
-    double am[] = {am0[0] + am1[0], am0[1] + am1[1], am0[2] + am1[2]};
+    T am0[] = {y0 * vz0 - z0 * vy0, z0 * vx0 - x0 * vz0, x0 * vy0 - y0 * vx0};
+    T am1[] = {y1 * vz1 - z1 * vy1, z1 * vx1 - x1 * vz1, x1 * vy1 - y1 * vx1};
+    T am[] = {am0[0] + am1[0], am0[1] + am1[1], am0[2] + am1[2]};
 
     return std::sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
 }
@@ -59,10 +60,10 @@ T tbp_energy(const std::vector<T> &st)
     auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
     auto v2_1 = st[1] * st[1] + st[3] * st[3] + st[5] * st[5];
 
-    return 1 / 2. * (v2_0 + v2_1) + U;
+    return T(1) / T(2) * (v2_0 + v2_1) + U;
 }
 
-TEST_CASE("two body")
+TEST_CASE("two body dbl")
 {
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
@@ -79,8 +80,8 @@ TEST_CASE("two body")
                              vx1, vy0, vy1, vz0, vz1},
                             std::move(init_state),
                             0,
-                            1E-16,
-                            1E-16};
+                            std::numeric_limits<double>::epsilon(),
+                            std::numeric_limits<double>::epsilon()};
 
     const auto &st = tad.get_state();
 
@@ -90,8 +91,40 @@ TEST_CASE("two body")
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
         REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
-        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= 1E-11);
-        REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
+        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<double>::epsilon() * 1E4);
+        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<double>::epsilon() * 1E4);
+    }
+}
+
+TEST_CASE("two body ldbl")
+{
+    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
+        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+
+    auto x01 = x1 - x0;
+    auto y01 = y1 - y0;
+    auto z01 = z1 - z0;
+    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_ldbl / 2_ldbl);
+
+    std::vector<long double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
+
+    taylor_adaptive_ldbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
+                              vx0, vx1, vy0, vy1, vz0, vz1},
+                             std::move(init_state),
+                             0,
+                             std::numeric_limits<long double>::epsilon(),
+                             std::numeric_limits<long double>::epsilon()};
+
+    const auto &st = tad.get_state();
+
+    const auto en = tbp_energy(st);
+    const auto am = compute_am(st);
+
+    for (auto i = 0; i < 200; ++i) {
+        const auto [oc, h, ord] = tad.step();
+        REQUIRE(oc == taylor_adaptive_ldbl::outcome::success);
+        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<long double>::epsilon() * 1E4);
+        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<long double>::epsilon() * 1E4);
     }
 }
 
