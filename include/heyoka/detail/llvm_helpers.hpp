@@ -18,20 +18,17 @@
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -153,9 +150,6 @@ inline auto taylor_diff_common(llvm_state &s, const std::string &name)
 
     return std::tuple{f, diff_ptr, order};
 }
-
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> kahan_acc(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *,
-                                                                    llvm::Value *);
 
 } // namespace heyoka::detail
 
