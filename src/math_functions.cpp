@@ -584,6 +584,203 @@ expression cos(expression e)
     return expression{std::move(fc)};
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_init_log(llvm_state &s, const function &f, llvm::Value *arr)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the logarithm (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    // Lookup the intrinsic ID.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.log");
+    if (intrinsic_ID == 0) {
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.log'");
+    }
+
+    // Fetch the function.
+    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
+    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+    if (!callee_f) {
+        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.log'");
+    }
+    if (!callee_f->empty()) {
+        // It does not make sense to have a definition of a builtin.
+        throw std::invalid_argument("The intrinsic 'llvm.log' must be an empty function");
+    }
+
+    // Create the function argument. The codegen for the argument
+    // comes from taylor_init.
+    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    assert(args_v[0] != nullptr);
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_log_tmp");
+    assert(r != nullptr);
+    r->setTailCall(true);
+
+    return r;
+}
+
+// Derivative of log(number).
+template <typename T>
+llvm::Function *taylor_diff_log_impl(llvm_state &s, const number &, std::uint32_t, const std::string &name,
+                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+{
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
+
+    // The derivative of a constant is always zero.
+    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// Derivative of log(variable).
+template <typename T>
+llvm::Function *taylor_diff_log_impl(llvm_state &s, const variable &var, std::uint32_t idx, const std::string &name,
+                                     std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &)
+{
+    auto &builder = s.builder();
+
+    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
+
+    // Accumulator for the result.
+    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
+    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop");
+    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop");
+
+    // NOTE: because we want to iterate in the [1, order) range,
+    // we don't want to ever execute the loop body if order is 1.
+    // Thus, check the condition and jump to the afterloop
+    // if needed.
+    auto *skip_cond = builder.CreateICmp(llvm::CmpInst::ICMP_EQ, builder.getInt32(1), order, "skipcond");
+    builder.CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Initial value for the loop variable (i = 1).
+    auto start_val = builder.getInt32(1);
+    assert(start_val != nullptr);
+
+    // Get a reference to the current block for
+    // later usage in the phi node.
+    auto *preheader_bb = builder.GetInsertBlock();
+    assert(preheader_bb != nullptr);
+
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
+    builder.SetInsertPoint(loop_bb);
+
+    // Create the phi node and add the first pair of arguments.
+    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "i");
+    assert(j_var != nullptr);
+    j_var->addIncoming(start_val, preheader_bb);
+
+    // Loop body.
+    // Compute the indices for accessing the derivatives in this loop iteration.
+    // The indices are:
+    // - (order - j_var) * n_uvars + idx,
+    // - j_var * n_uvars + u_idx.
+    const auto u_idx = uname_to_index(var.name());
+    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
+                                      builder.getInt32(idx));
+    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
+    // Convert into pointers.
+    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
+    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
+    // Load the values.
+    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
+    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
+    // Update ret_acc: ret_acc = ret_acc + (order-j)*v0*v1.
+    builder.CreateStore(
+        builder.CreateFAdd(
+            builder.CreateLoad(ret_acc),
+            builder.CreateFMul(builder.CreateFSub(builder.CreateUIToFP(order, to_llvm_type<T>(s.context())),
+                                                  builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context()))),
+                               builder.CreateFMul(v0, v1))),
+        ret_acc);
+
+    // Compute the next value of the iteration.
+    // NOTE: addition works regardless of integral signedness.
+    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+    assert(next_j_var != nullptr);
+
+    // Compute the end condition.
+    // NOTE: we use the unsigned less-than predicate.
+    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next_j_var, order, "loopcond");
+    assert(end_cond != nullptr);
+
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
+    auto *loop_end_bb = builder.GetInsertBlock();
+    assert(loop_end_bb != nullptr);
+    f->getBasicBlockList().push_back(after_bb);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    builder.SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    j_var->addIncoming(next_j_var, loop_end_bb);
+
+    // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
+    auto bn_idx = builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
+    auto b0_idx = builder.getInt32(u_idx);
+    auto bn = builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, bn_idx));
+    auto b0 = builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, b0_idx));
+    builder.CreateRet(builder.CreateFDiv(
+        builder.CreateFSub(bn, builder.CreateFDiv(builder.CreateLoad(ret_acc),
+                                                  builder.CreateUIToFP(order, to_llvm_type<T>(s.context())))),
+        b0));
+
+    s.verify_function(name);
+
+    return f;
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Function *taylor_diff_log_impl(llvm_state &, const U &, std::uint32_t, const std::string &, std::uint32_t,
+                                     const std::unordered_map<std::uint32_t, number> &)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
+}
+
+template <typename T>
+llvm::Function *taylor_diff_log(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
+                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the logarithm (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit([&s, idx, &name, n_uvars, &cd_uvars](
+                          const auto &v) { return taylor_diff_log_impl<T>(s, v, idx, name, n_uvars, cd_uvars); },
+                      func.args()[0].value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression log(expression e)
 {
     std::vector<expression> args;
@@ -598,7 +795,7 @@ expression log(expression e)
         if (args.size() != 1u) {
             throw std::invalid_argument(
                 "Inconsistent number of arguments when taking the derivative of the logarithm (1 "
-                "arguments were expected, but "
+                "argument was expected, but "
                 + std::to_string(args.size()) + " arguments were provided");
         }
 
@@ -644,6 +841,10 @@ expression log(expression e)
 
         return 1. / args[0];
     };
+    fc.taylor_init_dbl_f() = detail::taylor_init_log<double>;
+    fc.taylor_init_ldbl_f() = detail::taylor_init_log<long double>;
+    fc.taylor_diff_dbl_f() = detail::taylor_diff_log<double>;
+    fc.taylor_diff_ldbl_f() = detail::taylor_diff_log<long double>;
 
     return expression{std::move(fc)};
 }

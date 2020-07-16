@@ -33,6 +33,7 @@ endfunction()
 
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(taylor_div)
+ADD_HEYOKA_TESTCASE(taylor_log)
 ADD_HEYOKA_TESTCASE(taylor_mul)
 ADD_HEYOKA_TESTCASE(taylor_pow)
 ADD_HEYOKA_TESTCASE(taylor_sincos)
