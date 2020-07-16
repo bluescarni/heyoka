@@ -301,15 +301,13 @@ unsigned llvm_state::get_opt_level() const
     return m_opt_level;
 }
 
+// NOTE: it is important not to read m_opt_level
+// before assigning it here, as this function
+// is used in the constructor where m_opt_level
+// has not been initialised yet.
 void llvm_state::set_opt_level(unsigned opt_level)
 {
     check_uncompiled(__func__);
-
-    if (opt_level == m_opt_level) {
-        // Don't do anything if the optimisation
-        // level is not changing.
-        return;
-    }
 
     if (opt_level > 0u) {
         // Create a new function pass manager.
