@@ -97,15 +97,68 @@ TEST_CASE("setters and getters")
             == std::vector<expression (*)(expression)>({heyoka::cos, heyoka::cos, heyoka::cos}));
     generator.set_range_dbl(2);
     REQUIRE(generator.get_range_dbl() == 2.);
-    generator.set_weights({1.,1.,1.,1.,1.});
-    REQUIRE(generator.get_weights() == std::vector<double>({1.,1.,1.,1.,1.}));
+    generator.set_weights({1., 1., 1., 1., 1.});
+    REQUIRE(generator.get_weights() == std::vector<double>({1., 1., 1., 1., 1.}));
     // We test the throws
-    REQUIRE_THROWS(generator.set_weights({2.,3.}));
+    REQUIRE_THROWS(generator.set_weights({2., 3.}));
 }
 
 TEST_CASE("streaming operator")
 {
     detail::random_engine_type engine(123456789u);
     expression_generator generator({"x", "y"}, engine);
-    std::cout << generator << "\n";
+    CHECK_NOTHROW(std::cout << generator);
+}
+
+TEST_CASE("count_nodes")
+{
+    auto [x, y] = make_vars("x", "y");
+    {
+        expression ex = x;
+        REQUIRE(count_nodes(ex) == 1);
+    }
+    {
+        expression ex = x * x;
+        REQUIRE(count_nodes(ex) == 3);
+    }
+    {
+        expression ex = cos(x);
+        REQUIRE(count_nodes(ex) == 2);
+    }
+    {
+        expression ex = 2_dbl * x * x + y;
+        REQUIRE(count_nodes(ex) == 7);
+    }
+    {
+        expression ex = sin(x) * 2_dbl - pow(y, 6_dbl) * x;
+        REQUIRE(count_nodes(ex) == 10);
+    }
+    {
+        expression ex = pow(sin(x), cos(x * y)) - x * y * (x - y);
+        REQUIRE(count_nodes(ex) == 15);
+    }
+}
+
+TEST_CASE("fetch from node id")
+{
+    auto [x, y] = make_vars("x", "y");
+    {
+        expression ex = x * y;
+        REQUIRE(*fetch_from_node_id(ex, 0) == ex);
+    }
+    {
+        expression ex0 = x;
+        expression ex1 = y;
+        expression ex2 = ex0 * ex1;
+        expression ex3 = cos(ex1);
+        expression ex4 = ex2 - ex3;
+        REQUIRE(*fetch_from_node_id(ex4, 0) == ex4);
+        REQUIRE(*fetch_from_node_id(ex4, 1) == ex2);
+        REQUIRE(*fetch_from_node_id(ex4, 2) == ex0);
+        REQUIRE(*fetch_from_node_id(ex4, 3) == ex1);
+        REQUIRE(*fetch_from_node_id(ex4, 4) == ex3);
+        REQUIRE(*fetch_from_node_id(ex4, 5) == ex1);
+        REQUIRE(fetch_from_node_id(ex4, 6) == nullptr);
+
+    }
 }
