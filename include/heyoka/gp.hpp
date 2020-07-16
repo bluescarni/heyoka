@@ -37,11 +37,12 @@ private:
     std::vector<binary_operator::type> m_bos;
     std::vector<expression (*)(expression)> m_u_funcs;
     std::vector<expression (*)(expression, expression)> m_b_funcs;
+    std::vector<double> m_weights; 
     double m_range_dbl;
     mutable detail::random_engine_type m_e;
 
 public:
-    explicit expression_generator(const std::vector<std::string> &, ::std::uint64_t);
+    explicit expression_generator(const std::vector<std::string> &, detail::random_engine_type &);
     expression operator()(unsigned, unsigned, unsigned = 0u) const;
 
     // getters
@@ -50,6 +51,7 @@ public:
     const std::vector<expression (*)(expression, expression)> &get_b_funcs() const;
     const std::vector<std::string> &get_vars() const;
     const double &get_range_dbl() const;
+    const std::vector<double> &get_weights() const;
 
     // setters
     void set_bos(const std::vector<binary_operator::type> &);
@@ -57,6 +59,7 @@ public:
     void set_b_funcs(const std::vector<expression (*)(expression, expression)> &);
     void set_vars(const std::vector<std::string> &);
     void set_range_dbl(const double &);
+    void set_weights(const std::vector<double> &);
 };
 
 // Streaming operators

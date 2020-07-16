@@ -84,8 +84,8 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
 }
 } // namespace detail
 
-expression_generator::expression_generator(const std::vector<std::string> &vars, ::std::uint64_t seed)
-    : m_vars(vars), m_b_funcs(), m_e(seed)
+expression_generator::expression_generator(const std::vector<std::string> &vars, detail::random_engine_type &engine)
+    : m_vars(vars), m_b_funcs(), m_e(engine)
 {
     // These are the default blocks for a random expression.
     m_bos = {binary_operator::type::add, binary_operator::type::sub, binary_operator::type::mul,
@@ -93,6 +93,8 @@ expression_generator::expression_generator(const std::vector<std::string> &vars,
     m_u_funcs = {heyoka::sin, heyoka::cos};
     m_b_funcs = {};
     m_range_dbl = 10;
+    // Default weights for the probability of selecting a bo, unary, binary, a variable, a number.
+    m_weights = {8., 2., 1., 4., 1.};
 };
 
 expression expression_generator::operator()(unsigned min_depth, unsigned max_depth, unsigned depth) const
@@ -107,7 +109,7 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         double n_bos = m_bos.size();
         double n_u_fun = m_u_funcs.size();
         double n_b_fun = m_b_funcs.size();
-        std::discrete_distribution<> dis({n_bos * 4, n_u_fun * 2, n_b_fun});
+        std::discrete_distribution<> dis({n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2]});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -122,7 +124,7 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
     } else if (depth >= max_depth) {
         // If the node depth is above the maximum desired, we force leaves (num or var) to be selected
         double n_var = m_vars.size();
-        std::discrete_distribution<> dis({n_var * 4, 1.});
+        std::discrete_distribution<> dis({n_var * m_weights[3], m_weights[4]});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::var;
@@ -137,7 +139,8 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         double n_u_fun = m_u_funcs.size();
         double n_b_fun = m_b_funcs.size();
         double n_var = m_vars.size();
-        std::discrete_distribution<> dis({n_bos * 8, n_u_fun * 2, n_b_fun, n_var * 4, 1.});
+        std::discrete_distribution<> dis(
+            {n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2], n_var * m_weights[3], m_weights[4]});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -215,6 +218,10 @@ const double &expression_generator::get_range_dbl() const
 {
     return m_range_dbl;
 }
+const std::vector<double> &expression_generator::get_weights() const
+{
+    return m_weights;
+}
 
 void expression_generator::set_bos(const std::vector<binary_operator::type> &bos)
 {
@@ -235,6 +242,16 @@ void expression_generator::set_vars(const std::vector<std::string> &vars)
 void expression_generator::set_range_dbl(const double &rd)
 {
     m_range_dbl = rd;
+}
+void expression_generator::set_weights(const std::vector<double> &w)
+{
+    if (w.size() != 5) {
+        throw std::invalid_argument(
+            "The weight vector for the probablity distribution of the node type must have size "
+            "5 -> (binary operator, unary functions, binary functions, variable, numbers), while I detected a size of: "
+            + std::to_string(w.size()));
+    }
+    m_weights = w;
 }
 
 std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
