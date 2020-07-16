@@ -297,6 +297,13 @@ std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
     }
     os << "\nRandom double constants range: ";
     os << "[-" << eg.get_range_dbl() << ", " << eg.get_range_dbl() << "]";
+    os << "\nWeights:";
+    os << "\n\tBinary operator: " << eg.get_weights()[0];
+    os << "\n\tUnary function: " << eg.get_weights()[1];
+    os << "\n\tBinary function: " << eg.get_weights()[2];
+    os << "\n\tVariable: " << eg.get_weights()[3];
+    os << "\n\tConstant: " << eg.get_weights()[4];
+
     return os << "\n";
 }
 

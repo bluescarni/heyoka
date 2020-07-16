@@ -102,3 +102,10 @@ TEST_CASE("setters and getters")
     // We test the throws
     REQUIRE_THROWS(generator.set_weights({2.,3.}));
 }
+
+TEST_CASE("streaming operator")
+{
+    detail::random_engine_type engine(123456789u);
+    expression_generator generator({"x", "y"}, engine);
+    std::cout << generator << "\n";
+}
