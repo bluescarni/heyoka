@@ -106,15 +106,15 @@ public:
     void set_opt_level(unsigned);
     void optimise();
 
-    void add_dbl(const std::string &, const expression &);
-    void add_ldbl(const std::string &, const expression &);
+    void add_expression_dbl(const std::string &, const expression &);
+    void add_expression_ldbl(const std::string &, const expression &);
     template <typename T>
-    void add(const std::string &name, const expression &ex)
+    void add_expression(const std::string &name, const expression &ex)
     {
         if constexpr (std::is_same_v<T, double>) {
-            add_dbl(name, ex);
+            add_expression_dbl(name, ex);
         } else if constexpr (std::is_same_v<T, long double>) {
-            add_ldbl(name, ex);
+            add_expression_ldbl(name, ex);
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }

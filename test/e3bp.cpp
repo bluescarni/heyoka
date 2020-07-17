@@ -59,7 +59,7 @@ TEST_CASE("e3bp")
           - mu2 / (a * (xi + eta));
 
     llvm_state ham_llvm{"ham tracing"};
-    ham_llvm.add_dbl("ham", ham);
+    ham_llvm.add_expression_dbl("ham", ham);
     ham_llvm.compile();
     auto h_trace = ham_llvm.fetch_dbl<5>("ham");
 

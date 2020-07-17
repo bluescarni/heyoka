@@ -452,7 +452,7 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     assert(eret.second);
 }
 
-void llvm_state::add_dbl(const std::string &name, const expression &e)
+void llvm_state::add_expression_dbl(const std::string &name, const expression &e)
 {
     detail::verify_resetter vr{*this};
 
@@ -468,7 +468,7 @@ void llvm_state::add_dbl(const std::string &name, const expression &e)
     optimise();
 }
 
-void llvm_state::add_ldbl(const std::string &name, const expression &e)
+void llvm_state::add_expression_ldbl(const std::string &name, const expression &e)
 {
     detail::verify_resetter vr{*this};
 
