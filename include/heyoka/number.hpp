@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -19,6 +20,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -88,10 +90,34 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const number &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const number &);
 
+template <typename T>
+inline llvm::Value *codegen(llvm_state &s, const number &n)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return codegen_dbl(s, n);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return codegen_ldbl(s, n);
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const number &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const number &, llvm::Value *);
+
+template <typename T>
+inline llvm::Value *taylor_init(llvm_state &s, const number &n, llvm::Value *arr)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_init_dbl(s, n, arr);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_init_ldbl(s, n, arr);
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 } // namespace heyoka
 

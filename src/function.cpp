@@ -35,7 +35,6 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -623,7 +622,7 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
     // Create the function arguments.
     std::vector<llvm::Value *> args_v;
     for (const auto &arg : f.args()) {
-        args_v.push_back(detail::invoke_codegen<T>(s, arg));
+        args_v.push_back(codegen<T>(s, arg));
         assert(args_v.back() != nullptr);
     }
 

@@ -35,7 +35,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -314,8 +313,8 @@ namespace
 template <typename T>
 llvm::Value *bo_codegen_impl(llvm_state &s, const binary_operator &bo)
 {
-    auto *l = invoke_codegen<T>(s, bo.lhs());
-    auto *r = invoke_codegen<T>(s, bo.rhs());
+    auto *l = codegen<T>(s, bo.lhs());
+    auto *r = codegen<T>(s, bo.rhs());
 
     auto &builder = s.builder();
 
@@ -380,8 +379,8 @@ llvm::Value *taylor_init_impl(llvm_state &s, const binary_operator &bo, llvm::Va
     auto &builder = s.builder();
 
     // Do the Taylor init for lhs and rhs.
-    auto l = invoke_taylor_init<T>(s, bo.lhs(), arr);
-    auto r = invoke_taylor_init<T>(s, bo.rhs(), arr);
+    auto l = taylor_init<T>(s, bo.lhs(), arr);
+    auto r = taylor_init<T>(s, bo.rhs(), arr);
 
     // Do the codegen for the corresponding operation.
     switch (bo.op()) {
@@ -426,7 +425,7 @@ llvm::Function *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const 
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -566,7 +565,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const number &, const num
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -590,7 +589,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const number &num, const 
     // Load the value.
     auto ret = builder.CreateLoad(arr_ptr, "diff_load");
 
-    builder.CreateRet(builder.CreateFMul(invoke_codegen<T>(s, num), ret));
+    builder.CreateRet(builder.CreateFMul(codegen<T>(s, num), ret));
 
     s.verify_function(name);
 
@@ -618,7 +617,7 @@ llvm::Function *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, con
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Initial value for the for-loop. We will be operating
     // in the range [0, order] (i.e., order inclusive).
@@ -723,7 +722,7 @@ llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t, const numb
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -745,7 +744,7 @@ llvm::Function *bo_taylor_diff_div_impl(llvm_state &s, std::uint32_t idx, const 
     // Let's build the result of the summation first.
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "sum_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).

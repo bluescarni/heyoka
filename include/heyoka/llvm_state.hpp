@@ -31,6 +31,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
@@ -107,13 +108,48 @@ public:
 
     void add_dbl(const std::string &, const expression &);
     void add_ldbl(const std::string &, const expression &);
+    template <typename T>
+    void add(const std::string &name, const expression &ex)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_dbl(name, ex);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_ldbl(name, ex);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 
     std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+    template <typename T>
+    void add_taylor_jet(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_taylor_jet_dbl(name, std::move(sys), max_order);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_taylor_jet_ldbl(name, std::move(sys), max_order);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
     std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<std::pair<expression, expression>>,
                                                std::uint32_t);
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<std::pair<expression, expression>>,
                                                 std::uint32_t);
+    template <typename T>
+    void add_taylor_jet(const std::string &name, std::vector<std::pair<expression, expression>> sys,
+                        std::uint32_t max_order)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_taylor_jet_dbl(name, std::move(sys), max_order);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_taylor_jet_ldbl(name, std::move(sys), max_order);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 
     void compile();
 
@@ -192,6 +228,11 @@ public:
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<long double, N>>(jit_lookup(name)));
     }
+    template <typename T, std::size_t N>
+    auto fetch(const std::string &name)
+    {
+        return sig_check(name, reinterpret_cast<vararg_f_ptr<T, N>>(jit_lookup(name)));
+    }
 
 private:
     template <typename T>
@@ -203,10 +244,21 @@ private:
     }
 
 public:
-    using tj_dbl_t = void (*)(double *, std::uint32_t);
-    using tj_ldbl_t = void (*)(long double *, std::uint32_t);
-    tj_dbl_t fetch_taylor_jet_dbl(const std::string &);
-    tj_ldbl_t fetch_taylor_jet_ldbl(const std::string &);
+    template <typename T>
+    using tj_t = void (*)(T *, std::uint32_t);
+    tj_t<double> fetch_taylor_jet_dbl(const std::string &);
+    tj_t<long double> fetch_taylor_jet_ldbl(const std::string &);
+    template <typename T>
+    tj_t<T> fetch_taylor(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            return fetch_taylor_jet_dbl(name);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return fetch_taylor_jet_ldbl(name);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 };
 
 } // namespace heyoka

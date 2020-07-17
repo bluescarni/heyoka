@@ -426,7 +426,7 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     }
 
     // Run the codegen on the expression.
-    auto *ret_val = detail::invoke_codegen<T>(*this, e);
+    auto *ret_val = codegen<T>(*this, e);
     assert(ret_val != nullptr);
 
     // Finish off the function.
@@ -653,7 +653,7 @@ auto llvm_state::taylor_add_sv_diff(const std::string &fname, std::uint32_t, con
 
     // Emit then value.
     m_builder->SetInsertPoint(then_bb);
-    auto then_value = detail::invoke_codegen<T>(*this, num);
+    auto then_value = codegen<T>(*this, num);
 
     auto lab = m_builder->CreateBr(merge_bb);
     assert(lab != nullptr);
@@ -664,7 +664,7 @@ auto llvm_state::taylor_add_sv_diff(const std::string &fname, std::uint32_t, con
     // Emit else block.
     f->getBasicBlockList().push_back(else_bb);
     m_builder->SetInsertPoint(else_bb);
-    auto else_value = detail::invoke_codegen<T>(*this, number(0.));
+    auto else_value = codegen<T>(*this, number(0.));
 
     lab = m_builder->CreateBr(merge_bb);
     assert(lab != nullptr);
@@ -739,8 +739,8 @@ auto llvm_state::taylor_add_uvars_diff(const std::string &name, const std::vecto
 
     // Now the derivatives of the other u variables.
     for (auto i = n_eq; i < n_uvars; ++i) {
-        u_diff_funcs.emplace_back(detail::invoke_taylor_diff<T>(
-            *this, dc[i], i, name + ".diff." + detail::li_to_string(i), n_uvars, cd_uvars));
+        u_diff_funcs.emplace_back(
+            taylor_diff<T>(*this, dc[i], i, name + ".diff." + detail::li_to_string(i), n_uvars, cd_uvars));
     }
 
     return u_diff_funcs;
@@ -839,7 +839,7 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
         assert(diff_ptr != nullptr);
 
         // Run the initialization and store the result.
-        m_builder->CreateStore(detail::invoke_taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
+        m_builder->CreateStore(taylor_init<T>(*this, u_ex, diff_arr), diff_ptr);
     }
 
     // Pre-create loop and afterloop blocks. Note that these have just
@@ -1051,14 +1051,14 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
-llvm_state::tj_dbl_t llvm_state::fetch_taylor_jet_dbl(const std::string &name)
+llvm_state::tj_t<double> llvm_state::fetch_taylor_jet_dbl(const std::string &name)
 {
     check_compiled(__func__);
 
     return fetch_taylor_jet_impl<double>(name);
 }
 
-llvm_state::tj_ldbl_t llvm_state::fetch_taylor_jet_ldbl(const std::string &name)
+llvm_state::tj_t<long double> llvm_state::fetch_taylor_jet_ldbl(const std::string &name)
 {
     check_compiled(__func__);
 

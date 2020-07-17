@@ -10,14 +10,12 @@
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
 #include <cassert>
-#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
 #include <llvm/IR/Attributes.h>
@@ -26,7 +24,6 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
 
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -64,44 +61,6 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
         }
     } else {
         static_assert(always_false_v<T>, "Unhandled type in to_llvm_type().");
-    }
-}
-
-template <typename T, typename U>
-inline llvm::Value *invoke_codegen(llvm_state &s, const U &x)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, x);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, x);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_codegen().");
-    }
-}
-
-template <typename T, typename U>
-inline llvm::Value *invoke_taylor_init(llvm_state &s, const U &x, llvm::Value *arr)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_init_dbl(s, x, arr);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_init_ldbl(s, x, arr);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_init().");
-    }
-}
-
-template <typename T, typename U>
-inline llvm::Function *invoke_taylor_diff(llvm_state &s, const U &x, std::uint32_t idx, const std::string &name,
-                                          std::uint32_t n_uvars,
-                                          const std::unordered_map<std::uint32_t, number> &cd_uvars)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, x, idx, name, n_uvars, cd_uvars);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, x, idx, name, n_uvars, cd_uvars);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_diff().");
     }
 }
 

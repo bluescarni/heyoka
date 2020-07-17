@@ -18,7 +18,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/visibility.hpp>
@@ -29,18 +28,8 @@
 namespace heyoka
 {
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
-                                                                               std::vector<expression> &);
-
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const expression &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const expression &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
-                                                  std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
-                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
 
 namespace detail
 {
@@ -221,6 +210,29 @@ public:
     using base = detail::taylor_adaptive_impl<long double>;
     using base::base;
 };
+
+namespace detail
+{
+
+template <typename T>
+struct taylor_adaptive_t_impl {
+    static_assert(always_false_v<T>, "Unhandled type.");
+};
+
+template <>
+struct taylor_adaptive_t_impl<double> {
+    using type = taylor_adaptive_dbl;
+};
+
+template <>
+struct taylor_adaptive_t_impl<long double> {
+    using type = taylor_adaptive_ldbl;
+};
+
+} // namespace detail
+
+template <typename T>
+using taylor_adaptive = typename detail::taylor_adaptive_t_impl<T>::type;
 
 } // namespace heyoka
 

@@ -31,7 +31,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -74,7 +73,7 @@ llvm::Value *taylor_init_sin(llvm_state &s, const function &f, llvm::Value *arr)
 
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
     assert(args_v[0] != nullptr);
 
     // Create the function call.
@@ -95,7 +94,7 @@ llvm::Function *taylor_diff_sin_impl(llvm_state &s, const number &, std::uint32_
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -113,7 +112,7 @@ llvm::Function *taylor_diff_sin_impl(llvm_state &s, const variable &var, std::ui
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).
@@ -351,7 +350,7 @@ llvm::Value *taylor_init_cos(llvm_state &s, const function &f, llvm::Value *arr)
 
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
     assert(args_v[0] != nullptr);
 
     // Create the function call.
@@ -372,7 +371,7 @@ llvm::Function *taylor_diff_cos_impl(llvm_state &s, const number &, std::uint32_
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -390,7 +389,7 @@ llvm::Function *taylor_diff_cos_impl(llvm_state &s, const variable &var, std::ui
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Initial value for the for-loop. We will be operating
     // in the range [1, order] (i.e., order inclusive).
@@ -618,7 +617,7 @@ llvm::Value *taylor_init_log(llvm_state &s, const function &f, llvm::Value *arr)
 
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
+    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
     assert(args_v[0] != nullptr);
 
     // Create the function call.
@@ -639,7 +638,7 @@ llvm::Function *taylor_diff_log_impl(llvm_state &s, const number &, std::uint32_
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -657,7 +656,7 @@ llvm::Function *taylor_diff_log_impl(llvm_state &s, const variable &var, std::ui
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Pre-create loop and afterloop blocks. Note that these have just
     // been created, they have not been inserted yet in the IR.
@@ -883,8 +882,7 @@ llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
 
     // Create the function arguments. The codegen for the arguments
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v{invoke_taylor_init<T>(s, f.args()[0], arr),
-                                      invoke_taylor_init<T>(s, f.args()[1], arr)};
+    std::vector<llvm::Value *> args_v{taylor_init<T>(s, f.args()[0], arr), taylor_init<T>(s, f.args()[1], arr)};
     assert(args_v[0] != nullptr);
     assert(args_v[1] != nullptr);
 
@@ -914,7 +912,7 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const number &, const number
     auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
 
     // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
+    builder.CreateRet(codegen<T>(s, number(0.)));
 
     s.verify_function(name);
 
@@ -933,13 +931,13 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const n
 
     // Accumulator for the result.
     auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
+    builder.CreateStore(codegen<T>(s, number(0.)), ret_acc);
 
     // Pre-convert the order to a float and compute order * num (n * alpha
     // in the AD formulae).
     auto ord_f = builder.CreateUIToFP(order, to_llvm_type<T>(s.context()), "ord_f");
     assert(ord_f != nullptr);
-    auto ord_num = builder.CreateFMul(ord_f, invoke_codegen<T>(s, num), "ord_num");
+    auto ord_num = builder.CreateFMul(ord_f, codegen<T>(s, num), "ord_num");
     assert(ord_num != nullptr);
 
     // Initial value for the for-loop. We will be operating
@@ -985,7 +983,7 @@ llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const n
     auto scal_f
         = builder.CreateFSub(ord_num,
                              builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context()), "j_float"),
-                                                invoke_codegen<T>(s, num + number{T(1)})),
+                                                codegen<T>(s, num + number{T(1)})),
                              "scal_f");
     // Update ret_acc: ret_acc = ret_acc + scal_f*v0*v1.
     builder.CreateStore(

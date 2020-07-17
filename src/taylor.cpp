@@ -30,13 +30,10 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/binary_operator.hpp>
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -44,19 +41,6 @@
 
 namespace heyoka
 {
-
-// Transform in-place ex by decomposition, appending the
-// result of the decomposition to u_vars_defs.
-// The return value is the index, in u_vars_defs,
-// which corresponds to the decomposed version of ex.
-// If the return value is zero, ex was not decomposed.
-// NOTE: this will render ex unusable.
-std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, std::vector<expression> &u_vars_defs)
-{
-    return std::visit(
-        [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
-        std::move(ex.value()));
-}
 
 namespace detail
 {
@@ -445,50 +429,6 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
 #endif
 
     return u_vars_defs;
-}
-
-llvm::Value *taylor_init_dbl(llvm_state &s, const expression &e, llvm::Value *arr)
-{
-    heyoka_assert_nonnull_ret(
-        std::visit([&s, arr](const auto &arg) { return taylor_init_dbl(s, arg, arr); }, e.value()));
-}
-
-llvm::Value *taylor_init_ldbl(llvm_state &s, const expression &e, llvm::Value *arr)
-{
-    heyoka_assert_nonnull_ret(
-        std::visit([&s, arr](const auto &arg) { return taylor_init_ldbl(s, arg, arr); }, e.value()));
-}
-
-llvm::Function *taylor_diff_dbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
-                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
-{
-    auto visitor = [&s, idx, &name, n_uvars, &cd_uvars](const auto &v) -> llvm::Function * {
-        using type = detail::uncvref_t<decltype(v)>;
-
-        if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
-            return taylor_diff_dbl(s, v, idx, name, n_uvars, cd_uvars);
-        } else {
-            throw std::invalid_argument("Taylor derivatives can be computed only for binary operators or functions");
-        }
-    };
-
-    heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
-}
-
-llvm::Function *taylor_diff_ldbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
-                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
-{
-    auto visitor = [&s, idx, &name, n_uvars, &cd_uvars](const auto &v) -> llvm::Function * {
-        using type = detail::uncvref_t<decltype(v)>;
-
-        if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
-            return taylor_diff_ldbl(s, v, idx, name, n_uvars, cd_uvars);
-        } else {
-            throw std::invalid_argument("Taylor derivatives can be computed only for binary operators or functions");
-        }
-    };
-
-    heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
 }
 
 namespace detail

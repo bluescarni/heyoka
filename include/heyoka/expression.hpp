@@ -11,18 +11,22 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -153,6 +157,54 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const expression &);
+
+template <typename T>
+inline llvm::Value *codegen(llvm_state &s, const expression &ex)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return codegen_dbl(s, ex);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return codegen_ldbl(s, ex);
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
+                                                                               std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const expression &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const expression &, llvm::Value *);
+
+template <typename T>
+inline llvm::Value *taylor_init(llvm_state &s, const expression &ex, llvm::Value *arr)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_init_dbl(s, ex, arr);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_init_ldbl(s, ex, arr);
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
+                                                  std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
+                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+
+template <typename T>
+inline llvm::Function *taylor_diff(llvm_state &s, const expression &ex, std::uint32_t idx, const std::string &name,
+                                   std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_diff_dbl(s, ex, idx, name, n_uvars, cd_uvars);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_diff_ldbl(s, ex, idx, name, n_uvars, cd_uvars);
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
