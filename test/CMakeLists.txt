@@ -31,6 +31,7 @@ function(ADD_HEYOKA_TESTCASE arg1)
   add_test(${arg1} ${arg1})
 endfunction()
 
+ADD_HEYOKA_TESTCASE(add_expression)
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(taylor_div)
 ADD_HEYOKA_TESTCASE(taylor_log)

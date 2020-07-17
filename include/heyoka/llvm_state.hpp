@@ -61,6 +61,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename T>
     HEYOKA_DLL_LOCAL void add_varargs_expression(const std::string &, const expression &,
                                                  const std::vector<std::string> &);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_vecargs_expression(const std::string &, const expression &);
 
     // Implementation details for Taylor integration.
     template <typename T>
@@ -115,6 +117,20 @@ public:
             add_expression_dbl(name, ex);
         } else if constexpr (std::is_same_v<T, long double>) {
             add_expression_ldbl(name, ex);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    void add_vec_expression_dbl(const std::string &, const expression &);
+    void add_vec_expression_ldbl(const std::string &, const expression &);
+    template <typename T>
+    void add_vec_expression(const std::string &name, const expression &ex)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_vec_expression_dbl(name, ex);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_vec_expression_ldbl(name, ex);
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -219,19 +235,33 @@ private:
 
 public:
     template <std::size_t N>
-    auto fetch_dbl(const std::string &name)
+    auto fetch_expression_dbl(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<double, N>>(jit_lookup(name)));
     }
     template <std::size_t N>
-    auto fetch_ldbl(const std::string &name)
+    auto fetch_expression_ldbl(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<long double, N>>(jit_lookup(name)));
     }
     template <typename T, std::size_t N>
-    auto fetch(const std::string &name)
+    auto fetch_expression(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<T, N>>(jit_lookup(name)));
+    }
+
+    template <typename T>
+    using ev_t = T (*)(const T *);
+    ev_t<double> fetch_vec_expression_dbl(const std::string &);
+    ev_t<long double> fetch_vec_expression_ldbl(const std::string &);
+    template <typename T>
+    ev_t<T> fetch_vec_expression(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+            return sig_check(name, reinterpret_cast<ev_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
     }
 
 private:

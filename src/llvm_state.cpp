@@ -484,6 +484,99 @@ void llvm_state::add_expression_ldbl(const std::string &name, const expression &
     optimise();
 }
 
+template <typename T>
+void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
+{
+    // NOTE: the verify_resetter machinery will be
+    // set up by add_expression().
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    // NOTE: this is done also in add_expression(), perhaps
+    // we can avoid doing it twice.
+    const auto vars = get_variables(e);
+    if (vars.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("The number of variables in the expression passed to add_vecargs_expression() is too "
+                                  "large, and it results in an overflow condition");
+    }
+
+    // Add the variadic version.
+    const auto varargs_name = name + ".varargs";
+    add_expression<T>(varargs_name, e);
+
+    // Fetch the function we just added.
+    auto f_vararg = m_module->getFunction(varargs_name);
+    assert(f_vararg != nullptr);
+
+    // Change the linkage to internal.
+    f_vararg->setLinkage(llvm::Function::InternalLinkage);
+
+    // Remove the signature of the variadic function
+    // from m_sig_map, as we won't need to call it from
+    // the outside.
+    [[maybe_unused]] const auto n_rem = m_sig_map.erase(varargs_name);
+    assert(n_rem == 1u);
+
+    // Setup the vecargs function. It takes in input a read-only pointer,
+    // and it returns in output the value of the evaluation.
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context()))};
+    auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
+    assert(ft != nullptr);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
+    assert(f != nullptr);
+
+    // Setup the properties of the pointer argument.
+    auto in_ptr = f->args().begin();
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Setup the vector of arguments that we will pass
+    // to the varargs function call.
+    std::vector<llvm::Value *> varargs_args;
+    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
+        varargs_args.push_back(m_builder->CreateLoad(
+            m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)))));
+    }
+
+    // Invoke the varargs function.
+    auto varargs_call = m_builder->CreateCall(f_vararg, varargs_args, "vararg_call");
+    assert(varargs_call != nullptr);
+    varargs_call->setTailCall(true);
+
+    // Create the return value.
+    m_builder->CreateRet(varargs_call);
+
+    // Verify the function.
+    verify_function_impl(f);
+
+    // Add the function to m_sig_map.
+    std::vector<std::type_index> sig_args{std::type_index(typeid(const T *))};
+    auto sig = std::pair{std::type_index(typeid(T)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
+
+    // Run the optimization pass.
+    optimise();
+}
+
+void llvm_state::add_vec_expression_dbl(const std::string &name, const expression &e)
+{
+    add_vecargs_expression<double>(name, e);
+}
+
+void llvm_state::add_vec_expression_ldbl(const std::string &name, const expression &e)
+{
+    add_vecargs_expression<long double>(name, e);
+}
+
 // NOTE: this function will lookup symbol names,
 // so it does not necessarily return a function
 // pointer (could be, e.g., a global variable).
@@ -1063,6 +1156,16 @@ llvm_state::tj_t<long double> llvm_state::fetch_taylor_jet_ldbl(const std::strin
     check_compiled(__func__);
 
     return fetch_taylor_jet_impl<long double>(name);
+}
+
+llvm_state::ev_t<double> llvm_state::fetch_vec_expression_dbl(const std::string &name)
+{
+    return fetch_vec_expression<double>(name);
+}
+
+llvm_state::ev_t<long double> llvm_state::fetch_vec_expression_ldbl(const std::string &name)
+{
+    return fetch_vec_expression<long double>(name);
 }
 
 } // namespace heyoka

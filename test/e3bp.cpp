@@ -61,7 +61,7 @@ TEST_CASE("e3bp")
     llvm_state ham_llvm{"ham tracing"};
     ham_llvm.add_expression_dbl("ham", ham);
     ham_llvm.compile();
-    auto h_trace = ham_llvm.fetch_dbl<5>("ham");
+    auto h_trace = ham_llvm.fetch_expression<double, 5>("ham");
 
     // NOTE: initial conditions for the periodic orbit from the paper.
     std::vector<double> init_state

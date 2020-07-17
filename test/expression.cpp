@@ -390,7 +390,7 @@ TEST_CASE("basic")
 #if 0
     s.compile();
 
-    auto f = s.fetch_ldbl<1>("f");
+    auto f = s.fetch_expression<long double>("f");
 
     std::cout << f(5) << '\n';
 #endif
