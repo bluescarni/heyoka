@@ -1144,18 +1144,16 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
+// NOTE: in the fetch_* functions, check_compiled() is run
+// by jit_lookup().
 llvm_state::tj_t<double> llvm_state::fetch_taylor_jet_dbl(const std::string &name)
 {
-    check_compiled(__func__);
-
-    return fetch_taylor_jet_impl<double>(name);
+    return fetch_taylor_jet<double>(name);
 }
 
 llvm_state::tj_t<long double> llvm_state::fetch_taylor_jet_ldbl(const std::string &name)
 {
-    check_compiled(__func__);
-
-    return fetch_taylor_jet_impl<long double>(name);
+    return fetch_taylor_jet<long double>(name);
 }
 
 llvm_state::ev_t<double> llvm_state::fetch_vec_expression_dbl(const std::string &name)

@@ -183,9 +183,9 @@ private:
     // This function will check if ptr is compatible with the signature of
     // the function called "name" which was added via one of the add_*()
     // overloads.
-    // NOTE: this function is supposed to be called only within
-    // a fetch_*() overload, thus we don't do compiled/uncompiled
-    // checks.
+    // NOTE: this function is supposed to be called only
+    // with a pointer obtained via jit_lookup, thus we don't need
+    // compiled/uncompiled checks.
     template <typename Ret, typename... Args>
     auto sig_check(const std::string &name, Ret (*ptr)(Args...)) const
     {
@@ -264,27 +264,15 @@ public:
         }
     }
 
-private:
-    template <typename T>
-    auto fetch_taylor_jet_impl(const std::string &name)
-    {
-        using ret_t = void (*)(T *, std::uint32_t);
-
-        return sig_check(name, reinterpret_cast<ret_t>(jit_lookup(name)));
-    }
-
-public:
     template <typename T>
     using tj_t = void (*)(T *, std::uint32_t);
     tj_t<double> fetch_taylor_jet_dbl(const std::string &);
     tj_t<long double> fetch_taylor_jet_ldbl(const std::string &);
     template <typename T>
-    tj_t<T> fetch_taylor(const std::string &name)
+    tj_t<T> fetch_taylor_jet(const std::string &name)
     {
-        if constexpr (std::is_same_v<T, double>) {
-            return fetch_taylor_jet_dbl(name);
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return fetch_taylor_jet_ldbl(name);
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+            return sig_check(name, reinterpret_cast<tj_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
