@@ -498,7 +498,7 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     // we can avoid doing it twice.
     const auto vars = get_variables(e);
     if (vars.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("The number of variables in the expression passed to add_vecargs_expression() is too "
+        throw std::overflow_error("The number of variables in the expression passed to add_vec_expression() is too "
                                   "large, and it results in an overflow condition");
     }
 
@@ -575,6 +575,119 @@ void llvm_state::add_vec_expression_dbl(const std::string &name, const expressio
 void llvm_state::add_vec_expression_ldbl(const std::string &name, const expression &e)
 {
     add_vecargs_expression<long double>(name, e);
+}
+
+template <typename T>
+void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    if (batch_size == 0u) {
+        throw std::invalid_argument("Cannot add an expression in batch mode if the batch size is zero");
+    }
+
+    // NOTE: the verify_resetter machinery will be
+    // set up by add_expression().
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    // NOTE: this is done also in add_expression(), perhaps
+    // we can avoid doing it twice.
+    const auto vars = get_variables(e);
+    if (vars.size() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("The number of variables in the expression passed to add_batch_expression() is too "
+                                  "large, and it results in an overflow condition");
+    }
+
+    // Add the variadic version.
+    const auto varargs_name = name + ".varargs";
+    add_expression<T>(varargs_name, e);
+
+    // Fetch the function we just added.
+    auto f_vararg = m_module->getFunction(varargs_name);
+    assert(f_vararg != nullptr);
+
+    // Change the linkage to internal.
+    f_vararg->setLinkage(llvm::Function::InternalLinkage);
+
+    // Remove the signature of the variadic function
+    // from m_sig_map, as we won't need to call it from
+    // the outside.
+    [[maybe_unused]] const auto n_rem = m_sig_map.erase(varargs_name);
+    assert(n_rem == 1u);
+
+    // Setup the batch function. It takes in input a write-only pointer, a read-only pointer,
+    // and it returns nothing.
+    std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())));
+    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
+    assert(f != nullptr);
+    f->addFnAttr("target-cpu", "znver2");
+
+    // Setup the properties of the pointer argument.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto in_ptr = out_ptr + 1;
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    in_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Vector of arguments that we will pass
+    // to the varargs function call.
+    std::vector<llvm::Value *> varargs_args;
+    for (std::uint32_t b_idx = 0; b_idx < batch_size; ++b_idx) {
+        // Reset the vector of arguments for this iteration.
+        varargs_args.clear();
+
+        for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
+            varargs_args.push_back(m_builder->CreateLoad(m_builder->CreateInBoundsGEP(
+                in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i) * batch_size + b_idx))));
+        }
+
+        // Invoke the varargs function.
+        auto varargs_call = m_builder->CreateCall(f_vararg, varargs_args, "vararg_call");
+        assert(varargs_call != nullptr);
+        varargs_call->setTailCall(true);
+
+        // Write the return value.
+        m_builder->CreateStore(varargs_call, m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(b_idx)));
+    }
+
+    // Create the return value.
+    m_builder->CreateRetVoid();
+
+    // Verify the function.
+    verify_function_impl(f);
+
+    // Add the function to m_sig_map.
+    std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
+    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
+
+    // Run the optimization pass.
+    optimise();
+}
+
+void llvm_state::add_batch_expression_dbl(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    add_batch_expression_impl<double>(name, e, batch_size);
+}
+
+void llvm_state::add_batch_expression_ldbl(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    add_batch_expression_impl<long double>(name, e, batch_size);
 }
 
 // NOTE: this function will lookup symbol names,

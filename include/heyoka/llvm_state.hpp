@@ -63,6 +63,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
                                                  const std::vector<std::string> &);
     template <typename T>
     HEYOKA_DLL_LOCAL void add_vecargs_expression(const std::string &, const expression &);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_batch_expression_impl(const std::string &, const expression &, std::uint32_t);
 
     // Implementation details for Taylor integration.
     template <typename T>
@@ -131,6 +133,20 @@ public:
             add_vec_expression_dbl(name, ex);
         } else if constexpr (std::is_same_v<T, long double>) {
             add_vec_expression_ldbl(name, ex);
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    void add_batch_expression_dbl(const std::string &, const expression &, std::uint32_t);
+    void add_batch_expression_ldbl(const std::string &, const expression &, std::uint32_t);
+    template <typename T>
+    void add_batch_expression(const std::string &name, const expression &ex, std::uint32_t batch_size)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_batch_expression_dbl(name, ex, batch_size);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_batch_expression_ldbl(name, ex, batch_size);
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -259,6 +275,22 @@ public:
     {
         if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
             return sig_check(name, reinterpret_cast<ev_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    // NOTE: remember documenting that
+    // these pointers are restricted.
+    template <typename T>
+    using eb_t = void (*)(T *, const T *);
+    eb_t<double> fetch_batch_expression_dbl(const std::string &);
+    eb_t<long double> fetch_batch_expression_ldbl(const std::string &);
+    template <typename T>
+    eb_t<T> fetch_batch_expression(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+            return sig_check(name, reinterpret_cast<eb_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
