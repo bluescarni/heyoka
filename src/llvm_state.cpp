@@ -22,6 +22,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/ADT/Triple.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -85,6 +86,7 @@ class llvm_state::jit
     llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
     std::unique_ptr<llvm::DataLayout> m_dl;
+    std::unique_ptr<llvm::Triple> m_triple;
     // NOTE: it seems like in LLVM 11 this class was moved
     // from llvm/ExecutionEngine/Orc/Core.h to
     // llvm/ExecutionEngine/Orc/Mangling.h.
@@ -113,6 +115,8 @@ public:
         if (!dlout) {
             throw std::invalid_argument("Error fetching the default data layout for the host system");
         }
+
+        m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
 
         m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
             m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
@@ -171,6 +175,7 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(s
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
     m_module->setDataLayout(m_jitter->get_data_layout());
+    m_module->setTargetTriple(m_jitter->get_target_triple().str());
 
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
@@ -623,7 +628,6 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     assert(ft != nullptr);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
     assert(f != nullptr);
-    f->addFnAttr("target-cpu", "znver2");
 
     // Setup the properties of the pointer argument.
     auto out_ptr = f->args().begin();
