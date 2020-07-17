@@ -345,8 +345,6 @@ TEST_CASE("basic")
 
     llvm_state s{"pippo"};
 
-    // s.add_taylor_stepper_dbl("f", {y, (1_dbl - x * x) * y - x}, 20);
-    // s.add_taylor_jet_dbl("fj", {y, (1_dbl - x * x) * y - x}, 20);
     s.add_taylor_jet_dbl("fj", {cos(y), sin(x)}, 20);
 
     std::cout << s.dump() << '\n';
@@ -359,8 +357,6 @@ TEST_CASE("basic")
     state[0] = 1;
     state[1] = 2;
 
-    // s.fetch_taylor_stepper_dbl("f")(state, .1, 12);
-    // s.fetch_taylor_stepper_dbl("f")(state, -.1, 12);
     s.fetch_taylor_jet_dbl("fj")(state, 3);
     for (auto v : state) {
         std::cout << v << '\n';
