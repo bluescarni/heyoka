@@ -220,7 +220,7 @@ private:
     // Machinery to construct a function pointer
     // type with signature T(T, T, ..., T).
     // This type will be used in the implementation
-    // of the N-ary fetch_* overloads.
+    // of the N-ary fetch_expression_* overloads.
     template <typename T, std::size_t>
     using always_same_t = T;
 
