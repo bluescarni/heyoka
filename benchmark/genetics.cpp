@@ -40,7 +40,7 @@ int main()
     std::random_device rd;
     detail::random_engine_type engine(rd());
     // Here we define the type of expression (two variables, default choices for the operators)
-    expression_generator generator({"x", "y"}, engine());
+    expression_generator generator({"x", "y"}, engine);
     // 0 - We generate N expressions and count the nodes
     std::vector<expression> exs_original;
     std::vector<std::size_t> n_nodes;

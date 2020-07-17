@@ -187,7 +187,7 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
             break;
         }
         case node_type::b_fun: {
-            // We return one of the binary functions in m_b_funcs with randomly constructed argument
+            // We return one of the binary functions in m_b_funcs with randomly constructed arguments
             auto b_f = *random_element(m_b_funcs.begin(), m_b_funcs.end(), m_e);
             return b_f(this->operator()(min_depth, max_depth, depth + 1),
                        this->operator()(min_depth, max_depth, depth + 1));
@@ -307,6 +307,7 @@ std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
     return os << "\n";
 }
 
+// Version randomly selecting nodes during traversal (PROBABLY WILL BE REMOVED)
 void mutate(expression &e, const expression_generator &generator, const double mut_p,
             detail::random_engine_type &engine, const unsigned min_depth, const unsigned max_depth, unsigned depth)
 {
@@ -315,20 +316,31 @@ void mutate(expression &e, const expression_generator &generator, const double m
         e = generator(min_depth, max_depth, depth);
     } else {
         std::visit(
-            [&e, &generator, &mut_p, &depth, &engine](auto &node) {
+            [&e, &generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
                 if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
                     // code for binary_operator
-                    mutate(node.lhs(), generator, mut_p, engine, depth + 1);
-                    mutate(node.rhs(), generator, mut_p, engine, depth + 1);
+                    mutate(node.lhs(), generator, mut_p, engine, min_depth, max_depth, depth + 1);
+                    mutate(node.rhs(), generator, mut_p, engine, min_depth, max_depth, depth + 1);
                 } else if constexpr (std::is_same_v<decltype(node), function &>) {
                     // code for function
                     for (auto &branch : node.args()) {
-                        mutate(branch, generator, mut_p, engine, depth + 1);
+                        mutate(branch, generator, mut_p, engine, min_depth, max_depth, depth + 1);
                     }
                 }
             },
             e.value());
     }
+}
+// Version targeting a node
+void mutate(expression &e, size_t node_id, const expression_generator &generator, const unsigned min_depth,
+                const unsigned max_depth)
+{
+    auto e_sub_ptr = fetch_from_node_id(e, node_id);
+    if (!e_sub_ptr) {
+        throw std::invalid_argument("The node id requested: " + std::to_string(node_id)
+                                    + " was not found in the expression e1: ");
+    }
+    *e_sub_ptr = generator(min_depth, max_depth);
 }
 
 size_t count_nodes(const expression &e)

@@ -65,7 +65,7 @@ int main()
     std::random_device rd;
     detail::random_engine_type engine(rd());
     // Here we define the type of expression (two variables, default choices for the operators)
-    expression_generator generator({"x", "y"}, engine());
+    expression_generator generator({"x", "y"}, engine);
     auto ex = generator(2, 4);
     // uncomment for this expression
     // auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;

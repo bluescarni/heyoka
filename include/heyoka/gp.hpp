@@ -37,7 +37,7 @@ private:
     std::vector<binary_operator::type> m_bos;
     std::vector<expression (*)(expression)> m_u_funcs;
     std::vector<expression (*)(expression, expression)> m_b_funcs;
-    std::vector<double> m_weights; 
+    std::vector<double> m_weights;
     double m_range_dbl;
     mutable detail::random_engine_type m_e;
 
@@ -69,7 +69,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression_gene
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
 HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
-                              const unsigned = 2u, const unsigned = 4u, const unsigned = 0u);
+                              const unsigned, const unsigned, const unsigned = 0u);
+HEYOKA_DLL_PUBLIC void mutate(expression &, size_t, const expression_generator &, const unsigned, const unsigned);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::random_engine_type &);
 

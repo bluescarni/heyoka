@@ -159,6 +159,16 @@ TEST_CASE("fetch from node id")
         REQUIRE(*fetch_from_node_id(ex4, 4) == ex3);
         REQUIRE(*fetch_from_node_id(ex4, 5) == ex1);
         REQUIRE(fetch_from_node_id(ex4, 6) == nullptr);
-
     }
+}
+
+TEST_CASE("mutations")
+{
+    detail::random_engine_type engine(123456789u);
+    expression_generator generator({"x", "y"}, engine);
+    // ex = (((y * (y * x)) * ((y + 0.688871) + (x * y))) - (y + (x + (y + y))))
+    auto ex = generator(2, 4);
+    mutate(ex, 0u, generator, 0u, 0u);
+    REQUIRE(count_nodes(ex) == 1u);
+    REQUIRE_THROWS(mutate(ex, 3u, generator, 0u, 0u));
 }
