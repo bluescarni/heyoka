@@ -153,6 +153,10 @@ public:
     {
         return *m_dl;
     }
+    const llvm::Triple &get_target_triple() const
+    {
+        return *m_triple;
+    }
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
