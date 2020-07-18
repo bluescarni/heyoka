@@ -118,6 +118,7 @@ public:
             throw std::invalid_argument("Error fetching the default data layout for the host system");
         }
 
+        // Fetch the target triple.
         m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
 
         // Fetch the CPU type and features by creating a target
