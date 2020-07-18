@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <llvm/ADT/Triple.h>
+#include <llvm/CodeGen/CommandFlags.inc>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -87,6 +88,7 @@ class llvm_state::jit
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
     std::unique_ptr<llvm::DataLayout> m_dl;
     std::unique_ptr<llvm::Triple> m_triple;
+    std::string m_target_cpu, m_target_features;
     // NOTE: it seems like in LLVM 11 this class was moved
     // from llvm/ExecutionEngine/Orc/Core.h to
     // llvm/ExecutionEngine/Orc/Mangling.h.
@@ -117,6 +119,17 @@ public:
         }
 
         m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
+
+        // Fetch the CPU type and features by creating a target
+        // machine and then querying its properties.
+        // NOTE: perhaps these info can be fetched
+        // via some function in the llvm::sys namespace instead.
+        auto tm = jtmb->createTargetMachine();
+        if (!tm) {
+            throw std::invalid_argument("Error creating the target machine");
+        }
+        m_target_cpu = (*tm)->getTargetCPU();
+        m_target_features = (*tm)->getTargetFeatureString();
 
         m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
             m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
@@ -157,6 +170,14 @@ public:
     {
         return *m_triple;
     }
+    const std::string &get_target_cpu() const
+    {
+        return m_target_cpu;
+    }
+    const std::string &get_target_features() const
+    {
+        return m_target_features;
+    }
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
@@ -178,6 +199,7 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(s
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
+    // Setup the data layout and the target triple.
     m_module->setDataLayout(m_jitter->get_data_layout());
     m_module->setTargetTriple(m_jitter->get_target_triple().str());
 
@@ -368,6 +390,10 @@ void llvm_state::optimise()
     check_uncompiled(__func__);
 
     if (m_opt_level > 0u) {
+        // For every function in the module, setup its attributes
+        // so that the codegen uses all the features available on
+        // the host CPU.
+        ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
         m_pm->run(*m_module);
     } else {
         assert(!m_fpm);
