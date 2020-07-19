@@ -9,4 +9,18 @@
 #ifndef HEYOKA_CONFIG_HPP
 #define HEYOKA_CONFIG_HPP
 
+#cmakedefine HEYOKA_WITH_MPPP
+
+#if defined(HEYOKA_WITH_MPPP)
+
+#include <mp++/config.hpp>
+
+#if defined(MPPP_WITH_QUADMATH)
+
+#define HEYOKA_HAVE_REAL128
+
+#endif
+
+#endif
+
 #endif

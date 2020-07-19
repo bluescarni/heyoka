@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -26,6 +28,12 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
@@ -343,6 +351,15 @@ llvm::Value *codegen_ldbl(llvm_state &s, const binary_operator &bo)
 {
     heyoka_assert_nonnull_ret(detail::bo_codegen_impl<long double>(s, bo));
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const binary_operator &bo)
+{
+    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<mppp::real128>(s, bo));
+}
+
+#endif
 
 std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&bo, std::vector<expression> &u_vars_defs)
 {

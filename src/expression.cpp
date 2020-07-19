@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
@@ -20,6 +22,12 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/assert_nonnull_ret.hpp>
@@ -464,6 +472,15 @@ llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
 {
     heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value()));
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const expression &e)
+{
+    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_f128(s, arg); }, e.value()));
+}
+
+#endif
 
 // Transform in-place ex by decomposition, appending the
 // result of the decomposition to u_vars_defs.

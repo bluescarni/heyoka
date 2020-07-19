@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
@@ -61,6 +63,12 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Vectorize.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -492,6 +500,26 @@ void llvm_state::add_expression_ldbl(const std::string &name, const expression &
     optimise();
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_expression_f128(const std::string &name, const expression &e)
+{
+    detail::verify_resetter vr{*this};
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    const auto vars = get_variables(e);
+
+    add_varargs_expression<mppp::real128>(name, e, vars);
+
+    // Run the optimization pass.
+    optimise();
+}
+
+#endif
+
 template <typename T>
 void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
 {
@@ -584,6 +612,15 @@ void llvm_state::add_vec_expression_ldbl(const std::string &name, const expressi
 {
     add_vecargs_expression<long double>(name, e);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_vec_expression_f128(const std::string &name, const expression &e)
+{
+    add_vecargs_expression<mppp::real128>(name, e);
+}
+
+#endif
 
 template <typename T>
 void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
@@ -696,6 +733,15 @@ void llvm_state::add_batch_expression_ldbl(const std::string &name, const expres
 {
     add_batch_expression_impl<long double>(name, e, batch_size);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_batch_expression_f128(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    add_batch_expression_impl<mppp::real128>(name, e, batch_size);
+}
+
+#endif
 
 // NOTE: this function will lookup symbol names,
 // so it does not necessarily return a function

@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -26,6 +28,12 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -75,6 +83,9 @@ function::function(std::vector<expression> args)
 
 function::function(const function &f)
     : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
+#if defined(HEYOKA_HAVE_REAL128)
+      m_f128_name(f.m_f128_name),
+#endif
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
       m_attributes(f.m_attributes), m_ty(f.ty()), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
       m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
@@ -112,6 +123,15 @@ std::string &function::ldbl_name()
 {
     return m_ldbl_name;
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::string &function::f128_name()
+{
+    return m_f128_name;
+}
+
+#endif
 
 std::string &function::display_name()
 {
@@ -199,6 +219,15 @@ const std::string &function::ldbl_name() const
 {
     return m_ldbl_name;
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+const std::string &function::f128_name() const
+{
+    return m_f128_name;
+}
+
+#endif
 
 const std::string &function::display_name() const
 {
@@ -292,6 +321,9 @@ void swap(function &f0, function &f1) noexcept
     std::swap(f0.disable_verify(), f1.disable_verify());
     std::swap(f0.dbl_name(), f1.dbl_name());
     std::swap(f0.ldbl_name(), f1.ldbl_name());
+#if defined(HEYOKA_HAVE_REAL128)
+    std::swap(f0.f128_name(), f1.f128_name());
+#endif
     std::swap(f0.display_name(), f1.display_name());
     std::swap(f0.args(), f1.args());
     std::swap(f0.attributes(), f1.attributes());
@@ -316,6 +348,9 @@ std::size_t hash(const function &f)
     auto retval = std::hash<bool>{}(f.disable_verify());
     retval += std::hash<std::string>{}(f.dbl_name());
     retval += std::hash<std::string>{}(f.ldbl_name());
+#if defined(HEYOKA_HAVE_REAL128)
+    retval += std::hash<std::string>{}(f.f128_name());
+#endif
     retval += std::hash<std::string>{}(f.display_name());
 
     for (const auto &arg : f.args()) {
@@ -367,8 +402,11 @@ void rename_variables(function &f, const std::unordered_map<std::string, std::st
 
 bool operator==(const function &f1, const function &f2)
 {
-    return f1.dbl_name() == f2.dbl_name() && f1.ldbl_name() == f2.ldbl_name() && f1.display_name() == f2.display_name()
-           && f1.args() == f2.args() && f1.attributes() == f2.attributes()
+    return f1.dbl_name() == f2.dbl_name() && f1.ldbl_name() == f2.ldbl_name()
+#if defined(HEYOKA_HAVE_REAL128)
+           && f1.f128_name() == f2.f128_name()
+#endif
+           && f1.display_name() == f2.display_name() && f1.args() == f2.args() && f1.attributes() == f2.attributes()
            && f1.ty() == f2.ty()
            // NOTE: we have no way of comparing the content of std::function,
            // thus we just check if the std::function members contain something.
@@ -526,6 +564,10 @@ const std::string &function_name_from_type(const function &f)
         return f.dbl_name();
     } else if constexpr (std::is_same_v<T, long double>) {
         return f.ldbl_name();
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.f128_name();
+#endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type");
     }
@@ -648,6 +690,15 @@ llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
 {
     heyoka_assert_nonnull_ret(detail::function_codegen_impl<long double>(s, f));
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const function &f)
+{
+    heyoka_assert_nonnull_ret(detail::function_codegen_impl<mppp::real128>(s, f));
+}
+
+#endif
 
 std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::vector<expression> &u_vars_defs)
 {
