@@ -17,3 +17,4 @@ function(ADD_HEYOKA_BENCHMARK arg1)
 endfunction()
 
 ADD_HEYOKA_BENCHMARK(evaluate_benchmark_dbl)
+ADD_HEYOKA_BENCHMARK(flops_benchmark_dbl)
