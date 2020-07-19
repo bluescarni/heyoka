@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <llvm/ADT/Triple.h>
+#include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/CommandFlags.inc>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -49,6 +50,7 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/InstCombine/InstCombine.h>
@@ -88,7 +90,7 @@ class llvm_state::jit
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
     std::unique_ptr<llvm::DataLayout> m_dl;
     std::unique_ptr<llvm::Triple> m_triple;
-    std::string m_target_cpu, m_target_features;
+    std::unique_ptr<llvm::TargetMachine> m_tm;
     // NOTE: it seems like in LLVM 11 this class was moved
     // from llvm/ExecutionEngine/Orc/Core.h to
     // llvm/ExecutionEngine/Orc/Mangling.h.
@@ -121,16 +123,13 @@ public:
         // Fetch the target triple.
         m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
 
-        // Fetch the CPU type and features by creating a target
-        // machine and then querying its properties.
-        // NOTE: perhaps these info can be fetched
-        // via some function in the llvm::sys namespace instead.
+        // Keep a target machine around to fetch various
+        // properties of the host CPU.
         auto tm = jtmb->createTargetMachine();
         if (!tm) {
             throw std::invalid_argument("Error creating the target machine");
         }
-        m_target_cpu = (*tm)->getTargetCPU();
-        m_target_features = (*tm)->getTargetFeatureString();
+        m_tm = std::move(*tm);
 
         m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
             m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
@@ -171,13 +170,17 @@ public:
     {
         return *m_triple;
     }
-    const std::string &get_target_cpu() const
+    std::string get_target_cpu() const
     {
-        return m_target_cpu;
+        return m_tm->getTargetCPU();
     }
-    const std::string &get_target_features() const
+    std::string get_target_features() const
     {
-        return m_target_features;
+        return m_tm->getTargetFeatureString();
+    }
+    llvm::TargetIRAnalysis get_target_ir_analysis() const
+    {
+        return m_tm->getTargetIRAnalysis();
     }
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
@@ -196,7 +199,8 @@ public:
     }
 };
 
-llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(std::make_unique<jit>())
+llvm_state::llvm_state(const std::string &name, unsigned opt_level)
+    : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
@@ -212,9 +216,6 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level) : m_jitter(s
     llvm::FastMathFlags fmf;
     fmf.setFast();
     m_builder->setFastMathFlags(fmf);
-
-    // Setup the optimisation level.
-    set_opt_level(opt_level);
 }
 
 llvm_state::llvm_state(llvm_state &&) noexcept = default;
@@ -244,6 +245,11 @@ bool &llvm_state::verify()
     return m_verify;
 }
 
+unsigned &llvm_state::opt_level()
+{
+    return m_opt_level;
+}
+
 std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
 {
     return m_named_values;
@@ -268,6 +274,11 @@ const llvm::LLVMContext &llvm_state::context() const
 const bool &llvm_state::verify() const
 {
     return m_verify;
+}
+
+const unsigned &llvm_state::opt_level() const
+{
+    return m_opt_level;
 }
 
 const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
@@ -328,64 +339,6 @@ void llvm_state::verify_function(const std::string &name)
     verify_function_impl(f);
 }
 
-unsigned llvm_state::get_opt_level() const
-{
-    return m_opt_level;
-}
-
-// NOTE: it is important not to read m_opt_level
-// before assigning it here, as this function
-// is used in the constructor where m_opt_level
-// has not been initialised yet.
-void llvm_state::set_opt_level(unsigned opt_level)
-{
-    check_uncompiled(__func__);
-
-    if (opt_level > 0u) {
-        // Create a new function pass manager.
-        auto new_fpm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
-        new_fpm->add(llvm::createPromoteMemoryToRegisterPass());
-        new_fpm->add(llvm::createInstructionCombiningPass());
-        new_fpm->add(llvm::createReassociatePass());
-        new_fpm->add(llvm::createGVNPass());
-        new_fpm->add(llvm::createCFGSimplificationPass());
-        new_fpm->add(llvm::createLoopVectorizePass());
-        new_fpm->add(llvm::createSLPVectorizerPass());
-        new_fpm->add(llvm::createLoadStoreVectorizerPass());
-        new_fpm->add(llvm::createLoopUnrollPass());
-        new_fpm->doInitialization();
-
-        // Create a new module-level optimizer. See:
-        // https://stackoverflow.com/questions/48300510/llvm-api-optimisation-run
-        auto new_pm = std::make_unique<llvm::legacy::PassManager>();
-        llvm::PassManagerBuilder pm_builder;
-        // See here for the defaults:
-        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
-        pm_builder.OptLevel = opt_level;
-        pm_builder.VerifyInput = true;
-        pm_builder.VerifyOutput = true;
-        pm_builder.Inliner = llvm::createFunctionInliningPass();
-        if (opt_level >= 3u) {
-            pm_builder.SLPVectorize = true;
-            pm_builder.MergeFunctions = true;
-        }
-        pm_builder.populateModulePassManager(*new_pm);
-        pm_builder.populateFunctionPassManager(*new_fpm);
-
-        // Move them in.
-        m_fpm = std::move(new_fpm);
-        m_pm = std::move(new_pm);
-    } else {
-        // If the optimisation level is set to zero,
-        // clear out the optimisation pass managers.
-        m_fpm.reset();
-        m_pm.reset();
-    }
-
-    // Record the new optimisation level.
-    m_opt_level = opt_level;
-}
-
 void llvm_state::optimise()
 {
     check_uncompiled(__func__);
@@ -395,10 +348,31 @@ void llvm_state::optimise()
         // so that the codegen uses all the features available on
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
-        m_pm->run(*m_module);
-    } else {
-        assert(!m_fpm);
-        assert(!m_pm);
+
+        // We use the helper class PassManagerBuilder to populate the module
+        // pass manager with standard options.
+        llvm::PassManagerBuilder pm_builder;
+        // See here for the defaults:
+        // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
+        pm_builder.OptLevel = m_opt_level;
+        pm_builder.VerifyInput = true;
+        pm_builder.VerifyOutput = true;
+        pm_builder.Inliner = llvm::createFunctionInliningPass();
+        if (m_opt_level >= 3u) {
+            pm_builder.SLPVectorize = true;
+            pm_builder.MergeFunctions = true;
+        }
+
+        // Init the pass manager.
+        auto module_pm = std::make_unique<llvm::legacy::PassManager>();
+        // NOTE: this first pass is important because it defines what sort of CPU
+        // features are available to the following passes.
+        module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
+        // Populate it.
+        pm_builder.populateModulePassManager(*module_pm);
+
+        // Run the optimisation.
+        module_pm->run(*m_module);
     }
 }
 
@@ -740,7 +714,7 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
     return static_cast<std::uintptr_t>((*sym).getAddress());
 }
 
-std::string llvm_state::dump() const
+std::string llvm_state::dump_ir() const
 {
     check_uncompiled(__func__);
 
@@ -750,7 +724,7 @@ std::string llvm_state::dump() const
     return ostr.str();
 }
 
-std::string llvm_state::dump_function(const std::string &name) const
+std::string llvm_state::dump_function_ir(const std::string &name) const
 {
     check_uncompiled(__func__);
 

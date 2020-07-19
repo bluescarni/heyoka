@@ -24,7 +24,7 @@ TEST_CASE("vector expression")
 
         s.add_vec_expression<double>("foo", x + y + z);
 
-        std::cout << s.dump() << '\n';
+        std::cout << s.dump_ir() << '\n';
 
         s.compile();
 
@@ -33,5 +33,12 @@ TEST_CASE("vector expression")
         double args[] = {1, 2, 3};
 
         REQUIRE(f(args) == 6);
+    }
+    {
+        llvm_state s{""};
+
+        s.add_batch_expression<double>("foo", x + y, 4);
+
+        std::cout << s.dump_ir() << '\n';
     }
 }

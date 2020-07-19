@@ -347,7 +347,7 @@ TEST_CASE("basic")
 
     s.add_taylor_jet_dbl("fj", {cos(y), sin(x)}, 20);
 
-    std::cout << s.dump() << '\n';
+    std::cout << s.dump_ir() << '\n';
 
     s.compile();
 

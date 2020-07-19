@@ -555,11 +555,11 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
 
     // Change the optimisation level
     // and run the optimisation pass.
-    m_llvm.set_opt_level(opt_level);
+    m_llvm.opt_level() = opt_level;
     m_llvm.optimise();
 
     // Store the IR before compiling.
-    m_ir = m_llvm.dump();
+    m_ir = m_llvm.dump_ir();
 
     // Run the jit.
     m_llvm.compile();

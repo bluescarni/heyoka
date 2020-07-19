@@ -26,7 +26,6 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 
@@ -44,8 +43,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<llvm::IRBuilder<>> m_builder;
-    std::unique_ptr<llvm::legacy::FunctionPassManager> m_fpm;
-    std::unique_ptr<llvm::legacy::PassManager> m_pm;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     bool m_verify = true;
@@ -93,21 +90,21 @@ public:
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
     bool &verify();
+    unsigned &opt_level();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
     const bool &verify() const;
+    const unsigned &opt_level() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
-    std::string dump() const;
-    std::string dump_function(const std::string &) const;
+    std::string dump_ir() const;
+    std::string dump_function_ir(const std::string &) const;
 
     void verify_function(const std::string &);
 
-    unsigned get_opt_level() const;
-    void set_opt_level(unsigned);
     void optimise();
 
     void add_expression_dbl(const std::string &, const expression &);
