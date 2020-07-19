@@ -367,6 +367,9 @@ void llvm_state::optimise()
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
         // NOTE: this first pass is important because it defines what sort of CPU
         // features are available to the following passes.
+        // NOTE: the PassManagerBuilder class has an API for adding optimisation
+        // passes, but it seems like there's no way via that API to ensure
+        // that the tti pass is added as the very first pass.
         module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
         // Populate it.
         pm_builder.populateModulePassManager(*module_pm);
