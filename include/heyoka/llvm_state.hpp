@@ -153,12 +153,13 @@ public:
     std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
     template <typename T>
-    void add_taylor_jet(const std::string &name, std::vector<expression> sys, std::uint32_t max_order)
+    std::vector<expression> add_taylor_jet(const std::string &name, std::vector<expression> sys,
+                                           std::uint32_t max_order)
     {
         if constexpr (std::is_same_v<T, double>) {
-            add_taylor_jet_dbl(name, std::move(sys), max_order);
+            return add_taylor_jet_dbl(name, std::move(sys), max_order);
         } else if constexpr (std::is_same_v<T, long double>) {
-            add_taylor_jet_ldbl(name, std::move(sys), max_order);
+            return add_taylor_jet_ldbl(name, std::move(sys), max_order);
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -169,13 +170,13 @@ public:
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<std::pair<expression, expression>>,
                                                 std::uint32_t);
     template <typename T>
-    void add_taylor_jet(const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                        std::uint32_t max_order)
+    std::vector<expression> add_taylor_jet(const std::string &name, std::vector<std::pair<expression, expression>> sys,
+                                           std::uint32_t max_order)
     {
         if constexpr (std::is_same_v<T, double>) {
-            add_taylor_jet_dbl(name, std::move(sys), max_order);
+            return add_taylor_jet_dbl(name, std::move(sys), max_order);
         } else if constexpr (std::is_same_v<T, long double>) {
-            add_taylor_jet_ldbl(name, std::move(sys), max_order);
+            return add_taylor_jet_ldbl(name, std::move(sys), max_order);
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }

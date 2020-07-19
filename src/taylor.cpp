@@ -500,15 +500,8 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     // NOTE: in many cases m_order_r == m_order_a,
     // thus we could probably save some time by
     // creating (and optimising) only one function rather than 2.
-    if constexpr (std::is_same_v<T, double>) {
-        m_dc = m_llvm.add_taylor_jet_dbl("jet_r", sys, m_order_r);
-        m_llvm.add_taylor_jet_dbl("jet_a", std::move(sys), m_order_a);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        m_dc = m_llvm.add_taylor_jet_ldbl("jet_r", sys, m_order_r);
-        m_llvm.add_taylor_jet_ldbl("jet_a", std::move(sys), m_order_a);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type.");
-    }
+    m_dc = m_llvm.add_taylor_jet<T>("jet_r", sys, m_order_r);
+    m_llvm.add_taylor_jet<T>("jet_a", std::move(sys), m_order_a);
 
     // Fetch the functions we just added.
     auto orig_jet_r = m_llvm.module().getFunction("jet_r");
