@@ -1308,4 +1308,14 @@ llvm_state::ev_t<long double> llvm_state::fetch_vec_expression_ldbl(const std::s
     return fetch_vec_expression<long double>(name);
 }
 
+llvm_state::eb_t<double> llvm_state::fetch_batch_expression_dbl(const std::string &name)
+{
+    return fetch_batch_expression<double>(name);
+}
+
+llvm_state::eb_t<long double> llvm_state::fetch_batch_expression_ldbl(const std::string &name)
+{
+    return fetch_batch_expression<long double>(name);
+}
+
 } // namespace heyoka
