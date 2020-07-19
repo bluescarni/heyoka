@@ -37,8 +37,9 @@ TEST_CASE("vector expression")
     {
         llvm_state s{""};
 
-        s.add_batch_expression<double>("foo", x + y, 4);
+        s.add_batch_expression<double>("foo", x + (y * x), 4);
 
         std::cout << s.dump_ir() << '\n';
+        s.dump_object_code("add_ex.o");
     }
 }

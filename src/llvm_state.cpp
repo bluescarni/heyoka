@@ -14,6 +14,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -48,6 +49,8 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Support/CodeGen.h>
+#include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
@@ -83,8 +86,7 @@ std::once_flag nt_inited;
 } // namespace detail
 
 // Implementation of the jit class.
-class llvm_state::jit
-{
+struct llvm_state::jit {
     llvm::orc::ExecutionSession m_es;
     llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
@@ -98,7 +100,6 @@ class llvm_state::jit
     llvm::orc::ThreadSafeContext m_ctx;
     llvm::orc::JITDylib &m_main_jd;
 
-public:
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
           m_ctx(std::make_unique<llvm::LLVMContext>()), m_main_jd(m_es.createJITDylib("<main>"))
@@ -114,6 +115,8 @@ public:
         if (!jtmb) {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
+        // Set the codegen optimisation level to aggressive.
+        jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
         auto dlout = jtmb->getDefaultDataLayoutForTarget();
         if (!dlout) {
@@ -162,14 +165,6 @@ public:
     {
         return *m_ctx.getContext();
     }
-    const llvm::DataLayout &get_data_layout() const
-    {
-        return *m_dl;
-    }
-    const llvm::Triple &get_target_triple() const
-    {
-        return *m_triple;
-    }
     std::string get_target_cpu() const
     {
         return m_tm->getTargetCPU();
@@ -205,8 +200,8 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     // Create the module.
     m_module = std::make_unique<llvm::Module>(name, context());
     // Setup the data layout and the target triple.
-    m_module->setDataLayout(m_jitter->get_data_layout());
-    m_module->setTargetTriple(m_jitter->get_target_triple().str());
+    m_module->setDataLayout(*m_jitter->m_dl);
+    m_module->setTargetTriple(m_jitter->m_triple->str());
 
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
@@ -739,6 +734,28 @@ std::string llvm_state::dump_function_ir(const std::string &name) const
     } else {
         throw std::invalid_argument("Could not locate the function called '" + name + "'");
     }
+}
+
+void llvm_state::dump_object_code(const std::string &filename) const
+{
+    check_uncompiled(__func__);
+
+    std::error_code ec;
+    llvm::raw_fd_ostream dest(filename, ec, llvm::sys::fs::OF_None);
+
+    if (ec) {
+        throw std::invalid_argument("Could not open the file '" + filename
+                                    + "' for dumping object code. The error message is: ec.message()");
+    }
+
+    llvm::legacy::PassManager pass;
+    auto file_type = llvm::CGFT_ObjectFile;
+
+    if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
+        throw std::invalid_argument("The target machine can't emit a file of this type");
+    }
+
+    pass.run(*m_module);
 }
 
 // Create the function to implement the n-th order normalised derivative of a

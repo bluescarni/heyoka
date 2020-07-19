@@ -38,7 +38,7 @@ namespace heyoka
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {
-    class jit;
+    struct jit;
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
@@ -102,6 +102,7 @@ public:
 
     std::string dump_ir() const;
     std::string dump_function_ir(const std::string &) const;
+    void dump_object_code(const std::string &) const;
 
     void verify_function(const std::string &);
 
