@@ -20,6 +20,7 @@ project(heyoka VERSION 0.1.0 LANGUAGES CXX C)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
 message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "heyoka version: ${heyoka_VERSION}")
 
 # Run the YACMA compiler setup.
@@ -30,6 +31,28 @@ option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
+
+# NOTE: on Unix systems, the correct library installation path
+# could be something other than just "lib", such as "lib64",
+# "lib32", etc., depending on platform/configuration. Apparently,
+# CMake provides this information via the GNUInstallDirs module.
+# Let's enable this for now on all Unixes except OSX.
+# NOTE: potentially, this could be applicable to Cygwin as well.
+#
+# https://cmake.org/cmake/help/v3.15/module/GNUInstallDirs.html
+# https://cmake.org/pipermail/cmake/2013-July/055375.html
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    set(_HEYOKA_INSTALL_LIBDIR_DEFAULT "${CMAKE_INSTALL_LIBDIR}")
+else()
+    set(_HEYOKA_INSTALL_LIBDIR_DEFAULT "lib")
+endif()
+if(NOT HEYOKA_INSTALL_LIBDIR)
+    set(HEYOKA_INSTALL_LIBDIR "${_HEYOKA_INSTALL_LIBDIR_DEFAULT}" CACHE STRING
+        "Library installation directory." FORCE)
+endif()
+mark_as_advanced(HEYOKA_INSTALL_LIBDIR)
+message(STATUS "Library installation directory: ${HEYOKA_INSTALL_LIBDIR}")
 
 # Assemble the flags.
 set(HEYOKA_CXX_FLAGS_DEBUG ${YACMA_CXX_FLAGS} ${YACMA_CXX_FLAGS_DEBUG})
@@ -165,6 +188,7 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
     endif()
 endif()
 
+# Mandatory dependency on LLVM.
 find_package(LLVM REQUIRED)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
@@ -174,6 +198,37 @@ endif()
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
 target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
+
+# Configure config.hpp.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
+
+# Installation of the header files.
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" DESTINATION include/heyoka)
+
+# Installation of the library.
+install(TARGETS heyoka
+    EXPORT heyoka_export
+    LIBRARY DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${HEYOKA_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION bin
+)
+
+# Setup of the optional deps.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/heyoka-config.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
+    DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
+install(EXPORT heyoka_export NAMESPACE heyoka:: DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
+# Take care of versioning.
+include(CMakePackageConfigHelpers)
+# NOTE: SameMinorVersion available only
+# since CMake 3.11.
+if(${CMAKE_VERSION} VERSION_LESS "3.11.0")
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMajorVersion)
+else()
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
+endif()
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()
