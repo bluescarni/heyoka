@@ -65,14 +65,23 @@ public:
 
 private:
     bool m_disable_verify = false;
-    std::string m_dbl_name, m_ldbl_name,
+    std::string m_name_dbl, m_name_ldbl,
 #if defined(HEYOKA_HAVE_REAL128)
-        m_f128_name,
+        m_name_f128,
 #endif
         m_display_name;
     std::unique_ptr<std::vector<expression>> m_args;
-    std::vector<llvm::Attribute::AttrKind> m_attributes;
-    type m_ty = type::internal;
+    std::vector<llvm::Attribute::AttrKind> m_attributes_dbl, m_attributes_ldbl
+#if defined(HEYOKA_HAVE_REAL128)
+        ,
+        m_attributes_f128
+#endif
+        ;
+    type m_ty_dbl = type::internal;
+    type m_ty_ldbl = type::internal;
+#if defined(HEYOKA_HAVE_REAL128)
+    type m_ty_f128 = type::internal;
+#endif
 
     diff_t m_diff_f;
 
@@ -103,15 +112,23 @@ public:
     function &operator=(function &&) noexcept;
 
     bool &disable_verify();
-    std::string &dbl_name();
-    std::string &ldbl_name();
+    std::string &name_dbl();
+    std::string &name_ldbl();
 #if defined(HEYOKA_HAVE_REAL128)
-    std::string &f128_name();
+    std::string &name_f128();
 #endif
     std::string &display_name();
     std::vector<expression> &args();
-    std::vector<llvm::Attribute::AttrKind> &attributes();
-    type &ty();
+    std::vector<llvm::Attribute::AttrKind> &attributes_dbl();
+    std::vector<llvm::Attribute::AttrKind> &attributes_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+    std::vector<llvm::Attribute::AttrKind> &attributes_f128();
+#endif
+    type &ty_dbl();
+    type &ty_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+    type &ty_f128();
+#endif
     diff_t &diff_f();
     eval_dbl_t &eval_dbl_f();
     eval_batch_dbl_t &eval_batch_dbl_f();
@@ -130,15 +147,23 @@ public:
 #endif
 
     const bool &disable_verify() const;
-    const std::string &dbl_name() const;
-    const std::string &ldbl_name() const;
+    const std::string &name_dbl() const;
+    const std::string &name_ldbl() const;
 #if defined(HEYOKA_HAVE_REAL128)
-    const std::string &f128_name() const;
+    const std::string &name_f128() const;
 #endif
     const std::string &display_name() const;
     const std::vector<expression> &args() const;
-    const std::vector<llvm::Attribute::AttrKind> &attributes() const;
-    const type &ty() const;
+    const std::vector<llvm::Attribute::AttrKind> &attributes_dbl() const;
+    const std::vector<llvm::Attribute::AttrKind> &attributes_ldbl() const;
+#if defined(HEYOKA_HAVE_REAL128)
+    const std::vector<llvm::Attribute::AttrKind> &attributes_f128() const;
+#endif
+    const type &ty_dbl() const;
+    const type &ty_ldbl() const;
+#if defined(HEYOKA_HAVE_REAL128)
+    const type &ty_f128() const;
+#endif
     const diff_t &diff_f() const;
     const eval_dbl_t &eval_dbl_f() const;
     const eval_batch_dbl_t &eval_batch_dbl_f() const;
@@ -268,6 +293,15 @@ inline llvm::Function *taylor_diff(llvm_state &s, const function &f, std::uint32
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
+}
+
+namespace detail
+{
+
+template <typename T>
+HEYOKA_DLL_PUBLIC llvm::Value *function_codegen_from_values(llvm_state &, const function &,
+                                                            const std::vector<llvm::Value *> &);
+
 }
 
 } // namespace heyoka

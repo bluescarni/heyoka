@@ -146,6 +146,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
 )
 
 # Setup of the heyoka shared library.

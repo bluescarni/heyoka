@@ -82,15 +82,23 @@ function::function(std::vector<expression> args)
 }
 
 function::function(const function &f)
-    : m_disable_verify(f.m_disable_verify), m_dbl_name(f.m_dbl_name), m_ldbl_name(f.m_ldbl_name),
+    : m_disable_verify(f.m_disable_verify), m_name_dbl(f.m_name_dbl), m_name_ldbl(f.m_name_ldbl),
 #if defined(HEYOKA_HAVE_REAL128)
-      m_f128_name(f.m_f128_name),
+      m_name_f128(f.m_name_f128),
 #endif
       m_display_name(f.m_display_name), m_args(std::make_unique<std::vector<expression>>(f.args())),
-      m_attributes(f.m_attributes), m_ty(f.ty()), m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f),
-      m_eval_batch_dbl_f(f.m_eval_batch_dbl_f), m_eval_num_dbl_f(f.m_eval_num_dbl_f),
-      m_deval_num_dbl_f(f.m_deval_num_dbl_f), m_taylor_decompose_f(f.m_taylor_decompose_f),
-      m_taylor_init_dbl_f(f.m_taylor_init_dbl_f), m_taylor_init_ldbl_f(f.m_taylor_init_ldbl_f),
+      m_attributes_dbl(f.m_attributes_dbl), m_attributes_ldbl(f.m_attributes_ldbl),
+#if defined(HEYOKA_HAVE_REAL128)
+      m_attributes_f128(f.m_attributes_f128),
+#endif
+      m_ty_dbl(f.ty_dbl()), m_ty_ldbl(f.ty_ldbl()),
+#if defined(HEYOKA_HAVE_REAL128)
+      m_ty_f128(f.ty_f128()),
+#endif
+      m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f), m_eval_batch_dbl_f(f.m_eval_batch_dbl_f),
+      m_eval_num_dbl_f(f.m_eval_num_dbl_f), m_deval_num_dbl_f(f.m_deval_num_dbl_f),
+      m_taylor_decompose_f(f.m_taylor_decompose_f), m_taylor_init_dbl_f(f.m_taylor_init_dbl_f),
+      m_taylor_init_ldbl_f(f.m_taylor_init_ldbl_f),
 #if defined(HEYOKA_HAVE_REAL128)
       m_taylor_init_f128_f(f.m_taylor_init_f128_f),
 #endif
@@ -121,21 +129,21 @@ bool &function::disable_verify()
     return m_disable_verify;
 }
 
-std::string &function::dbl_name()
+std::string &function::name_dbl()
 {
-    return m_dbl_name;
+    return m_name_dbl;
 }
 
-std::string &function::ldbl_name()
+std::string &function::name_ldbl()
 {
-    return m_ldbl_name;
+    return m_name_ldbl;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-std::string &function::f128_name()
+std::string &function::name_f128()
 {
-    return m_f128_name;
+    return m_name_f128;
 }
 
 #endif
@@ -151,16 +159,46 @@ std::vector<expression> &function::args()
     return *m_args;
 }
 
-std::vector<llvm::Attribute::AttrKind> &function::attributes()
+std::vector<llvm::Attribute::AttrKind> &function::attributes_dbl()
 {
-    return m_attributes;
+    return m_attributes_dbl;
 }
 
-function::type &function::ty()
+std::vector<llvm::Attribute::AttrKind> &function::attributes_ldbl()
 {
-    assert(m_ty >= type::internal && m_ty <= type::builtin);
-    return m_ty;
+    return m_attributes_ldbl;
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<llvm::Attribute::AttrKind> &function::attributes_f128()
+{
+    return m_attributes_f128;
+}
+
+#endif
+
+function::type &function::ty_dbl()
+{
+    assert(m_ty_dbl >= type::internal && m_ty_dbl <= type::builtin);
+    return m_ty_dbl;
+}
+
+function::type &function::ty_ldbl()
+{
+    assert(m_ty_ldbl >= type::internal && m_ty_ldbl <= type::builtin);
+    return m_ty_ldbl;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+function::type &function::ty_f128()
+{
+    assert(m_ty_f128 >= type::internal && m_ty_f128 <= type::builtin);
+    return m_ty_f128;
+}
+
+#endif
 
 function::diff_t &function::diff_f()
 {
@@ -235,21 +273,21 @@ const bool &function::disable_verify() const
     return m_disable_verify;
 }
 
-const std::string &function::dbl_name() const
+const std::string &function::name_dbl() const
 {
-    return m_dbl_name;
+    return m_name_dbl;
 }
 
-const std::string &function::ldbl_name() const
+const std::string &function::name_ldbl() const
 {
-    return m_ldbl_name;
+    return m_name_ldbl;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-const std::string &function::f128_name() const
+const std::string &function::name_f128() const
 {
-    return m_f128_name;
+    return m_name_f128;
 }
 
 #endif
@@ -265,16 +303,46 @@ const std::vector<expression> &function::args() const
     return *m_args;
 }
 
-const std::vector<llvm::Attribute::AttrKind> &function::attributes() const
+const std::vector<llvm::Attribute::AttrKind> &function::attributes_dbl() const
 {
-    return m_attributes;
+    return m_attributes_dbl;
 }
 
-const function::type &function::ty() const
+const std::vector<llvm::Attribute::AttrKind> &function::attributes_ldbl() const
 {
-    assert(m_ty >= type::internal && m_ty <= type::builtin);
-    return m_ty;
+    return m_attributes_ldbl;
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+const std::vector<llvm::Attribute::AttrKind> &function::attributes_f128() const
+{
+    return m_attributes_f128;
+}
+
+#endif
+
+const function::type &function::ty_dbl() const
+{
+    assert(m_ty_dbl >= type::internal && m_ty_dbl <= type::builtin);
+    return m_ty_dbl;
+}
+
+const function::type &function::ty_ldbl() const
+{
+    assert(m_ty_ldbl >= type::internal && m_ty_ldbl <= type::builtin);
+    return m_ty_ldbl;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+const function::type &function::ty_f128() const
+{
+    assert(m_ty_f128 >= type::internal && m_ty_f128 <= type::builtin);
+    return m_ty_f128;
+}
+
+#endif
 
 const function::diff_t &function::diff_f() const
 {
@@ -362,15 +430,23 @@ std::ostream &operator<<(std::ostream &os, const function &f)
 void swap(function &f0, function &f1) noexcept
 {
     std::swap(f0.disable_verify(), f1.disable_verify());
-    std::swap(f0.dbl_name(), f1.dbl_name());
-    std::swap(f0.ldbl_name(), f1.ldbl_name());
+    std::swap(f0.name_dbl(), f1.name_dbl());
+    std::swap(f0.name_ldbl(), f1.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
-    std::swap(f0.f128_name(), f1.f128_name());
+    std::swap(f0.name_f128(), f1.name_f128());
 #endif
     std::swap(f0.display_name(), f1.display_name());
     std::swap(f0.args(), f1.args());
-    std::swap(f0.attributes(), f1.attributes());
-    std::swap(f0.ty(), f1.ty());
+    std::swap(f0.attributes_dbl(), f1.attributes_dbl());
+    std::swap(f0.attributes_ldbl(), f1.attributes_ldbl());
+#if defined(HEYOKA_HAVE_REAL128)
+    std::swap(f0.attributes_f128(), f1.attributes_f128());
+#endif
+    std::swap(f0.ty_dbl(), f1.ty_dbl());
+    std::swap(f0.ty_ldbl(), f1.ty_ldbl());
+#if defined(HEYOKA_HAVE_REAL128)
+    std::swap(f0.ty_f128(), f1.ty_f128());
+#endif
 
     std::swap(f0.diff_f(), f1.diff_f());
 
@@ -395,10 +471,10 @@ void swap(function &f0, function &f1) noexcept
 std::size_t hash(const function &f)
 {
     auto retval = std::hash<bool>{}(f.disable_verify());
-    retval += std::hash<std::string>{}(f.dbl_name());
-    retval += std::hash<std::string>{}(f.ldbl_name());
+    retval += std::hash<std::string>{}(f.name_dbl());
+    retval += std::hash<std::string>{}(f.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
-    retval += std::hash<std::string>{}(f.f128_name());
+    retval += std::hash<std::string>{}(f.name_f128());
 #endif
     retval += std::hash<std::string>{}(f.display_name());
 
@@ -406,11 +482,25 @@ std::size_t hash(const function &f)
         retval += hash(arg);
     }
 
-    for (const auto &attr : f.attributes()) {
+    for (const auto &attr : f.attributes_dbl()) {
         retval += std::hash<llvm::Attribute::AttrKind>{}(attr);
     }
 
-    retval += std::hash<function::type>{}(f.ty());
+    for (const auto &attr : f.attributes_ldbl()) {
+        retval += std::hash<llvm::Attribute::AttrKind>{}(attr);
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+    for (const auto &attr : f.attributes_f128()) {
+        retval += std::hash<llvm::Attribute::AttrKind>{}(attr);
+    }
+#endif
+
+    retval += std::hash<function::type>{}(f.ty_dbl());
+    retval += std::hash<function::type>{}(f.ty_ldbl());
+#if defined(HEYOKA_HAVE_REAL128)
+    retval += std::hash<function::type>{}(f.ty_f128());
+#endif
 
     retval += std::hash<bool>{}(static_cast<bool>(f.diff_f()));
 
@@ -457,12 +547,19 @@ void rename_variables(function &f, const std::unordered_map<std::string, std::st
 
 bool operator==(const function &f1, const function &f2)
 {
-    return f1.dbl_name() == f2.dbl_name() && f1.ldbl_name() == f2.ldbl_name()
+    return f1.name_dbl() == f2.name_dbl() && f1.name_ldbl() == f2.name_ldbl()
 #if defined(HEYOKA_HAVE_REAL128)
-           && f1.f128_name() == f2.f128_name()
+           && f1.name_f128() == f2.name_f128()
 #endif
-           && f1.display_name() == f2.display_name() && f1.args() == f2.args() && f1.attributes() == f2.attributes()
-           && f1.ty() == f2.ty()
+           && f1.display_name() == f2.display_name() && f1.args() == f2.args()
+           && f1.attributes_dbl() == f2.attributes_dbl() && f1.attributes_ldbl() == f2.attributes_ldbl()
+#if defined(HEYOKA_HAVE_REAL128)
+           && f1.attributes_f128() == f2.attributes_f128()
+#endif
+           && f1.ty_dbl() == f2.ty_dbl() && f1.ty_ldbl() == f2.ty_ldbl()
+#if defined(HEYOKA_HAVE_REAL128)
+           && f1.ty_f128() == f2.ty_f128()
+#endif
            // NOTE: we have no way of comparing the content of std::function,
            // thus we just check if the std::function members contain something.
            && static_cast<bool>(f1.diff_f()) == static_cast<bool>(f2.diff_f())
@@ -623,12 +720,44 @@ template <typename T>
 const std::string &function_name_from_type(const function &f)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return f.dbl_name();
+        return f.name_dbl();
     } else if constexpr (std::is_same_v<T, long double>) {
-        return f.ldbl_name();
+        return f.name_ldbl();
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return f.f128_name();
+        return f.name_f128();
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type");
+    }
+}
+
+template <typename T>
+const function::type &function_ty_from_type(const function &f)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.ty_dbl();
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.ty_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.ty_f128();
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type");
+    }
+}
+
+template <typename T>
+const auto &function_attributes_from_type(const function &f)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.attributes_dbl();
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.attributes_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.attributes_f128();
 #endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type");
@@ -642,10 +771,35 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
         s.verify() = false;
     }
 
+    // Create the function arguments.
+    std::vector<llvm::Value *> args_v;
+    for (const auto &arg : f.args()) {
+        args_v.push_back(codegen<T>(s, arg));
+        assert(args_v.back() != nullptr);
+    }
+
+    return function_codegen_from_values<T>(s, f, args_v);
+}
+
+} // namespace
+
+// Function codegen with arguments passed as a vector of LLVM values. That is, the function
+// arguments are *not* those stored in the function object, rather they are explicitly
+// passed.
+template <typename T>
+llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, const std::vector<llvm::Value *> &args_v)
+{
+    if (args_v.size() != f.args().size()) {
+        throw std::invalid_argument(
+            "Inconsistent arguments sizes when invoking function_codegen_from_values(): the function '"
+            + f.display_name() + "' expects " + std::to_string(f.args().size()) + " argument(s), but "
+            + std::to_string(args_v.size()) + " were provided instead");
+    }
+
     llvm::Function *callee_f;
     const auto &f_name = function_name_from_type<T>(f);
 
-    switch (f.ty()) {
+    switch (function_ty_from_type<T>(f)) {
         case function::type::internal: {
             // Look up the name in the global module table.
             callee_f = s.module().getFunction(f_name);
@@ -676,14 +830,14 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
                 }
             } else {
                 // The function does not exist yet, make the prototype.
-                std::vector<llvm::Type *> arg_types(f.args().size(), to_llvm_type<T>(s.context()));
+                std::vector<llvm::Type *> arg_types(args_v.size(), to_llvm_type<T>(s.context()));
                 auto *ft = llvm::FunctionType::get(to_llvm_type<T>(s.context()), arg_types, false);
                 assert(ft);
                 callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, f_name, &s.module());
                 assert(callee_f);
 
                 // Add the function attributes.
-                for (const auto &att : f.attributes()) {
+                for (const auto &att : function_attributes_from_type<T>(f)) {
                     callee_f->addFnAttr(att);
                 }
             }
@@ -701,7 +855,7 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
             // the desired argument types. See:
             // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
             // And the docs of the getDeclaration() function.
-            const std::vector<llvm::Type *> arg_types(f.args().size(), to_llvm_type<T>(s.context()));
+            const std::vector<llvm::Type *> arg_types(args_v.size(), to_llvm_type<T>(s.context()));
 
             callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
 
@@ -717,29 +871,32 @@ llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
     }
 
     // Check the number of arguments.
-    if (callee_f->arg_size() != f.args().size()) {
-        throw std::invalid_argument("Incorrect # of arguments passed in a function call: "
-                                    + std::to_string(callee_f->arg_size()) + " are expected, but "
-                                    + std::to_string(f.args().size()) + " were provided instead");
+    if (callee_f->arg_size() != args_v.size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed while calling the function '" + f.display_name()
+                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(args_v.size()) + " were provided instead");
     }
 
-    // Create the function arguments.
-    std::vector<llvm::Value *> args_v;
-    for (const auto &arg : f.args()) {
-        args_v.push_back(codegen<T>(s, arg));
-        assert(args_v.back() != nullptr);
-    }
-
+    // Create the function call.
     auto r = s.builder().CreateCall(callee_f, args_v, "calltmp");
     assert(r != nullptr);
-    // NOTE: not sure what this does exactly, but the optimized
-    // IR from clang has this.
     r->setTailCall(true);
 
     return r;
 }
 
-} // namespace
+// Explicit instantiations of function_codegen_from_values().
+template llvm::Value *function_codegen_from_values<double>(llvm_state &, const function &,
+                                                           const std::vector<llvm::Value *> &);
+template llvm::Value *function_codegen_from_values<long double>(llvm_state &, const function &,
+                                                                const std::vector<llvm::Value *> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template llvm::Value *function_codegen_from_values<mppp::real128>(llvm_state &, const function &,
+                                                                  const std::vector<llvm::Value *> &);
+
+#endif
 
 } // namespace detail
 

@@ -19,6 +19,8 @@
 
 #endif
 
+#include <heyoka/detail/visibility.hpp>
+
 namespace heyoka::detail
 {
 
@@ -135,5 +137,14 @@ inline mppp::real128 pow<mppp::real128>(mppp::real128 x, mppp::real128 y)
 #endif
 
 } // namespace heyoka::detail
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_pow128(__float128, __float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cos128(__float128);
+
+#endif
 
 #endif

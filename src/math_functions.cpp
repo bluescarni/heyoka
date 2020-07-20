@@ -19,6 +19,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InstrTypes.h>
@@ -50,9 +51,6 @@ namespace detail
 namespace
 {
 
-// NOTE: this code is very similar to the function invocation
-// code for builtins in function.cpp. Perhaps in the future
-// we can avoid repetition.
 template <typename T>
 llvm::Value *taylor_init_sin(llvm_state &s, const function &f, llvm::Value *arr)
 {
@@ -62,34 +60,11 @@ llvm::Value *taylor_init_sin(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.sin");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.sin'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.sin'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.sin' must be an empty function");
-    }
-
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
-    assert(args_v[0] != nullptr);
+    std::vector<llvm::Value *> args_v{taylor_init<T>(s, f.args()[0], arr)};
 
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_sin_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return function_codegen_from_values<T>(s, f, args_v);
 }
 
 // Derivative of sin(number).
@@ -234,10 +209,19 @@ expression sin(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.sin";
-    fc.ldbl_name() = "llvm.sin";
+    fc.name_dbl() = "llvm.sin";
+    fc.name_ldbl() = "llvm.sin";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_sin128";
+#endif
     fc.display_name() = "sin";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::ReadNone, llvm::Attribute::Speculatable,
+                            llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -318,8 +302,14 @@ expression sin(expression e)
     };
     fc.taylor_init_dbl_f() = detail::taylor_init_sin<double>;
     fc.taylor_init_ldbl_f() = detail::taylor_init_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_f128_f() = detail::taylor_init_sin<mppp::real128>;
+#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_sin<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_f128_f() = detail::taylor_diff_sin<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -339,34 +329,11 @@ llvm::Value *taylor_init_cos(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.cos");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.cos'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.cos'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.cos' must be an empty function");
-    }
-
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
-    assert(args_v[0] != nullptr);
+    std::vector<llvm::Value *> args_v{taylor_init<T>(s, f.args()[0], arr)};
 
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_cos_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return function_codegen_from_values<T>(s, f, args_v);
 }
 
 // Derivative of cos(number).
@@ -511,10 +478,19 @@ expression cos(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.cos";
-    fc.ldbl_name() = "llvm.cos";
+    fc.name_dbl() = "llvm.cos";
+    fc.name_ldbl() = "llvm.cos";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_cos128";
+#endif
     fc.display_name() = "cos";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::ReadNone, llvm::Attribute::Speculatable,
+                            llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument("Inconsistent number of arguments when taking the derivative of the cosine (1 "
@@ -585,8 +561,14 @@ expression cos(expression e)
     };
     fc.taylor_init_dbl_f() = detail::taylor_init_cos<double>;
     fc.taylor_init_ldbl_f() = detail::taylor_init_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_f128_f() = detail::taylor_init_cos<mppp::real128>;
+#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_cos<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_f128_f() = detail::taylor_diff_cos<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -606,34 +588,12 @@ llvm::Value *taylor_init_log(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.log");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.log'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.log'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.log' must be an empty function");
-    }
-
     // Create the function argument. The codegen for the argument
     // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, taylor_init<T>(s, f.args()[0], arr));
+    std::vector<llvm::Value *> args_v{taylor_init<T>(s, f.args()[0], arr)};
     assert(args_v[0] != nullptr);
 
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_log_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return function_codegen_from_values<T>(s, f, args_v);
 }
 
 // Derivative of log(number).
@@ -794,10 +754,19 @@ expression log(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.log";
-    fc.ldbl_name() = "llvm.log";
+    fc.name_dbl() = "llvm.log";
+    fc.name_ldbl() = "llvm.log";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_log128";
+#endif
     fc.display_name() = "log";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::ReadNone, llvm::Attribute::Speculatable,
+                            llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -850,8 +819,14 @@ expression log(expression e)
     };
     fc.taylor_init_dbl_f() = detail::taylor_init_log<double>;
     fc.taylor_init_ldbl_f() = detail::taylor_init_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_f128_f() = detail::taylor_init_log<mppp::real128>;
+#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_log<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_f128_f() = detail::taylor_diff_log<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -871,33 +846,9 @@ llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.pow");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.pow'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(2, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.pow'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.pow' must be an empty function");
-    }
-
-    // Create the function arguments. The codegen for the arguments
+    // Create the function argument. The codegen for the argument
     // comes from taylor_init.
     std::vector<llvm::Value *> args_v{taylor_init<T>(s, f.args()[0], arr), taylor_init<T>(s, f.args()[1], arr)};
-    assert(args_v[0] != nullptr);
-    assert(args_v[1] != nullptr);
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_pow_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
 
     // Disable verification in the llvm
     // machinery when we are generating code
@@ -906,7 +857,7 @@ llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
     // pow intrinsic mangling.
     s.verify() = false;
 
-    return r;
+    return function_codegen_from_values<T>(s, f, args_v);
 }
 
 // Derivative of pow(number, number).
@@ -1068,17 +1019,24 @@ expression pow(expression e1, expression e2)
     args.emplace_back(std::move(e2));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.pow";
-    fc.ldbl_name() = "llvm.pow";
+    fc.name_dbl() = "llvm.pow";
+    fc.name_ldbl() = "llvm.pow";
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.f128_name() = "llvm.pow";
+    fc.name_f128() = "heyoka_pow128";
 #endif
     fc.display_name() = "pow";
     // Disable verification whenever
     // we codegen the pow() function, due
     // to what looks like an LLVM verification bug.
     fc.disable_verify() = true;
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::ReadNone, llvm::Attribute::Speculatable,
+                            llvm::Attribute::WillReturn};
+#endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 2u) {
             throw std::invalid_argument(

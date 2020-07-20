@@ -20,8 +20,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 
-#include <iostream>
-
 #include "catch.hpp"
 
 using namespace heyoka;
@@ -63,6 +61,7 @@ TEST_CASE("vector expression")
         mppp::real128 args[] = {mppp::real128{1}};
 
         REQUIRE(f(args) == 1 + mppp::real128{"1.1"});
+        REQUIRE(args[0] == mppp::real128{1});
     }
 #endif
 
@@ -92,7 +91,7 @@ TEST_CASE("batch expression")
         s.add_batch_expression<mppp::real128>("foo", x + y + z, 4);
 
         std::vector<mppp::real128> out(4);
-        std::vector<mppp::real128> in = {1_rq, 1_rq, 1_rq, 1_rq, 2_rq, 2_rq, 2_rq, 2_rq, 3_rq, 3_rq, 3_rq, 3_rq};
+        std::vector<mppp::real128> in = {1_rq, 2_rq, 3_rq, 4_rq, 1_rq, 2_rq, 3_rq, 4_rq, 1_rq, 2_rq, 3_rq, 4_rq};
 
         s.compile();
 
@@ -100,10 +99,10 @@ TEST_CASE("batch expression")
 
         f(out.data(), in.data());
 
-        REQUIRE(out[0] == 6);
+        REQUIRE(out[0] == 3);
         REQUIRE(out[1] == 6);
-        REQUIRE(out[2] == 6);
-        REQUIRE(out[3] == 6);
+        REQUIRE(out[2] == 9);
+        REQUIRE(out[3] == 12);
     }
 #endif
 }
