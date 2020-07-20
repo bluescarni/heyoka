@@ -19,6 +19,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math_functions.hpp>
 
 #include "catch.hpp"
 
@@ -40,6 +41,18 @@ TEST_CASE("vararg expression")
         auto f = s.fetch_expression<mppp::real128, 1>("foo");
 
         REQUIRE(f(mppp::real128(1)) == 1 + mppp::real128{"1.1"});
+    }
+
+    {
+        llvm_state s{""};
+
+        s.add_expression<mppp::real128>("foo", log(x) + 3_dbl * log(x));
+
+        s.compile();
+
+        auto f = s.fetch_expression<mppp::real128, 1>("foo");
+
+        REQUIRE(f(mppp::real128(2)) == Approx(4 * log(2_rq)));
     }
 #endif
 }
