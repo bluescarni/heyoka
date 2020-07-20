@@ -6,12 +6,20 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cmath>
 #include <initializer_list>
 #include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
@@ -26,6 +34,8 @@ using namespace heyoka;
 template <typename T>
 T compute_am(const std::vector<T> &st)
 {
+    using std::sqrt;
+
     auto vx0 = st[0];
     auto vx1 = st[1];
     auto vy0 = st[2];
@@ -44,17 +54,19 @@ T compute_am(const std::vector<T> &st)
     T am1[] = {y1 * vz1 - z1 * vy1, z1 * vx1 - x1 * vz1, x1 * vy1 - y1 * vx1};
     T am[] = {am0[0] + am1[0], am0[1] + am1[1], am0[2] + am1[2]};
 
-    return std::sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
+    return sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
 }
 
 // Two-body problem energy from the state vector.
 template <typename T>
 T tbp_energy(const std::vector<T> &st)
 {
+    using std::sqrt;
+
     auto Dx = st[6] - st[7];
     auto Dy = st[8] - st[9];
     auto Dz = st[10] - st[11];
-    auto dist = std::sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
+    auto dist = sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
     auto U = -1 / dist;
 
     auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
@@ -95,6 +107,46 @@ TEST_CASE("two body dbl")
         REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<double>::epsilon() * 1E4);
     }
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+TEST_CASE("two body f128")
+{
+    using namespace mppp::literals;
+
+    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
+        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+
+    auto x01 = x1 - x0;
+    auto y01 = y1 - y0;
+    auto z01 = z1 - z0;
+    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_f128 / 2_f128);
+
+    // NOTE: this corresponds to a highly elliptic orbit.
+    std::vector<mppp::real128> init_state{0.593_rq,     -0.593_rq,   0_rq,  0_rq, 0_rq, 0_rq,
+                                          -1.000001_rq, 1.000001_rq, -1_rq, 1_rq, 0_rq, 0_rq};
+
+    taylor_adaptive<mppp::real128> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
+                                        -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                       std::move(init_state),
+                                       0_rq,
+                                       std::numeric_limits<mppp::real128>::epsilon(),
+                                       std::numeric_limits<mppp::real128>::epsilon()};
+
+    const auto &st = tad.get_state();
+
+    const auto en = tbp_energy(st);
+    const auto am = compute_am(st);
+
+    for (auto i = 0; i < 200; ++i) {
+        const auto [oc, h, ord] = tad.step();
+        REQUIRE(oc == taylor_adaptive<mppp::real128>::outcome::success);
+        REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<mppp::real128>::epsilon() * 1E4);
+        REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<mppp::real128>::epsilon() * 1E4);
+    }
+}
+
+#endif
 
 TEST_CASE("two body ldbl")
 {

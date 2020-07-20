@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -23,6 +25,12 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -1062,6 +1070,9 @@ expression pow(expression e1, expression e2)
     function fc{std::move(args)};
     fc.dbl_name() = "llvm.pow";
     fc.ldbl_name() = "llvm.pow";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.f128_name() = "llvm.pow";
+#endif
     fc.display_name() = "pow";
     // Disable verification whenever
     // we codegen the pow() function, due
@@ -1119,8 +1130,14 @@ expression pow(expression e1, expression e2)
     };
     fc.taylor_init_dbl_f() = detail::taylor_init_pow<double>;
     fc.taylor_init_ldbl_f() = detail::taylor_init_pow<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_f128_f() = detail::taylor_init_pow<mppp::real128>;
+#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_pow<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_pow<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_f128_f() = detail::taylor_diff_pow<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }

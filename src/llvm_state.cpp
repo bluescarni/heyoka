@@ -1318,6 +1318,16 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_f128(const std::string &name, std::vector<expression> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<mppp::real128>(name, std::move(sys), max_order);
+}
+
+#endif
+
 std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name,
                                                        std::vector<std::pair<expression, expression>> sys,
                                                        std::uint32_t max_order)
@@ -1331,6 +1341,17 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
 {
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_f128(const std::string &name,
+                                                        std::vector<std::pair<expression, expression>> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<mppp::real128>(name, std::move(sys), max_order);
+}
+
+#endif
 
 // NOTE: in the fetch_* functions, check_compiled() is run
 // by jit_lookup().

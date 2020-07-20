@@ -507,6 +507,16 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const expression &e, llvm::Value *a
         std::visit([&s, arr](const auto &arg) { return taylor_init_ldbl(s, arg, arr); }, e.value()));
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const expression &e, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(
+        std::visit([&s, arr](const auto &arg) { return taylor_init_f128(s, arg, arr); }, e.value()));
+}
+
+#endif
+
 llvm::Function *taylor_diff_dbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
@@ -538,5 +548,25 @@ llvm::Function *taylor_diff_ldbl(llvm_state &s, const expression &e, std::uint32
 
     heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *taylor_diff_f128(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
+                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    auto visitor = [&s, idx, &name, n_uvars, &cd_uvars](const auto &v) -> llvm::Function * {
+        using type = detail::uncvref_t<decltype(v)>;
+
+        if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+            return taylor_diff_f128(s, v, idx, name, n_uvars, cd_uvars);
+        } else {
+            throw std::invalid_argument("Taylor derivatives can be computed only for binary operators or functions");
+        }
+    };
+
+    heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
+}
+
+#endif
 
 } // namespace heyoka

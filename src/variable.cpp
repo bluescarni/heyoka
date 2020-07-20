@@ -222,4 +222,13 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const variable &var, llvm::Value *a
     return taylor_init_dbl(s, var, arr);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const variable &var, llvm::Value *arr)
+{
+    return taylor_init_dbl(s, var, arr);
+}
+
+#endif
+
 } // namespace heyoka

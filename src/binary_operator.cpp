@@ -426,6 +426,15 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const binary_operator &bo, llvm::Va
     heyoka_assert_nonnull_ret(detail::taylor_init_impl<long double>(s, bo, arr));
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const binary_operator &bo, llvm::Value *arr)
+{
+    heyoka_assert_nonnull_ret(detail::taylor_init_impl<mppp::real128>(s, bo, arr));
+}
+
+#endif
+
 namespace detail
 {
 
@@ -946,5 +955,15 @@ llvm::Function *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, std::
 {
     return detail::taylor_diff_bo_impl<long double>(s, bo, idx, name, n_uvars, cd_uvars);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *taylor_diff_f128(llvm_state &s, const binary_operator &bo, std::uint32_t idx, const std::string &name,
+                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, idx, name, n_uvars, cd_uvars);
+}
+
+#endif
 
 } // namespace heyoka
