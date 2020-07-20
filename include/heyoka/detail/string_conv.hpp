@@ -9,6 +9,8 @@
 #ifndef HEYOKA_DETAIL_STRING_CONV_HPP
 #define HEYOKA_DETAIL_STRING_CONV_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <ios>
 #include <limits>
@@ -17,6 +19,12 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/visibility.hpp>
 
@@ -31,7 +39,11 @@ inline std::string li_to_string(const T &x)
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
     oss.imbue(std::locale("C"));
-    if constexpr (std::is_floating_point_v<T>) {
+    if constexpr (std::is_floating_point_v<T>
+#if defined(HEYOKA_HAVE_REAL128)
+                  || std::is_same_v<T, mppp::real128>
+#endif
+    ) {
         // For floating-point types, make
         // sure we print as many digits as necessary
         // to represent "exactly" the value.

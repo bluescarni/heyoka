@@ -140,6 +140,12 @@ inline mppp::real128 pow<mppp::real128>(mppp::real128 x, mppp::real128 y)
 
 #if defined(HEYOKA_HAVE_REAL128)
 
+// NOTE: these wrappers are needed as a replacement
+// for the LLVM builtins, which seem to have issues
+// when invoked with __float128 arguments. This may be
+// related to incompatibilities between GCC
+// and LLVM in the implementation of __float128,
+// and needs to be investigated more.
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_pow128(__float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128);

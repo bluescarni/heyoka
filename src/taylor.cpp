@@ -894,8 +894,8 @@ template <typename T>
 void taylor_adaptive_impl<T>::set_time(T t)
 {
     if (!detail::isfinite(t)) {
-        throw std::invalid_argument(
-            "Non-finite time passed to the set_time() function of an adaptive Taylor integrator");
+        throw std::invalid_argument("Non-finite time " + detail::li_to_string(t)
+                                    + " passed to the set_time() function of an adaptive Taylor integrator");
     }
 
     m_time = t;

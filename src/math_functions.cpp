@@ -219,6 +219,8 @@ expression sin(expression e)
     fc.ty_ldbl() = function::type::builtin;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.ty_f128() = function::type::external;
+    // NOTE: give the quadmath wrappers the same
+    // attributes as builtins.
     fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::ReadNone, llvm::Attribute::Speculatable,
                             llvm::Attribute::WillReturn};
 #endif
