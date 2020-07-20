@@ -1365,6 +1365,15 @@ llvm_state::tj_t<long double> llvm_state::fetch_taylor_jet_ldbl(const std::strin
     return fetch_taylor_jet<long double>(name);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::tj_t<mppp::real128> llvm_state::fetch_taylor_jet_f128(const std::string &name)
+{
+    return fetch_taylor_jet<mppp::real128>(name);
+}
+
+#endif
+
 llvm_state::ev_t<double> llvm_state::fetch_vec_expression_dbl(const std::string &name)
 {
     return fetch_vec_expression<double>(name);
