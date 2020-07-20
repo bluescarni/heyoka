@@ -9,6 +9,8 @@
 #ifndef HEYOKA_TAYLOR_HPP
 #define HEYOKA_TAYLOR_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +21,12 @@
 #include <vector>
 
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -211,6 +219,17 @@ public:
     using base::base;
 };
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+class HEYOKA_DLL_PUBLIC taylor_adaptive_f128 : public detail::taylor_adaptive_impl<mppp::real128>
+{
+public:
+    using base = detail::taylor_adaptive_impl<mppp::real128>;
+    using base::base;
+};
+
+#endif
+
 namespace detail
 {
 
@@ -228,6 +247,15 @@ template <>
 struct taylor_adaptive_t_impl<long double> {
     using type = taylor_adaptive_ldbl;
 };
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+struct taylor_adaptive_t_impl<mppp::real128> {
+    using type = taylor_adaptive_f128;
+};
+
+#endif
 
 } // namespace detail
 

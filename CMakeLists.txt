@@ -29,6 +29,7 @@ include(YACMACompilerLinkerSettings)
 # The build options.
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
+option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
 
@@ -145,6 +146,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
 )
 
 # Setup of the heyoka shared library.
@@ -190,6 +192,15 @@ endif()
 
 # Mandatory dependency on LLVM.
 find_package(LLVM REQUIRED)
+
+# Optional dependency on MPC.
+if(HEYOKA_WITH_MPPP)
+    find_package(mp++ REQUIRED)
+    if(${mp++_VERSION} VERSION_LESS "0.21")
+        message(FATAL_ERROR "mp++ >= 0.21 is required.")
+    endif()
+    target_link_libraries(heyoka PUBLIC mp++::mp++)
+endif()
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")

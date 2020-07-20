@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cmath>
 #include <cstddef>
 #include <functional>
@@ -22,6 +24,12 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -36,6 +44,12 @@ namespace heyoka
 number::number(double x) : m_value(x) {}
 
 number::number(long double x) : m_value(x) {}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+number::number(mppp::real128 x) : m_value(x) {}
+
+#endif
 
 number::number(const number &) = default;
 
@@ -66,12 +80,24 @@ std::size_t hash(const number &n)
 {
     return std::visit(
         [](const auto &v) {
-            if (std::isnan(v)) {
-                // Make all nan return the same hash value.
-                return std::size_t(0);
+#if defined(HEYOKA_HAVE_REAL128)
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, mppp::real128>) {
+                // NOTE: the real128 hash already guarantees
+                // that all nan values return the same hash.
+                return mppp::hash(v);
             } else {
-                return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+#endif
+                if (std::isnan(v)) {
+                    // Make all nan return the same hash value.
+                    return std::size_t(0);
+                } else {
+                    return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+                }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
         },
         n.value());
 }
@@ -146,13 +172,23 @@ bool operator==(const number &n1, const number &n2)
         using type2 = detail::uncvref_t<decltype(v2)>;
 
         if constexpr (std::is_same_v<type1, type2>) {
-            // NOTE: make nan compare equal, for consistency
-            // with hashing.
-            if (std::isnan(v1) && std::isnan(v2)) {
-                return true;
+#if defined(HEYOKA_HAVE_REAL128)
+            if constexpr (std::is_same_v<type1, mppp::real128>) {
+                // NOTE: the real128_equal_to() function considers
+                // all nan equal.
+                return mppp::real128_equal_to(v1, v2);
             } else {
-                return v1 == v2;
+#endif
+                // NOTE: make nan compare equal, for consistency
+                // with hashing.
+                if (std::isnan(v1) && std::isnan(v2)) {
+                    return true;
+                } else {
+                    return v1 == v2;
+                }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
         } else {
             return false;
         }
@@ -243,6 +279,21 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
         n.value()));
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const number &n)
+{
+    heyoka_assert_nonnull_ret(std::visit(
+        [&s](const auto &v) {
+            const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
+            return llvm::ConstantFP::get(s.context(),
+                                         llvm::APFloat(sem, detail::li_to_string(static_cast<mppp::real128>(v))));
+        },
+        n.value()));
+}
+
+#endif
+
 std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &)
 {
     // NOTE: numbers do not require decomposition.
@@ -260,5 +311,14 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const number &n, llvm::Value *)
 {
     return codegen_ldbl(s, n);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const number &n, llvm::Value *)
+{
+    return codegen_f128(s, n);
+}
+
+#endif
 
 } // namespace heyoka

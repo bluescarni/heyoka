@@ -9,6 +9,8 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <initializer_list>
 #include <limits>
@@ -24,6 +26,12 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -59,6 +67,12 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
             static_assert(always_false_v<T>,
                           "Cannot deduce the LLVM type corresponding to 'long double' on this platform.");
         }
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        auto ret = llvm::Type::getFP128Ty(c);
+        assert(ret != nullptr);
+        return ret;
+#endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type in to_llvm_type().");
     }

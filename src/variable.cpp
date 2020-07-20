@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstddef>
 #include <functional>
@@ -17,6 +19,12 @@
 #include <vector>
 
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -172,6 +180,15 @@ llvm::Value *codegen_ldbl(llvm_state &s, const variable &var)
     return codegen_dbl(s, var);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const variable &var)
+{
+    return codegen_dbl(s, var);
+}
+
+#endif
+
 std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &)
 {
     // NOTE: variables do not require decomposition.
@@ -204,5 +221,14 @@ llvm::Value *taylor_init_ldbl(llvm_state &s, const variable &var, llvm::Value *a
     // NOTE: no codegen differences between dbl and ldbl in this case.
     return taylor_init_dbl(s, var, arr);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const variable &var, llvm::Value *arr)
+{
+    return taylor_init_dbl(s, var, arr);
+}
+
+#endif
 
 } // namespace heyoka

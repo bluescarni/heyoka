@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
@@ -61,6 +63,12 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Vectorize.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -492,6 +500,26 @@ void llvm_state::add_expression_ldbl(const std::string &name, const expression &
     optimise();
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_expression_f128(const std::string &name, const expression &e)
+{
+    detail::verify_resetter vr{*this};
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    const auto vars = get_variables(e);
+
+    add_varargs_expression<mppp::real128>(name, e, vars);
+
+    // Run the optimization pass.
+    optimise();
+}
+
+#endif
+
 template <typename T>
 void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
 {
@@ -584,6 +612,15 @@ void llvm_state::add_vec_expression_ldbl(const std::string &name, const expressi
 {
     add_vecargs_expression<long double>(name, e);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_vec_expression_f128(const std::string &name, const expression &e)
+{
+    add_vecargs_expression<mppp::real128>(name, e);
+}
+
+#endif
 
 template <typename T>
 void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
@@ -696,6 +733,15 @@ void llvm_state::add_batch_expression_ldbl(const std::string &name, const expres
 {
     add_batch_expression_impl<long double>(name, e, batch_size);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_batch_expression_f128(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    add_batch_expression_impl<mppp::real128>(name, e, batch_size);
+}
+
+#endif
 
 // NOTE: this function will lookup symbol names,
 // so it does not necessarily return a function
@@ -1272,6 +1318,16 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_f128(const std::string &name, std::vector<expression> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<mppp::real128>(name, std::move(sys), max_order);
+}
+
+#endif
+
 std::vector<expression> llvm_state::add_taylor_jet_dbl(const std::string &name,
                                                        std::vector<std::pair<expression, expression>> sys,
                                                        std::uint32_t max_order)
@@ -1286,6 +1342,17 @@ std::vector<expression> llvm_state::add_taylor_jet_ldbl(const std::string &name,
     return add_taylor_jet_impl<long double>(name, std::move(sys), max_order);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_f128(const std::string &name,
+                                                        std::vector<std::pair<expression, expression>> sys,
+                                                        std::uint32_t max_order)
+{
+    return add_taylor_jet_impl<mppp::real128>(name, std::move(sys), max_order);
+}
+
+#endif
+
 // NOTE: in the fetch_* functions, check_compiled() is run
 // by jit_lookup().
 llvm_state::tj_t<double> llvm_state::fetch_taylor_jet_dbl(const std::string &name)
@@ -1298,6 +1365,15 @@ llvm_state::tj_t<long double> llvm_state::fetch_taylor_jet_ldbl(const std::strin
     return fetch_taylor_jet<long double>(name);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::tj_t<mppp::real128> llvm_state::fetch_taylor_jet_f128(const std::string &name)
+{
+    return fetch_taylor_jet<mppp::real128>(name);
+}
+
+#endif
+
 llvm_state::ev_t<double> llvm_state::fetch_vec_expression_dbl(const std::string &name)
 {
     return fetch_vec_expression<double>(name);
@@ -1308,6 +1384,15 @@ llvm_state::ev_t<long double> llvm_state::fetch_vec_expression_ldbl(const std::s
     return fetch_vec_expression<long double>(name);
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::ev_t<mppp::real128> llvm_state::fetch_vec_expression_f128(const std::string &name)
+{
+    return fetch_vec_expression<mppp::real128>(name);
+}
+
+#endif
+
 llvm_state::eb_t<double> llvm_state::fetch_batch_expression_dbl(const std::string &name)
 {
     return fetch_batch_expression<double>(name);
@@ -1317,5 +1402,14 @@ llvm_state::eb_t<long double> llvm_state::fetch_batch_expression_ldbl(const std:
 {
     return fetch_batch_expression<long double>(name);
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::eb_t<mppp::real128> llvm_state::fetch_batch_expression_f128(const std::string &name)
+{
+    return fetch_batch_expression<mppp::real128>(name);
+}
+
+#endif
 
 } // namespace heyoka

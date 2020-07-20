@@ -9,6 +9,8 @@
 #ifndef HEYOKA_LLVM_STATE_HPP
 #define HEYOKA_LLVM_STATE_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -28,6 +30,12 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -110,6 +118,9 @@ public:
 
     void add_expression_dbl(const std::string &, const expression &);
     void add_expression_ldbl(const std::string &, const expression &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_expression_f128(const std::string &, const expression &);
+#endif
     template <typename T>
     void add_expression(const std::string &name, const expression &ex)
     {
@@ -117,6 +128,10 @@ public:
             add_expression_dbl(name, ex);
         } else if constexpr (std::is_same_v<T, long double>) {
             add_expression_ldbl(name, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_expression_f128(name, ex);
+#endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -124,6 +139,9 @@ public:
 
     void add_vec_expression_dbl(const std::string &, const expression &);
     void add_vec_expression_ldbl(const std::string &, const expression &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_vec_expression_f128(const std::string &, const expression &);
+#endif
     template <typename T>
     void add_vec_expression(const std::string &name, const expression &ex)
     {
@@ -131,6 +149,10 @@ public:
             add_vec_expression_dbl(name, ex);
         } else if constexpr (std::is_same_v<T, long double>) {
             add_vec_expression_ldbl(name, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_vec_expression_f128(name, ex);
+#endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -138,6 +160,9 @@ public:
 
     void add_batch_expression_dbl(const std::string &, const expression &, std::uint32_t);
     void add_batch_expression_ldbl(const std::string &, const expression &, std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_batch_expression_f128(const std::string &, const expression &, std::uint32_t);
+#endif
     template <typename T>
     void add_batch_expression(const std::string &name, const expression &ex, std::uint32_t batch_size)
     {
@@ -145,6 +170,10 @@ public:
             add_batch_expression_dbl(name, ex, batch_size);
         } else if constexpr (std::is_same_v<T, long double>) {
             add_batch_expression_ldbl(name, ex, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_batch_expression_f128(name, ex, batch_size);
+#endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -152,6 +181,9 @@ public:
 
     std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    std::vector<expression> add_taylor_jet_f128(const std::string &, std::vector<expression>, std::uint32_t);
+#endif
     template <typename T>
     std::vector<expression> add_taylor_jet(const std::string &name, std::vector<expression> sys,
                                            std::uint32_t max_order)
@@ -160,6 +192,10 @@ public:
             return add_taylor_jet_dbl(name, std::move(sys), max_order);
         } else if constexpr (std::is_same_v<T, long double>) {
             return add_taylor_jet_ldbl(name, std::move(sys), max_order);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return add_taylor_jet_f128(name, std::move(sys), max_order);
+#endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -169,6 +205,10 @@ public:
                                                std::uint32_t);
     std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<std::pair<expression, expression>>,
                                                 std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    std::vector<expression> add_taylor_jet_f128(const std::string &, std::vector<std::pair<expression, expression>>,
+                                                std::uint32_t);
+#endif
     template <typename T>
     std::vector<expression> add_taylor_jet(const std::string &name, std::vector<std::pair<expression, expression>> sys,
                                            std::uint32_t max_order)
@@ -177,6 +217,10 @@ public:
             return add_taylor_jet_dbl(name, std::move(sys), max_order);
         } else if constexpr (std::is_same_v<T, long double>) {
             return add_taylor_jet_ldbl(name, std::move(sys), max_order);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return add_taylor_jet_f128(name, std::move(sys), max_order);
+#endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
@@ -259,6 +303,13 @@ public:
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<long double, N>>(jit_lookup(name)));
     }
+#if defined(HEYOKA_HAVE_REAL128)
+    template <std::size_t N>
+    auto fetch_expression_f128(const std::string &name)
+    {
+        return sig_check(name, reinterpret_cast<vararg_f_ptr<mppp::real128, N>>(jit_lookup(name)));
+    }
+#endif
     template <typename T, std::size_t N>
     auto fetch_expression(const std::string &name)
     {
@@ -269,10 +320,17 @@ public:
     using ev_t = T (*)(const T *);
     ev_t<double> fetch_vec_expression_dbl(const std::string &);
     ev_t<long double> fetch_vec_expression_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    ev_t<mppp::real128> fetch_vec_expression_f128(const std::string &);
+#endif
     template <typename T>
     ev_t<T> fetch_vec_expression(const std::string &name)
     {
-        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
             return sig_check(name, reinterpret_cast<ev_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -285,10 +343,17 @@ public:
     using eb_t = void (*)(T *, const T *);
     eb_t<double> fetch_batch_expression_dbl(const std::string &);
     eb_t<long double> fetch_batch_expression_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    eb_t<mppp::real128> fetch_batch_expression_f128(const std::string &);
+#endif
     template <typename T>
     eb_t<T> fetch_batch_expression(const std::string &name)
     {
-        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
             return sig_check(name, reinterpret_cast<eb_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -299,10 +364,17 @@ public:
     using tj_t = void (*)(T *, std::uint32_t);
     tj_t<double> fetch_taylor_jet_dbl(const std::string &);
     tj_t<long double> fetch_taylor_jet_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    tj_t<mppp::real128> fetch_taylor_jet_f128(const std::string &);
+#endif
     template <typename T>
     tj_t<T> fetch_taylor_jet(const std::string &name)
     {
-        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
             return sig_check(name, reinterpret_cast<tj_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");

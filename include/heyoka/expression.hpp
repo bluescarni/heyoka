@@ -9,6 +9,8 @@
 #ifndef HEYOKA_EXPRESSION_HPP
 #define HEYOKA_EXPRESSION_HPP
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -23,6 +25,12 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
@@ -68,6 +76,16 @@ HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
 
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <char... Chars>
+inline expression operator"" _f128()
+{
+    return expression{number{mppp::literals::operator"" _rq<Chars...>()}};
+}
+
+#endif
 
 HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 
@@ -158,6 +176,12 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const expression &);
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const expression &);
+
+#endif
+
 template <typename T>
 inline llvm::Value *codegen(llvm_state &s, const expression &ex)
 {
@@ -165,6 +189,10 @@ inline llvm::Value *codegen(llvm_state &s, const expression &ex)
         return codegen_dbl(s, ex);
     } else if constexpr (std::is_same_v<T, long double>) {
         return codegen_ldbl(s, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return codegen_f128(s, ex);
+#endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
@@ -176,6 +204,12 @@ HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(e
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const expression &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const expression &, llvm::Value *);
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_f128(llvm_state &, const expression &, llvm::Value *);
+
+#endif
+
 template <typename T>
 inline llvm::Value *taylor_init(llvm_state &s, const expression &ex, llvm::Value *arr)
 {
@@ -183,6 +217,10 @@ inline llvm::Value *taylor_init(llvm_state &s, const expression &ex, llvm::Value
         return taylor_init_dbl(s, ex, arr);
     } else if constexpr (std::is_same_v<T, long double>) {
         return taylor_init_ldbl(s, ex, arr);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_init_f128(s, ex, arr);
+#endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
@@ -193,6 +231,13 @@ HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const expression
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const expression &, std::uint32_t, const std::string &,
                                                    std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_f128(llvm_state &, const expression &, std::uint32_t, const std::string &,
+                                                   std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+
+#endif
+
 template <typename T>
 inline llvm::Function *taylor_diff(llvm_state &s, const expression &ex, std::uint32_t idx, const std::string &name,
                                    std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
@@ -201,6 +246,10 @@ inline llvm::Function *taylor_diff(llvm_state &s, const expression &ex, std::uin
         return taylor_diff_dbl(s, ex, idx, name, n_uvars, cd_uvars);
     } else if constexpr (std::is_same_v<T, long double>) {
         return taylor_diff_ldbl(s, ex, idx, name, n_uvars, cd_uvars);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_diff_f128(s, ex, idx, name, n_uvars, cd_uvars);
+#endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
