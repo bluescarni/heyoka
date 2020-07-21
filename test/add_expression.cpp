@@ -119,3 +119,64 @@ TEST_CASE("batch expression")
     }
 #endif
 }
+
+TEST_CASE("vector expressions")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+#if defined(HEYOKA_HAVE_REAL128)
+    {
+        llvm_state s{""};
+
+        s.add_vec_expressions<mppp::real128>("foo", {y / z, x * x - y * z});
+
+        s.compile();
+
+        auto f = s.fetch_vec_expressions<mppp::real128>("foo");
+
+        mppp::real128 input[] = {1_rq, 2_rq, 3_rq};
+        mppp::real128 output[2];
+
+        f(output, input);
+
+        REQUIRE(output[0] == Approx(mppp::real128{2. / 3}));
+        REQUIRE(output[1] == Approx(1. - 2. * 3));
+    }
+#endif
+
+    {
+        llvm_state s{""};
+
+        s.add_vec_expressions<double>("foo", {x + y, x * x - y * z});
+
+        s.compile();
+
+        auto f = s.fetch_vec_expressions<double>("foo");
+
+        double input[] = {1, 2, 3};
+        double output[2];
+
+        f(output, input);
+
+        REQUIRE(output[0] == Approx(1. + 2));
+        REQUIRE(output[1] == Approx(1. - 2. * 3));
+    }
+
+    {
+        llvm_state s{""};
+
+        s.add_vec_expressions<long double>("foo", {y / z, x * x - y * z});
+
+        s.compile();
+
+        auto f = s.fetch_vec_expressions<long double>("foo");
+
+        long double input[] = {1, 2, 3};
+        long double output[2];
+
+        f(output, input);
+
+        REQUIRE(output[0] == Approx(2.l / 3));
+        REQUIRE(output[1] == Approx(1.l - 2. * 3));
+    }
+}

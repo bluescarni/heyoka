@@ -69,6 +69,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename T>
     HEYOKA_DLL_LOCAL void add_vecargs_expression(const std::string &, const expression &);
     template <typename T>
+    HEYOKA_DLL_LOCAL void add_vecargs_expressions(const std::string &, const std::vector<expression> &);
+    template <typename T>
     HEYOKA_DLL_LOCAL void add_batch_expression_impl(const std::string &, const expression &, std::uint32_t);
 
     // Implementation details for Taylor integration.
@@ -152,6 +154,27 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
         } else if constexpr (std::is_same_v<T, mppp::real128>) {
             add_vec_expression_f128(name, ex);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    void add_vec_expressions_dbl(const std::string &, const std::vector<expression> &);
+    void add_vec_expressions_ldbl(const std::string &, const std::vector<expression> &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_vec_expressions_f128(const std::string &, const std::vector<expression> &);
+#endif
+    template <typename T>
+    void add_vec_expressions(const std::string &name, const std::vector<expression> &es)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_vec_expressions_dbl(name, es);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_vec_expressions_ldbl(name, es);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_vec_expressions_f128(name, es);
 #endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -332,6 +355,29 @@ public:
 #endif
         ) {
             return sig_check(name, reinterpret_cast<ev_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    // NOTE: remember documenting that
+    // these pointers are restricted.
+    template <typename T>
+    using evs_t = void (*)(T *, const T *);
+    evs_t<double> fetch_vec_expressions_dbl(const std::string &);
+    evs_t<long double> fetch_vec_expressions_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    evs_t<mppp::real128> fetch_vec_expressions_f128(const std::string &);
+#endif
+    template <typename T>
+    evs_t<T> fetch_vec_expressions(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
+            return sig_check(name, reinterpret_cast<evs_t<T>>(jit_lookup(name)));
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }

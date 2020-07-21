@@ -8,9 +8,11 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -523,37 +525,17 @@ void llvm_state::add_expression_f128(const std::string &name, const expression &
 template <typename T>
 void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
 {
-    // NOTE: the verify_resetter machinery will be
-    // set up by add_expression().
+    detail::verify_resetter vr{*this};
 
     check_uncompiled(__func__);
     check_add_name(name);
 
     // Fetch the sorted list of variables in the expression.
-    // NOTE: this is done also in add_expression(), perhaps
-    // we can avoid doing it twice.
     const auto vars = get_variables(e);
     if (vars.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw std::overflow_error("The number of variables in the expression passed to add_vec_expression() is too "
                                   "large, and it results in an overflow condition");
     }
-
-    // Add the variadic version.
-    const auto varargs_name = name + ".varargs";
-    add_expression<T>(varargs_name, e);
-
-    // Fetch the function we just added.
-    auto f_vararg = m_module->getFunction(varargs_name);
-    assert(f_vararg != nullptr);
-
-    // Change the linkage to internal.
-    f_vararg->setLinkage(llvm::Function::InternalLinkage);
-
-    // Remove the signature of the variadic function
-    // from m_sig_map, as we won't need to call it from
-    // the outside.
-    [[maybe_unused]] const auto n_rem = m_sig_map.erase(varargs_name);
-    assert(n_rem == 1u);
 
     // Setup the vecargs function. It takes in input a read-only pointer,
     // and it returns in output the value of the evaluation.
@@ -574,21 +556,20 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     assert(bb != nullptr);
     m_builder->SetInsertPoint(bb);
 
-    // Setup the vector of arguments that we will pass
-    // to the varargs function call.
-    std::vector<llvm::Value *> varargs_args;
+    // Fill in the m_named_values map
+    // with values loaded from in_ptr.
+    m_named_values.clear();
     for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        varargs_args.push_back(m_builder->CreateLoad(
-            m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)))));
+        [[maybe_unused]] const auto res = m_named_values.emplace(
+            vars[i], m_builder->CreateLoad(
+                         m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
+                                                      "in_ptr_" + detail::li_to_string(i)),
+                         "var_" + detail::li_to_string(i)));
+        assert(res.second);
     }
 
-    // Invoke the varargs function.
-    auto varargs_call = m_builder->CreateCall(f_vararg, varargs_args, "vararg_call");
-    assert(varargs_call != nullptr);
-    varargs_call->setTailCall(true);
-
-    // Create the return value.
-    m_builder->CreateRet(varargs_call);
+    // Create the return value from the codegen of the expression.
+    m_builder->CreateRet(codegen<T>(*this, e));
 
     // Verify the function.
     verify_function_impl(f);
@@ -623,53 +604,37 @@ void llvm_state::add_vec_expression_f128(const std::string &name, const expressi
 #endif
 
 template <typename T>
-void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
+void llvm_state::add_vecargs_expressions(const std::string &name, const std::vector<expression> &es)
 {
-    if (batch_size == 0u) {
-        throw std::invalid_argument("Cannot add an expression in batch mode if the batch size is zero");
-    }
-
-    // NOTE: the verify_resetter machinery will be
-    // set up by add_expression().
+    detail::verify_resetter vr{*this};
 
     check_uncompiled(__func__);
     check_add_name(name);
 
-    // Fetch the sorted list of variables in the expression.
-    // NOTE: this is done also in add_expression(), perhaps
-    // we can avoid doing it twice.
-    const auto vars = get_variables(e);
-    if (vars.size() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("The number of variables in the expression passed to add_batch_expression() is too "
+    // Build the global list of variables.
+    std::vector<std::string> vars;
+    for (const auto &e : es) {
+        auto e_vars = get_variables(e);
+
+        vars.insert(vars.end(), std::make_move_iterator(e_vars.begin()), std::make_move_iterator(e_vars.end()));
+        std::sort(vars.begin(), vars.end());
+        vars.erase(std::unique(vars.begin(), vars.end()), vars.end());
+    }
+
+    if (vars.size() > std::numeric_limits<std::uint32_t>::max()
+        || es.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("The number of variables/expressions passed to add_vec_expressions() is too "
                                   "large, and it results in an overflow condition");
     }
 
-    // Add the variadic version.
-    const auto varargs_name = name + ".varargs";
-    add_expression<T>(varargs_name, e);
-
-    // Fetch the function we just added.
-    auto f_vararg = m_module->getFunction(varargs_name);
-    assert(f_vararg != nullptr);
-
-    // Change the linkage to internal.
-    f_vararg->setLinkage(llvm::Function::InternalLinkage);
-
-    // Remove the signature of the variadic function
-    // from m_sig_map, as we won't need to call it from
-    // the outside.
-    [[maybe_unused]] const auto n_rem = m_sig_map.erase(varargs_name);
-    assert(n_rem == 1u);
-
-    // Setup the batch function. It takes in input a write-only pointer, a read-only pointer,
-    // and it returns nothing.
+    // Prepare the function prototype.
     std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())));
     auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
     assert(ft != nullptr);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
     assert(f != nullptr);
 
-    // Setup the properties of the pointer argument.
+    // Setup the properties of the pointer arguments.
     auto out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::WriteOnly);
@@ -687,25 +652,121 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     assert(bb != nullptr);
     m_builder->SetInsertPoint(bb);
 
-    // Vector of arguments that we will pass
-    // to the varargs function call.
-    std::vector<llvm::Value *> varargs_args;
-    for (std::uint32_t b_idx = 0; b_idx < batch_size; ++b_idx) {
-        // Reset the vector of arguments for this iteration.
-        varargs_args.clear();
+    // Fill in the m_named_values map
+    // with values loaded from in_ptr.
+    m_named_values.clear();
+    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
+        [[maybe_unused]] const auto res = m_named_values.emplace(
+            vars[i], m_builder->CreateLoad(
+                         m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
+                                                      "in_ptr_" + detail::li_to_string(i)),
+                         "var_" + detail::li_to_string(i)));
+        assert(res.second);
+    }
 
+    // Run the codegen for each expression and
+    // store the result of the evaluation
+    // in out_ptr.
+    for (decltype(es.size()) i = 0; i < es.size(); ++i) {
+        m_builder->CreateStore(codegen<T>(*this, es[i]),
+                               m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
+                                                            "out_ptr_" + detail::li_to_string(i)));
+    }
+
+    // Create the return value.
+    m_builder->CreateRetVoid();
+
+    // Verify the function.
+    verify_function_impl(f);
+
+    // Add the function to m_sig_map.
+    std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
+    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
+
+    // Run the optimization pass.
+    optimise();
+}
+
+void llvm_state::add_vec_expressions_dbl(const std::string &name, const std::vector<expression> &es)
+{
+    add_vecargs_expressions<double>(name, es);
+}
+
+void llvm_state::add_vec_expressions_ldbl(const std::string &name, const std::vector<expression> &es)
+{
+    add_vecargs_expressions<long double>(name, es);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+void llvm_state::add_vec_expressions_f128(const std::string &name, const std::vector<expression> &es)
+{
+    add_vecargs_expressions<mppp::real128>(name, es);
+}
+
+#endif
+
+template <typename T>
+void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
+{
+    if (batch_size == 0u) {
+        throw std::invalid_argument("Cannot add an expression in batch mode if the batch size is zero");
+    }
+
+    detail::verify_resetter vr{*this};
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    // Fetch the sorted list of variables in the expression.
+    const auto vars = get_variables(e);
+    if (vars.size() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("The number of variables in the expression passed to add_batch_expression() is too "
+                                  "large, and it results in an overflow condition");
+    }
+
+    // Setup the batch function. It takes in input a write-only pointer, a read-only pointer,
+    // and it returns nothing.
+    std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())));
+    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
+    assert(f != nullptr);
+
+    // Setup the properties of the pointer arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto in_ptr = out_ptr + 1;
+    in_ptr->setName("in_ptr");
+    in_ptr->addAttr(llvm::Attribute::ReadOnly);
+    in_ptr->addAttr(llvm::Attribute::NoCapture);
+    in_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Clear up the variables mapping.
+    m_named_values.clear();
+    for (std::uint32_t b_idx = 0; b_idx < batch_size; ++b_idx) {
+        // Map the variables to the values corresponding to the
+        // current batch.
         for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-            varargs_args.push_back(m_builder->CreateLoad(m_builder->CreateInBoundsGEP(
-                in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i) * batch_size + b_idx))));
+            m_named_values[vars[i]] = m_builder->CreateLoad(m_builder->CreateInBoundsGEP(
+                in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i) * batch_size + b_idx),
+                "in_ptr_" + detail::li_to_string(b_idx) + "_" + detail::li_to_string(i)));
         }
 
-        // Invoke the varargs function.
-        auto varargs_call = m_builder->CreateCall(f_vararg, varargs_args, "vararg_call");
-        assert(varargs_call != nullptr);
-        varargs_call->setTailCall(true);
-
-        // Write the return value.
-        m_builder->CreateStore(varargs_call, m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(b_idx)));
+        // Do the expression codegen for the current batch, store the result
+        // of the evaluation in out_ptr.
+        m_builder->CreateStore(codegen<T>(*this, e), m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(b_idx)));
     }
 
     // Create the return value.
@@ -1389,6 +1450,25 @@ llvm_state::ev_t<long double> llvm_state::fetch_vec_expression_ldbl(const std::s
 llvm_state::ev_t<mppp::real128> llvm_state::fetch_vec_expression_f128(const std::string &name)
 {
     return fetch_vec_expression<mppp::real128>(name);
+}
+
+#endif
+
+llvm_state::evs_t<double> llvm_state::fetch_vec_expressions_dbl(const std::string &name)
+{
+    return fetch_vec_expressions<double>(name);
+}
+
+llvm_state::evs_t<long double> llvm_state::fetch_vec_expressions_ldbl(const std::string &name)
+{
+    return fetch_vec_expressions<long double>(name);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::evs_t<mppp::real128> llvm_state::fetch_vec_expressions_f128(const std::string &name)
+{
+    return fetch_vec_expressions<mppp::real128>(name);
 }
 
 #endif
