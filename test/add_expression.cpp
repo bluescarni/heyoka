@@ -22,8 +22,10 @@
 #include <heyoka/math_functions.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 using namespace mppp::literals;
 
 TEST_CASE("vararg expression")
@@ -52,7 +54,7 @@ TEST_CASE("vararg expression")
 
         auto f = s.fetch_expression<mppp::real128, 1>("foo");
 
-        REQUIRE(f(mppp::real128(2)) == Approx(4 * log(2_rq)));
+        REQUIRE(f(mppp::real128(2)) == approximately(4 * log(2_rq)));
     }
 #endif
 }
@@ -139,8 +141,8 @@ TEST_CASE("vector expressions")
 
         f(output, input);
 
-        REQUIRE(output[0] == Approx(mppp::real128{2. / 3}));
-        REQUIRE(output[1] == Approx(1. - 2. * 3));
+        REQUIRE(output[0] == approximately(2._rq / 3));
+        REQUIRE(output[1] == approximately(1._rq - 2._rq * 3));
     }
 #endif
 
@@ -158,8 +160,8 @@ TEST_CASE("vector expressions")
 
         f(output, input);
 
-        REQUIRE(output[0] == Approx(1. + 2));
-        REQUIRE(output[1] == Approx(1. - 2. * 3));
+        REQUIRE(output[0] == approximately(1. + 2));
+        REQUIRE(output[1] == approximately(1. - 2. * 3));
     }
 
     {
@@ -176,7 +178,7 @@ TEST_CASE("vector expressions")
 
         f(output, input);
 
-        REQUIRE(output[0] == Approx(2.l / 3));
-        REQUIRE(output[1] == Approx(1.l - 2. * 3));
+        REQUIRE(output[0] == approximately(2.l / 3));
+        REQUIRE(output[1] == approximately(1.l - 2. * 3));
     }
 }

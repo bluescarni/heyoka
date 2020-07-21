@@ -24,8 +24,10 @@
 #include <heyoka/math_functions.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -52,8 +54,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3_rq, 3 / 2._rq)));
-        REQUIRE(jet[3] == Approx(pow(2_rq, -3 / 2._rq)));
+        REQUIRE(jet[2] == approximately(pow(3_rq, 3 / 2._rq)));
+        REQUIRE(jet[3] == approximately(pow(2_rq, -3 / 2._rq)));
     }
 
     {
@@ -71,33 +73,33 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
-        REQUIRE(jet[3] == Approx(pow(2, -3 / 2._rq)));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[3] == approximately(pow(2, -3 / 2._rq)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
-        REQUIRE(jet[3] == Approx(pow(2, -3 / 2._rq)));
-        REQUIRE(jet[4] == Approx(0.5_rq * 3 / 2._rq * sqrt(3._rq) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5_rq * -3 / 2._rq * pow(2, -5 / 2._rq) * jet[2]));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[3] == approximately(pow(2, -3 / 2._rq)));
+        REQUIRE(jet[4] == approximately(0.5_rq * 3 / 2._rq * sqrt(3._rq) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5_rq * -3 / 2._rq * pow(2, -5 / 2._rq) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
-        REQUIRE(jet[3] == Approx(pow(2, -3 / 2._rq)));
-        REQUIRE(jet[4] == Approx(0.5_rq * 3 / 2._rq * sqrt(3._rq) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5_rq * -3 / 2._rq * pow(2, -5 / 2._rq) * jet[2]));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[3] == approximately(pow(2, -3 / 2._rq)));
+        REQUIRE(jet[4] == approximately(0.5_rq * 3 / 2._rq * sqrt(3._rq) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5_rq * -3 / 2._rq * pow(2, -5 / 2._rq) * jet[2]));
         REQUIRE(jet[6]
-                == Approx(1 / 6._rq * 3 / 2._rq
-                          * (1 / 2._rq * 1 / sqrt(3._rq) * jet[3] * jet[3] + sqrt(3._rq) * jet[5] * 2)));
+                == approximately(1 / 6._rq * 3 / 2._rq
+                                 * (1 / 2._rq * 1 / sqrt(3._rq) * jet[3] * jet[3] + sqrt(3._rq) * jet[5] * 2)));
         REQUIRE(jet[7]
-                == Approx(1 / 6._rq
-                          * (15 / 4._rq * pow(2, -7 / 2._rq) * jet[2] * jet[2]
-                             - 3 / 2._rq * pow(2, -5 / 2._rq) * jet[4] * 2)));
+                == approximately(1 / 6._rq
+                                 * (15 / 4._rq * pow(2, -7 / 2._rq) * jet[2] * jet[2]
+                                    - 3 / 2._rq * pow(2, -5 / 2._rq) * jet[4] * 2)));
     }
 
     {
@@ -116,28 +118,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5_rq * (pow(3, 3 / 2._rq) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5_rq * (pow(3, 3 / 2._rq) + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(pow(3, 3 / 2._rq)));
+        REQUIRE(jet[2] == approximately(pow(3, 3 / 2._rq)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5_rq * (pow(3, 3 / 2._rq) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5_rq * (pow(3, 3 / 2._rq) + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6._rq * jet[5] * 2));
+        REQUIRE(jet[7] == approximately(1 / 6._rq * jet[5] * 2));
     }
 
     // Failure modes for non-implemented cases.
@@ -182,8 +184,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.)));
     }
 
     {
@@ -201,30 +203,31 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.)));
-        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.)));
+        REQUIRE(jet[4] == approximately(0.5 * 3 / 2. * std::sqrt(3) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5 * -3 / 2. * std::pow(2, -5 / 2.) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.)));
-        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.)));
+        REQUIRE(jet[4] == approximately(0.5 * 3 / 2. * std::sqrt(3) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5 * -3 / 2. * std::pow(2, -5 / 2.) * jet[2]));
         REQUIRE(jet[6]
-                == Approx(1 / 6. * 3 / 2. * (1 / 2. * 1 / std::sqrt(3) * jet[3] * jet[3] + std::sqrt(3) * jet[5] * 2)));
+                == approximately(1 / 6. * 3 / 2.
+                                 * (1 / 2. * 1 / std::sqrt(3) * jet[3] * jet[3] + std::sqrt(3) * jet[5] * 2)));
         REQUIRE(jet[7]
-                == Approx(
+                == approximately(
                     1 / 6.
                     * (15 / 4. * std::pow(2, -7 / 2.) * jet[2] * jet[2] - 3 / 2. * std::pow(2, -5 / 2.) * jet[4] * 2)));
     }
@@ -245,28 +248,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (std::pow(3, 3 / 2.) + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (std::pow(3, 3 / 2.) + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6. * jet[5] * 2));
+        REQUIRE(jet[7] == approximately(1 / 6. * jet[5] * 2));
     }
 
     // Failure modes for non-implemented cases.
@@ -309,8 +312,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.l)));
     }
 
     {
@@ -328,33 +331,33 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.l)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
-        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[4] == approximately(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
-        REQUIRE(jet[3] == Approx(std::pow(2, -3 / 2.l)));
-        REQUIRE(jet[4] == Approx(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[3] == approximately(std::pow(2, -3 / 2.l)));
+        REQUIRE(jet[4] == approximately(0.5 * 3 / 2. * std::sqrt(3.l) * jet[3]));
+        REQUIRE(jet[5] == approximately(0.5 * -3 / 2. * std::pow(2, -5 / 2.l) * jet[2]));
         REQUIRE(jet[6]
-                == Approx(1 / 6.l * 3 / 2.
-                          * (1 / 2. * 1 / std::sqrt(3.l) * jet[3] * jet[3] + std::sqrt(3.l) * jet[5] * 2)));
+                == approximately(1 / 6.l * 3 / 2.
+                                 * (1 / 2. * 1 / std::sqrt(3.l) * jet[3] * jet[3] + std::sqrt(3.l) * jet[5] * 2)));
         REQUIRE(jet[7]
-                == Approx(1 / 6.l
-                          * (15 / 4. * std::pow(2, -7 / 2.l) * jet[2] * jet[2]
-                             - 3 / 2. * std::pow(2, -5 / 2.l) * jet[4] * 2)));
+                == approximately(1 / 6.l
+                                 * (15 / 4. * std::pow(2, -7 / 2.l) * jet[2] * jet[2]
+                                    - 3 / 2. * std::pow(2, -5 / 2.l) * jet[4] * 2)));
     }
 
     {
@@ -373,28 +376,28 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::pow(3, 3 / 2.l)));
+        REQUIRE(jet[2] == approximately(std::pow(3, 3 / 2.l)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (std::pow(3, 3 / 2.l) + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6.l * jet[5] * 2));
+        REQUIRE(jet[7] == approximately(1 / 6.l * jet[5] * 2));
     }
 
     // Failure modes for non-implemented cases.
