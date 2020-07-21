@@ -759,8 +759,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         const auto d_ptr = jet_ptr + o * nvars;
 
         for (std::uint32_t i = 0; i < nvars; ++i) {
-            // NOTE: use FMA wrappers here?
-            m_state[i] += cur_h * d_ptr[i];
+            m_state[i] = detail::fma(cur_h, d_ptr[i], m_state[i]);
         }
     }
 
