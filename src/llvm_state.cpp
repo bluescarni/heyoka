@@ -427,9 +427,13 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
     assert(f != nullptr);
     // Set names for all arguments.
+    // NOTE: don't use the same name in vars
+    // as it's not clear to me if any name
+    // is allowed in the IR. Just use a simple
+    // arg_n format.
     decltype(vars.size()) idx = 0;
     for (auto &arg : f->args()) {
-        arg.setName(vars[idx++]);
+        arg.setName("arg_" + detail::li_to_string(idx++));
     }
 
     // Create a new basic block to start insertion into.
@@ -438,9 +442,10 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     m_builder->SetInsertPoint(bb);
 
     // Record the function arguments in the m_named_values map.
+    idx = 0;
     m_named_values.clear();
     for (auto &arg : f->args()) {
-        m_named_values[arg.getName()] = &arg;
+        m_named_values[vars[idx++]] = &arg;
     }
 
     // Run the codegen on the expression.
@@ -1156,8 +1161,7 @@ void llvm_state::taylor_add_jet_func(const std::string &name, const std::vector<
         // Fetch the target pointer in diff_arr.
         auto diff_ptr = m_builder->CreateInBoundsGEP(diff_arr,
                                                      // The offsets. The first is fixed because
-                                                     // diff_arr somehow becomes a pointer
-                                                     // to itself in the generation of the instruction,
+                                                     // diff_arr is an alloca
                                                      // and thus we need to deref it. The second
                                                      // offset is the index into the array.
                                                      {m_builder->getInt32(0), m_builder->getInt32(i)},
