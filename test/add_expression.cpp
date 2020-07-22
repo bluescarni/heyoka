@@ -36,11 +36,11 @@ TEST_CASE("vararg expression")
     {
         llvm_state s{""};
 
-        s.add_expression<mppp::real128>("foo", x + 1.1_f128);
+        s.add_nary_function<mppp::real128>("foo", x + 1.1_f128);
 
         s.compile();
 
-        auto f = s.fetch_expression<mppp::real128, 1>("foo");
+        auto f = s.fetch_nary_function<mppp::real128, 1>("foo");
 
         REQUIRE(f(mppp::real128(1)) == 1 + mppp::real128{"1.1"});
     }
@@ -48,11 +48,11 @@ TEST_CASE("vararg expression")
     {
         llvm_state s{""};
 
-        s.add_expression<mppp::real128>("foo", log(x) + 3_dbl * log(x));
+        s.add_nary_function<mppp::real128>("foo", log(x) + 3_dbl * log(x));
 
         s.compile();
 
-        auto f = s.fetch_expression<mppp::real128, 1>("foo");
+        auto f = s.fetch_nary_function<mppp::real128, 1>("foo");
 
         REQUIRE(f(mppp::real128(2)) == approximately(4 * log(2_rq)));
     }
@@ -67,11 +67,11 @@ TEST_CASE("vector expression")
     {
         llvm_state s{""};
 
-        s.add_vec_expression<mppp::real128>("foo", x + 1.1_f128);
+        s.add_function<mppp::real128>("foo", x + 1.1_f128);
 
         s.compile();
 
-        auto f = s.fetch_vec_expression<mppp::real128>("foo");
+        auto f = s.fetch_function<mppp::real128>("foo");
 
         mppp::real128 args[] = {mppp::real128{1}};
 
@@ -83,11 +83,11 @@ TEST_CASE("vector expression")
     {
         llvm_state s{""};
 
-        s.add_vec_expression<double>("foo", x + y + z);
+        s.add_function<double>("foo", x + y + z);
 
         s.compile();
 
-        auto f = s.fetch_vec_expression<double>("foo");
+        auto f = s.fetch_function<double>("foo");
 
         double args[] = {1, 2, 3};
 
@@ -103,14 +103,14 @@ TEST_CASE("batch expression")
     {
         llvm_state s{""};
 
-        s.add_batch_expression<mppp::real128>("foo", x + y + z, 4);
+        s.add_function_batch<mppp::real128>("foo", x + y + z, 4);
 
         std::vector<mppp::real128> out(4);
         std::vector<mppp::real128> in = {1_rq, 2_rq, 3_rq, 4_rq, 1_rq, 2_rq, 3_rq, 4_rq, 1_rq, 2_rq, 3_rq, 4_rq};
 
         s.compile();
 
-        auto f = s.fetch_batch_expression<mppp::real128>("foo");
+        auto f = s.fetch_function_batch<mppp::real128>("foo");
 
         f(out.data(), in.data());
 
@@ -130,11 +130,11 @@ TEST_CASE("vector expressions")
     {
         llvm_state s{""};
 
-        s.add_vec_expressions<mppp::real128>("foo", {y / z, x * x - y * z});
+        s.add_vector_function<mppp::real128>("foo", {y / z, x * x - y * z});
 
         s.compile();
 
-        auto f = s.fetch_vec_expressions<mppp::real128>("foo");
+        auto f = s.fetch_vector_function<mppp::real128>("foo");
 
         mppp::real128 input[] = {1_rq, 2_rq, 3_rq};
         mppp::real128 output[2];
@@ -149,11 +149,11 @@ TEST_CASE("vector expressions")
     {
         llvm_state s{""};
 
-        s.add_vec_expressions<double>("foo", {x + y, x * x - y * z});
+        s.add_vector_function<double>("foo", {x + y, x * x - y * z});
 
         s.compile();
 
-        auto f = s.fetch_vec_expressions<double>("foo");
+        auto f = s.fetch_vector_function<double>("foo");
 
         double input[] = {1, 2, 3};
         double output[2];
@@ -167,11 +167,11 @@ TEST_CASE("vector expressions")
     {
         llvm_state s{""};
 
-        s.add_vec_expressions<long double>("foo", {y / z, x * x - y * z});
+        s.add_vector_function<long double>("foo", {y / z, x * x - y * z});
 
         s.compile();
 
-        auto f = s.fetch_vec_expressions<long double>("foo");
+        auto f = s.fetch_vector_function<long double>("foo");
 
         long double input[] = {1, 2, 3};
         long double output[2];

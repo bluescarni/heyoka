@@ -475,7 +475,7 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     assert(eret.second);
 }
 
-void llvm_state::add_expression_dbl(const std::string &name, const expression &e)
+void llvm_state::add_nary_function_dbl(const std::string &name, const expression &e)
 {
     detail::verify_resetter vr{*this};
 
@@ -491,7 +491,7 @@ void llvm_state::add_expression_dbl(const std::string &name, const expression &e
     optimise();
 }
 
-void llvm_state::add_expression_ldbl(const std::string &name, const expression &e)
+void llvm_state::add_nary_function_ldbl(const std::string &name, const expression &e)
 {
     detail::verify_resetter vr{*this};
 
@@ -509,7 +509,7 @@ void llvm_state::add_expression_ldbl(const std::string &name, const expression &
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-void llvm_state::add_expression_f128(const std::string &name, const expression &e)
+void llvm_state::add_nary_function_f128(const std::string &name, const expression &e)
 {
     detail::verify_resetter vr{*this};
 
@@ -538,7 +538,7 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     // Fetch the sorted list of variables in the expression.
     const auto vars = get_variables(e);
     if (vars.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("The number of variables in the expression passed to add_vec_expression() is too "
+        throw std::overflow_error("The number of variables in the expression passed to add_function() is too "
                                   "large, and it results in an overflow condition");
     }
 
@@ -589,19 +589,19 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     optimise();
 }
 
-void llvm_state::add_vec_expression_dbl(const std::string &name, const expression &e)
+void llvm_state::add_function_dbl(const std::string &name, const expression &e)
 {
     add_vecargs_expression<double>(name, e);
 }
 
-void llvm_state::add_vec_expression_ldbl(const std::string &name, const expression &e)
+void llvm_state::add_function_ldbl(const std::string &name, const expression &e)
 {
     add_vecargs_expression<long double>(name, e);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-void llvm_state::add_vec_expression_f128(const std::string &name, const expression &e)
+void llvm_state::add_function_f128(const std::string &name, const expression &e)
 {
     add_vecargs_expression<mppp::real128>(name, e);
 }
@@ -628,7 +628,7 @@ void llvm_state::add_vecargs_expressions(const std::string &name, const std::vec
 
     if (vars.size() > std::numeric_limits<std::uint32_t>::max()
         || es.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("The number of variables/expressions passed to add_vec_expressions() is too "
+        throw std::overflow_error("The number of variables/expressions passed to add_vector_function() is too "
                                   "large, and it results in an overflow condition");
     }
 
@@ -694,19 +694,19 @@ void llvm_state::add_vecargs_expressions(const std::string &name, const std::vec
     optimise();
 }
 
-void llvm_state::add_vec_expressions_dbl(const std::string &name, const std::vector<expression> &es)
+void llvm_state::add_vector_function_dbl(const std::string &name, const std::vector<expression> &es)
 {
     add_vecargs_expressions<double>(name, es);
 }
 
-void llvm_state::add_vec_expressions_ldbl(const std::string &name, const std::vector<expression> &es)
+void llvm_state::add_vector_function_ldbl(const std::string &name, const std::vector<expression> &es)
 {
     add_vecargs_expressions<long double>(name, es);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-void llvm_state::add_vec_expressions_f128(const std::string &name, const std::vector<expression> &es)
+void llvm_state::add_vector_function_f128(const std::string &name, const std::vector<expression> &es)
 {
     add_vecargs_expressions<mppp::real128>(name, es);
 }
@@ -728,7 +728,7 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     // Fetch the sorted list of variables in the expression.
     const auto vars = get_variables(e);
     if (vars.size() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("The number of variables in the expression passed to add_batch_expression() is too "
+        throw std::overflow_error("The number of variables in the expression passed to add_function_batch() is too "
                                   "large, and it results in an overflow condition");
     }
 
@@ -790,19 +790,19 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     optimise();
 }
 
-void llvm_state::add_batch_expression_dbl(const std::string &name, const expression &e, std::uint32_t batch_size)
+void llvm_state::add_function_batch_dbl(const std::string &name, const expression &e, std::uint32_t batch_size)
 {
     add_batch_expression_impl<double>(name, e, batch_size);
 }
 
-void llvm_state::add_batch_expression_ldbl(const std::string &name, const expression &e, std::uint32_t batch_size)
+void llvm_state::add_function_batch_ldbl(const std::string &name, const expression &e, std::uint32_t batch_size)
 {
     add_batch_expression_impl<long double>(name, e, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-void llvm_state::add_batch_expression_f128(const std::string &name, const expression &e, std::uint32_t batch_size)
+void llvm_state::add_function_batch_f128(const std::string &name, const expression &e, std::uint32_t batch_size)
 {
     add_batch_expression_impl<mppp::real128>(name, e, batch_size);
 }
@@ -1439,59 +1439,59 @@ llvm_state::tj_t<mppp::real128> llvm_state::fetch_taylor_jet_f128(const std::str
 
 #endif
 
-llvm_state::ev_t<double> llvm_state::fetch_vec_expression_dbl(const std::string &name)
+llvm_state::sf_t<double> llvm_state::fetch_function_dbl(const std::string &name)
 {
-    return fetch_vec_expression<double>(name);
+    return fetch_function<double>(name);
 }
 
-llvm_state::ev_t<long double> llvm_state::fetch_vec_expression_ldbl(const std::string &name)
+llvm_state::sf_t<long double> llvm_state::fetch_function_ldbl(const std::string &name)
 {
-    return fetch_vec_expression<long double>(name);
+    return fetch_function<long double>(name);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm_state::ev_t<mppp::real128> llvm_state::fetch_vec_expression_f128(const std::string &name)
+llvm_state::sf_t<mppp::real128> llvm_state::fetch_function_f128(const std::string &name)
 {
-    return fetch_vec_expression<mppp::real128>(name);
+    return fetch_function<mppp::real128>(name);
 }
 
 #endif
 
-llvm_state::evs_t<double> llvm_state::fetch_vec_expressions_dbl(const std::string &name)
+llvm_state::vf_t<double> llvm_state::fetch_vector_function_dbl(const std::string &name)
 {
-    return fetch_vec_expressions<double>(name);
+    return fetch_vector_function<double>(name);
 }
 
-llvm_state::evs_t<long double> llvm_state::fetch_vec_expressions_ldbl(const std::string &name)
+llvm_state::vf_t<long double> llvm_state::fetch_vector_function_ldbl(const std::string &name)
 {
-    return fetch_vec_expressions<long double>(name);
+    return fetch_vector_function<long double>(name);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm_state::evs_t<mppp::real128> llvm_state::fetch_vec_expressions_f128(const std::string &name)
+llvm_state::vf_t<mppp::real128> llvm_state::fetch_vector_function_f128(const std::string &name)
 {
-    return fetch_vec_expressions<mppp::real128>(name);
+    return fetch_vector_function<mppp::real128>(name);
 }
 
 #endif
 
-llvm_state::eb_t<double> llvm_state::fetch_batch_expression_dbl(const std::string &name)
+llvm_state::sfb_t<double> llvm_state::fetch_function_batch_dbl(const std::string &name)
 {
-    return fetch_batch_expression<double>(name);
+    return fetch_function_batch<double>(name);
 }
 
-llvm_state::eb_t<long double> llvm_state::fetch_batch_expression_ldbl(const std::string &name)
+llvm_state::sfb_t<long double> llvm_state::fetch_function_batch_ldbl(const std::string &name)
 {
-    return fetch_batch_expression<long double>(name);
+    return fetch_function_batch<long double>(name);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm_state::eb_t<mppp::real128> llvm_state::fetch_batch_expression_f128(const std::string &name)
+llvm_state::sfb_t<mppp::real128> llvm_state::fetch_function_batch_f128(const std::string &name)
 {
-    return fetch_batch_expression<mppp::real128>(name);
+    return fetch_function_batch<mppp::real128>(name);
 }
 
 #endif

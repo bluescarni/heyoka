@@ -36,7 +36,7 @@ int main()
 
     llvm_state s{""};
 
-    s.add_batch_expression<double>("bench", (x * y) + (x * z) + (y * z) + (x + y) + (x + z) + (y + z), batch_size);
+    s.add_function_batch<double>("bench", (x * y) + (x * z) + (y * z) + (x + y) + (x + z) + (y + z), batch_size);
 
     // NOTE: uncomment to dump IR/object code.
     // std::cout << s.dump_ir() << '\n';
@@ -44,7 +44,7 @@ int main()
 
     s.compile();
 
-    auto f_ptr = s.fetch_batch_expression_dbl("bench");
+    auto f_ptr = s.fetch_function_batch_dbl("bench");
 
     auto start = std::chrono::high_resolution_clock::now();
 
