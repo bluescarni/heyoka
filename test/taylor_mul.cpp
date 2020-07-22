@@ -21,8 +21,10 @@
 #include <heyoka/llvm_state.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -50,8 +52,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
     }
 
     {
@@ -70,17 +72,17 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5_rq * (6_rq + jet[3])));
+        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
     }
 
     {
@@ -99,28 +101,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5_rq * (6_rq + jet[3])));
+        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(5_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(5_rq));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5_rq * (6_rq + jet[3])));
+        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6_rq * (2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6_rq * (2 * jet[5])));
     }
 
     // Variable-number tests.
@@ -139,8 +141,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
     }
 
     {
@@ -158,17 +160,17 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -186,28 +188,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6_rq * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3_rq * jet[4]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6_rq * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3_rq * jet[4]));
     }
 
     // Number/variable tests.
@@ -226,8 +228,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
     }
 
     {
@@ -245,17 +247,17 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -273,28 +275,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(-8_rq));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6_rq * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3_rq * jet[4]));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(-8_rq));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6_rq * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3_rq * jet[4]));
     }
 
     // Variable/variable tests.
@@ -313,8 +315,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(6_rq));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(6_rq));
     }
 
     {
@@ -332,10 +334,10 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(6_rq));
-        REQUIRE(jet[4] == Approx(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5_rq * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(6_rq));
+        REQUIRE(jet[4] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
     }
 
     {
@@ -353,12 +355,12 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6_rq));
-        REQUIRE(jet[3] == Approx(6_rq));
-        REQUIRE(jet[4] == Approx(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == Approx(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
+        REQUIRE(jet[2] == approximately(6_rq));
+        REQUIRE(jet[3] == approximately(6_rq));
+        REQUIRE(jet[4] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[6] == approximately(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
     }
 }
 
@@ -386,8 +388,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
     }
 
     {
@@ -405,17 +407,17 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5 * (6. + jet[3])));
+        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
     }
 
     {
@@ -433,28 +435,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5 * (6. + jet[3])));
+        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(5.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(5.));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5 * (6. + jet[3])));
+        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6. * (2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6. * (2 * jet[5])));
     }
 
     // Variable-number tests.
@@ -473,8 +475,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
     }
 
     {
@@ -492,17 +494,17 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -520,28 +522,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6. * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3. * jet[4]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6. * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3. * jet[4]));
     }
 
     // Number/variable tests.
@@ -560,8 +562,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
     }
 
     {
@@ -579,17 +581,17 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -607,28 +609,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(-8.));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6. * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3. * jet[4]));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(-8.));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6. * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3. * jet[4]));
     }
 
     // Variable/variable tests.
@@ -647,8 +649,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(6.));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(6.));
     }
 
     {
@@ -666,10 +668,10 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(6.));
-        REQUIRE(jet[4] == Approx(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5 * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(6.));
+        REQUIRE(jet[4] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
     }
 
     {
@@ -687,12 +689,12 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.));
-        REQUIRE(jet[3] == Approx(6.));
-        REQUIRE(jet[4] == Approx(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == Approx(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
+        REQUIRE(jet[2] == approximately(6.));
+        REQUIRE(jet[3] == approximately(6.));
+        REQUIRE(jet[4] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[6] == approximately(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
     }
 }
 
@@ -719,8 +721,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
     }
 
     {
@@ -739,17 +741,17 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5l * (6.l + jet[3])));
+        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
     }
 
     {
@@ -768,28 +770,28 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5l * (6.l + jet[3])));
+        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(5.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(5.l));
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(.5l * (6.l + jet[3])));
+        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6.l * (2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6.l * (2 * jet[5])));
     }
 
     // Variable-number tests.
@@ -808,8 +810,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
     }
 
     {
@@ -827,17 +829,17 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -855,28 +857,28 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6.l * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3.l * jet[4]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6.l * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3.l * jet[4]));
     }
 
     // Number/variable tests.
@@ -895,8 +897,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
     }
 
     {
@@ -914,17 +916,17 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
     }
 
     {
@@ -942,28 +944,28 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(-8.l));
-        REQUIRE(jet[4] == Approx(jet[3]));
-        REQUIRE(jet[5] == Approx(-2 * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6.l * 4 * jet[5]));
-        REQUIRE(jet[7] == Approx(-4. / 3.l * jet[4]));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(-8.l));
+        REQUIRE(jet[4] == approximately(jet[3]));
+        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6.l * 4 * jet[5]));
+        REQUIRE(jet[7] == approximately(-4. / 3.l * jet[4]));
     }
 
     // Variable/variable tests.
@@ -982,8 +984,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(6.l));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(6.l));
     }
 
     {
@@ -1001,10 +1003,10 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(6.l));
-        REQUIRE(jet[4] == Approx(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5l * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(6.l));
+        REQUIRE(jet[4] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
     }
 
     {
@@ -1022,11 +1024,11 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(6.l));
-        REQUIRE(jet[3] == Approx(6.l));
-        REQUIRE(jet[4] == Approx(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == Approx(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == Approx(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
+        REQUIRE(jet[2] == approximately(6.l));
+        REQUIRE(jet[3] == approximately(6.l));
+        REQUIRE(jet[4] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[5] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
+        REQUIRE(jet[6] == approximately(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
     }
 }

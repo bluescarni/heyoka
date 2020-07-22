@@ -22,8 +22,10 @@
 #include <heyoka/math_functions.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -50,7 +52,7 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
     }
 
@@ -69,14 +71,14 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
         REQUIRE(jet[5] == 0.5_rq * (jet[2] + jet[3]));
@@ -97,28 +99,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5_rq * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5_rq * (jet[2] + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(2._rq) + cos(3._rq)));
+        REQUIRE(jet[2] == approximately(sin(2._rq) + cos(3._rq)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5_rq * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5_rq * (jet[2] + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6._rq * (2 * jet[4] + 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6._rq * (2 * jet[4] + 2 * jet[5])));
     }
 
     // Variable tests.
@@ -137,8 +139,8 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
     }
     {
         llvm_state s{"", 0};
@@ -155,17 +157,17 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
-        REQUIRE(jet[4] == Approx(0.5_rq * cos(3._rq) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5_rq * sin(2._rq) * jet[2]));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
+        REQUIRE(jet[4] == approximately(0.5_rq * cos(3._rq) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5_rq * sin(2._rq) * jet[2]));
     }
     {
         llvm_state s{"", 0};
@@ -182,28 +184,28 @@ TEST_CASE("f128")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
-        REQUIRE(jet[4] == Approx(0.5_rq * cos(3._rq) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5_rq * sin(2._rq) * jet[2]));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
+        REQUIRE(jet[4] == approximately(0.5_rq * cos(3._rq) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5_rq * sin(2._rq) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(sin(3._rq)));
-        REQUIRE(jet[3] == Approx(cos(2._rq)));
-        REQUIRE(jet[4] == Approx(0.5_rq * cos(3._rq) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5_rq * sin(2._rq) * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6._rq * (-sin(3._rq) * jet[3] * jet[3] + cos(3._rq) * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6._rq * (-cos(2._rq) * jet[2] * jet[2] - sin(2._rq) * 2 * jet[4])));
+        REQUIRE(jet[2] == approximately(sin(3._rq)));
+        REQUIRE(jet[3] == approximately(cos(2._rq)));
+        REQUIRE(jet[4] == approximately(0.5_rq * cos(3._rq) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5_rq * sin(2._rq) * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6._rq * (-sin(3._rq) * jet[3] * jet[3] + cos(3._rq) * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6._rq * (-cos(2._rq) * jet[2] * jet[2] - sin(2._rq) * 2 * jet[4])));
     }
 }
 
@@ -231,7 +233,7 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
     }
 
@@ -250,14 +252,14 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
         REQUIRE(jet[5] == 0.5 * (jet[2] + jet[3]));
@@ -278,28 +280,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (jet[2] + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
+        REQUIRE(jet[2] == approximately(std::sin(2.) + std::cos(3.)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5 * (jet[2] + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6. * (2 * jet[4] + 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6. * (2 * jet[4] + 2 * jet[5])));
     }
 
     // Variable tests.
@@ -318,8 +320,8 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
     }
     {
         llvm_state s{"", 0};
@@ -336,17 +338,17 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
+        REQUIRE(jet[4] == approximately(0.5 * std::cos(3.) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5 * std::sin(2.) * jet[2]));
     }
     {
         llvm_state s{"", 0};
@@ -363,28 +365,28 @@ TEST_CASE("dbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
+        REQUIRE(jet[4] == approximately(0.5 * std::cos(3.) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5 * std::sin(2.) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6. * (-std::sin(3.) * jet[3] * jet[3] + std::cos(3.) * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6. * (-std::cos(2.) * jet[2] * jet[2] - std::sin(2.) * 2 * jet[4])));
+        REQUIRE(jet[2] == approximately(std::sin(3.)));
+        REQUIRE(jet[3] == approximately(std::cos(2.)));
+        REQUIRE(jet[4] == approximately(0.5 * std::cos(3.) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5 * std::sin(2.) * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6. * (-std::sin(3.) * jet[3] * jet[3] + std::cos(3.) * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6. * (-std::cos(2.) * jet[2] * jet[2] - std::sin(2.) * 2 * jet[4])));
     }
 }
 
@@ -410,7 +412,7 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
     }
 
@@ -429,14 +431,14 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
         REQUIRE(jet[5] == 0.5l * (jet[2] + jet[3]));
@@ -457,28 +459,28 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5l * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5l * (jet[2] + jet[3])));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
+        REQUIRE(jet[2] == approximately(std::sin(2.l) + std::cos(3.l)));
         REQUIRE(jet[3] == 5);
         REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5l * (jet[2] + jet[3])));
+        REQUIRE(jet[5] == approximately(0.5l * (jet[2] + jet[3])));
         REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6.l * (2 * jet[4] + 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6.l * (2 * jet[4] + 2 * jet[5])));
     }
 
     // Variable tests.
@@ -497,8 +499,8 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
     }
     {
         llvm_state s{"", 0};
@@ -515,17 +517,17 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
+        REQUIRE(jet[4] == approximately(0.5l * std::cos(3.l) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5l * std::sin(2.l) * jet[2]));
     }
     {
         llvm_state s{"", 0};
@@ -542,27 +544,27 @@ TEST_CASE("ldbl")
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
 
         jptr(jet, 2);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
+        REQUIRE(jet[4] == approximately(0.5l * std::cos(3.l) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5l * std::sin(2.l) * jet[2]));
 
         jptr(jet, 3);
 
         REQUIRE(jet[0] == 2);
         REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6.l * (-std::sin(3.l) * jet[3] * jet[3] + std::cos(3.l) * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6.l * (-std::cos(2.l) * jet[2] * jet[2] - std::sin(2.l) * 2 * jet[4])));
+        REQUIRE(jet[2] == approximately(std::sin(3.l)));
+        REQUIRE(jet[3] == approximately(std::cos(2.l)));
+        REQUIRE(jet[4] == approximately(0.5l * std::cos(3.l) * jet[3]));
+        REQUIRE(jet[5] == approximately(-0.5l * std::sin(2.l) * jet[2]));
+        REQUIRE(jet[6] == approximately(1 / 6.l * (-std::sin(3.l) * jet[3] * jet[3] + std::cos(3.l) * 2 * jet[5])));
+        REQUIRE(jet[7] == approximately(1 / 6.l * (-std::cos(2.l) * jet[2] * jet[2] - std::sin(2.l) * 2 * jet[4])));
     }
 }

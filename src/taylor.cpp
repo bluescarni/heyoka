@@ -754,13 +754,14 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     }
 
     // Update the state.
+    // NOTE: this loop is already in a SIMD-friendly
+    // format, if we ever decide to JIT it.
     auto cur_h = h;
     for (std::uint32_t o = 1; o < order + 1u; ++o, cur_h *= h) {
         const auto d_ptr = jet_ptr + o * nvars;
 
         for (std::uint32_t i = 0; i < nvars; ++i) {
-            // NOTE: use FMA wrappers here?
-            m_state[i] += cur_h * d_ptr[i];
+            m_state[i] = detail::fma(cur_h, d_ptr[i], m_state[i]);
         }
     }
 
