@@ -517,6 +517,31 @@ llvm::Value *taylor_init_f128(llvm_state &s, const expression &e, llvm::Value *a
 
 #endif
 
+llvm::Value *taylor_init_batch_dbl(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_batch_dbl(s, arg, arr, batch_idx, batch_size); },
+                      e.value());
+}
+
+llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_idx,
+                                    std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_batch_ldbl(s, arg, arr, batch_idx, batch_size); },
+                      e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_batch_f128(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_idx,
+                                    std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_batch_f128(s, arg, arr, batch_idx, batch_size); },
+                      e.value());
+}
+
+#endif
+
 llvm::Function *taylor_diff_dbl(llvm_state &s, const expression &e, std::uint32_t idx, const std::string &name,
                                 std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
@@ -565,6 +590,64 @@ llvm::Function *taylor_diff_f128(llvm_state &s, const expression &e, std::uint32
     };
 
     heyoka_assert_nonnull_ret(std::visit(visitor, e.value()));
+}
+
+#endif
+
+llvm::Value *taylor_diff_batch_dbl(llvm_state &s, const expression &e, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_diff_batch_dbl(s, v, idx, order, n_uvars, diff_arr, batch_idx, batch_size, cd_uvars);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives can be computed only for binary operators or functions");
+            }
+        },
+        e.value());
+}
+
+llvm::Value *taylor_diff_batch_ldbl(llvm_state &s, const expression &e, std::uint32_t idx, std::uint32_t order,
+                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                    std::uint32_t batch_size, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_diff_batch_ldbl(s, v, idx, order, n_uvars, diff_arr, batch_idx, batch_size, cd_uvars);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives can be computed only for binary operators or functions");
+            }
+        },
+        e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_diff_batch_f128(llvm_state &s, const expression &e, std::uint32_t idx, std::uint32_t order,
+                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                    std::uint32_t batch_size, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_diff_batch_f128(s, v, idx, order, n_uvars, diff_arr, batch_idx, batch_size, cd_uvars);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives can be computed only for binary operators or functions");
+            }
+        },
+        e.value());
 }
 
 #endif

@@ -182,3 +182,14 @@ TEST_CASE("vector expressions")
         REQUIRE(output[1] == approximately(1.l - 2. * 3));
     }
 }
+
+TEST_CASE("tj batch")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s{""};
+
+    s.add_taylor_jet_batch_dbl("tjb", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 20, 4);
+
+    std::cout << s.dump_ir() << '\n';
+}

@@ -1418,6 +1418,372 @@ std::vector<expression> llvm_state::add_taylor_jet_f128(const std::string &name,
 
 #endif
 
+// Compute the derivative of order "order" of a state variable.
+// ex is the formula for the first-order derivative of the state variable (which
+// is either a u variable or a number), n_uvars the number of variables in
+// the decomposition, diff_arr the array containing the derivatives of all u variables
+// up to order - 1, batch_idx and batch_size the batch index and size.
+template <typename T>
+llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t order, std::uint32_t n_uvars,
+                                             llvm::Value *diff_arr, std::uint32_t batch_idx, std::uint32_t batch_size)
+{
+    assert(order > 0u);
+
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, variable>) {
+                // Extract the index of the u variable in the expression
+                // of the first-order derivative.
+                const auto u_idx = detail::uname_to_index(v.name());
+
+                // Fetch from diff_arr the pointer to the derivative
+                // of order order - 1 of the u variable at u_idx. The index is:
+                // (order - 1) * n_uvars * batch_size + u_idx * batch_size + batch_idx.
+                auto diff_ptr = m_builder->CreateInBoundsGEP(
+                    diff_arr,
+                    {m_builder->getInt32(0),
+                     m_builder->getInt32((order - 1u) * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+                    "sv_diff_ptr");
+
+                // Load the value.
+                auto diff_load = m_builder->CreateLoad(diff_ptr, "sv_diff_load");
+
+                // We have to divide the derivative by order
+                // to get the normalised derivative of the state variable.
+                // NOTE: precompute in the main function the 1/n factors?
+                return m_builder->CreateFDiv(
+                    diff_load, m_builder->CreateUIToFP(m_builder->getInt32(order), detail::to_llvm_type<T>(context())),
+                    "sv_norm");
+            } else if constexpr (std::is_same_v<type, number>) {
+                // The first-order derivative is a constant.
+                if (order == 1u) {
+                    // First-order derivative is just the codegen
+                    // of the constant itself.
+                    return codegen<T>(*this, v);
+                } else {
+                    // Higher-order derivatives are all zero.
+                    return codegen<T>(*this, number{0.});
+                }
+            } else {
+                assert(false);
+
+                return nullptr;
+            }
+        },
+        ex.value());
+}
+
+template <typename T, typename U>
+auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::uint32_t order,
+                                           std::uint32_t batch_size)
+{
+    detail::verify_resetter vr{*this};
+
+    check_uncompiled(__func__);
+    check_add_name(name);
+
+    if (order == 0u) {
+        throw std::invalid_argument("The order of a Taylor jet cannot be zero");
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
+    }
+
+    // Record the number of equations/variables.
+    const auto n_eq = sys.size();
+
+    // Decompose the system of equations.
+    auto dc = taylor_decompose(std::move(sys));
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = dc.size() - n_eq;
+
+    // Overflow checking. We want to make sure we can do all computations
+    // using uint32_t. We need to be able to:
+    // - index into the jet array (size n_eq * (order + 1) * batch_size),
+    // - index into the internal derivatives array (size n_uvars * order * batch_size).
+    // NOTE: even though some automatic differentiation formulae have
+    // sums up to i = order (and thus could formally overflow in a
+    // for loop), we invoke them only up to order = order - 1.
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || n_eq > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)
+        || n_uvars > std::numeric_limits<std::uint32_t>::max() / (order * batch_size)) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the number of variables while adding a Taylor jet");
+    }
+
+    // Prepare the main function prototype. The only argument is a float pointer to in/out array.
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context()))};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
+    assert(f != nullptr);
+
+    // Set the name of the function argument.
+    auto in_out = f->args().begin();
+    in_out->setName("in_out");
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
+    assert(bb != nullptr);
+    m_builder->SetInsertPoint(bb);
+
+    // Create the array of derivatives for the u variables.
+    // NOTE: by allocating order rows, we are able to store derivatives
+    // up to order - 1 (rather than order), because we start from order
+    // 0. This is ok, because in this function we will be reading/writing from/to
+    // the derivatives array only up to order - 1: the last step involves only the
+    // derivatives of the state variables, which access only values at order - 1.
+    auto array_type = llvm::ArrayType::get(detail::to_llvm_type<T>(context()),
+                                           static_cast<std::uint64_t>(n_uvars * order * batch_size));
+    assert(array_type != nullptr);
+    auto diff_arr = m_builder->CreateAlloca(array_type, 0, "diff_arr");
+    assert(diff_arr != nullptr);
+
+    // Fill-in the order-0 row of the derivatives array.
+    // Use a separate block for clarity.
+    auto *init_bb = llvm::BasicBlock::Create(context(), "order_0_init", f);
+    assert(init_bb != nullptr);
+    m_builder->CreateBr(init_bb);
+    m_builder->SetInsertPoint(init_bb);
+
+    // Load the initial values for the state variables from in_out.
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            const auto arr_idx = i * batch_size + batch_idx;
+
+            // Fetch the input pointer from in_out.
+            auto in_ptr = m_builder->CreateInBoundsGEP(in_out, {m_builder->getInt32(arr_idx)},
+                                                       "o0_init_ptr_" + detail::li_to_string(i) + "_"
+                                                           + detail::li_to_string(batch_idx));
+            assert(in_ptr != nullptr);
+
+            // Create the load instruction from in_out.
+            auto load_inst = m_builder->CreateLoad(in_ptr, "o0_init_load_" + detail::li_to_string(i) + "_"
+                                                               + detail::li_to_string(batch_idx));
+            assert(load_inst != nullptr);
+
+            // Fetch the target pointer in diff_arr.
+            auto diff_ptr = m_builder->CreateInBoundsGEP(diff_arr,
+                                                         // The offsets. The first is fixed because
+                                                         // diff_arr is an alloca
+                                                         // and thus we need to deref it. The second
+                                                         // offset is the index into the array.
+                                                         {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
+                                                         // Name for the pointer variable.
+                                                         "o0_diff_ptr_" + detail::li_to_string(i) + "_"
+                                                             + detail::li_to_string(batch_idx));
+            assert(diff_ptr != nullptr);
+
+            // Do the copy.
+            m_builder->CreateStore(load_inst, diff_ptr);
+        }
+    }
+
+    // Fill in the initial values for the other u vars in the diff array.
+    // These are not loaded directly from in_out, rather they are computed
+    // via the taylor_init_batch machinery.
+    for (auto i = n_eq; i < n_uvars; ++i) {
+        const auto &u_ex = dc[i];
+
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            const auto arr_idx = static_cast<std::uint32_t>(i * batch_size + batch_idx);
+
+            // Fetch the target pointer in diff_arr.
+            auto diff_ptr = m_builder->CreateInBoundsGEP(
+                diff_arr, {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
+                "o0_diff_ptr_" + detail::li_to_string(i) + "_" + detail::li_to_string(batch_idx));
+            assert(diff_ptr != nullptr);
+
+            // Run the initialization and store the result.
+            m_builder->CreateStore(taylor_init_batch<T>(*this, u_ex, diff_arr, batch_idx, batch_size), diff_ptr);
+        }
+    }
+
+    // Establish if there are state variables whose derivatives are constants.
+    // NOTE: the derivatives of the state variables
+    // are at the end of the decomposition vector.
+    std::unordered_map<std::uint32_t, number> cd_uvars;
+    for (auto i = n_uvars; i < dc.size(); ++i) {
+        std::visit(
+            [&cd_uvars, i, n_uvars](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, number>) {
+                    [[maybe_unused]] const auto res = cd_uvars.emplace(static_cast<std::uint32_t>(i - n_uvars), v);
+                    assert(res.second);
+                } else if constexpr (!std::is_same_v<type, variable>) {
+                    // NOTE: the derivative of a state variable
+                    // can only be a u variable or a number.
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    // Compute the derivatives order by order, starting from 1 to order excluded.
+    // We will compute the highest derivatives of the state variables separately
+    // in the last step.
+    for (std::uint32_t cur_order = 1; cur_order < order; ++cur_order) {
+        // Place the computation in its own block for clarity.
+        auto *cur_order_bb = llvm::BasicBlock::Create(context(), "order_" + detail::li_to_string(cur_order), f);
+        assert(cur_order_bb != nullptr);
+        m_builder->CreateBr(cur_order_bb);
+        m_builder->SetInsertPoint(cur_order_bb);
+
+        // Begin with the state variables.
+        // NOTE: the derivatives of the state variables
+        // are at the end of the decomposition vector.
+        for (auto i = n_uvars; i < dc.size(); ++i) {
+            // The index of the state variable whose
+            // derivative we are computing.
+            const auto sv_idx = static_cast<std::uint32_t>(i - n_uvars);
+            // The expression of the first-order derivative.
+            const auto &ex = dc[i];
+
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                // Compute the derivative.
+                auto sv_diff = tjb_compute_sv_diff<T>(ex, cur_order, static_cast<std::uint32_t>(n_uvars), diff_arr,
+                                                      batch_idx, batch_size);
+                // Store the result in diff_arr. The index is:
+                // cur_order * n_uvars * batch_size + sv_idx * batch_size + batch_idx.
+                m_builder->CreateStore(sv_diff,
+                                       m_builder->CreateInBoundsGEP(
+                                           diff_arr,
+                                           {m_builder->getInt32(0),
+                                            m_builder->getInt32(static_cast<std::uint32_t>(
+                                                cur_order * n_uvars * batch_size + sv_idx * batch_size + batch_idx))},
+                                           "sv_" + detail::li_to_string(sv_idx) + "_diff_ptr"));
+
+                // Store the result also in in_out.
+                // The in_out index into which we need to write is
+                // cur_order * n_eq * batch_size + sv_idx * batch_size + batch_idx.
+                m_builder->CreateStore(
+                    sv_diff,
+                    m_builder->CreateInBoundsGEP(in_out,
+                                                 {m_builder->getInt32(static_cast<std::uint32_t>(
+                                                     cur_order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
+                                                 "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"));
+            }
+        }
+
+        // Now the other u variables.
+        for (auto i = n_eq; i < n_uvars; ++i) {
+            const auto &ex = dc[i];
+
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                auto uv_diff = taylor_diff_batch<T>(*this, ex, static_cast<std::uint32_t>(i), cur_order,
+                                                    static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
+                                                    batch_size, cd_uvars);
+
+                m_builder->CreateStore(
+                    uv_diff,
+                    m_builder->CreateInBoundsGEP(
+                        diff_arr,
+                        {m_builder->getInt32(0), m_builder->getInt32(static_cast<std::uint32_t>(
+                                                     cur_order * n_uvars * batch_size + i * batch_size + batch_idx))},
+                        "uv_" + detail::li_to_string(i) + "_diff_ptr"));
+            }
+        }
+    }
+
+    auto *final_bb = llvm::BasicBlock::Create(context(), "finalise", f);
+    assert(final_bb != nullptr);
+    m_builder->CreateBr(final_bb);
+    m_builder->SetInsertPoint(final_bb);
+
+    // The last step is to write the highest-order derivatives to in_out.
+    for (auto i = n_uvars; i < dc.size(); ++i) {
+        const auto sv_idx = static_cast<std::uint32_t>(i - n_uvars);
+        const auto &ex = dc[i];
+
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            // Compute the derivative.
+            auto sv_diff = tjb_compute_sv_diff<T>(ex, order, static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
+                                                  batch_size);
+            // Store the result in in_out.
+            // The in_out index into which we need to write is
+            // order * n_eq * batch_size + sv_idx * batch_size + batch_idx.
+            m_builder->CreateStore(sv_diff, m_builder->CreateInBoundsGEP(
+                                                in_out,
+                                                {m_builder->getInt32(static_cast<std::uint32_t>(
+                                                    order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
+                                                "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"));
+        }
+    }
+
+    // Finish off the function.
+    m_builder->CreateRetVoid();
+
+    // Verify it.
+    verify_function_impl(f);
+
+    // Add the function to m_sig_map. The signature is void(T *).
+    std::vector<std::type_index> sig_args{std::type_index(typeid(T *))};
+    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
+    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
+    assert(eret.second);
+
+    // Run the optimization pass.
+    optimise();
+
+    return dc;
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_dbl(const std::string &name,
+                                                             std::vector<std::pair<expression, expression>> sys,
+                                                             std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<double>(name, std::move(sys), order, batch_size);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_ldbl(const std::string &name,
+                                                              std::vector<std::pair<expression, expression>> sys,
+                                                              std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<long double>(name, std::move(sys), order, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_f128(const std::string &name,
+                                                              std::vector<std::pair<expression, expression>> sys,
+                                                              std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<mppp::real128>(name, std::move(sys), order, batch_size);
+}
+
+#endif
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_dbl(const std::string &name, std::vector<expression> sys,
+                                                             std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<double>(name, std::move(sys), order, batch_size);
+}
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_ldbl(const std::string &name, std::vector<expression> sys,
+                                                              std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<long double>(name, std::move(sys), order, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> llvm_state::add_taylor_jet_batch_f128(const std::string &name, std::vector<expression> sys,
+                                                              std::uint32_t order, std::uint32_t batch_size)
+{
+    return add_taylor_jet_batch_impl<mppp::real128>(name, std::move(sys), order, batch_size);
+}
+
+#endif
+
 // NOTE: in the fetch_* functions, check_compiled() is run
 // by jit_lookup().
 llvm_state::tj_t<double> llvm_state::fetch_taylor_jet_dbl(const std::string &name)
@@ -1492,6 +1858,25 @@ llvm_state::sfb_t<long double> llvm_state::fetch_function_batch_ldbl(const std::
 llvm_state::sfb_t<mppp::real128> llvm_state::fetch_function_batch_f128(const std::string &name)
 {
     return fetch_function_batch<mppp::real128>(name);
+}
+
+#endif
+
+llvm_state::tjb_t<double> llvm_state::fetch_taylor_jet_batch_dbl(const std::string &name)
+{
+    return fetch_taylor_jet_batch<double>(name);
+}
+
+llvm_state::tjb_t<long double> llvm_state::fetch_taylor_jet_batch_ldbl(const std::string &name)
+{
+    return fetch_taylor_jet_batch<long double>(name);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm_state::tjb_t<mppp::real128> llvm_state::fetch_taylor_jet_batch_f128(const std::string &name)
+{
+    return fetch_taylor_jet_batch<mppp::real128>(name);
 }
 
 #endif
