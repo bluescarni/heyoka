@@ -1578,6 +1578,9 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
 
     // Load the initial values for the state variables from in_out.
     for (std::uint32_t i = 0; i < n_eq; ++i) {
+        // NOTE: do first all the loads, then all the stores.
+        std::vector<llvm::Value *> values;
+
         for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
             const auto arr_idx = i * batch_size + batch_idx;
 
@@ -1592,6 +1595,12 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                                                                + detail::li_to_string(batch_idx));
             assert(load_inst != nullptr);
 
+            values.push_back(load_inst);
+        }
+
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            const auto arr_idx = i * batch_size + batch_idx;
+
             // Fetch the target pointer in diff_arr.
             auto diff_ptr = m_builder->CreateInBoundsGEP(diff_arr,
                                                          // The offsets. The first is fixed because
@@ -1605,7 +1614,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
             assert(diff_ptr != nullptr);
 
             // Do the copy.
-            m_builder->CreateStore(load_inst, diff_ptr);
+            m_builder->CreateStore(values[batch_idx], diff_ptr);
         }
     }
 
@@ -1614,6 +1623,14 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
     // via the taylor_init_batch machinery.
     for (auto i = n_eq; i < n_uvars; ++i) {
         const auto &u_ex = dc[i];
+
+        // NOTE: do first all the initialisations, then all the stores.
+        std::vector<llvm::Value *> values;
+
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            // Run the initialisation.
+            values.push_back(taylor_init_batch<T>(*this, u_ex, diff_arr, batch_idx, batch_size));
+        }
 
         for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
             const auto arr_idx = static_cast<std::uint32_t>(i * batch_size + batch_idx);
@@ -1624,8 +1641,8 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                 "o0_diff_ptr_" + detail::li_to_string(i) + "_" + detail::li_to_string(batch_idx));
             assert(diff_ptr != nullptr);
 
-            // Run the initialization and store the result.
-            m_builder->CreateStore(taylor_init_batch<T>(*this, u_ex, diff_arr, batch_idx, batch_size), diff_ptr);
+            // Store the result of the initialisation.
+            m_builder->CreateStore(values[batch_idx], diff_ptr);
         }
     }
 
@@ -1742,18 +1759,24 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
         const auto sv_idx = static_cast<std::uint32_t>(i - n_uvars);
         const auto &ex = dc[i];
 
+        std::vector<llvm::Value *> diff_values;
+
         for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
             // Compute the derivative.
-            auto sv_diff = tjb_compute_sv_diff<T>(ex, order, static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
-                                                  batch_size);
+            diff_values.push_back(tjb_compute_sv_diff<T>(ex, order, static_cast<std::uint32_t>(n_uvars), diff_arr,
+                                                         batch_idx, batch_size));
+        }
+
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
             // Store the result in in_out.
             // The in_out index into which we need to write is
             // order * n_eq * batch_size + sv_idx * batch_size + batch_idx.
-            m_builder->CreateStore(sv_diff, m_builder->CreateInBoundsGEP(
-                                                in_out,
-                                                {m_builder->getInt32(static_cast<std::uint32_t>(
-                                                    order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
-                                                "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"));
+            m_builder->CreateStore(
+                diff_values[batch_idx],
+                m_builder->CreateInBoundsGEP(in_out,
+                                             {m_builder->getInt32(static_cast<std::uint32_t>(
+                                                 order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
+                                             "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"));
         }
     }
 
