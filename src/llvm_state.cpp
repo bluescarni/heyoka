@@ -1632,12 +1632,6 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
     // We will compute the highest derivatives of the state variables separately
     // in the last step.
     for (std::uint32_t cur_order = 1; cur_order < order; ++cur_order) {
-        // Place the computation in its own block for clarity.
-        auto *cur_order_bb = llvm::BasicBlock::Create(context(), "order_" + detail::li_to_string(cur_order), f);
-        assert(cur_order_bb != nullptr);
-        m_builder->CreateBr(cur_order_bb);
-        m_builder->SetInsertPoint(cur_order_bb);
-
         // Begin with the state variables.
         // NOTE: the derivatives of the state variables
         // are at the end of the decomposition vector.
@@ -1648,13 +1642,27 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
             // The expression of the first-order derivative.
             const auto &ex = dc[i];
 
+            // Place the computation in its own block for clarity.
+            auto *cur_bb = llvm::BasicBlock::Create(
+                context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(sv_idx), f);
+            assert(cur_bb != nullptr);
+            m_builder->CreateBr(cur_bb);
+            m_builder->SetInsertPoint(cur_bb);
+
+            // Cache the values of the derivatives in a vector,
+            // and store them later in diff_arr/in_out.
+            std::vector<llvm::Value *> diff_values;
             for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
                 // Compute the derivative.
-                auto sv_diff = tjb_compute_sv_diff<T>(ex, cur_order, static_cast<std::uint32_t>(n_uvars), diff_arr,
-                                                      batch_idx, batch_size);
-                // Store the result in diff_arr. The index is:
+                diff_values.push_back(tjb_compute_sv_diff<T>(ex, cur_order, static_cast<std::uint32_t>(n_uvars),
+                                                             diff_arr, batch_idx, batch_size));
+            }
+
+            // Store the values from diff_values into diff_arr and in_out.
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                // The index in diff_arr is:
                 // cur_order * n_uvars * batch_size + sv_idx * batch_size + batch_idx.
-                m_builder->CreateStore(sv_diff,
+                m_builder->CreateStore(diff_values[batch_idx],
                                        m_builder->CreateInBoundsGEP(
                                            diff_arr,
                                            {m_builder->getInt32(0),
@@ -1662,11 +1670,10 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                                                 cur_order * n_uvars * batch_size + sv_idx * batch_size + batch_idx))},
                                            "sv_" + detail::li_to_string(sv_idx) + "_diff_ptr"));
 
-                // Store the result also in in_out.
-                // The in_out index into which we need to write is
+                // The index in in_out is:
                 // cur_order * n_eq * batch_size + sv_idx * batch_size + batch_idx.
                 m_builder->CreateStore(
-                    sv_diff,
+                    diff_values[batch_idx],
                     m_builder->CreateInBoundsGEP(in_out,
                                                  {m_builder->getInt32(static_cast<std::uint32_t>(
                                                      cur_order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
@@ -1678,13 +1685,22 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
         for (auto i = n_eq; i < n_uvars; ++i) {
             const auto &ex = dc[i];
 
-            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-                auto uv_diff = taylor_diff_batch<T>(*this, ex, static_cast<std::uint32_t>(i), cur_order,
-                                                    static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
-                                                    batch_size, cd_uvars);
+            auto *cur_bb = llvm::BasicBlock::Create(
+                context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(i), f);
+            assert(cur_bb != nullptr);
+            m_builder->CreateBr(cur_bb);
+            m_builder->SetInsertPoint(cur_bb);
 
+            std::vector<llvm::Value *> diff_values;
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                diff_values.push_back(taylor_diff_batch<T>(*this, ex, static_cast<std::uint32_t>(i), cur_order,
+                                                           static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
+                                                           batch_size, cd_uvars));
+            }
+
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
                 m_builder->CreateStore(
-                    uv_diff,
+                    diff_values[batch_idx],
                     m_builder->CreateInBoundsGEP(
                         diff_arr,
                         {m_builder->getInt32(0), m_builder->getInt32(static_cast<std::uint32_t>(
