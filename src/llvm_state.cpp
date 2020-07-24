@@ -28,8 +28,10 @@
 #include <vector>
 
 #include <llvm/ADT/Triple.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/CommandFlags.inc>
+#include <llvm/CodeGen/TargetPassConfig.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -349,10 +351,29 @@ void llvm_state::optimise()
     check_uncompiled(__func__);
 
     if (m_opt_level > 0u) {
+        // NOTE: the logic here largely mimics (with a lot of simplifications)
+        // the implementation of the 'opt' tool. See:
+        // https://github.com/llvm/llvm-project/blob/release/10.x/llvm/tools/opt/opt.cpp
+
         // For every function in the module, setup its attributes
         // so that the codegen uses all the features available on
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
+
+        // Init the module pass manager.
+        auto module_pm = std::make_unique<llvm::legacy::PassManager>();
+        // These are passes which set up target-specific info
+        // that are used by successive optimisation passes.
+        module_pm->add(new llvm::TargetLibraryInfoWrapperPass(llvm::TargetLibraryInfoImpl(*m_jitter->m_triple)));
+        module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
+
+        // Init the function pass manager.
+        auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
+        f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
+
+        // NOTE: not sure what this does, presumably some target-specifc
+        // configuration.
+        module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
@@ -360,26 +381,27 @@ void llvm_state::optimise()
         // See here for the defaults:
         // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
         pm_builder.OptLevel = m_opt_level;
-        pm_builder.VerifyInput = true;
-        pm_builder.VerifyOutput = true;
-        pm_builder.Inliner = llvm::createFunctionInliningPass();
+        pm_builder.SizeLevel = 0;
+        pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
         if (m_opt_level >= 3u) {
             pm_builder.SLPVectorize = true;
             pm_builder.MergeFunctions = true;
         }
 
-        // Init the pass manager.
-        auto module_pm = std::make_unique<llvm::legacy::PassManager>();
-        // NOTE: this first pass is important because it defines what sort of CPU
-        // features are available to the following passes.
-        // NOTE: the PassManagerBuilder class has an API for adding optimisation
-        // passes, but it seems like there's no way via that API to ensure
-        // that the tti pass is added as the very first pass.
-        module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
-        // Populate it.
+        m_jitter->m_tm->adjustPassManager(pm_builder);
+
+        // Populate both the function pass manager and the module pass manager.
+        pm_builder.populateFunctionPassManager(*f_pm);
         pm_builder.populateModulePassManager(*module_pm);
 
-        // Run the optimisation.
+        // Run the function pass manager on all functions in the module.
+        f_pm->doInitialization();
+        for (auto &f : *m_module) {
+            f_pm->run(f);
+        }
+        f_pm->doFinalization();
+
+        // Run the module passes.
         module_pm->run(*m_module);
     }
 }
