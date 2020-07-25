@@ -1534,12 +1534,10 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                      m_builder->getInt32((order - 1u) * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
                     "sv_diff_ptr");
 
-                if (vector_size > 0u) {
-                    diff_ptr = detail::to_vector_pointer(*m_builder, diff_ptr, vector_size);
-                }
-
-                // Load the value.
-                auto diff_load = m_builder->CreateLoad(diff_ptr, "sv_diff_load");
+                // Load the value, as a scalar or vector.
+                auto diff_load = (vector_size == 0u) ? m_builder->CreateLoad(diff_ptr, "sv_diff_load")
+                                                     : detail::load_vector_from_memory(*m_builder, diff_ptr,
+                                                                                       vector_size, "sv_diff_load");
 
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
@@ -1703,26 +1701,22 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
             for (std::uint32_t batch_idx = 0; batch_idx < n_sub_batch * vector_size; batch_idx += vector_size) {
                 const auto arr_idx = i * batch_size + batch_idx;
 
-                auto in_ptr = detail::to_vector_pointer(
-                    *m_builder,
-                    m_builder->CreateInBoundsGEP(in_out, {m_builder->getInt32(arr_idx)},
-                                                 "o0_init_ptr_" + detail::li_to_string(i) + "_"
-                                                     + detail::li_to_string(batch_idx)),
-                    vector_size);
+                auto in_ptr = m_builder->CreateInBoundsGEP(in_out, {m_builder->getInt32(arr_idx)},
+                                                           "o0_init_ptr_" + detail::li_to_string(i) + "_"
+                                                               + detail::li_to_string(batch_idx));
                 assert(in_ptr != nullptr);
 
-                auto load_inst = m_builder->CreateLoad(in_ptr, "o0_init_load_" + detail::li_to_string(i) + "_"
-                                                                   + detail::li_to_string(batch_idx));
+                auto vec = detail::load_vector_from_memory(*m_builder, in_ptr, vector_size,
+                                                           "o0_init_load_" + detail::li_to_string(i) + "_"
+                                                               + detail::li_to_string(batch_idx));
+                assert(vec != nullptr);
 
-                auto diff_ptr = detail::to_vector_pointer(
-                    *m_builder,
-                    m_builder->CreateInBoundsGEP(diff_arr, {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
-                                                 "o0_diff_ptr_" + detail::li_to_string(i) + "_"
-                                                     + detail::li_to_string(batch_idx)),
-                    vector_size);
+                auto diff_ptr = m_builder->CreateInBoundsGEP(
+                    diff_arr, {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
+                    "o0_diff_ptr_" + detail::li_to_string(i) + "_" + detail::li_to_string(batch_idx));
                 assert(diff_ptr != nullptr);
 
-                m_builder->CreateStore(load_inst, diff_ptr);
+                detail::store_vector_to_memory(*m_builder, diff_ptr, vec, vector_size);
             }
 
             // NOTE: this remainder loop could be interleaved in the same way as the scalar computation
@@ -1789,16 +1783,13 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                 auto init = taylor_init_batch<T>(*this, u_ex, diff_arr, batch_idx, batch_size, vector_size);
 
                 // Fetch the target pointer in diff_arr.
-                auto diff_ptr = detail::to_vector_pointer(
-                    *m_builder,
-                    m_builder->CreateInBoundsGEP(diff_arr, {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
-                                                 "o0_diff_ptr_" + detail::li_to_string(i) + "_"
-                                                     + detail::li_to_string(batch_idx)),
-                    vector_size);
+                auto diff_ptr = m_builder->CreateInBoundsGEP(
+                    diff_arr, {m_builder->getInt32(0), m_builder->getInt32(arr_idx)},
+                    "o0_diff_ptr_" + detail::li_to_string(i) + "_" + detail::li_to_string(batch_idx));
                 assert(diff_ptr != nullptr);
 
                 // Store the result of the initialisation.
-                m_builder->CreateStore(init, diff_ptr);
+                detail::store_vector_to_memory(*m_builder, diff_ptr, init, vector_size);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1898,26 +1889,24 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                     auto diff_val = tjb_compute_sv_diff<T>(ex, cur_order, static_cast<std::uint32_t>(n_uvars), diff_arr,
                                                            batch_idx, batch_size, vector_size);
 
-                    m_builder->CreateStore(
-                        diff_val, detail::to_vector_pointer(
-                                      *m_builder,
-                                      m_builder->CreateInBoundsGEP(
-                                          diff_arr,
-                                          {m_builder->getInt32(0),
-                                           m_builder->getInt32(static_cast<std::uint32_t>(
-                                               cur_order * n_uvars * batch_size + sv_idx * batch_size + batch_idx))},
-                                          "sv_" + detail::li_to_string(sv_idx) + "_diff_ptr"),
-                                      vector_size));
+                    detail::store_vector_to_memory(
+                        *m_builder,
+                        m_builder->CreateInBoundsGEP(
+                            diff_arr,
+                            {m_builder->getInt32(0),
+                             m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_uvars * batch_size
+                                                                            + sv_idx * batch_size + batch_idx))},
+                            "sv_" + detail::li_to_string(sv_idx) + "_diff_ptr"),
+                        diff_val, vector_size);
 
-                    m_builder->CreateStore(
-                        diff_val, detail::to_vector_pointer(
-                                      *m_builder,
-                                      m_builder->CreateInBoundsGEP(
-                                          in_out,
-                                          {m_builder->getInt32(static_cast<std::uint32_t>(
-                                              cur_order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
-                                          "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
-                                      vector_size));
+                    detail::store_vector_to_memory(
+                        *m_builder,
+                        m_builder->CreateInBoundsGEP(
+                            in_out,
+                            {m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_eq * batch_size
+                                                                            + sv_idx * batch_size + batch_idx))},
+                            "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
+                        diff_val, vector_size);
                 }
 
                 for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1980,16 +1969,16 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                     auto diff_v = taylor_diff_batch<T>(*this, ex, static_cast<std::uint32_t>(i), cur_order,
                                                        static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
                                                        batch_size, vector_size, cd_uvars);
-                    m_builder->CreateStore(
-                        diff_v, detail::to_vector_pointer(
-                                    *m_builder,
-                                    m_builder->CreateInBoundsGEP(
-                                        diff_arr,
-                                        {m_builder->getInt32(0),
-                                         m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_uvars * batch_size
-                                                                                        + i * batch_size + batch_idx))},
-                                        "uv_" + detail::li_to_string(i) + "_diff_ptr"),
-                                    vector_size));
+
+                    detail::store_vector_to_memory(
+                        *m_builder,
+                        m_builder->CreateInBoundsGEP(
+                            diff_arr,
+                            {m_builder->getInt32(0),
+                             m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_uvars * batch_size
+                                                                            + i * batch_size + batch_idx))},
+                            "uv_" + detail::li_to_string(i) + "_diff_ptr"),
+                        diff_v, vector_size);
                 }
 
                 for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -2048,14 +2037,13 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                 auto diff = tjb_compute_sv_diff<T>(ex, order, static_cast<std::uint32_t>(n_uvars), diff_arr, batch_idx,
                                                    batch_size, vector_size);
 
-                m_builder->CreateStore(diff, detail::to_vector_pointer(
-                                                 *m_builder,
-                                                 m_builder->CreateInBoundsGEP(
-                                                     in_out,
-                                                     {m_builder->getInt32(static_cast<std::uint32_t>(
-                                                         order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
-                                                     "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
-                                                 vector_size));
+                detail::store_vector_to_memory(
+                    *m_builder,
+                    m_builder->CreateInBoundsGEP(in_out,
+                                                 {m_builder->getInt32(static_cast<std::uint32_t>(
+                                                     order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
+                                                 "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
+                    diff, vector_size);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {

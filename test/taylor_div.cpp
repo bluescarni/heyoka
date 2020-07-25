@@ -8,7 +8,9 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <initializer_list>
+#include <random>
 #include <tuple>
 #include <vector>
 
@@ -25,6 +27,8 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+static std::mt19937 rng;
+
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -34,6 +38,45 @@ const auto fp_types = std::tuple<double, long double
                                  mppp::real128
 #endif
                                  >{};
+
+template <typename T, typename U>
+void compare_batch_scalar(std::initializer_list<U> sys)
+{
+    const auto batch_size = 23u;
+
+    llvm_state s{"", 0};
+
+    s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
+    s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
+
+    s.compile();
+
+    auto jptr_batch = s.fetch_taylor_jet_batch<T>("jet_batch");
+    auto jptr_scalar = s.fetch_taylor_jet_batch<T>("jet_scalar");
+
+    std::vector<T> jet_batch;
+    jet_batch.resize(8 * batch_size);
+    std::uniform_real_distribution<float> dist(-10.f, 10.f);
+    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
+
+    std::vector<T> jet_scalar;
+    jet_scalar.resize(8);
+
+    jptr_batch(jet_batch.data());
+
+    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+        // Assign the initial values of x and y.
+        for (auto i = 0u; i < 2u; ++i) {
+            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
+        }
+
+        jptr_scalar(jet_scalar.data());
+
+        for (auto i = 2u; i < 8u; ++i) {
+            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+        }
+    }
+}
 
 TEST_CASE("taylor div")
 {
@@ -199,6 +242,9 @@ TEST_CASE("taylor div")
             REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[17])));
         }
 
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y});
+
         // Variable-number tests.
         {
             llvm_state s{"", 0};
@@ -342,6 +388,8 @@ TEST_CASE("taylor div")
             REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (jet[13] * fp_t{2} / fp_t{-4})));
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (jet[14] * fp_t{2} / fp_t{-4})));
         }
+
+        compare_batch_scalar<fp_t>({y / 2_dbl, x / -4_dbl});
 
         // Number/variable tests.
         {
@@ -500,6 +548,8 @@ TEST_CASE("taylor div")
             REQUIRE(jet[22]
                     == approximately(4 / fp_t{6} * (2 * jet[14] * 1 * 1 - jet[8] * 2 * 1 * jet[8]) / (1 * 1 * 1 * 1)));
         }
+
+        compare_batch_scalar<fp_t>({2_dbl / y, -4_dbl / x});
 
         // Variable/variable tests.
         {
@@ -674,6 +724,8 @@ TEST_CASE("taylor div")
                         * ((2 * jet[17] * 1 - 2 * jet[14] * -2) * 1 * 1 - 2 * 1 * jet[8] * (jet[11] * 1 - jet[8] * -2))
                         / (1 * 1 * 1 * 1)));
         }
+
+        compare_batch_scalar<fp_t>({x / y, y / x});
     };
 
     tuple_for_each(fp_types, tester);

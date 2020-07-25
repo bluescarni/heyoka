@@ -1071,11 +1071,9 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, con
         {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
         "bo_addsub_num_var_ptr");
 
-    if (vector_size > 0u) {
-        ptr = detail::to_vector_pointer(builder, ptr, vector_size);
-    }
-
-    auto ret = builder.CreateLoad(ptr, "bo_addsub_num_var_load");
+    auto ret = (vector_size == 0u)
+                   ? builder.CreateLoad(ptr, "bo_addsub_num_var_load")
+                   : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_addsub_num_var_load");
 
     if constexpr (AddOrSub) {
         return ret;
@@ -1104,12 +1102,9 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var
         {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
         "bo_addsub_var_num_ptr");
 
-    if (vector_size > 0u) {
-        ptr = detail::to_vector_pointer(builder, ptr, vector_size);
-    }
-
     // NOTE: does not matter here plus or minus.
-    return builder.CreateLoad(ptr, "bo_addsub_var_num_load");
+    return (vector_size == 0u) ? builder.CreateLoad(ptr, "bo_addsub_num_var_load")
+                               : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_addsub_num_var_load");
 }
 
 // Derivative of var +- var.
@@ -1137,14 +1132,13 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var
         {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
         "bo_addsub_var_var_ptr");
 
-    if (vector_size > 0u) {
-        arr_ptr0 = detail::to_vector_pointer(builder, arr_ptr0, vector_size);
-        arr_ptr1 = detail::to_vector_pointer(builder, arr_ptr1, vector_size);
-    }
-
     // Load the values.
-    auto v0 = builder.CreateLoad(arr_ptr0, "bo_addsub_var_var_load");
-    auto v1 = builder.CreateLoad(arr_ptr1, "bo_addsub_var_var_load");
+    auto v0 = (vector_size == 0u)
+                  ? builder.CreateLoad(arr_ptr0, "bo_addsub_var_var_load")
+                  : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_addsub_var_var_load");
+    auto v1 = (vector_size == 0u)
+                  ? builder.CreateLoad(arr_ptr1, "bo_addsub_var_var_load")
+                  : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_addsub_var_var_load");
 
     if constexpr (AddOrSub) {
         return builder.CreateFAdd(v0, v1);
@@ -1219,11 +1213,8 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var, c
         {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
         "bo_mul_var_num_ptr");
 
-    if (vector_size > 0u) {
-        ptr = detail::to_vector_pointer(builder, ptr, vector_size);
-    }
-
-    auto ret = builder.CreateLoad(ptr, "bo_mul_var_num_load");
+    auto ret = (vector_size == 0u) ? builder.CreateLoad(ptr, "bo_mul_var_num_load")
+                                   : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_mul_var_num_load");
 
     auto mul = codegen<T>(s, num);
 
@@ -1281,14 +1272,13 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
             {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
             "bo_mul_var_var_ptr");
 
-        if (vector_size > 0u) {
-            arr_ptr0 = detail::to_vector_pointer(builder, arr_ptr0, vector_size);
-            arr_ptr1 = detail::to_vector_pointer(builder, arr_ptr1, vector_size);
-        }
-
         // Load the values.
-        auto v0 = builder.CreateLoad(arr_ptr0, "bo_mul_var_var_load");
-        auto v1 = builder.CreateLoad(arr_ptr1, "bo_mul_var_var_load");
+        auto v0 = (vector_size == 0u)
+                      ? builder.CreateLoad(arr_ptr0, "bo_mul_var_var_load")
+                      : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_mul_var_var_load");
+        auto v1 = (vector_size == 0u)
+                      ? builder.CreateLoad(arr_ptr1, "bo_mul_var_var_load")
+                      : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_mul_var_var_load");
 
         // Update ret_acc: ret_acc = ret_acc + v0*v1.
         ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(v0, v1), "bo_mul_var_var_ret_update");
@@ -1366,14 +1356,11 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
             {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
             "bo_div_ptr");
 
-        if (vector_size > 0u) {
-            arr_ptr0 = detail::to_vector_pointer(builder, arr_ptr0, vector_size);
-            arr_ptr1 = detail::to_vector_pointer(builder, arr_ptr1, vector_size);
-        }
-
         // Load the values.
-        auto v0 = builder.CreateLoad(arr_ptr0, "bo_div_load");
-        auto v1 = builder.CreateLoad(arr_ptr1, "bo_div_load");
+        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "bo_div_load")
+                                      : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_div_load");
+        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "bo_div_load")
+                                      : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_div_load");
 
         // Update ret_acc: ret_acc = ret_acc + v0*v1.
         ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(v0, v1), "bo_div_ret_update");
@@ -1385,11 +1372,8 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     auto div_ptr = builder.CreateInBoundsGEP(
         diff_arr, {builder.getInt32(0), builder.getInt32(u_idx1 * batch_size + batch_idx)}, "bo_div_div_ptr");
 
-    if (vector_size > 0u) {
-        div_ptr = detail::to_vector_pointer(builder, div_ptr, vector_size);
-    }
-
-    auto div = builder.CreateLoad(div_ptr, "bo_div_div");
+    auto div = (vector_size == 0u) ? builder.CreateLoad(div_ptr, "bo_div_div")
+                                   : detail::load_vector_from_memory(builder, div_ptr, vector_size, "bo_div_div");
 
     if constexpr (std::is_same_v<U, number>) {
         // nv is a number. Negate the accumulator
@@ -1404,11 +1388,9 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
             diff_arr,
             {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx0 * batch_size + batch_idx)});
 
-        if (vector_size > 0u) {
-            arr_ptr0 = detail::to_vector_pointer(builder, arr_ptr0, vector_size);
-        }
-
-        auto diff_nv_v = builder.CreateLoad(arr_ptr0, "bo_div_diff_nv");
+        auto diff_nv_v = (vector_size == 0u)
+                             ? builder.CreateLoad(arr_ptr0, "bo_div_diff_nv")
+                             : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_div_diff_nv");
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
         return builder.CreateFDiv(builder.CreateFSub(diff_nv_v, ret_acc), div);

@@ -252,12 +252,12 @@ llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Val
                                          "diff_ptr");
     assert(ptr != nullptr);
 
-    if (vector_size > 0u) {
-        ptr = detail::to_vector_pointer(builder, ptr, vector_size);
+    // Load from the array of derivatives as a scalar or vector.
+    if (vector_size == 0u) {
+        return builder.CreateLoad(ptr, "diff_load");
+    } else {
+        return detail::load_vector_from_memory(builder, ptr, vector_size, "diff_load");
     }
-
-    // Return a load instruction from the array of derivatives.
-    return builder.CreateLoad(ptr, "diff_load");
 }
 
 llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,

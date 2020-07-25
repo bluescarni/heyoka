@@ -128,9 +128,12 @@ inline auto taylor_diff_common(llvm_state &s, const std::string &name)
     return std::tuple{f, diff_ptr, order};
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *to_vector_pointer(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
-
 HEYOKA_DLL_PUBLIC llvm::Value *create_constant_vector(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
+
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t,
+                                                       const std::string & = "");
+
+HEYOKA_DLL_PUBLIC llvm::Value *store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *, std::uint32_t);
 
 } // namespace heyoka::detail
 
