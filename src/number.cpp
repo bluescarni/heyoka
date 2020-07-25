@@ -324,21 +324,42 @@ llvm::Value *taylor_init_f128(llvm_state &s, const number &n, llvm::Value *)
 
 // NOTE: for numbers, the Taylor init phase is
 // just the codegen.
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t vector_size)
 {
-    return codegen_dbl(s, n);
+    auto ret = codegen_dbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
 {
-    return codegen_ldbl(s, n);
+    auto ret = codegen_ldbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
 {
-    return codegen_f128(s, n);
+    auto ret = codegen_f128(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
 #endif

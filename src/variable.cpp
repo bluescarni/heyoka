@@ -28,6 +28,7 @@
 #endif
 
 #include <heyoka/detail/assert_nonnull_ret.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -233,7 +234,7 @@ llvm::Value *taylor_init_f128(llvm_state &s, const variable &var, llvm::Value *a
 #endif
 
 llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size)
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
 {
     auto &builder = s.builder();
 
@@ -251,23 +252,27 @@ llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Val
                                          "diff_ptr");
     assert(ptr != nullptr);
 
+    if (vector_size > 0u) {
+        ptr = detail::to_vector_pointer(builder, ptr, vector_size);
+    }
+
     // Return a load instruction from the array of derivatives.
     return builder.CreateLoad(ptr, "diff_load");
 }
 
 llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size)
+                                    std::uint32_t batch_size, std::uint32_t vector_size)
 {
     // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size);
+    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size, vector_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_init_batch_f128(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size)
+                                    std::uint32_t batch_size, std::uint32_t vector_size)
 {
-    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size);
+    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size, vector_size);
 }
 
 #endif

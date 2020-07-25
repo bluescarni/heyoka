@@ -91,7 +91,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL auto add_taylor_jet_batch_impl(const std::string &, U, std::uint32_t, std::uint32_t);
     template <typename T>
     HEYOKA_DLL_LOCAL llvm::Value *tjb_compute_sv_diff(const expression &, std::uint32_t, std::uint32_t, llvm::Value *,
-                                                      std::uint32_t, std::uint32_t);
+                                                      std::uint32_t, std::uint32_t, std::uint32_t);
 
 public:
     explicit llvm_state(const std::string &, unsigned = 3);

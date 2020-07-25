@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cassert>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <stdexcept>
@@ -24,8 +25,10 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -34,6 +37,7 @@
 #endif
 
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -123,6 +127,10 @@ inline auto taylor_diff_common(llvm_state &s, const std::string &name)
 
     return std::tuple{f, diff_ptr, order};
 }
+
+HEYOKA_DLL_PUBLIC llvm::Value *to_vector_pointer(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
+
+HEYOKA_DLL_PUBLIC llvm::Value *create_constant_vector(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 
 } // namespace heyoka::detail
 

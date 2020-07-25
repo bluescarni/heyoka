@@ -963,19 +963,22 @@ llvm::Value *taylor_init_f128(llvm_state &s, const function &f, llvm::Value *arr
 
 #endif
 
-llvm::Value *taylor_init_batch_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t)
 {
     throw;
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
     throw;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_init_batch_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
     throw;
 }
@@ -1020,14 +1023,14 @@ llvm::Function *taylor_diff_f128(llvm_state &s, const function &f, std::uint32_t
 #endif
 
 llvm::Value *taylor_diff_batch_dbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                   llvm::Value *, std::uint32_t, std::uint32_t,
+                                   llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                    const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
 }
 
 llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                    llvm::Value *, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                     const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
@@ -1036,7 +1039,7 @@ llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const function &, std::uint32_
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_batch_f128(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                    llvm::Value *, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                     const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
