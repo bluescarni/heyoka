@@ -375,6 +375,11 @@ void llvm_state::check_compiled(const char *f) const
 void llvm_state::check_add_name(const std::string &name) const
 {
     assert(m_module);
+
+    if (name.rfind("heyoka_", 0) == 0) {
+        throw std::invalid_argument("Names starting with 'heyoka_' are reserved");
+    }
+
     if (m_module->getNamedValue(name) != nullptr) {
         throw std::invalid_argument("The name '" + name + "' already exists in the module");
     }
