@@ -26,19 +26,12 @@
 #include <variant>
 #include <vector>
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
-#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -440,8 +433,6 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
     return u_vars_defs;
 }
 
-#if 0
-
 namespace detail
 {
 
@@ -508,56 +499,14 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     // before consuming sys.
     const auto n_vars = sys.size();
 
-    // Add the variable-order functions for computing
+    // Add the functions for computing
     // the jet of normalised derivatives.
-    // NOTE: in many cases m_order_r == m_order_a,
-    // thus we could probably save some time by
-    // creating (and optimising) only one function rather than 2.
-    m_dc = m_llvm.add_taylor_jet<T>("jet_r", sys, m_order_r);
-    m_llvm.add_taylor_jet<T>("jet_a", std::move(sys), m_order_a);
-
-    // Fetch the functions we just added.
-    auto orig_jet_r = m_llvm.module().getFunction("jet_r");
-    assert(orig_jet_r != nullptr);
-    auto orig_jet_a = m_llvm.module().getFunction("jet_a");
-    assert(orig_jet_a != nullptr);
-
-    // Change their linkage to internal, as we don't
-    // need to invoke them from outside the module.
-    orig_jet_r->setLinkage(llvm::Function::InternalLinkage);
-    orig_jet_a->setLinkage(llvm::Function::InternalLinkage);
-
-    // Add the wrappers with fixed order.
-    // The prototypes are both void(T *).
-    std::vector<llvm::Type *> f_args(1u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(m_llvm.context())));
-    auto *ft = llvm::FunctionType::get(m_llvm.builder().getVoidTy(), f_args, false);
-    assert(ft != nullptr);
-
-    // The relative tolerance function.
-    auto *fr = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_r", &m_llvm.module());
-    assert(fr != nullptr);
-    fr->args().begin()->setName("in_out_ptr");
-    auto *bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fr);
-    assert(bb != nullptr);
-    m_llvm.builder().SetInsertPoint(bb);
-    auto jet_call = m_llvm.builder().CreateCall(orig_jet_r, {fr->args().begin(), m_llvm.builder().getInt32(m_order_r)});
-    assert(jet_call != nullptr);
-    jet_call->setTailCall(true);
-    m_llvm.builder().CreateRetVoid();
-    m_llvm.verify_function("jet_f_r");
-
-    // The absolute tolerance function.
-    auto *fa = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "jet_f_a", &m_llvm.module());
-    assert(fa != nullptr);
-    fa->args().begin()->setName("in_out_ptr");
-    bb = llvm::BasicBlock::Create(m_llvm.context(), "entry", fa);
-    assert(bb != nullptr);
-    m_llvm.builder().SetInsertPoint(bb);
-    jet_call = m_llvm.builder().CreateCall(orig_jet_a, {fa->args().begin(), m_llvm.builder().getInt32(m_order_a)});
-    assert(jet_call != nullptr);
-    jet_call->setTailCall(true);
-    m_llvm.builder().CreateRetVoid();
-    m_llvm.verify_function("jet_f_a");
+    m_dc = m_llvm.add_taylor_jet_batch<T>("jet_r", sys, m_order_r, 1);
+    if (m_order_r != m_order_a) {
+        // NOTE: add the absolute tolerance jet function only
+        // if the relative and absolute orders differ.
+        m_llvm.add_taylor_jet_batch<T>("jet_a", std::move(sys), m_order_a, 1);
+    }
 
     // Change the optimisation level
     // and run the optimisation pass.
@@ -572,8 +521,12 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
 
     // Fetch the compiled function for computing
     // the jet of derivatives.
-    m_jet_f_r = reinterpret_cast<jet_f_t>(m_llvm.jit_lookup("jet_f_r"));
-    m_jet_f_a = reinterpret_cast<jet_f_t>(m_llvm.jit_lookup("jet_f_a"));
+    m_jet_f_r = m_llvm.fetch_taylor_jet_batch<T>("jet_r");
+    if (m_order_r == m_order_a) {
+        m_jet_f_a = m_jet_f_r;
+    } else {
+        m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
 
     // Init the jet vector. Its maximum size is n_vars * (max_order + 1).
     // NOTE: n_vars must be nonzero because we successfully
@@ -952,7 +905,5 @@ template class taylor_adaptive_impl<mppp::real128>;
 #endif
 
 } // namespace detail
-
-#endif
 
 } // namespace heyoka
