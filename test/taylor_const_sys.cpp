@@ -9,6 +9,9 @@
 #include <heyoka/config.hpp>
 
 #include <initializer_list>
+#include <random>
+#include <tuple>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -18,334 +21,262 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
+
+static std::mt19937 rng;
 
 using namespace heyoka;
+using namespace heyoka_test;
 
+const auto fp_types = std::tuple<double, long double
 #if defined(HEYOKA_HAVE_REAL128)
-
-TEST_CASE("f128")
-{
-    using namespace mppp::literals;
-
-    auto [x, y, z] = make_vars("x", "y", "z");
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {prime(x) = 1_f128, prime(y) = -2_f128, prime(z) = 0_f128}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[6] = {2_rq, 3_rq, 4_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {prime(x) = 1_f128, prime(y) = -2_f128, prime(z) = 0_f128}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[9] = {2_rq, 3_rq, 4_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {prime(x) = 1_f128, prime(y) = -2_f128, prime(z) = 0_f128}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[12] = {2_rq, 3_rq, 4_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-        REQUIRE(jet[9] == 0);
-        REQUIRE(jet[10] == 0);
-        REQUIRE(jet[11] == 0);
-    }
-}
-
+                                 ,
+                                 mppp::real128
 #endif
+                                 >{};
 
-TEST_CASE("dbl")
+template <typename T, typename U>
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
-    auto [x, y, z] = make_vars("x", "y", "z");
+    const auto batch_size = 23u;
 
-    {
-        llvm_state s{"", 0};
+    llvm_state s{"", opt_level};
 
-        s.add_taylor_jet_dbl("jet", {prime(x) = 1_dbl, prime(y) = -2_dbl, prime(z) = 0_dbl}, 1);
+    s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
+    s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
 
-        s.compile();
+    s.compile();
 
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
+    auto jptr_batch = s.fetch_taylor_jet_batch<T>("jet_batch");
+    auto jptr_scalar = s.fetch_taylor_jet_batch<T>("jet_scalar");
 
-        double jet[6] = {2, 3, 4};
+    std::vector<T> jet_batch;
+    jet_batch.resize(12 * batch_size);
+    std::uniform_real_distribution<float> dist(-10.f, 10.f);
+    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
 
-        jptr(jet, 1);
+    std::vector<T> jet_scalar;
+    jet_scalar.resize(12);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-    }
+    jptr_batch(jet_batch.data());
 
-    {
-        llvm_state s{"", 0};
+    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+        // Assign the initial values of x and y.
+        for (auto i = 0u; i < 3u; ++i) {
+            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
+        }
 
-        s.add_taylor_jet_dbl("jet", {prime(x) = 1_dbl, prime(y) = -2_dbl, prime(z) = 0_dbl}, 2);
+        jptr_scalar(jet_scalar.data());
 
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[9] = {2, 3, 4};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {prime(x) = 1_dbl, prime(y) = -2_dbl, prime(z) = 0_dbl}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[12] = {2, 3, 4};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-        REQUIRE(jet[9] == 0);
-        REQUIRE(jet[10] == 0);
-        REQUIRE(jet[11] == 0);
+        for (auto i = 3u; i < 12u; ++i) {
+            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+        }
     }
 }
 
-TEST_CASE("ldbl")
+TEST_CASE("taylor const sys")
 {
-    auto [x, y, z] = make_vars("x", "y", "z");
+    auto tester = [](auto fp_x, unsigned opt_level) {
+        using fp_t = decltype(fp_x);
 
-    {
-        llvm_state s{"", 0};
+        auto [x, y, z] = make_vars("x", "y", "z");
 
-        s.add_taylor_jet_ldbl("jet", {prime(x) = 1_ldbl, prime(y) = -2_ldbl, prime(z) = 0_ldbl}, 1);
+        {
+            llvm_state s{"", opt_level};
 
-        s.compile();
+            s.add_taylor_jet_batch<fp_t>("jet",
+                                         {prime(x) = expression{number{fp_t{1}}},
+                                          prime(y) = expression{number{fp_t{-2}}},
+                                          prime(z) = expression{number{fp_t{0}}}},
+                                         1, 1);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.compile();
 
-        long double jet[6] = {2, 3, 4};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 1);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}, fp_t{4}};
+            jet.resize(6);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-    }
+            jptr(jet.data());
 
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == 4);
+            REQUIRE(jet[3] == 1);
+            REQUIRE(jet[4] == -2);
+            REQUIRE(jet[5] == 0);
+        }
 
-        s.add_taylor_jet_ldbl("jet", {prime(x) = 1_ldbl, prime(y) = -2_ldbl, prime(z) = 0_ldbl}, 2);
+        {
+            llvm_state s{"", opt_level};
 
-        s.compile();
+            s.add_taylor_jet_batch<fp_t>("jet",
+                                         {prime(x) = expression{number{fp_t{1}}},
+                                          prime(y) = expression{number{fp_t{-2}}},
+                                          prime(z) = expression{number{fp_t{0}}}},
+                                         1, 2);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.compile();
 
-        long double jet[9] = {2, 3, 4};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 1);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}, fp_t{4}, fp_t{-4}};
+            jet.resize(12);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
+            jptr(jet.data());
 
-        jptr(jet, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-    }
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
 
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[4] == 4);
+            REQUIRE(jet[5] == -4);
 
-        s.add_taylor_jet_ldbl("jet", {prime(x) = 1_ldbl, prime(y) = -2_ldbl, prime(z) = 0_ldbl}, 3);
+            REQUIRE(jet[6] == 1);
+            REQUIRE(jet[7] == 1);
 
-        s.compile();
+            REQUIRE(jet[8] == -2);
+            REQUIRE(jet[9] == -2);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            REQUIRE(jet[10] == 0);
+            REQUIRE(jet[11] == 0);
+        }
 
-        long double jet[12] = {2, 3, 4};
+        {
+            llvm_state s{"", opt_level};
 
-        jptr(jet, 1);
+            s.add_taylor_jet_batch<fp_t>("jet",
+                                         {prime(x) = expression{number{fp_t{1}}},
+                                          prime(y) = expression{number{fp_t{-2}}},
+                                          prime(z) = expression{number{fp_t{0}}}},
+                                         2, 1);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
+            s.compile();
 
-        jptr(jet, 2);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}, fp_t{4}};
+            jet.resize(9);
 
-        jptr(jet, 3);
+            jptr(jet.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == 4);
-        REQUIRE(jet[3] == 1);
-        REQUIRE(jet[4] == -2);
-        REQUIRE(jet[5] == 0);
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == 0);
-        REQUIRE(jet[8] == 0);
-        REQUIRE(jet[9] == 0);
-        REQUIRE(jet[10] == 0);
-        REQUIRE(jet[11] == 0);
-    }
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == 4);
+            REQUIRE(jet[3] == 1);
+            REQUIRE(jet[4] == -2);
+            REQUIRE(jet[5] == 0);
+            REQUIRE(jet[6] == 0);
+            REQUIRE(jet[7] == 0);
+            REQUIRE(jet[8] == 0);
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet",
+                                         {prime(x) = expression{number{fp_t{1}}},
+                                          prime(y) = expression{number{fp_t{-2}}},
+                                          prime(z) = expression{number{fp_t{0}}}},
+                                         2, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}, fp_t{4}, fp_t{-4}};
+            jet.resize(18);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
+
+            REQUIRE(jet[4] == 4);
+            REQUIRE(jet[5] == -4);
+
+            REQUIRE(jet[6] == 1);
+            REQUIRE(jet[7] == 1);
+
+            REQUIRE(jet[8] == -2);
+            REQUIRE(jet[9] == -2);
+
+            REQUIRE(jet[10] == 0);
+            REQUIRE(jet[11] == 0);
+
+            REQUIRE(jet[12] == 0);
+            REQUIRE(jet[13] == 0);
+
+            REQUIRE(jet[14] == 0);
+            REQUIRE(jet[15] == 0);
+
+            REQUIRE(jet[16] == 0);
+            REQUIRE(jet[17] == 0);
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet",
+                                         {prime(x) = expression{number{fp_t{1}}},
+                                          prime(y) = expression{number{fp_t{-2}}},
+                                          prime(z) = expression{number{fp_t{0}}}},
+                                         3, 3);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{0}, fp_t{3}, fp_t{-3}, fp_t{0}, fp_t{4}, fp_t{-4}, fp_t{0}};
+            jet.resize(36);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == 0);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == -3);
+            REQUIRE(jet[5] == 0);
+
+            REQUIRE(jet[6] == 4);
+            REQUIRE(jet[7] == -4);
+            REQUIRE(jet[8] == 0);
+
+            REQUIRE(jet[9] == 1);
+            REQUIRE(jet[10] == 1);
+            REQUIRE(jet[11] == 1);
+
+            REQUIRE(jet[12] == -2);
+            REQUIRE(jet[13] == -2);
+            REQUIRE(jet[14] == -2);
+
+            REQUIRE(jet[15] == 0);
+            REQUIRE(jet[16] == 0);
+            REQUIRE(jet[17] == 0);
+
+            for (auto i = 18u; i < 36u; ++i) {
+                REQUIRE(jet[i] == 0);
+            }
+        }
+
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                    prime(z) = expression{number{fp_t{0}}}},
+                                   opt_level);
+    };
+
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }
