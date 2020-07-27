@@ -26,7 +26,12 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
 using namespace mppp::literals;
+
+#endif
 
 TEST_CASE("vararg expression")
 {
@@ -191,7 +196,7 @@ TEST_CASE("tj batch")
 
     s.add_taylor_jet_batch_dbl("tjb", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 20, 4);
 
-    std::cout << s.dump_ir() << '\n';
+    // std::cout << s.dump_ir() << '\n';
 }
 
 TEST_CASE("log tmp test")
@@ -202,5 +207,5 @@ TEST_CASE("log tmp test")
 
     s.add_taylor_jet_batch_dbl("tjb", {prime(x) = log(y), prime(y) = log(x)}, 2, 4);
 
-    std::cout << s.dump_ir() << '\n';
+    // std::cout << s.dump_ir() << '\n';
 }
