@@ -440,6 +440,8 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
     return u_vars_defs;
 }
 
+#if 0
+
 namespace detail
 {
 
@@ -950,5 +952,7 @@ template class taylor_adaptive_impl<mppp::real128>;
 #endif
 
 } // namespace detail
+
+#endif
 
 } // namespace heyoka

@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/IR/Constants.h>
@@ -23,6 +24,13 @@
 #include <llvm/Support/Casting.h>
 
 #include <heyoka/detail/llvm_helpers.hpp>
+
+#if defined(__clang__)
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+
+#endif
 
 namespace heyoka::detail
 {
@@ -132,5 +140,63 @@ llvm::Value *create_constant_vector(llvm::IRBuilder<> &builder, llvm::Value *c, 
 
     return vec;
 }
+
+std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::Value *vec)
+{
+    // Fetch the vector type.
+    auto vec_t = llvm::cast<llvm::VectorType>(vec->getType());
+
+    // Fetch the vector width.
+    auto vector_size = vec_t->getNumElements();
+
+    // Extract the vector elements one by one.
+    std::vector<llvm::Value *> ret;
+    if (vector_size > std::numeric_limits<std::uint64_t>::max()) {
+        throw std::overflow_error("Overflow in vector_to_scalars()");
+    }
+    for (decltype(vector_size) i = 0; i < vector_size; ++i) {
+        ret.push_back(builder.CreateExtractElement(vec, static_cast<std::uint64_t>(i)));
+        assert(ret.back() != nullptr);
+    }
+
+    return ret;
+}
+
+llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llvm::Value *> &scalars)
+{
+    assert(!scalars.empty());
+
+    // Fetch the scalar type.
+    auto scalar_t = scalars[0]->getType();
+
+    // Fetch the vector size.
+    const auto vector_size = scalars.size();
+
+    // Create the corresponding vector type.
+    if (vector_size > std::numeric_limits<unsigned>::max()) {
+        throw std::overflow_error("Overflow in scalars_to_vector()");
+    }
+    auto vector_t = llvm::VectorType::get(scalar_t, static_cast<unsigned>(vector_size));
+    assert(vector_t != nullptr);
+
+    // Create an empty vector.
+    llvm::Value *vec = llvm::UndefValue::get(vector_t);
+    assert(vec != nullptr);
+
+    // Fill it up.
+    for (auto i = 0u; i < vector_size; ++i) {
+        assert(scalars[i]->getType() == scalar_t);
+
+        vec = builder.CreateInsertElement(vec, scalars[i], i);
+    }
+
+    return vec;
+}
+
+#if defined(__clang__)
+
+#pragma clang diagnostic pop
+
+#endif
 
 } // namespace heyoka::detail

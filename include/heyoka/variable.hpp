@@ -108,31 +108,6 @@ inline llvm::Value *codegen(llvm_state &s, const variable &var)
 
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const variable &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const variable &, llvm::Value *);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_f128(llvm_state &, const variable &, llvm::Value *);
-
-#endif
-
-template <typename T>
-inline llvm::Value *taylor_init(llvm_state &s, const variable &var, llvm::Value *arr)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_init_dbl(s, var, arr);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_init_ldbl(s, var, arr);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_init_f128(s, var, arr);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_dbl(llvm_state &, const variable &, llvm::Value *, std::uint32_t,
                                                      std::uint32_t, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_ldbl(llvm_state &, const variable &, llvm::Value *, std::uint32_t,

@@ -193,3 +193,14 @@ TEST_CASE("tj batch")
 
     std::cout << s.dump_ir() << '\n';
 }
+
+TEST_CASE("log tmp test")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s{""};
+
+    s.add_taylor_jet_batch_dbl("tjb", {prime(x) = log(y), prime(y) = log(x)}, 2, 4);
+
+    std::cout << s.dump_ir() << '\n';
+}

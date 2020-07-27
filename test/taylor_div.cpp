@@ -40,11 +40,11 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
     const auto batch_size = 23u;
 
-    llvm_state s{"", 0};
+    llvm_state s{"", opt_level};
 
     s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
     s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
@@ -80,7 +80,7 @@ void compare_batch_scalar(std::initializer_list<U> sys)
 
 TEST_CASE("taylor div")
 {
-    auto tester = [](auto fp_x) {
+    auto tester = [](auto fp_x, unsigned opt_level) {
         using fp_t = decltype(fp_x);
 
         using Catch::Matchers::Message;
@@ -89,7 +89,7 @@ TEST_CASE("taylor div")
 
         // Number-number tests.
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 1, 1);
@@ -110,7 +110,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 2, 1);
@@ -133,7 +133,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 1, 2);
@@ -161,7 +161,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 2, 2);
@@ -195,7 +195,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 3, 3);
@@ -243,11 +243,12 @@ TEST_CASE("taylor div")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y});
+        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y},
+                                   opt_level);
 
         // Variable-number tests.
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y / 2_dbl, x / -4_dbl}, 1, 1);
 
@@ -267,7 +268,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y / 2_dbl, x / -4_dbl}, 2, 1);
 
@@ -289,7 +290,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y / 2_dbl, x / -4_dbl}, 1, 2);
 
@@ -316,7 +317,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y / 2_dbl, x / -4_dbl}, 2, 2);
 
@@ -343,7 +344,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y / 2_dbl, x / -4_dbl}, 3, 3);
 
@@ -389,11 +390,11 @@ TEST_CASE("taylor div")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (jet[14] * fp_t{2} / fp_t{-4})));
         }
 
-        compare_batch_scalar<fp_t>({y / 2_dbl, x / -4_dbl});
+        compare_batch_scalar<fp_t>({y / 2_dbl, x / -4_dbl}, opt_level);
 
         // Number/variable tests.
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl / y, -4_dbl / x}, 1, 1);
 
@@ -413,7 +414,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl / y, -4_dbl / x}, 2, 1);
 
@@ -435,7 +436,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl / y, -4_dbl / x}, 1, 2);
 
@@ -462,7 +463,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl / y, -4_dbl / x}, 2, 2);
 
@@ -495,7 +496,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl / y, -4_dbl / x}, 3, 3);
 
@@ -549,11 +550,11 @@ TEST_CASE("taylor div")
                     == approximately(4 / fp_t{6} * (2 * jet[14] * 1 * 1 - jet[8] * 2 * 1 * jet[8]) / (1 * 1 * 1 * 1)));
         }
 
-        compare_batch_scalar<fp_t>({2_dbl / y, -4_dbl / x});
+        compare_batch_scalar<fp_t>({2_dbl / y, -4_dbl / x}, opt_level);
 
         // Variable/variable tests.
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x / y, y / x}, 1, 1);
 
@@ -573,7 +574,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x / y, y / x}, 2, 1);
 
@@ -595,7 +596,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x / y, y / x}, 1, 2);
 
@@ -622,7 +623,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x / y, y / x}, 2, 2);
 
@@ -655,7 +656,7 @@ TEST_CASE("taylor div")
         }
 
         {
-            llvm_state s{"", 0};
+            llvm_state s{"", opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x / y, y / x}, 3, 3);
 
@@ -725,8 +726,11 @@ TEST_CASE("taylor div")
                         / (1 * 1 * 1 * 1)));
         }
 
-        compare_batch_scalar<fp_t>({x / y, y / x});
+        compare_batch_scalar<fp_t>({x / y, y / x}, opt_level);
     };
 
-    tuple_for_each(fp_types, tester);
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }

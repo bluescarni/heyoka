@@ -25,7 +25,7 @@ struct approximately {
     const T m_value;
     const T m_eps_mul;
 
-    explicit approximately(T x, T eps_mul = T(10)) : m_value(x), m_eps_mul(eps_mul) {}
+    explicit approximately(T x, T eps_mul = T(100)) : m_value(x), m_eps_mul(eps_mul) {}
 };
 
 template <typename T>

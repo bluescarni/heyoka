@@ -197,42 +197,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::v
     return 0;
 }
 
-llvm::Value *taylor_init_dbl(llvm_state &s, const variable &var, llvm::Value *arr)
-{
-    auto &builder = s.builder();
-
-    // Check that var is a u variable and extract its index.
-    const auto &var_name = var.name();
-    if (var_name.rfind("u_", 0) != 0) {
-        throw std::invalid_argument("Invalid variable name '" + var_name
-                                    + "' encountered in the Taylor initialization phase (the name "
-                                      "must be in the form 'u_n', where n is a non-negative integer)");
-    }
-    const auto idx = detail::uname_to_index(var_name);
-
-    // Index into the array of derivatives.
-    auto ptr = builder.CreateInBoundsGEP(arr, {builder.getInt32(0), builder.getInt32(idx)}, "diff_ptr");
-    assert(ptr != nullptr);
-
-    // Return a load instruction from the array of derivatives.
-    heyoka_assert_nonnull_ret(builder.CreateLoad(ptr, "diff_load"));
-}
-
-llvm::Value *taylor_init_ldbl(llvm_state &s, const variable &var, llvm::Value *arr)
-{
-    // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_init_dbl(s, var, arr);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_init_f128(llvm_state &s, const variable &var, llvm::Value *arr)
-{
-    return taylor_init_dbl(s, var, arr);
-}
-
-#endif
-
 llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
                                    std::uint32_t batch_size, std::uint32_t vector_size)
 {

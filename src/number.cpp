@@ -303,27 +303,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vec
 
 // NOTE: for numbers, the Taylor init phase is
 // just the codegen.
-llvm::Value *taylor_init_dbl(llvm_state &s, const number &n, llvm::Value *)
-{
-    return codegen_dbl(s, n);
-}
-
-llvm::Value *taylor_init_ldbl(llvm_state &s, const number &n, llvm::Value *)
-{
-    return codegen_ldbl(s, n);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_init_f128(llvm_state &s, const number &n, llvm::Value *)
-{
-    return codegen_f128(s, n);
-}
-
-#endif
-
-// NOTE: for numbers, the Taylor init phase is
-// just the codegen.
 llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
                                    std::uint32_t vector_size)
 {

@@ -39,6 +39,8 @@ namespace heyoka
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
 
+#if 0
+
 namespace detail
 {
 
@@ -261,6 +263,8 @@ struct taylor_adaptive_t_impl<mppp::real128> {
 
 template <typename T>
 using taylor_adaptive = typename detail::taylor_adaptive_t_impl<T>::type;
+
+#endif
 
 } // namespace heyoka
 
