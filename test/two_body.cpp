@@ -119,7 +119,7 @@ TEST_CASE("two body")
 
         for (auto i = 0; i < 200; ++i) {
             const auto [oc, h, ord] = tad.step();
-            REQUIRE(oc == taylor_adaptive<fp_t>::outcome::success);
+            REQUIRE(oc == taylor_outcome::success);
             REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
             REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
         }
@@ -183,7 +183,7 @@ TEST_CASE("two uniform spheres")
 
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
+        REQUIRE(oc == taylor_outcome::success);
         REQUIRE(std::abs((en - tus_energy(rs_val, st)) / en) <= 1E-11);
         REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
     }
@@ -257,7 +257,7 @@ TEST_CASE("mixed tb/spheres")
 
         // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
         auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
-        REQUIRE((oc == taylor_adaptive_dbl::outcome::success || oc == taylor_adaptive_dbl::outcome::time_limit));
+        REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
 
         if (get_regime(cur_t->get_state()) != cur_regime) {
             auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));

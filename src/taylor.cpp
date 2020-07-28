@@ -618,8 +618,7 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 // Jorba still needs to be implemented.
 template <typename T>
 template <bool LimitTimestep, bool Direction>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t>
-taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
+std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
 {
     assert(detail::isfinite(max_delta_t));
     if constexpr (LimitTimestep) {
@@ -637,7 +636,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         // NOTE: can we do this check just once at the end of the loop?
         // Need to reason about NaNs.
         if (!detail::isfinite(x)) {
-            return std::tuple{outcome::err_nf_state, T(0), std::uint32_t(0)};
+            return std::tuple{taylor_outcome::err_nf_state, T(0), std::uint32_t(0)};
         }
 
         max_abs_state = std::max(max_abs_state, detail::abs(x));
@@ -664,7 +663,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
 
     // Check the computed derivatives, starting from order 1.
     if (std::any_of(jet_ptr + nvars, jet_ptr + (order + 1u) * nvars, [](const T &x) { return !detail::isfinite(x); })) {
-        return std::tuple{outcome::err_nf_derivative, T(0), std::uint32_t(0)};
+        return std::tuple{taylor_outcome::err_nf_derivative, T(0), std::uint32_t(0)};
     }
 
     // Now we compute an estimation of the radius of convergence of the Taylor
@@ -684,12 +683,12 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
     const auto rho_o = use_abs_tol ? detail::pow(1 / max_abs_diff_o, m_inv_order[order])
                                    : detail::pow(max_abs_state / max_abs_diff_o, m_inv_order[order]);
     if (detail::isnan(rho_om1) || detail::isnan(rho_o)) {
-        return std::tuple{outcome::err_nan_rho, T(0), std::uint32_t(0)};
+        return std::tuple{taylor_outcome::err_nan_rho, T(0), std::uint32_t(0)};
     }
 
     // From this point on, the only possible
     // outcomes are success or time_limit.
-    auto oc = outcome::success;
+    auto oc = taylor_outcome::success;
 
     // Take the minimum.
     const auto rho_m = std::min(rho_o, rho_om1);
@@ -700,7 +699,7 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
         // Make sure h does not exceed max_delta_t.
         if (h > max_delta_t) {
             h = max_delta_t;
-            oc = outcome::time_limit;
+            oc = taylor_outcome::time_limit;
         }
     }
     if constexpr (!Direction) {
@@ -727,19 +726,19 @@ taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
 }
 
 template <typename T>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step()
+std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step()
 {
     return step_impl<false, true>(T(0));
 }
 
 template <typename T>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_backward()
+std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_backward()
 {
     return step_impl<false, false>(T(0));
 }
 
 template <typename T>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step(T max_delta_t)
+std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step(T max_delta_t)
 {
     if (!detail::isfinite(max_delta_t)) {
         throw std::invalid_argument(
@@ -754,14 +753,14 @@ std::tuple<typename taylor_adaptive_impl<T>::outcome, T, std::uint32_t> taylor_a
 }
 
 template <typename T>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
+std::tuple<taylor_outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
 taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
 {
     return propagate_until(m_time + delta_t, max_steps);
 }
 
 template <typename T>
-std::tuple<typename taylor_adaptive_impl<T>::outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
+std::tuple<taylor_outcome, T, T, std::uint32_t, std::uint32_t, std::size_t>
 taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 {
     if (!detail::isfinite(t)) {
@@ -777,7 +776,7 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
     std::uint32_t min_order = std::numeric_limits<std::uint32_t>::max(), max_order = 0;
 
     if (t == m_time) {
-        return std::tuple{outcome::time_limit, min_h, max_h, min_order, max_order, step_counter};
+        return std::tuple{taylor_outcome::time_limit, min_h, max_h, min_order, max_order, step_counter};
     }
 
     if ((t > m_time && !detail::isfinite(t - m_time)) || (t < m_time && !detail::isfinite(m_time - t))) {
@@ -789,7 +788,7 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
         while (true) {
             const auto [res, h, t_order] = step_impl<true, true>(t - m_time);
 
-            if (res != outcome::success && res != outcome::time_limit) {
+            if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
                 return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
             }
 
@@ -814,14 +813,14 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 
             // Check the max number of steps stopping criterion.
             if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
+                return std::tuple{taylor_outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
             }
         }
     } else {
         while (true) {
             const auto [res, h, t_order] = step_impl<true, false>(m_time - t);
 
-            if (res != outcome::success && res != outcome::time_limit) {
+            if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
                 return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
             }
 
@@ -838,12 +837,12 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
             max_h = std::max(max_h, detail::abs(h));
 
             if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
+                return std::tuple{taylor_outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
             }
         }
     }
 
-    return std::tuple{outcome::time_limit, min_h, max_h, min_order, max_order, step_counter};
+    return std::tuple{taylor_outcome::time_limit, min_h, max_h, min_order, max_order, step_counter};
 }
 
 template <typename T>
