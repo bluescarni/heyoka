@@ -8,7 +8,11 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <initializer_list>
+#include <random>
+#include <tuple>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -23,1012 +27,661 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+static std::mt19937 rng;
+
 using namespace heyoka;
 using namespace heyoka_test;
 
+const auto fp_types = std::tuple<double, long double
 #if defined(HEYOKA_HAVE_REAL128)
-
-TEST_CASE("f128")
-{
-    using Catch::Matchers::Message;
-    using namespace mppp::literals;
-
-    auto x = "x"_var, y = "y"_var;
-
-    // Number-number tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {expression{binary_operator{binary_operator::type::mul, 2_f128, 3_f128}}, x + y},
-                              1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[4] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {expression{binary_operator{binary_operator::type::mul, 2_f128, 3_f128}}, x + y},
-                              2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[6] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {expression{binary_operator{binary_operator::type::mul, 2_f128, 3_f128}}, x + y},
-                              3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[8] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(5_rq));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5_rq * (6_rq + jet[3])));
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == approximately(1 / 6_rq * (2 * jet[5])));
-    }
-
-    // Variable-number tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {y * 2_f128, x * -4_f128}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[4] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {y * 2_f128, x * -4_f128}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[6] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {y * 2_f128, x * -4_f128}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[8] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6_rq * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3_rq * jet[4]));
-    }
-
-    // Number/variable tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {2_f128 * y, -4_f128 * x}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[4] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {2_f128 * y, -4_f128 * x}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[6] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {2_f128 * y, -4_f128 * x}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[8] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(-8_rq));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6_rq * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3_rq * jet[4]));
-    }
-
-    // Variable/variable tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {x * y, y * x}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[4] = {2_rq, 3_rq};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(6_rq));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {x * y, y * x}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[6] = {2_rq, 3_rq};
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(6_rq));
-        REQUIRE(jet[4] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_f128("jet", {x * y, y * x}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_f128("jet");
-
-        mppp::real128 jet[8] = {2_rq, 3_rq};
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6_rq));
-        REQUIRE(jet[3] == approximately(6_rq));
-        REQUIRE(jet[4] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5_rq * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == approximately(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
-        REQUIRE(jet[7] == approximately(1 / 6_rq * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2_rq * 2 * jet[5])));
-    }
-}
-
+                                 ,
+                                 mppp::real128
 #endif
+                                 >{};
 
-TEST_CASE("dbl")
+template <typename T, typename U>
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
-    using Catch::Matchers::Message;
+    const auto batch_size = 23u;
 
-    auto x = "x"_var, y = "y"_var;
+    llvm_state s{"", opt_level};
 
-    // Number-number tests.
-    {
-        llvm_state s{"", 0};
+    s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
+    s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
 
-        s.add_taylor_jet_dbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1);
+    s.compile();
 
-        s.compile();
+    auto jptr_batch = s.fetch_taylor_jet_batch<T>("jet_batch");
+    auto jptr_scalar = s.fetch_taylor_jet_batch<T>("jet_scalar");
 
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
+    std::vector<T> jet_batch;
+    jet_batch.resize(8 * batch_size);
+    std::uniform_real_distribution<float> dist(-10.f, 10.f);
+    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
 
-        double jet[4] = {2, 3};
+    std::vector<T> jet_scalar;
+    jet_scalar.resize(8);
 
-        jptr(jet, 1);
+    jptr_batch(jet_batch.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-    }
+    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+        // Assign the initial values of x and y.
+        for (auto i = 0u; i < 2u; ++i) {
+            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
+        }
 
-    {
-        llvm_state s{"", 0};
+        jptr_scalar(jet_scalar.data());
 
-        s.add_taylor_jet_dbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(5.));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5 * (6. + jet[3])));
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == approximately(1 / 6. * (2 * jet[5])));
-    }
-
-    // Variable-number tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {y * 2_dbl, x * -4_dbl}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[4] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {y * 2_dbl, x * -4_dbl}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {y * 2_dbl, x * -4_dbl}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6. * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3. * jet[4]));
-    }
-
-    // Number/variable tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {2_dbl * y, -4_dbl * x}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[4] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {2_dbl * y, -4_dbl * x}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {2_dbl * y, -4_dbl * x}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(-8.));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6. * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3. * jet[4]));
-    }
-
-    // Variable/variable tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {x * y, y * x}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[4] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(6.));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {x * y, y * x}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(6.));
-        REQUIRE(jet[4] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {x * y, y * x}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.));
-        REQUIRE(jet[3] == approximately(6.));
-        REQUIRE(jet[4] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5 * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == approximately(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
-        REQUIRE(jet[7] == approximately(1 / 6. * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2. * 2 * jet[5])));
+        for (auto i = 2u; i < 8u; ++i) {
+            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+        }
     }
 }
 
-TEST_CASE("ldbl")
+TEST_CASE("taylor mul")
 {
-    using Catch::Matchers::Message;
+    auto tester = [](auto fp_x, unsigned opt_level) {
+        using fp_t = decltype(fp_x);
 
-    auto x = "x"_var, y = "y"_var;
+        using Catch::Matchers::Message;
 
-    // Number-number tests.
-    {
-        llvm_state s{"", 0};
+        auto x = "x"_var, y = "y"_var;
 
-        s.add_taylor_jet_ldbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_ldbl, 3_ldbl}}, x + y},
-                              1);
+        // Number-number tests.
+        {
+            llvm_state s{"", opt_level};
 
-        s.compile();
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 1);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.compile();
 
-        long double jet[4] = {2, 3};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 1);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
-    }
+            jptr(jet.data());
 
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(fp_t{5}));
+        }
 
-        s.add_taylor_jet_ldbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_ldbl, 3_ldbl}}, x + y},
-                              2);
+        {
+            llvm_state s{"", opt_level};
 
-        s.compile();
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 2);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.compile();
 
-        long double jet[6] = {2, 3};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 1);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
+            jet.resize(8);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
+            jptr(jet.data());
 
-        jptr(jet, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
+            REQUIRE(jet[4] == 6);
+            REQUIRE(jet[5] == 6);
+            REQUIRE(jet[6] == 5);
+            REQUIRE(jet[7] == -5);
+        }
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
-    }
+        {
+            llvm_state s{"", opt_level};
 
-    {
-        llvm_state s{"", 0};
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 1);
 
-        s.add_taylor_jet_ldbl("jet", {expression{binary_operator{binary_operator::type::mul, 2_ldbl, 3_ldbl}}, x + y},
-                              3);
+            s.compile();
 
-        s.compile();
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
 
-        long double jet[8] = {2, 3};
+            jptr(jet.data());
 
-        jptr(jet, 1);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(fp_t{5}));
+            REQUIRE(jet[4] == 0);
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (fp_t{6} + jet[3])));
+        }
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
+        {
+            llvm_state s{"", opt_level};
 
-        jptr(jet, 2);
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 2);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
+            s.compile();
 
-        jptr(jet, 3);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(5.l));
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == approximately(.5l * (6.l + jet[3])));
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == approximately(1 / 6.l * (2 * jet[5])));
-    }
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
+            jet.resize(12);
 
-    // Variable-number tests.
-    {
-        llvm_state s{"", 0};
+            jptr(jet.data());
 
-        s.add_taylor_jet_ldbl("jet", {y * 2_ldbl, x * -4_ldbl}, 1);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(fp_t{6}));
+            REQUIRE(jet[6] == approximately(fp_t{5}));
+            REQUIRE(jet[7] == approximately(-fp_t{5}));
+            REQUIRE(jet[8] == 0);
+            REQUIRE(jet[9] == 0);
+            REQUIRE(jet[10] == approximately(.5 * (fp_t{6} + jet[6])));
+            REQUIRE(jet[11] == approximately(.5 * (fp_t{6} + jet[7])));
+        }
 
-        s.compile();
+        {
+            llvm_state s{"", opt_level};
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 3, 3);
 
-        long double jet[4] = {2, 3};
+            s.compile();
 
-        jptr(jet, 1);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-    }
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{-1}, fp_t{3}, fp_t{2}, fp_t{4}};
+            jet.resize(24);
 
-    {
-        llvm_state s{"", 0};
+            jptr(jet.data());
 
-        s.add_taylor_jet_ldbl("jet", {y * 2_ldbl, x * -4_ldbl}, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == -1);
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == 2);
+            REQUIRE(jet[5] == 4);
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(fp_t{6}));
+            REQUIRE(jet[8] == approximately(fp_t{6}));
+            REQUIRE(jet[9] == approximately(fp_t{5}));
+            REQUIRE(jet[10] == approximately(fp_t{0}));
+            REQUIRE(jet[11] == approximately(fp_t{3}));
+            REQUIRE(jet[12] == 0);
+            REQUIRE(jet[13] == 0);
+            REQUIRE(jet[14] == 0);
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (fp_t{6} + jet[9])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (fp_t{6} + jet[10])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (fp_t{6} + jet[11])));
+            REQUIRE(jet[18] == 0);
+            REQUIRE(jet[19] == 0);
+            REQUIRE(jet[20] == 0);
+            REQUIRE(jet[21] == approximately(1 / fp_t{6} * (2 * jet[15])));
+            REQUIRE(jet[22] == approximately(1 / fp_t{6} * (2 * jet[16])));
+            REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[17])));
+        }
 
-        s.compile();
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y},
+                                   opt_level);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+        // Variable-number tests.
+        {
+            llvm_state s{"", opt_level};
 
-        long double jet[6] = {2, 3};
+            s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 1, 1);
 
-        jptr(jet, 1);
+            s.compile();
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 2);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
+            jptr(jet.data());
 
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(-fp_t{8}));
+        }
 
-        s.add_taylor_jet_ldbl("jet", {y * 2_ldbl, x * -4_ldbl}, 3);
+        {
+            llvm_state s{"", opt_level};
 
-        s.compile();
+            s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 1, 2);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.compile();
 
-        long double jet[8] = {2, 3};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 1);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
+            jet.resize(8);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
+            jptr(jet.data());
 
-        jptr(jet, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 1);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -4);
 
-        jptr(jet, 3);
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(-fp_t{8}));
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6.l * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3.l * jet[4]));
-    }
+            REQUIRE(jet[6] == approximately(-fp_t{8}));
+            REQUIRE(jet[7] == approximately(-fp_t{4}));
+        }
 
-    // Number/variable tests.
-    {
-        llvm_state s{"", 0};
+        {
+            llvm_state s{"", opt_level};
 
-        s.add_taylor_jet_ldbl("jet", {2_ldbl * y, -4_ldbl * x}, 1);
+            s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 2, 1);
 
-        s.compile();
+            s.compile();
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        long double jet[4] = {2, 3};
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
 
-        jptr(jet, 1);
+            jptr(jet.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-    }
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(-fp_t{8}));
+            REQUIRE(jet[4] == approximately(jet[3]));
+            REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        }
 
-    {
-        llvm_state s{"", 0};
+        {
+            llvm_state s{"", opt_level};
 
-        s.add_taylor_jet_ldbl("jet", {2_ldbl * y, -4_ldbl * x}, 2);
+            s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 2, 2);
 
-        s.compile();
+            s.compile();
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        long double jet[6] = {2, 3};
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
+            jet.resize(12);
 
-        jptr(jet, 1);
+            jptr(jet.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 4);
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(fp_t{8}));
+            REQUIRE(jet[6] == approximately(-fp_t{8}));
+            REQUIRE(jet[7] == approximately(fp_t{4}));
+            REQUIRE(jet[8] == approximately(jet[6]));
+            REQUIRE(jet[9] == approximately(jet[7]));
+            REQUIRE(jet[10] == approximately(-2 * jet[4]));
+            REQUIRE(jet[11] == approximately(-2 * jet[5]));
+        }
 
-        jptr(jet, 2);
+        {
+            llvm_state s{"", opt_level};
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-    }
+            s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 3, 3);
 
-    {
-        llvm_state s{"", 0};
+            s.compile();
 
-        s.add_taylor_jet_ldbl("jet", {2_ldbl * y, -4_ldbl * x}, 3);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        s.compile();
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
+            jet.resize(24);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            jptr(jet.data());
 
-        long double jet[8] = {2, 3};
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+            REQUIRE(jet[2] == 0);
 
-        jptr(jet, 1);
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == 4);
+            REQUIRE(jet[5] == -5);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(fp_t{8}));
+            REQUIRE(jet[8] == approximately(fp_t{-10}));
 
-        jptr(jet, 2);
+            REQUIRE(jet[9] == approximately(-fp_t{8}));
+            REQUIRE(jet[10] == approximately(fp_t{4}));
+            REQUIRE(jet[11] == approximately(fp_t{0}));
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
+            REQUIRE(jet[12] == approximately(jet[9]));
+            REQUIRE(jet[13] == approximately(jet[10]));
+            REQUIRE(jet[14] == approximately(jet[11]));
 
-        jptr(jet, 3);
+            REQUIRE(jet[15] == approximately(-2 * jet[6]));
+            REQUIRE(jet[16] == approximately(-2 * jet[7]));
+            REQUIRE(jet[17] == approximately(-2 * jet[8]));
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(-8.l));
-        REQUIRE(jet[4] == approximately(jet[3]));
-        REQUIRE(jet[5] == approximately(-2 * jet[2]));
-        REQUIRE(jet[6] == approximately(1 / 6.l * 4 * jet[5]));
-        REQUIRE(jet[7] == approximately(-4. / 3.l * jet[4]));
-    }
+            REQUIRE(jet[18] == approximately(1 / fp_t{6} * 4 * jet[15]));
+            REQUIRE(jet[19] == approximately(1 / fp_t{6} * 4 * jet[16]));
+            REQUIRE(jet[20] == approximately(1 / fp_t{6} * 4 * jet[17]));
 
-    // Variable/variable tests.
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[21] == approximately(-1 / fp_t{6} * 8 * jet[12]));
+            REQUIRE(jet[22] == approximately(-1 / fp_t{6} * 8 * jet[13]));
+            REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
+        }
 
-        s.add_taylor_jet_ldbl("jet", {x * y, y * x}, 1);
+        compare_batch_scalar<fp_t>({y * 2_dbl, x * -4_dbl}, opt_level);
 
-        s.compile();
+        // Number/variable tests.
+        {
+            llvm_state s{"", opt_level};
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 1, 1);
 
-        long double jet[4] = {2, 3};
+            s.compile();
 
-        jptr(jet, 1);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(6.l));
-    }
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
 
-    {
-        llvm_state s{"", 0};
+            jptr(jet.data());
 
-        s.add_taylor_jet_ldbl("jet", {x * y, y * x}, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(-fp_t{8}));
+        }
 
-        s.compile();
+        {
+            llvm_state s{"", opt_level};
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 1, 2);
 
-        long double jet[6] = {2, 3};
+            s.compile();
 
-        jptr(jet, 2);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(6.l));
-        REQUIRE(jet[4] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
-    }
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
+            jet.resize(8);
 
-    {
-        llvm_state s{"", 0};
+            jptr(jet.data());
 
-        s.add_taylor_jet_ldbl("jet", {x * y, y * x}, 3);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
 
-        s.compile();
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 4);
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(fp_t{8}));
 
-        long double jet[8] = {2, 3};
+            REQUIRE(jet[6] == approximately(-fp_t{8}));
+            REQUIRE(jet[7] == approximately(fp_t{4}));
+        }
 
-        jptr(jet, 3);
+        {
+            llvm_state s{"", opt_level};
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == approximately(6.l));
-        REQUIRE(jet[3] == approximately(6.l));
-        REQUIRE(jet[4] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[5] == approximately(.5l * (jet[2] * 3 + jet[3] * 2)));
-        REQUIRE(jet[6] == approximately(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
-        REQUIRE(jet[7] == approximately(1 / 6.l * (jet[4] * 2 * 3 + 2 * jet[2] * jet[3] + 2.l * 2 * jet[5])));
-    }
+            s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 2, 1);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(-fp_t{8}));
+            REQUIRE(jet[4] == approximately(jet[3]));
+            REQUIRE(jet[5] == approximately(-2 * jet[2]));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 2, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{4}};
+            jet.resize(12);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 4);
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(fp_t{8}));
+            REQUIRE(jet[6] == approximately(-fp_t{8}));
+            REQUIRE(jet[7] == approximately(fp_t{4}));
+            REQUIRE(jet[8] == approximately(jet[6]));
+            REQUIRE(jet[9] == approximately(jet[7]));
+            REQUIRE(jet[10] == approximately(-2 * jet[4]));
+            REQUIRE(jet[11] == approximately(-2 * jet[5]));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 3, 3);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{0}, fp_t{3}, fp_t{4}, fp_t{-5}};
+            jet.resize(24);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+            REQUIRE(jet[2] == 0);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == 4);
+            REQUIRE(jet[5] == -5);
+
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(fp_t{8}));
+            REQUIRE(jet[8] == approximately(fp_t{-10}));
+
+            REQUIRE(jet[9] == approximately(-fp_t{8}));
+            REQUIRE(jet[10] == approximately(fp_t{4}));
+            REQUIRE(jet[11] == approximately(fp_t{0}));
+
+            REQUIRE(jet[12] == approximately(jet[9]));
+            REQUIRE(jet[13] == approximately(jet[10]));
+            REQUIRE(jet[14] == approximately(jet[11]));
+
+            REQUIRE(jet[15] == approximately(-2 * jet[6]));
+            REQUIRE(jet[16] == approximately(-2 * jet[7]));
+            REQUIRE(jet[17] == approximately(-2 * jet[8]));
+
+            REQUIRE(jet[18] == approximately(1 / fp_t{6} * 4 * jet[15]));
+            REQUIRE(jet[19] == approximately(1 / fp_t{6} * 4 * jet[16]));
+            REQUIRE(jet[20] == approximately(1 / fp_t{6} * 4 * jet[17]));
+
+            REQUIRE(jet[21] == approximately(-1 / fp_t{6} * 8 * jet[12]));
+            REQUIRE(jet[22] == approximately(-1 / fp_t{6} * 8 * jet[13]));
+            REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
+        }
+
+        compare_batch_scalar<fp_t>({2_dbl * y, -4_dbl * x}, opt_level);
+
+        // Variable/variable tests.
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 1, 1);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(fp_t{6}));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 1, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
+            jet.resize(8);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 1);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -4);
+
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(-fp_t{4}));
+
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(-fp_t{4}));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 2, 1);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(fp_t{6}));
+            REQUIRE(jet[3] == approximately(fp_t{6}));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * (jet[2] * 3 + jet[3] * 2)));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] * 3 + jet[3] * 2)));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 2, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{-4}};
+            jet.resize(12);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 1);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -4);
+
+            REQUIRE(jet[4] == approximately(fp_t{6}));
+            REQUIRE(jet[5] == approximately(-fp_t{4}));
+
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(-fp_t{4}));
+
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * (jet[4] * 3 + jet[6] * 2)));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * (jet[5] * -4 + jet[7] * 1)));
+
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[4] * 3 + jet[6] * 2)));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[5] * -4 + jet[7] * 1)));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 3, 3);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{1}, fp_t{3}, fp_t{3}, fp_t{-4}, fp_t{6}};
+            jet.resize(24);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 1);
+            REQUIRE(jet[2] == 3);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == -4);
+            REQUIRE(jet[5] == 6);
+
+            REQUIRE(jet[6] == approximately(fp_t{6}));
+            REQUIRE(jet[7] == approximately(-fp_t{4}));
+            REQUIRE(jet[8] == approximately(fp_t{18}));
+
+            REQUIRE(jet[9] == approximately(fp_t{6}));
+            REQUIRE(jet[10] == approximately(-fp_t{4}));
+            REQUIRE(jet[11] == approximately(fp_t{18}));
+
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * (jet[6] * 3 + jet[9] * 2)));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * (jet[7] * -4 + jet[10] * 1)));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * (jet[8] * 6 + jet[11] * 3)));
+
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[6] * 3 + jet[9] * 2)));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[7] * -4 + jet[10] * 1)));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[8] * 6 + jet[11] * 3)));
+
+            REQUIRE(jet[18] == approximately(1 / fp_t{6} * (2 * jet[12] * 3 + 2 * jet[6] * jet[9] + 2 * 2 * jet[15])));
+            REQUIRE(jet[19]
+                    == approximately(1 / fp_t{6} * (2 * jet[13] * -4 + 2 * jet[7] * jet[10] + 2 * 1 * jet[16])));
+            REQUIRE(jet[20] == approximately(1 / fp_t{6} * (2 * jet[14] * 6 + 2 * jet[8] * jet[11] + 2 * 3 * jet[17])));
+
+            REQUIRE(jet[21] == approximately(1 / fp_t{6} * (2 * jet[12] * 3 + 2 * jet[6] * jet[9] + 2 * 2 * jet[15])));
+            REQUIRE(jet[22]
+                    == approximately(1 / fp_t{6} * (2 * jet[13] * -4 + 2 * jet[7] * jet[10] + 2 * 1 * jet[16])));
+            REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[14] * 6 + 2 * jet[8] * jet[11] + 2 * 3 * jet[17])));
+        }
+
+        compare_batch_scalar<fp_t>({x * y, y * x}, opt_level);
+    };
+
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }

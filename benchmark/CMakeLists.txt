@@ -18,3 +18,4 @@ endfunction()
 
 ADD_HEYOKA_BENCHMARK(evaluate_benchmark_dbl)
 ADD_HEYOKA_BENCHMARK(flops_benchmark_dbl)
+ADD_HEYOKA_BENCHMARK(taylor_jet_batch_benchmark)

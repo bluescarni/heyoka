@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <ostream>
@@ -30,7 +31,6 @@
 
 #endif
 
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -255,14 +255,14 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
 
 llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 {
-    heyoka_assert_nonnull_ret(std::visit(
+    return std::visit(
         [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
-        n.value()));
+        n.value());
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
 {
-    heyoka_assert_nonnull_ret(std::visit(
+    return std::visit(
         [&s](const auto &v) {
             // NOTE: the idea here is that we first fetch the FP
             // semantics of the LLVM type long double corresponds
@@ -276,20 +276,20 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
             return llvm::ConstantFP::get(s.context(),
                                          llvm::APFloat(sem, detail::li_to_string(static_cast<long double>(v))));
         },
-        n.value()));
+        n.value());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *codegen_f128(llvm_state &s, const number &n)
 {
-    heyoka_assert_nonnull_ret(std::visit(
+    return std::visit(
         [&s](const auto &v) {
             const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
             return llvm::ConstantFP::get(s.context(),
                                          llvm::APFloat(sem, detail::li_to_string(static_cast<mppp::real128>(v))));
         },
-        n.value()));
+        n.value());
 }
 
 #endif
@@ -302,21 +302,42 @@ std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vec
 
 // NOTE: for numbers, the Taylor init phase is
 // just the codegen.
-llvm::Value *taylor_init_dbl(llvm_state &s, const number &n, llvm::Value *)
+llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t vector_size)
 {
-    return codegen_dbl(s, n);
+    auto ret = codegen_dbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
-llvm::Value *taylor_init_ldbl(llvm_state &s, const number &n, llvm::Value *)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
 {
-    return codegen_ldbl(s, n);
+    auto ret = codegen_ldbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_f128(llvm_state &s, const number &n, llvm::Value *)
+llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
 {
-    return codegen_f128(s, n);
+    auto ret = codegen_f128(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
 #endif

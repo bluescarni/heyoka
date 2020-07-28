@@ -26,8 +26,17 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 // Small helper to compute the angular momentum
 // wrt the origin given a state vector.
@@ -75,109 +84,51 @@ T tbp_energy(const std::vector<T> &st)
     return T(1) / T(2) * (v2_0 + v2_1) + U;
 }
 
-TEST_CASE("two body dbl")
+TEST_CASE("two body")
 {
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+    auto tester = [](auto fp_x, unsigned opt_level) {
+        using std::abs;
 
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
+        using fp_t = decltype(fp_x);
 
-    // NOTE: this corresponds to a highly elliptic orbit.
-    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
+        auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
+            = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
-    taylor_adaptive_dbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3, vx0,
-                             vx1, vy0, vy1, vz0, vz1},
-                            std::move(init_state),
-                            0,
-                            std::numeric_limits<double>::epsilon(),
-                            std::numeric_limits<double>::epsilon()};
+        auto x01 = x1 - x0;
+        auto y01 = y1 - y0;
+        auto z01 = z1 - z0;
+        auto r01_m3
+            = pow(x01 * x01 + y01 * y01 + z01 * z01, expression{number{fp_t{-3}}} / expression{number{fp_t{2}}});
 
-    const auto &st = tad.get_state();
+        // NOTE: this corresponds to a highly elliptic orbit.
+        std::vector<fp_t> init_state{fp_t{0.593},     fp_t{-0.593},   fp_t{0},  fp_t{0}, fp_t{0}, fp_t{0},
+                                     fp_t{-1.000001}, fp_t{1.000001}, fp_t{-1}, fp_t{1}, fp_t{0}, fp_t{0}};
 
-    const auto en = tbp_energy(st);
-    const auto am = compute_am(st);
+        taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
+                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                  std::move(init_state),
+                                  fp_t{0},
+                                  std::numeric_limits<fp_t>::epsilon(),
+                                  std::numeric_limits<fp_t>::epsilon(),
+                                  opt_level};
 
-    for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
-        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<double>::epsilon() * 1E4);
-        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<double>::epsilon() * 1E4);
-    }
-}
+        const auto &st = tad.get_state();
 
-#if defined(HEYOKA_HAVE_REAL128)
+        const auto en = tbp_energy(st);
+        const auto am = compute_am(st);
 
-TEST_CASE("two body f128")
-{
-    using namespace mppp::literals;
+        for (auto i = 0; i < 200; ++i) {
+            const auto [oc, h, ord] = tad.step();
+            REQUIRE(oc == taylor_adaptive<fp_t>::outcome::success);
+            REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
+            REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
+        }
+    };
 
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
-
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_f128 / 2_f128);
-
-    // NOTE: this corresponds to a highly elliptic orbit.
-    std::vector<mppp::real128> init_state{0.593_rq,     -0.593_rq,   0_rq,  0_rq, 0_rq, 0_rq,
-                                          -1.000001_rq, 1.000001_rq, -1_rq, 1_rq, 0_rq, 0_rq};
-
-    taylor_adaptive<mppp::real128> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                        -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
-                                       std::move(init_state),
-                                       0_rq,
-                                       std::numeric_limits<mppp::real128>::epsilon(),
-                                       std::numeric_limits<mppp::real128>::epsilon()};
-
-    const auto &st = tad.get_state();
-
-    const auto en = tbp_energy(st);
-    const auto am = compute_am(st);
-
-    for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive<mppp::real128>::outcome::success);
-        REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<mppp::real128>::epsilon() * 1E4);
-        REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<mppp::real128>::epsilon() * 1E4);
-    }
-}
-
-#endif
-
-TEST_CASE("two body ldbl")
-{
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
-
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_ldbl / 2_ldbl);
-
-    std::vector<long double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
-
-    taylor_adaptive_ldbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
-                              vx0, vx1, vy0, vy1, vz0, vz1},
-                             std::move(init_state),
-                             0,
-                             std::numeric_limits<long double>::epsilon(),
-                             std::numeric_limits<long double>::epsilon()};
-
-    const auto &st = tad.get_state();
-
-    const auto en = tbp_energy(st);
-    const auto am = compute_am(st);
-
-    for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_ldbl::outcome::success);
-        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<long double>::epsilon() * 1E4);
-        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<long double>::epsilon() * 1E4);
-    }
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }
 
 // Energy of two uniform overlapping spheres.
