@@ -438,6 +438,25 @@ TEST_CASE("taylor pow")
         compare_batch_scalar<fp_t>({pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
                                     pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
                                    opt_level);
+
+        // Failure modes for non-implemented cases.
+        {
+            llvm_state s{"", opt_level};
+
+            REQUIRE_THROWS_MATCHES(
+                s.add_taylor_jet_batch<fp_t>("jet", {pow(1_dbl, x)}, 3, 3), std::invalid_argument,
+                Message(
+                    "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+        }
+
+        {
+            llvm_state s{"", opt_level};
+
+            REQUIRE_THROWS_MATCHES(
+                s.add_taylor_jet_batch<fp_t>("jet", {y, pow(y, x)}, 3, 3), std::invalid_argument,
+                Message(
+                    "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+        }
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
