@@ -27,7 +27,6 @@
 
 #endif
 
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>

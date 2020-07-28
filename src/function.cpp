@@ -35,7 +35,6 @@
 
 #endif
 
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -902,19 +901,19 @@ template llvm::Value *function_codegen_from_values<mppp::real128>(llvm_state &, 
 
 llvm::Value *codegen_dbl(llvm_state &s, const function &f)
 {
-    heyoka_assert_nonnull_ret(detail::function_codegen_impl<double>(s, f));
+    return detail::function_codegen_impl<double>(s, f);
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const function &f)
 {
-    heyoka_assert_nonnull_ret(detail::function_codegen_impl<long double>(s, f));
+    return detail::function_codegen_impl<long double>(s, f);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *codegen_f128(llvm_state &s, const function &f)
 {
-    heyoka_assert_nonnull_ret(detail::function_codegen_impl<mppp::real128>(s, f));
+    return detail::function_codegen_impl<mppp::real128>(s, f);
 }
 
 #endif

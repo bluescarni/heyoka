@@ -29,7 +29,6 @@
 #endif
 
 #include <heyoka/binary_operator.hpp>
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
@@ -464,19 +463,19 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 
 llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
 {
-    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value()));
+    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
 {
-    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value()));
+    return std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *codegen_f128(llvm_state &s, const expression &e)
 {
-    heyoka_assert_nonnull_ret(std::visit([&s](const auto &arg) { return codegen_f128(s, arg); }, e.value()));
+    return std::visit([&s](const auto &arg) { return codegen_f128(s, arg); }, e.value());
 }
 
 #endif

@@ -36,7 +36,6 @@
 #endif
 
 #include <heyoka/binary_operator.hpp>
-#include <heyoka/detail/assert_nonnull_ret.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -344,19 +343,19 @@ llvm::Value *bo_codegen_impl(llvm_state &s, const binary_operator &bo)
 
 llvm::Value *codegen_dbl(llvm_state &s, const binary_operator &bo)
 {
-    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<double>(s, bo));
+    return detail::bo_codegen_impl<double>(s, bo);
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const binary_operator &bo)
 {
-    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<long double>(s, bo));
+    return detail::bo_codegen_impl<long double>(s, bo);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *codegen_f128(llvm_state &s, const binary_operator &bo)
 {
-    heyoka_assert_nonnull_ret(detail::bo_codegen_impl<mppp::real128>(s, bo));
+    return detail::bo_codegen_impl<mppp::real128>(s, bo);
 }
 
 #endif
