@@ -879,7 +879,11 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
     // Create the function call.
     auto r = s.builder().CreateCall(callee_f, args_v, "calltmp");
     assert(r != nullptr);
-    r->setTailCall(true);
+    // NOTE: we used to have r->setTailCall(true) here, but:
+    // - when optimising, the tail call attribute is automatically
+    //   added,
+    // - it is not 100% clear to me whether it is always safe to enable it:
+    // https://llvm.org/docs/CodeGenerator.html#tail-calls
 
     return r;
 }
