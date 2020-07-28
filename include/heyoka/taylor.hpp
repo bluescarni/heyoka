@@ -39,6 +39,8 @@ namespace heyoka
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
 
+// Enum to represnt the outcome of a Taylor integration
+// stepping function.
 enum class taylor_outcome {
     success,           // Integration step was successful, no time/step limits were reached.
     step_limit,        // Maximum number of steps reached.
