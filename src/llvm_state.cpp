@@ -432,7 +432,9 @@ void llvm_state::optimise()
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
         // These are passes which set up target-specific info
         // that are used by successive optimisation passes.
-        module_pm->add(new llvm::TargetLibraryInfoWrapperPass(llvm::TargetLibraryInfoImpl(*m_jitter->m_triple)));
+        auto tliwp
+            = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(llvm::TargetLibraryInfoImpl(*m_jitter->m_triple));
+        module_pm->add(tliwp.release());
         module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
         // Init the function pass manager.
