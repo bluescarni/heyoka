@@ -1661,4 +1661,23 @@ llvm_state::tjb_t<mppp::real128> llvm_state::fetch_taylor_jet_batch_f128(const s
 
 #endif
 
+std::uint32_t llvm_state::vector_size_dbl() const
+{
+    return m_jitter->m_vector_size_dbl;
+}
+
+std::uint32_t llvm_state::vector_size_ldbl() const
+{
+    return m_jitter->m_vector_size_ldbl;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::uint32_t llvm_state::vector_size_f128() const
+{
+    return m_jitter->m_vector_size_f128;
+}
+
+#endif
+
 } // namespace heyoka

@@ -88,6 +88,27 @@ public:
     llvm_state &operator=(llvm_state &&) noexcept;
     ~llvm_state();
 
+    std::uint32_t vector_size_dbl() const;
+    std::uint32_t vector_size_ldbl() const;
+#if defined(HEYOKA_HAVE_REAL128)
+    std::uint32_t vector_size_f128() const;
+#endif
+    template <typename T>
+    std::uint32_t vector_size() const
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            return vector_size_dbl();
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return vector_size_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return vector_size_f128();
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
     llvm::Module &module();
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
