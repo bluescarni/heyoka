@@ -453,7 +453,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
 
     if (m_state.size() != sys.size()) {
         throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a size of "
+                                    "integrator: the state vector has a dimension of "
                                     + std::to_string(m_state.size()) + ", while the number of equations is "
                                     + std::to_string(sys.size()));
     }
@@ -627,7 +627,7 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
         assert(max_delta_t == 0);
     }
 
-    // Store the number of variables in the system.
+    // Cache number of variables in the system.
     const auto nvars = static_cast<std::uint32_t>(m_state.size());
 
     // Compute the norm infinity in the state vector.
