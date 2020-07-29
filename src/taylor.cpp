@@ -513,9 +513,6 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     m_llvm.opt_level() = opt_level;
     m_llvm.optimise();
 
-    // Store the IR before compiling.
-    m_ir = m_llvm.dump_ir();
-
     // Run the jit.
     m_llvm.compile();
 
@@ -882,9 +879,9 @@ void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
 }
 
 template <typename T>
-const std::string &taylor_adaptive_impl<T>::get_ir() const
+std::string taylor_adaptive_impl<T>::get_ir() const
 {
-    return m_ir;
+    return m_llvm.dump_ir();
 }
 
 template <typename T>

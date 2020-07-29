@@ -84,8 +84,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // The functions to compute the derivatives.
     using jet_f_t = void (*)(T *);
     jet_f_t m_jet_f_r, m_jet_f_a;
-    // LLVM IR.
-    std::string m_ir;
     // Taylor decomposition.
     std::vector<expression> m_dc;
 
@@ -111,7 +109,7 @@ public:
 
     ~taylor_adaptive_impl();
 
-    const std::string &get_ir() const;
+    std::string get_ir() const;
     const std::vector<expression> &get_decomposition() const;
 
     T get_time() const
