@@ -905,4 +905,443 @@ template class taylor_adaptive_impl<mppp::real128>;
 
 } // namespace detail
 
+namespace detail
+{
+
+template <typename T>
+template <typename U>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vector<T> states, std::vector<T> times,
+                                                          T rtol, T atol, std::uint32_t batch_size, unsigned opt_level)
+    : m_batch_size(batch_size), m_states(std::move(states)), m_times(std::move(times)), m_rtol(rtol), m_atol(atol),
+      // NOTE: init to optimisation level 0 in order
+      // to delay the optimisation pass.
+      m_llvm{"adaptive batch taylor integrator", 0u}
+{
+    // Check input params.
+    if (m_batch_size == 0u) {
+        throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
+    }
+
+    if (std::any_of(m_states.begin(), m_states.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
+    }
+
+    if (m_states.size() % m_batch_size != 0u) {
+        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
+                                    "integrator: the state vector has a size of "
+                                    + std::to_string(m_states.size()) + ", which is not a multiple of the batch size ("
+                                    + std::to_string(m_batch_size) + ")");
+    }
+
+    if (m_states.size() / m_batch_size != sys.size()) {
+        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
+                                    "integrator: the state vector has a dimension of "
+                                    + std::to_string(m_states.size() / m_batch_size)
+                                    + ", while the number of equations is " + std::to_string(sys.size()));
+    }
+
+    if (std::any_of(m_times.begin(), m_times.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
+    }
+
+    if (!detail::isfinite(m_rtol) || m_rtol <= 0) {
+        throw std::invalid_argument(
+            "The relative tolerance in an adaptive Taylor integrator must be finite and positive, but it is "
+            + li_to_string(m_rtol) + " instead");
+    }
+
+    if (!detail::isfinite(m_atol) || m_atol <= 0) {
+        throw std::invalid_argument(
+            "The absolute tolerance in an adaptive Taylor integrator must be finite and positive, but it is "
+            + li_to_string(m_atol) + " instead");
+    }
+
+    // Compute the two possible orders for the integration, ensuring that
+    // they are at least 2.
+    const auto order_r_f = std::max(T(2), detail::ceil(-detail::log(m_rtol) / 2 + 1));
+    const auto order_a_f = std::max(T(2), detail::ceil(-detail::log(m_atol) / 2 + 1));
+
+    if (!detail::isfinite(order_r_f) || !detail::isfinite(order_a_f)) {
+        throw std::invalid_argument(
+            "The computation of the Taylor orders in an adaptive Taylor integrator produced non-finite values");
+    }
+    // NOTE: static cast is safe because we know that T is at least
+    // a double-precision IEEE type.
+    if (order_r_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())
+        || order_a_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::overflow_error("The computation of the max Taylor orders in an adaptive Taylor integrator resulted "
+                                  "in an overflow condition");
+    }
+    // Record the Taylor orders.
+    m_order_r = static_cast<std::uint32_t>(order_r_f);
+    m_order_a = static_cast<std::uint32_t>(order_a_f);
+
+    // Record the number of variables
+    // before consuming sys.
+    const auto n_vars = sys.size();
+
+    // Add the functions for computing
+    // the jet of normalised derivatives.
+    m_dc = m_llvm.add_taylor_jet_batch<T>("jet_r", sys, m_order_r, batch_size);
+    if (m_order_r != m_order_a) {
+        // NOTE: add the absolute tolerance jet function only
+        // if the relative and absolute orders differ.
+        m_llvm.add_taylor_jet_batch<T>("jet_a", std::move(sys), m_order_a, batch_size);
+    }
+
+    // Change the optimisation level
+    // and run the optimisation pass.
+    m_llvm.opt_level() = opt_level;
+    m_llvm.optimise();
+
+    // Store the IR before compiling.
+    m_ir = m_llvm.dump_ir();
+
+    // Run the jit.
+    m_llvm.compile();
+
+    // Fetch the compiled function for computing
+    // the jet of derivatives.
+    m_jet_f_r = m_llvm.fetch_taylor_jet_batch<T>("jet_r");
+    if (m_order_r == m_order_a) {
+        m_jet_f_a = m_jet_f_r;
+    } else {
+        m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+
+    // Init the jet vector. Its maximum size is n_vars * (max_order + 1) * batch_size.
+    // NOTE: n_vars must be nonzero because we successfully
+    // created a Taylor jet function from sys.
+    using jet_size_t = decltype(m_jet.size());
+    const auto max_order = std::max(m_order_r, m_order_a);
+    if (max_order >= std::numeric_limits<jet_size_t>::max()
+        || (static_cast<jet_size_t>(max_order) + 1u) > std::numeric_limits<jet_size_t>::max() / n_vars
+        || (static_cast<jet_size_t>(max_order) + 1u) * n_vars > std::numeric_limits<jet_size_t>::max() / batch_size) {
+        throw std::overflow_error("The computation of the size of the jet of derivatives in an adaptive Taylor "
+                                  "integrator resulted in an overflow condition");
+    }
+    m_jet.resize((static_cast<jet_size_t>(max_order) + 1u) * n_vars * batch_size);
+
+    // Check the values of the derivatives
+    // for the initial state.
+
+    // Copy the current state to the order zero
+    // of the jet of derivatives.
+    auto jet_ptr = m_jet.data();
+    std::copy(m_states.begin(), m_states.end(), jet_ptr);
+
+    // Compute the jet of derivatives at max order.
+    if (m_order_r > m_order_a) {
+        m_jet_f_r(jet_ptr);
+    } else {
+        m_jet_f_a(jet_ptr);
+    }
+
+    // Check the computed derivatives, starting from order 1.
+    if (std::any_of(jet_ptr + (n_vars * batch_size), jet_ptr + m_jet.size(),
+                    [](const T &x) { return !detail::isfinite(x); })) {
+        throw std::invalid_argument(
+            "Non-finite value(s) detected in the jet of derivatives corresponding to the initial "
+            "state of an adaptive Taylor integrator");
+    }
+
+    // Pre-compute the inverse orders. This spares
+    // us a few divisions in the stepping function.
+    m_inv_order.resize(static_cast<jet_size_t>(max_order) + 1u);
+    for (jet_size_t i = 1; i < max_order + 1u; ++i) {
+        m_inv_order[i] = 1 / static_cast<T>(i);
+    }
+
+    // Pre-compute the factors by which rho must
+    // be multiplied in order to determine the
+    // integration timestep.
+    m_rhofac_r = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_r - 1u));
+    m_rhofac_a = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_a - 1u));
+
+    // Prepare the temporary variables for use in the
+    // stepping functions.
+    m_max_abs_states.resize(static_cast<jet_size_t>(m_batch_size));
+    m_use_abs_tol.resize(static_cast<decltype(m_use_abs_tol.size())>(m_batch_size));
+    m_max_abs_diff_om1.resize(static_cast<jet_size_t>(m_batch_size));
+    m_max_abs_diff_o.resize(static_cast<jet_size_t>(m_batch_size));
+    m_rho_om1.resize(static_cast<jet_size_t>(m_batch_size));
+    m_rho_o.resize(static_cast<jet_size_t>(m_batch_size));
+    m_h.resize(static_cast<jet_size_t>(m_batch_size));
+    m_cur_h.resize(static_cast<jet_size_t>(m_batch_size));
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states,
+                                                          std::vector<T> times, T rtol, T atol,
+                                                          std::uint32_t batch_size, unsigned opt_level)
+    : taylor_adaptive_batch_impl(p_tag{}, std::move(sys), std::move(states), std::move(times), rtol, atol, batch_size,
+                                 opt_level)
+{
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys,
+                                                          std::vector<T> states, std::vector<T> times, T rtol, T atol,
+                                                          std::uint32_t batch_size, unsigned opt_level)
+    : taylor_adaptive_batch_impl(p_tag{}, std::move(sys), std::move(states), std::move(times), rtol, atol, batch_size,
+                                 opt_level)
+{
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T> &
+taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+// Implementation detail to make a single integration timestep.
+// The size of the timestep is automatically deduced for each
+// state vector. If LimitTimestep is true, then the integration
+// timestep for each state vector will be limited not to be greater
+// than the corresponding value in max_delta_ts in absolute value.
+// If Direction is true then the propagation is done forward
+// in time, otherwise backwards. In any case the values in
+// max_delta_ts can never be negative.
+// The function will write to res a triple for each state
+// vector, containing a flag describing the outcome of the integration,
+// the integration timestep that was used and the
+// Taylor order that was used.
+// NOTE: perhaps there's performance to be gained
+// by moving the timestep deduction logic and the
+// actual propagation in LLVM (e.g., unrolling
+// over the number of variables).
+// NOTE: the safer adaptive timestep from
+// Jorba still needs to be implemented.
+template <typename T>
+template <bool LimitTimestep, bool Direction>
+void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res,
+                                              [[maybe_unused]] const std::vector<T> &max_delta_ts)
+{
+    // Check preconditions.
+    if constexpr (LimitTimestep) {
+        assert(max_delta_ts.size() == m_batch_size);
+        assert(std::all_of(max_delta_ts.begin(), max_delta_ts.end(),
+                           [](const auto &x) { return detail::isfinite(x) && x >= 0; }));
+    } else {
+        assert(max_delta_ts.empty());
+    }
+
+    // Cache locally the batch size.
+    const auto batch_size = m_batch_size;
+
+    // Prepare res.
+    res.resize(batch_size);
+    std::fill(res.begin(), res.end(), std::tuple{taylor_outcome::success, T(0), std::uint32_t(0)});
+
+    // Cache the number of variables in the system.
+    assert(m_states.size() % batch_size == 0u);
+    const auto nvars = static_cast<std::uint32_t>(m_states.size() / batch_size);
+
+    // Compute the norm infinity of each state vector.
+    assert(m_max_abs_states.size() == batch_size);
+    std::fill(m_max_abs_states.begin(), m_max_abs_states.end(), T(0));
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            const auto s_idx = i * batch_size + batch_idx;
+
+            if (detail::isfinite(m_states[s_idx])) {
+                m_max_abs_states[batch_idx] = std::max(m_max_abs_states[batch_idx], detail::abs(m_states[s_idx]));
+            } else {
+                // Mark the current state vector as non-finite in res.
+                // NOTE: the timestep and order have already
+                // been set to zero via the fill() above.
+                std::get<0>(res[batch_idx]) = taylor_outcome::err_nf_state;
+            }
+        }
+    }
+
+    // Compute the Taylor order for this timestep.
+    // For each state vector, we determine the Taylor
+    // order based on the norm infinity, and we take the
+    // maximum.
+    // NOTE: this means that we might end up using a higher
+    // order than necessary in some elements of the batch.
+    assert(m_use_abs_tol.size() == batch_size);
+    std::uint32_t order = 0;
+    for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+        if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
+            // If the current state vector is not finite, skip it.
+            continue;
+        }
+
+        const auto use_abs_tol = m_rtol * m_max_abs_states[batch_idx] <= m_atol;
+        const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
+        order = std::max(order, cur_order);
+        m_use_abs_tol[batch_idx] = use_abs_tol;
+    }
+
+    if (order == 0u) {
+        // If order is still zero, it means that all state vectors
+        // contain non-finite values. Exit.
+        return;
+    }
+
+    assert(order >= 2u);
+
+    // Copy the current state to the order zero
+    // of the jet of derivatives.
+    auto jet_ptr = m_jet.data();
+    std::copy(m_states.begin(), m_states.end(), jet_ptr);
+
+    // Compute the jet of derivatives.
+    if (order == m_order_a) {
+        m_jet_f_a(jet_ptr);
+    } else {
+        m_jet_f_r(jet_ptr);
+    }
+
+    // Check the computed derivatives, starting from order 1.
+    for (std::uint32_t o = 1; o < order + 1u; ++o) {
+        for (std::uint32_t i = 0; i < nvars; ++i) {
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                const auto idx = o * nvars * batch_size + i * batch_size + batch_idx;
+
+                if (std::get<0>(res[batch_idx]) == taylor_outcome::success && !detail::isfinite(jet_ptr[idx])) {
+                    // The original state vector was finite but the derivative is not finite
+                    // Mark the current state vector as err_nf_derivative in res.
+                    std::get<0>(res[batch_idx]) = taylor_outcome::err_nf_derivative;
+                }
+            }
+        }
+    }
+
+    // Now we compute an estimation of the radius of convergence of the Taylor
+    // series at orders 'order' and 'order - 1'. We start by computing
+    // the norm infinity of the derivatives at orders 'order - 1' and
+    // 'order'.
+    assert(m_max_abs_diff_om1.size() == batch_size);
+    assert(m_max_abs_diff_o.size() == batch_size);
+    std::fill(m_max_abs_diff_om1.begin(), m_max_abs_diff_om1.end(), T(0));
+    std::fill(m_max_abs_diff_o.begin(), m_max_abs_diff_o.end(), T(0));
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
+                // If the current state is non finite or it resulted
+                // in non-finite derivatives, skip it.
+                continue;
+            }
+
+            m_max_abs_diff_om1[batch_idx]
+                = std::max(m_max_abs_diff_om1[batch_idx],
+                           detail::abs(jet_ptr[(order - 1u) * nvars * batch_size + i * batch_size + batch_idx]));
+            m_max_abs_diff_o[batch_idx]
+                = std::max(m_max_abs_diff_o[batch_idx],
+                           detail::abs(jet_ptr[order * nvars * batch_size + i * batch_size + batch_idx]));
+        }
+    }
+
+    // Estimate rho at orders 'order - 1' and 'order',
+    // and compute the integration timestep.
+    assert(m_rho_om1.size() == batch_size);
+    assert(m_rho_o.size() == batch_size);
+    assert(m_h.size() == batch_size);
+    for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+        if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
+            // If the current state is non finite or it resulted
+            // in non-finite derivatives, skip it.
+            continue;
+        }
+
+        const auto rho_om1
+            = m_use_abs_tol[batch_idx]
+                  ? detail::pow(1 / m_max_abs_diff_om1[batch_idx], m_inv_order[order - 1u])
+                  : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_om1[batch_idx], m_inv_order[order - 1u]);
+        const auto rho_o
+            = m_use_abs_tol[batch_idx]
+                  ? detail::pow(1 / m_max_abs_diff_o[batch_idx], m_inv_order[order])
+                  : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_o[batch_idx], m_inv_order[order]);
+
+        if (detail::isnan(rho_om1) || detail::isnan(rho_o)) {
+            // Mark the presence of NaN rho in res.
+            std::get<0>(res[batch_idx]) = taylor_outcome::err_nan_rho;
+        } else {
+            // Compute the minimum.
+            const auto rho_m = std::min(rho_o, rho_om1);
+
+            // Compute the timestep.
+            auto h = rho_m * (m_use_abs_tol[batch_idx] ? m_rhofac_a : m_rhofac_r);
+
+            if constexpr (LimitTimestep) {
+                // Make sure h does not exceed max_delta_t.
+                if (h > max_delta_ts[batch_idx]) {
+                    h = max_delta_ts[batch_idx];
+                    std::get<0>(res[batch_idx]) = taylor_outcome::time_limit;
+                }
+            }
+            if constexpr (!Direction) {
+                // When propagating backwards, invert the sign of the timestep.
+                h = -h;
+            }
+
+            // Store the integration timestep
+            // for the current state vector.
+            m_h[batch_idx] = h;
+        }
+    }
+
+    // Update the state.
+    assert(m_cur_h.size() == batch_size);
+    // Init the accumulator for the powers of the
+    // timestep.
+    std::copy(m_h.begin(), m_h.end(), m_cur_h.begin());
+    for (std::uint32_t o = 1; o < order + 1u; ++o) {
+        const auto d_ptr = jet_ptr + o * nvars * batch_size;
+
+        for (std::uint32_t i = 0; i < nvars; ++i) {
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
+                    // Skip the current state if it was non-finite to begin
+                    // with or if it resulted in non-finite derivatives
+                    // or nan rhos.
+                    continue;
+                }
+
+                m_states[i * batch_size + batch_idx] = detail::fma(
+                    m_cur_h[batch_idx], d_ptr[i * batch_size + batch_idx], m_states[i * batch_size + batch_idx]);
+            }
+        }
+
+        // Update h.
+        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+            m_cur_h[batch_idx] *= m_h[batch_idx];
+        }
+    }
+
+    // Update the times, store the timesteps and order in res.
+    for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+        m_times[batch_idx] += m_h[batch_idx];
+        std::get<1>(res[batch_idx]) = m_h[batch_idx];
+        std::get<2>(res[batch_idx]) = order;
+    }
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res)
+{
+    return step_impl<false, true>(res, std::vector<T>{});
+}
+
+// Explicit instantiation of the batch implementation classes.
+template class taylor_adaptive_batch_impl<double>;
+template class taylor_adaptive_batch_impl<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class taylor_adaptive_batch_impl<mppp::real128>;
+
+#endif
+
+} // namespace detail
+
 } // namespace heyoka
