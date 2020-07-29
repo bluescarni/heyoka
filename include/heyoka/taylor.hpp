@@ -101,10 +101,10 @@ public:
     explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, T, T, T,
                                   unsigned = 3);
 
-    taylor_adaptive_impl(const taylor_adaptive_impl &) = delete;
+    taylor_adaptive_impl(const taylor_adaptive_impl &);
     taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept;
 
-    taylor_adaptive_impl &operator=(const taylor_adaptive_impl &) = delete;
+    taylor_adaptive_impl &operator=(const taylor_adaptive_impl &);
     taylor_adaptive_impl &operator=(taylor_adaptive_impl &&) noexcept;
 
     ~taylor_adaptive_impl();

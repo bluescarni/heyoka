@@ -588,7 +588,35 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<std::pair<expression, 
 }
 
 template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
+    // NOTE: make a manual copy of all members, apart from the function pointers.
+    : m_state(other.m_state), m_time(other.m_time), m_rtol(other.m_rtol), m_atol(other.m_atol),
+      m_order_r(other.m_order_r), m_order_a(other.m_order_a), m_inv_order(other.m_inv_order),
+      m_rhofac_r(other.m_rhofac_r), m_rhofac_a(other.m_rhofac_a), m_llvm(other.m_llvm), m_jet(other.m_jet),
+      m_dc(other.m_dc)
+{
+    // Fetch the compiled functions for computing
+    // the jet of derivatives.
+    m_jet_f_r = m_llvm.fetch_taylor_jet_batch<T>("jet_r");
+    if (m_order_r == m_order_a) {
+        m_jet_f_a = m_jet_f_r;
+    } else {
+        m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+}
+
+template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(const taylor_adaptive_impl &other)
+{
+    if (this != &other) {
+        *this = taylor_adaptive_impl(other);
+    }
+
+    return *this;
+}
 
 template <typename T>
 taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl &&) noexcept = default;
@@ -999,7 +1027,7 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     // Run the jit.
     m_llvm.compile();
 
-    // Fetch the compiled function for computing
+    // Fetch the compiled functions for computing
     // the jet of derivatives.
     m_jet_f_r = m_llvm.fetch_taylor_jet_batch<T>("jet_r");
     if (m_order_r == m_order_a) {
