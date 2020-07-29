@@ -56,8 +56,11 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
@@ -288,7 +291,53 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     m_builder->setFastMathFlags(fmf);
 }
 
+llvm_state::llvm_state(const llvm_state &other)
+    : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level)
+{
+    // Get the IR of other.
+    auto other_ir = other.dump_ir();
+
+    // Create the corresponding memory buffer.
+    auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
+
+    // Construct a new module from the parsed IR.
+    llvm::SMDiagnostic err;
+    m_module = llvm::parseIR(*mb, err, context());
+    if (!m_module) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        err.print("", ostr);
+
+        throw std::invalid_argument("Error parsing the IR while copying an llvm_state. The full error message:\n"
+                                    + ostr.str());
+    }
+
+    // Create a new builder for the module.
+    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+
+    // Set a couple of flags for faster math at the
+    // price of potential change of semantics.
+    llvm::FastMathFlags fmf;
+    fmf.setFast();
+    m_builder->setFastMathFlags(fmf);
+
+    // Run the compilation if other was compiled.
+    if (!other.m_module) {
+        compile();
+    }
+}
+
 llvm_state::llvm_state(llvm_state &&) noexcept = default;
+
+llvm_state &llvm_state::operator=(const llvm_state &other)
+{
+    if (this != &other) {
+        *this = llvm_state(other);
+    }
+
+    return *this;
+}
 
 llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
 

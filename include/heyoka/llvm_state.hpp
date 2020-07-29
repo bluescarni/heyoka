@@ -83,9 +83,9 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
 public:
     explicit llvm_state(const std::string &, unsigned = 3);
-    llvm_state(const llvm_state &) = delete;
+    llvm_state(const llvm_state &);
     llvm_state(llvm_state &&) noexcept;
-    llvm_state &operator=(const llvm_state &) = delete;
+    llvm_state &operator=(const llvm_state &);
     llvm_state &operator=(llvm_state &&) noexcept;
     ~llvm_state();
 
