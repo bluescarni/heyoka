@@ -480,6 +480,9 @@ void llvm_state::compile()
 {
     check_uncompiled(__func__);
 
+    // Store a snapshot of the IR before compiling.
+    m_ir_snapshot = dump_ir();
+
     m_jitter->add_module(std::move(m_module));
 }
 
@@ -918,12 +921,19 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
 std::string llvm_state::dump_ir() const
 {
-    check_uncompiled(__func__);
-
-    std::string out;
-    llvm::raw_string_ostream ostr(out);
-    m_module->print(ostr, nullptr);
-    return ostr.str();
+    if (m_module) {
+        // The module has not been compiled yet,
+        // get the IR from it.
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+        m_module->print(ostr, nullptr);
+        return ostr.str();
+    } else {
+        // The module has been compiled.
+        // Return the IR snapshot that
+        // was created before the compilation.
+        return m_ir_snapshot;
+    }
 }
 
 std::string llvm_state::dump_function_ir(const std::string &name) const

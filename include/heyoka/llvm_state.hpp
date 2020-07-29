@@ -55,6 +55,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     bool m_verify = true;
     unsigned m_opt_level;
+    std::string m_ir_snapshot;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
