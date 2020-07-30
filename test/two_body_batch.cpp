@@ -129,10 +129,9 @@ TEST_CASE("two body batch")
         auto bst_copy(bst);
         auto times_copy(tab.get_times());
 
-        std::vector<std::tuple<taylor_outcome, fp_t, std::uint32_t>> res, s_res;
-        s_res.resize(batch_size);
+        std::vector<std::tuple<taylor_outcome, fp_t, std::uint32_t>> res;
 
-        for (auto i = 0; i < 200; ++i) {
+        for (auto _ = 0; _ < 200; ++_) {
             // Copy the batch state/times before propagation.
             bst_copy = bst;
             times_copy = tab.get_times();

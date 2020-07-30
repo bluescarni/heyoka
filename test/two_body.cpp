@@ -90,6 +90,7 @@ TEST_CASE("two body")
 {
     auto tester = [](auto fp_x, unsigned opt_level) {
         using std::abs;
+        using std::cos;
 
         using fp_t = decltype(fp_x);
 
@@ -124,8 +125,24 @@ TEST_CASE("two body")
         for (auto i = 0; i < 200; ++i) {
             const auto [oc, h, ord] = tad.step();
             REQUIRE(oc == taylor_outcome::success);
-            REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E2);
-            REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E2);
+            REQUIRE(tbp_energy(st) == approximately(en, fp_t{1E2}));
+            REQUIRE(compute_am(st) == approximately(am, fp_t{1E2}));
+
+            const auto kep1 = cart_to_kep(std::array<fp_t, 3>{st[6], st[8], st[10]},
+                                          std::array<fp_t, 3>{st[0], st[2], st[4]}, fp_t{1} / 4);
+            const auto kep2 = cart_to_kep(std::array<fp_t, 3>{st[7], st[9], st[11]},
+                                          std::array<fp_t, 3>{st[1], st[3], st[5]}, fp_t{1} / 4);
+
+            REQUIRE(kep1[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep2[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep1[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep2[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep1[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(kep2[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(abs(cos(kep1[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(abs(cos(kep2[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(kep1[4] == approximately(fp_t{.5}, fp_t{1E2}));
+            REQUIRE(kep2[4] == approximately(fp_t{.5}, fp_t{1E2}));
         }
     };
 
