@@ -1069,7 +1069,7 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
                     [](const T &x) { return !detail::isfinite(x); })) {
         throw std::invalid_argument(
             "Non-finite value(s) detected in the jet of derivatives corresponding to the initial "
-            "state of an adaptive Taylor integrator");
+            "state of an adaptive batch Taylor integrator");
     }
 
     // Pre-compute the inverse orders. This spares
