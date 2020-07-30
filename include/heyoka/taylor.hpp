@@ -335,7 +335,7 @@ public:
 
     ~taylor_adaptive_batch_impl();
 
-    const std::string &get_ir() const;
+    std::string get_ir() const;
     const std::vector<expression> &get_decomposition() const;
 
     const std::vector<T> &get_times() const

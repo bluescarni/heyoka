@@ -1357,6 +1357,12 @@ void taylor_adaptive_batch_impl<T>::step(std::vector<std::tuple<taylor_outcome, 
     return step_impl<false, true>(res, std::vector<T>{});
 }
 
+template <typename T>
+std::string taylor_adaptive_batch_impl<T>::get_ir() const
+{
+    return m_llvm.dump_ir();
+}
+
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch_impl<double>;
 template class taylor_adaptive_batch_impl<long double>;
