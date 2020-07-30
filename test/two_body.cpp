@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <array>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
@@ -101,9 +102,11 @@ TEST_CASE("two body")
         auto r01_m3
             = pow(x01 * x01 + y01 * y01 + z01 * z01, expression{number{fp_t{-3}}} / expression{number{fp_t{2}}});
 
-        // NOTE: this corresponds to a highly elliptic orbit.
-        std::vector<fp_t> init_state{fp_t{0.593},     fp_t{-0.593},   fp_t{0},  fp_t{0}, fp_t{0}, fp_t{0},
-                                     fp_t{-1.000001}, fp_t{1.000001}, fp_t{-1}, fp_t{1}, fp_t{0}, fp_t{0}};
+        const auto kep = std::array<fp_t, 6>{fp_t{1.5}, fp_t{.2}, fp_t{.3}, fp_t{.4}, fp_t{.5}, fp_t{.6}};
+        const auto [c_x, c_v] = kep_to_cart(kep, fp_t{1} / 4);
+
+        std::vector<fp_t> init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
+                                     c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
         taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
@@ -121,8 +124,8 @@ TEST_CASE("two body")
         for (auto i = 0; i < 200; ++i) {
             const auto [oc, h, ord] = tad.step();
             REQUIRE(oc == taylor_outcome::success);
-            REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
-            REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
+            REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E2);
+            REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E2);
         }
     };
 
