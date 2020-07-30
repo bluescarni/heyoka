@@ -8,9 +8,12 @@
 
 #include <heyoka/config.hpp>
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <random>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -30,6 +33,8 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+static std::mt19937 rng;
+
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -40,9 +45,12 @@ const auto fp_types = std::tuple<double, long double
 #endif
                                  >{};
 
-TEST_CASE("two body")
+TEST_CASE("two body batch")
 {
     auto tester = [](auto fp_x, unsigned opt_level) {
+        using std::cos;
+        using std::abs;
+
         using fp_t = decltype(fp_x);
 
         const auto batch_size = llvm_state{""}.vector_size<fp_t>();
@@ -64,20 +72,51 @@ TEST_CASE("two body")
         auto sys = {x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
                     vx0,          vx1,           vy0,          vy1,           vz0,          vz1};
 
-        std::vector<fp_t> init_state{fp_t{0.593},     fp_t{-0.593},   fp_t{0},  fp_t{0}, fp_t{0}, fp_t{0},
-                                     fp_t{-1.000001}, fp_t{1.000001}, fp_t{-1}, fp_t{1}, fp_t{0}, fp_t{0}};
-
-        // Initialise time and states for the batch integrator.
-        std::vector<fp_t> init_states, times;
-        for (const auto &x : init_state) {
-            for (auto i = 0u; i < batch_size; ++i) {
-                init_states.push_back(x);
-            }
-        }
-        for (auto i = 0u; i < batch_size; ++i) {
-            times.push_back(fp_t{0});
+        // Generate a bunch of random initial conditions in orbital elements.
+        std::vector<std::array<fp_t, 6>> v_kep;
+        for (std::uint32_t i = 0; i < batch_size; ++i) {
+            std::uniform_real_distribution<float> a_dist(0.1f, 10.f), e_dist(0.1f, 0.5f), i_dist(0.1f, 3.13f),
+                ang_dist(0.1f, 6.28f);
+            v_kep.push_back(std::array<fp_t, 6>{fp_t{a_dist(rng)}, fp_t{e_dist(rng)}, fp_t{i_dist(rng)},
+                                                fp_t{ang_dist(rng)}, fp_t{ang_dist(rng)}, fp_t{ang_dist(rng)}});
         }
 
+        // Generate the initial state/time vector for the batch integrator.
+        std::vector<fp_t> init_states(batch_size * 12u), times(batch_size);
+        for (std::uint32_t i = 0; i < batch_size; ++i) {
+            const auto [x, v] = kep_to_cart(v_kep[i], fp_t(1) / 4);
+
+            init_states[0u * batch_size + i] = v[0];
+            init_states[1u * batch_size + i] = -v[0];
+            init_states[2u * batch_size + i] = v[1];
+            init_states[3u * batch_size + i] = -v[1];
+            init_states[4u * batch_size + i] = v[2];
+            init_states[5u * batch_size + i] = -v[2];
+            init_states[6u * batch_size + i] = x[0];
+            init_states[7u * batch_size + i] = -x[0];
+            init_states[8u * batch_size + i] = x[1];
+            init_states[9u * batch_size + i] = -x[1];
+            init_states[10u * batch_size + i] = x[2];
+            init_states[11u * batch_size + i] = -x[2];
+        }
+
+        // Create a corresponding scalar integrator.
+        // Init with the first state in init_states
+        // (does not matter, will be changed in the loop below).
+        std::vector<fp_t> scalar_init;
+        for (std::uint32_t j = 0; j < 12u; ++j) {
+            scalar_init.push_back(init_states[j * batch_size]);
+        }
+        taylor_adaptive<fp_t> ta{sys,
+                                 std::move(scalar_init),
+                                 fp_t{0},
+                                 std::numeric_limits<fp_t>::epsilon(),
+                                 std::numeric_limits<fp_t>::epsilon(),
+                                 opt_level};
+        const auto &st = ta.get_state();
+        auto scal_st(ta.get_state());
+
+        // Init the batch integrator.
         taylor_adaptive_batch<fp_t> tab{sys,
                                         std::move(init_states),
                                         std::move(times),
@@ -87,35 +126,70 @@ TEST_CASE("two body")
                                         opt_level};
 
         const auto &bst = tab.get_states();
+        auto bst_copy(bst);
+        auto times_copy(tab.get_times());
 
         std::vector<std::tuple<taylor_outcome, fp_t, std::uint32_t>> res, s_res;
         s_res.resize(batch_size);
 
-        // Create corresponding scalar integrators.
-        std::vector<taylor_adaptive<fp_t>> v_ta;
-        for (std::uint32_t i = 0; i < batch_size; ++i) {
-            v_ta.emplace_back(sys, init_state, fp_t{0}, std::numeric_limits<fp_t>::epsilon(),
-                              std::numeric_limits<fp_t>::epsilon(), opt_level);
-        }
-
         for (auto i = 0; i < 200; ++i) {
+            // Copy the batch state/times before propagation.
+            bst_copy = bst;
+            times_copy = tab.get_times();
+
             tab.step(res);
 
             for (std::uint32_t i = 0; i < batch_size; ++i) {
-                s_res[i] = v_ta[i].step();
+                // Evolve separately the scalar integrators.
 
-                // NOTE: these 1E5 tolerances can be reduced once
-                // we have a way of disabling the fast math flags
-                // in llvm_state.
-                REQUIRE(std::get<0>(s_res[i]) == std::get<0>(res[i]));
-                REQUIRE(std::get<1>(s_res[i]) == approximately(std::get<1>(res[i]), fp_t{1E5}));
-                REQUIRE(std::get<2>(s_res[i]) == std::get<2>(res[i]));
-
-                const auto &st = v_ta[i].get_state();
-
+                // Set state and time.
                 for (std::uint32_t j = 0; j < 12u; ++j) {
-                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], fp_t{1E5}));
+                    scal_st[j] = bst_copy[j * batch_size + i];
                 }
+                ta.set_state(scal_st);
+                ta.set_time(times_copy[i]);
+
+                auto s_res = ta.step();
+
+                // NOTE: this tolerance can be lowered once
+                // we have a way of disabling fast math flags.
+                // We will probably have to add some extra leeway
+                // in the conservation of the orbital elements though.
+                const auto tol_mul = fp_t{1E4};
+
+                // Check the result of the integration.
+                REQUIRE(std::get<0>(s_res) == std::get<0>(res[i]));
+                REQUIRE(std::get<1>(s_res) == approximately(std::get<1>(res[i]), tol_mul));
+                REQUIRE(std::get<2>(s_res) == std::get<2>(res[i]));
+
+                // Check the state vectors.
+                for (std::uint32_t j = 0; j < 12u; ++j) {
+                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], tol_mul));
+                }
+
+                // Check the conservation of the orbital elements.
+                const auto kep1 = cart_to_kep<fp_t>({st[6], st[8], st[10]}, {st[0], st[2], st[4]}, fp_t{1} / 4);
+                const auto kep2 = cart_to_kep<fp_t>({st[7], st[9], st[11]}, {st[1], st[3], st[5]}, fp_t{1} / 4);
+
+                // Both bodies have the same semi-major axis.
+                REQUIRE(kep1[0] == approximately(v_kep[i][0], tol_mul));
+                REQUIRE(kep2[0] == approximately(v_kep[i][0], tol_mul));
+
+                // Same eccentricity.
+                REQUIRE(kep1[1] == approximately(v_kep[i][1], tol_mul));
+                REQUIRE(kep2[1] == approximately(v_kep[i][1], tol_mul));
+
+                // Same inclination.
+                REQUIRE(kep1[2] == approximately(v_kep[i][2], tol_mul));
+                REQUIRE(kep2[2] == approximately(v_kep[i][2], tol_mul));
+
+                // omega is phased by pi.
+                REQUIRE(abs(cos(kep1[3])) == approximately(abs(cos(v_kep[i][3])), tol_mul));
+                REQUIRE(abs(cos(kep2[3])) == approximately(abs(cos(v_kep[i][3])), tol_mul));
+
+                // Same Omega.
+                REQUIRE(kep1[4] == approximately(v_kep[i][4], tol_mul));
+                REQUIRE(kep2[4] == approximately(v_kep[i][4], tol_mul));
             }
         }
     };
