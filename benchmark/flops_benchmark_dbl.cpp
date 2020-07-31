@@ -48,7 +48,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    const auto nruns = 10000u;
+    const auto nruns = 100000u;
     for (auto i = 0u; i < nruns; ++i) {
         f_ptr(out_ptr, in_ptr);
     }
