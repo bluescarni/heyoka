@@ -303,8 +303,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // at the end of an integration timestep.
     using s_update_f_t = void (*)(T *, const T *, const T *);
     s_update_f_t m_update_f_r, m_update_f_a;
-    // LLVM IR.
-    std::string m_ir;
     // Taylor decomposition.
     std::vector<expression> m_dc;
     // Temporary vectors for use
@@ -334,10 +332,10 @@ public:
     explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::vector<T>,
                                         T, T, std::uint32_t, unsigned = 3);
 
-    taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &) = delete;
+    taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &);
     taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept;
 
-    taylor_adaptive_batch_impl &operator=(const taylor_adaptive_batch_impl &) = delete;
+    taylor_adaptive_batch_impl &operator=(const taylor_adaptive_batch_impl &);
     taylor_adaptive_batch_impl &operator=(taylor_adaptive_batch_impl &&) noexcept;
 
     ~taylor_adaptive_batch_impl();
@@ -359,7 +357,7 @@ public:
 
     void step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &);
     void step_backward(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &);
-    void step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &, T);
+    void step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &, const std::vector<T> &);
 };
 
 } // namespace detail

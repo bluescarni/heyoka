@@ -1248,9 +1248,6 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     m_llvm.opt_level() = opt_level;
     m_llvm.optimise();
 
-    // Store the IR before compiling.
-    m_ir = m_llvm.dump_ir();
-
     // Run the jit.
     m_llvm.compile();
 
@@ -1351,7 +1348,45 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(std::vector<std::pair<
 }
 
 template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
+    // NOTE: make a manual copy of all members, apart from the function pointers.
+    : m_batch_size(other.m_batch_size), m_states(other.m_states), m_times(other.m_times), m_rtol(other.m_rtol),
+      m_atol(other.m_atol), m_order_r(other.m_order_r), m_order_a(other.m_order_a), m_inv_order(other.m_inv_order),
+      m_rhofac_r(other.m_rhofac_r), m_rhofac_a(other.m_rhofac_a), m_llvm(other.m_llvm), m_jet(other.m_jet),
+      m_dc(other.m_dc), m_max_abs_states(other.m_max_abs_states), m_use_abs_tol(other.m_use_abs_tol),
+      m_max_abs_diff_om1(other.m_max_abs_diff_om1), m_max_abs_diff_o(other.m_max_abs_diff_o),
+      m_rho_om1(other.m_rho_om1), m_rho_o(other.m_rho_o), m_h(other.m_h)
+{
+    // Fetch the compiled functions for computing
+    // the jet of derivatives.
+    m_jet_f_r = m_llvm.fetch_taylor_jet_batch<T>("jet_r");
+    if (m_order_r == m_order_a) {
+        m_jet_f_a = m_jet_f_r;
+    } else {
+        m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+
+    // Same for the functions for the state update.
+    m_update_f_r = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_r"));
+    if (m_order_r == m_order_a) {
+        m_update_f_a = m_update_f_r;
+    } else {
+        m_update_f_a = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_a"));
+    }
+}
+
+template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T> &taylor_adaptive_batch_impl<T>::operator=(const taylor_adaptive_batch_impl &other)
+{
+    if (this != &other) {
+        *this = taylor_adaptive_batch_impl(other);
+    }
+
+    return *this;
+}
 
 template <typename T>
 taylor_adaptive_batch_impl<T> &
@@ -1597,9 +1632,72 @@ void taylor_adaptive_batch_impl<T>::step(std::vector<std::tuple<taylor_outcome, 
 }
 
 template <typename T>
+void taylor_adaptive_batch_impl<T>::step_backward(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res)
+{
+    return step_impl<false, false>(res, std::vector<T>{});
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_times(const std::vector<T> &t)
+{
+    if (&t == &m_times) {
+        // Check that t and m_times are not the same object,
+        // otherwise std::copy() cannot be used.
+        return;
+    }
+
+    if (t.size() != m_times.size()) {
+        throw std::invalid_argument("Inconsistent sizes when setting the times in a batch Taylor integrator: the new "
+                                    "times vector has a size of "
+                                    + std::to_string(t.size()) + ", while the existing times vector has a size of "
+                                    + std::to_string(m_times.size()));
+    }
+
+    if (std::any_of(t.begin(), t.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite time value was detected while setting the times in a batch Taylor integrator");
+    }
+
+    // Do the copy.
+    std::copy(t.begin(), t.end(), m_times.begin());
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_states(const std::vector<T> &states)
+{
+    if (&states == &m_states) {
+        // Check that states and m_states are not the same object,
+        // otherwise std::copy() cannot be used.
+        return;
+    }
+
+    if (states.size() != m_states.size()) {
+        throw std::invalid_argument("The states vector passed to the set_states() function of an adaptive batch Taylor "
+                                    "integrator has a size of "
+                                    + std::to_string(states.size())
+                                    + ", which is inconsistent with the size of the current states vector ("
+                                    + std::to_string(m_states.size()) + ")");
+    }
+
+    if (std::any_of(states.begin(), states.end(), [](const T &x) { return !detail::isfinite(x); })) {
+        throw std::invalid_argument("A non-finite states vector was passed to the set_states() function of an adaptive "
+                                    "batch Taylor integrator");
+    }
+
+    // Do the copy.
+    std::copy(states.begin(), states.end(), m_states.begin());
+}
+
+template <typename T>
 std::string taylor_adaptive_batch_impl<T>::get_ir() const
 {
     return m_llvm.dump_ir();
+}
+
+template <typename T>
+const std::vector<expression> &taylor_adaptive_batch_impl<T>::get_decomposition() const
+{
+    return m_dc;
 }
 
 // Explicit instantiation of the batch implementation classes.
