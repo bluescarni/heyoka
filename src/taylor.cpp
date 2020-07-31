@@ -907,11 +907,6 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
         m_jet_f_r(jet_ptr);
     }
 
-    // Check the computed derivatives, starting from order 1.
-    if (std::any_of(jet_ptr + nvars, jet_ptr + (order + 1u) * nvars, [](const T &x) { return !detail::isfinite(x); })) {
-        return std::tuple{taylor_outcome::err_nf_derivative, T(0), std::uint32_t(0)};
-    }
-
     // Now we compute an estimation of the radius of convergence of the Taylor
     // series at orders order and order - 1.
 
@@ -919,8 +914,17 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
     // at orders order and order - 1.
     T max_abs_diff_o(0), max_abs_diff_om1(0);
     for (std::uint32_t i = 0; i < nvars; ++i) {
-        max_abs_diff_om1 = std::max(max_abs_diff_om1, detail::abs(jet_ptr[(order - 1u) * nvars + i]));
-        max_abs_diff_o = std::max(max_abs_diff_o, detail::abs(jet_ptr[order * nvars + i]));
+        const auto diff_om1 = jet_ptr[(order - 1u) * nvars + i];
+        const auto diff_o = jet_ptr[order * nvars + i];
+
+        if (!detail::isfinite(diff_om1) || !detail::isfinite(diff_o)) {
+            // Non-finite derivatives detected, return failure.
+            return std::tuple{taylor_outcome::err_nf_derivative, T(0), std::uint32_t(0)};
+        }
+
+        // Update the max abs.
+        max_abs_diff_om1 = std::max(max_abs_diff_om1, detail::abs(diff_om1));
+        max_abs_diff_o = std::max(max_abs_diff_o, detail::abs(diff_o));
     }
 
     // Estimate rho at orders order - 1 and order.
@@ -1424,29 +1428,30 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     // NOTE: this means that we might end up using a higher
     // order than necessary in some elements of the batch.
     assert(m_use_abs_tol.size() == batch_size);
-    std::uint32_t order = 0;
+    std::uint32_t max_order = 0;
     for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
         if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
-            // If the current state vector is not finite, skip it.
+            // If the current state vector is not finite, skip it
+            // for the purpose of determining the max order.
             continue;
         }
 
         const auto use_abs_tol = m_rtol * m_max_abs_states[batch_idx] <= m_atol;
         const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
-        order = std::max(order, cur_order);
+        max_order = std::max(max_order, cur_order);
 
         // Record whether we are using absolute or relative
         // tolerance for this element of the batch.
         m_use_abs_tol[batch_idx] = use_abs_tol;
     }
 
-    if (order == 0u) {
-        // If order is still zero, it means that all state vectors
+    if (max_order == 0u) {
+        // If max_order is still zero, it means that all state vectors
         // contain non-finite values. Exit.
         return;
     }
 
-    assert(order >= 2u);
+    assert(max_order >= 2u);
 
     // Copy the current state to the order zero
     // of the jet of derivatives.
@@ -1454,25 +1459,11 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     std::copy(m_states.begin(), m_states.end(), jet_ptr);
 
     // Compute the jet of derivatives.
-    if (order == m_order_a) {
+    // NOTE: this will be computed to the max order.
+    if (max_order == m_order_a) {
         m_jet_f_a(jet_ptr);
     } else {
         m_jet_f_r(jet_ptr);
-    }
-
-    // Check the computed derivatives, starting from order 1.
-    for (std::uint32_t o = 1; o < order + 1u; ++o) {
-        for (std::uint32_t i = 0; i < nvars; ++i) {
-            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-                const auto idx = o * nvars * batch_size + i * batch_size + batch_idx;
-
-                if (std::get<0>(res[batch_idx]) == taylor_outcome::success && !detail::isfinite(jet_ptr[idx])) {
-                    // The original state vector was finite but the derivative is not finite
-                    // Mark the current state vector as err_nf_derivative in res.
-                    std::get<0>(res[batch_idx]) = taylor_outcome::err_nf_derivative;
-                }
-            }
-        }
     }
 
     // Now we compute an estimation of the radius of convergence of the Taylor
@@ -1486,17 +1477,33 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     for (std::uint32_t i = 0; i < nvars; ++i) {
         for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
             if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
-                // If the current state is non finite or it resulted
-                // in non-finite derivatives, skip it.
+                // If the current state is not finite or resulted in non-finite
+                // derivatives, skip it.
                 continue;
             }
 
-            m_max_abs_diff_om1[batch_idx]
-                = std::max(m_max_abs_diff_om1[batch_idx],
-                           detail::abs(jet_ptr[(order - 1u) * nvars * batch_size + i * batch_size + batch_idx]));
-            m_max_abs_diff_o[batch_idx]
-                = std::max(m_max_abs_diff_o[batch_idx],
-                           detail::abs(jet_ptr[order * nvars * batch_size + i * batch_size + batch_idx]));
+            // Establish if we are using absolute or relative
+            // tolerance for this state vector.
+            const auto use_abs_tol = m_use_abs_tol[batch_idx];
+
+            // Determine the order for the current state vector.
+            const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
+
+            // Load the values of the derivatives.
+            const auto diff_om1 = jet_ptr[(cur_order - 1u) * nvars * batch_size + i * batch_size + batch_idx];
+            const auto diff_o = jet_ptr[cur_order * nvars * batch_size + i * batch_size + batch_idx];
+
+            if (!detail::isfinite(diff_om1) || !detail::isfinite(diff_o)) {
+                // If the current state resulted in non-finite derivatives,
+                // mark it and skip it.
+                std::get<0>(res[batch_idx]) = taylor_outcome::err_nf_derivative;
+
+                continue;
+            }
+
+            // Update the max abs.
+            m_max_abs_diff_om1[batch_idx] = std::max(m_max_abs_diff_om1[batch_idx], detail::abs(diff_om1));
+            m_max_abs_diff_o[batch_idx] = std::max(m_max_abs_diff_o[batch_idx], detail::abs(diff_o));
         }
     }
 
@@ -1508,28 +1515,40 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
         if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
             // If the current state is non finite or it resulted
-            // in non-finite derivatives, skip it.
+            // in non-finite derivatives, set the timestep to
+            // zero and skip it.
+            m_h[batch_idx] = 0;
+
             continue;
         }
 
-        const auto rho_om1
-            = m_use_abs_tol[batch_idx]
-                  ? detail::pow(1 / m_max_abs_diff_om1[batch_idx], m_inv_order[order - 1u])
-                  : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_om1[batch_idx], m_inv_order[order - 1u]);
-        const auto rho_o
-            = m_use_abs_tol[batch_idx]
-                  ? detail::pow(1 / m_max_abs_diff_o[batch_idx], m_inv_order[order])
-                  : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_o[batch_idx], m_inv_order[order]);
+        // Establish if we are using absolute or relative
+        // tolerance for this state vector.
+        const auto use_abs_tol = m_use_abs_tol[batch_idx];
+
+        // Determine the order for the current state vector.
+        const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
+
+        // Compute the rhos.
+        const auto rho_om1 = use_abs_tol ? detail::pow(1 / m_max_abs_diff_om1[batch_idx], m_inv_order[cur_order - 1u])
+                                         : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_om1[batch_idx],
+                                                       m_inv_order[cur_order - 1u]);
+        const auto rho_o = use_abs_tol ? detail::pow(1 / m_max_abs_diff_o[batch_idx], m_inv_order[cur_order])
+                                       : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_o[batch_idx],
+                                                     m_inv_order[cur_order]);
 
         if (detail::isnan(rho_om1) || detail::isnan(rho_o)) {
             // Mark the presence of NaN rho in res.
             std::get<0>(res[batch_idx]) = taylor_outcome::err_nan_rho;
+
+            // Set the timestep to zero.
+            m_h[batch_idx] = 0;
         } else {
             // Compute the minimum.
             const auto rho_m = std::min(rho_o, rho_om1);
 
             // Compute the timestep.
-            auto h = rho_m * (m_use_abs_tol[batch_idx] ? m_rhofac_a : m_rhofac_r);
+            auto h = rho_m * (use_abs_tol ? m_rhofac_a : m_rhofac_r);
 
             if constexpr (LimitTimestep) {
                 // Make sure h does not exceed max_delta_t.
@@ -1550,7 +1569,8 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     }
 
     // Update the state.
-    if (order == m_order_a) {
+    // NOTE: this will update the state using the max order.
+    if (max_order == m_order_a) {
         m_update_f_a(m_states.data(), jet_ptr, m_h.data());
     } else {
         m_update_f_r(m_states.data(), jet_ptr, m_h.data());
@@ -1558,9 +1578,15 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
 
     // Update the times, store the timesteps and order in res.
     for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+        if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
+            // If some failure mode was detected, don't update
+            // the times or the return values.
+            continue;
+        }
+
         m_times[batch_idx] += m_h[batch_idx];
         std::get<1>(res[batch_idx]) = m_h[batch_idx];
-        std::get<2>(res[batch_idx]) = order;
+        std::get<2>(res[batch_idx]) = m_use_abs_tol[batch_idx] ? m_order_a : m_order_r;
     }
 }
 
