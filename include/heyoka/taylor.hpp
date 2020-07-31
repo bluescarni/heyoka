@@ -91,7 +91,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // Taylor decomposition.
     std::vector<expression> m_dc;
 
-    template <bool, bool>
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T, std::uint32_t> step_impl(T);
 
     // Private implementation-detail constructor machinery.

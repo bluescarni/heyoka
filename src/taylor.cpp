@@ -846,34 +846,29 @@ template <typename T>
 taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 
 // Implementation detail to make a single integration timestep.
-// The size of the timestep is automatically deduced. If
-// LimitTimestep is true, then the integration timestep will be
-// limited not to be greater than max_delta_t in absolute value.
-// If Direction is true then the propagation is done forward
-// in time, otherwise backwards. In any case max_delta_t can never
-// be negative.
+// The magnitude of the timestep is automatically deduced, but it will
+// always be not greater than abs(max_delta_t). The propagation
+// is done forward in time if max_delta_t >= 0, backwards in
+// time otherwise.
+//
 // The function will return a triple, containing
 // a flag describing the outcome of the integration,
 // the integration timestep that was used and the
 // Taylor order that was used.
-// NOTE: perhaps there's performance to be gained
-// by moving the timestep deduction logic and the
-// actual propagation in LLVM (e.g., unrolling
-// over the number of variables).
 // NOTE: the safer adaptive timestep from
 // Jorba still needs to be implemented.
 template <typename T>
-template <bool LimitTimestep, bool Direction>
-std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl([[maybe_unused]] T max_delta_t)
+std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 {
-    assert(detail::isfinite(max_delta_t));
-    if constexpr (LimitTimestep) {
-        assert(max_delta_t >= 0);
-    } else {
-        assert(max_delta_t == 0);
-    }
+    assert(!detail::isnan(max_delta_t));
 
-    // Cache number of variables in the system.
+    // Cache abs(max_delta_t).
+    const auto abs_max_delta_t = detail::abs(max_delta_t);
+
+    // Propagate backwards?
+    const auto backwards = max_delta_t < T(0);
+
+    // Cache the number of variables in the system.
     const auto nvars = static_cast<std::uint32_t>(m_state.size());
 
     // Compute the norm infinity in the state vector.
@@ -945,14 +940,14 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
 
     // Now determine the step size using the formula with safety factors.
     auto h = rho_m * (use_abs_tol ? m_rhofac_a : m_rhofac_r);
-    if constexpr (LimitTimestep) {
-        // Make sure h does not exceed max_delta_t.
-        if (h > max_delta_t) {
-            h = max_delta_t;
-            oc = taylor_outcome::time_limit;
-        }
+
+    // Make sure h does not exceed abs(max_delta_t).
+    if (h > abs_max_delta_t) {
+        h = abs_max_delta_t;
+        oc = taylor_outcome::time_limit;
     }
-    if constexpr (!Direction) {
+
+    if (backwards) {
         // When propagating backwards, invert the sign of the timestep.
         h = -h;
     }
@@ -972,28 +967,26 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
 template <typename T>
 std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step()
 {
-    return step_impl<false, true>(T(0));
+    // NOTE: time limit +inf means integration forward in time
+    // and no time limit.
+    return step_impl(std::numeric_limits<T>::infinity());
 }
 
 template <typename T>
 std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_backward()
 {
-    return step_impl<false, false>(T(0));
+    return step_impl(-std::numeric_limits<T>::infinity());
 }
 
 template <typename T>
 std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step(T max_delta_t)
 {
-    if (!detail::isfinite(max_delta_t)) {
+    if (detail::isnan(max_delta_t)) {
         throw std::invalid_argument(
-            "A non-finite max_delta_t was passed to the step() function of an adaptive Taylor integrator");
+            "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
 
-    if (max_delta_t >= 0) {
-        return step_impl<true, true>(max_delta_t);
-    } else {
-        return step_impl<true, false>(-max_delta_t);
-    }
+    return step_impl(max_delta_t);
 }
 
 template <typename T>
@@ -1030,7 +1023,7 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 
     if (t > m_time) {
         while (true) {
-            const auto [res, h, t_order] = step_impl<true, true>(t - m_time);
+            const auto [res, h, t_order] = step_impl(t - m_time);
 
             if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
                 return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
@@ -1046,7 +1039,7 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 
             // Break out if the time limit is reached,
             // *before* updating the min_h/max_h values.
-            if (t <= m_time) {
+            if (m_time >= t) {
                 break;
             }
 
@@ -1062,7 +1055,7 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
         }
     } else {
         while (true) {
-            const auto [res, h, t_order] = step_impl<true, false>(m_time - t);
+            const auto [res, h, t_order] = step_impl(t - m_time);
 
             if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
                 return std::tuple{res, min_h, max_h, min_order, max_order, step_counter};
@@ -1073,12 +1066,13 @@ taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
             min_order = std::min(min_order, t_order);
             max_order = std::max(max_order, t_order);
 
-            if (t >= m_time) {
+            if (m_time <= t) {
                 break;
             }
 
-            min_h = std::min(min_h, detail::abs(h));
-            max_h = std::max(max_h, detail::abs(h));
+            assert(h < 0);
+            min_h = std::min(min_h, -h);
+            max_h = std::max(max_h, -h);
 
             if (max_steps != 0u && step_counter == max_steps) {
                 return std::tuple{taylor_outcome::step_limit, min_h, max_h, min_order, max_order, step_counter};
