@@ -50,33 +50,35 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Do 20 steps.
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
-    tad.step();
+    // Do 400 steps.
+    for (auto i = 0; i < 20; ++i) {
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+        tad.step();
+    }
 
     const auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Elapsed time for a single timestep (double precision): " << elapsed / 20 << "ns\n";
+    std::cout << "Elapsed time for a single timestep (double precision): " << elapsed / 400 << "ns\n";
 
     return 0;
 }

@@ -59,23 +59,25 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Do 10 evaluations.
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
+    // Do 400 evaluations.
+    for (auto i = 0; i < 40; ++i) {
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+    }
 
     const auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Order " << order << ", batch size " << batch_size << ": " << elapsed / 10 << "ns\n";
+    std::cout << "Order " << order << ", batch size " << batch_size << ": " << elapsed / 400 << "ns\n";
 
     return 0;
 }
