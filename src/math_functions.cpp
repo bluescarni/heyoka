@@ -115,20 +115,23 @@ llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const 
                                         std::uint32_t batch_size, std::uint32_t vector_size,
                                         const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of sin() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = create_constant_vector(builder, ret_acc, vector_size);
-    }
-
     // NOTE: iteration in the [1, order] range
     // (i.e., order included).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         // The indices for accessing the derivatives in this loop iteration:
         // - (order - j) * n_uvars * batch_size + (idx + 1) * batch_size + batch_idx,
@@ -152,15 +155,21 @@ llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const 
         auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "sin_load")
                                       : load_vector_from_memory(builder, arr_ptr1, vector_size, "sin_load");
 
-        // Update ret_acc: ret_acc = ret_acc + j*v0*v1.
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
             fac = create_constant_vector(builder, fac, vector_size);
         }
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+
+        // Add j*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
+
     // Compute and return the result: ret_acc / order
+    // NOTE: worthwhile to replace division with multiplication
+    // by inverse or better let LLVM do it?
     auto div = codegen<T>(s, number(static_cast<T>(order)));
     if (vector_size > 0u) {
         div = create_constant_vector(builder, div, vector_size);
@@ -351,20 +360,23 @@ llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const 
                                         std::uint32_t batch_size, std::uint32_t vector_size,
                                         const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of cos() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = create_constant_vector(builder, ret_acc, vector_size);
-    }
-
     // NOTE: iteration in the [1, order] range
     // (i.e., order included).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         // The indices for accessing the derivatives in this loop iteration:
         // - (order - j) * n_uvars * batch_size + (idx - 1) * batch_size + batch_idx,
@@ -388,13 +400,17 @@ llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const 
         auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "cos_load")
                                       : load_vector_from_memory(builder, arr_ptr1, vector_size, "cos_load");
 
-        // Update ret_acc: ret_acc = ret_acc + j*v0*v1.
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
             fac = create_constant_vector(builder, fac, vector_size);
         }
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+
+        // Add j*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: -ret_acc / order
     auto div = codegen<T>(s, number(-static_cast<T>(order)));
@@ -577,20 +593,23 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
                                         std::uint32_t batch_size, std::uint32_t vector_size,
                                         const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of log() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = create_constant_vector(builder, ret_acc, vector_size);
-    }
-
     // NOTE: iteration in the [1, order) range
     // (i.e., order excluded).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         // The indices for accessing the derivatives in this loop iteration:
         // - (order - j) * n_uvars * batch_size + idx * batch_size + batch_idx,
@@ -610,13 +629,17 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
         auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "log_load")
                                       : load_vector_from_memory(builder, arr_ptr1, vector_size, "log_load");
 
-        // Update ret_acc: ret_acc = ret_acc + (order-j)*v0*v1.
         auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
         if (vector_size > 0u) {
             fac = create_constant_vector(builder, fac, vector_size);
         }
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+
+        // Add (order-j)*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
     auto arr_ptrn = builder.CreateInBoundsGEP(
@@ -831,20 +854,23 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
                                         std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
                                         const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of pow() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = create_constant_vector(builder, ret_acc, vector_size);
-    }
-
     // NOTE: iteration in the [0, order) range
     // (i.e., order *not* included).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
         // The indices for accessing the derivatives in this loop iteration:
         // - (order - j) * n_uvars * batch_size + u_idx * batch_size + batch_idx,
@@ -871,9 +897,12 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
             scal_f = create_constant_vector(builder, scal_f, vector_size);
         }
 
-        // Update ret_acc: ret_acc = ret_acc + scal_f*v0*v1.
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
+        // Add scal_f*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
     }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
     auto ord_f = codegen<T>(s, number(static_cast<T>(order)));
