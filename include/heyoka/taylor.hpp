@@ -84,6 +84,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // The functions to compute the derivatives.
     using jet_f_t = void (*)(T *);
     jet_f_t m_jet_f_r, m_jet_f_a;
+    // The functions to update the state vectors
+    // at the end of an integration timestep.
+    using s_update_f_t = void (*)(T *, const T *, const T *);
+    s_update_f_t m_update_f_r, m_update_f_a;
     // Taylor decomposition.
     std::vector<expression> m_dc;
 
@@ -295,6 +299,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // The functions to compute the derivatives.
     using jet_f_t = void (*)(T *);
     jet_f_t m_jet_f_r, m_jet_f_a;
+    // The functions to update the state vectors
+    // at the end of an integration timestep.
+    using s_update_f_t = void (*)(T *, const T *, const T *);
+    s_update_f_t m_update_f_r, m_update_f_a;
     // LLVM IR.
     std::string m_ir;
     // Taylor decomposition.
@@ -308,7 +316,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_rho_om1;
     std::vector<T> m_rho_o;
     std::vector<T> m_h;
-    std::vector<T> m_cur_h;
 
     template <bool, bool>
     HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &,

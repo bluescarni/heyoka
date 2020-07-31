@@ -24,42 +24,6 @@
 namespace heyoka::detail
 {
 
-inline float fma(float x, float y, float z)
-{
-#if defined(FP_FAST_FMAF)
-    return std::fma(x, y, z);
-#else
-    return x * y + z;
-#endif
-}
-
-inline double fma(double x, double y, double z)
-{
-#if defined(FP_FAST_FMA)
-    return std::fma(x, y, z);
-#else
-    return x * y + z;
-#endif
-}
-
-inline long double fma(long double x, long double y, long double z)
-{
-#if defined(FP_FAST_FMAL)
-    return std::fma(x, y, z);
-#else
-    return x * y + z;
-#endif
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-inline mppp::real128 fma(mppp::real128 x, mppp::real128 y, mppp::real128 z)
-{
-    return mppp::fma(x, y, z);
-}
-
-#endif
-
 template <typename T>
 inline bool isfinite(T x)
 {

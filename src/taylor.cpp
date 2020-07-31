@@ -26,12 +26,20 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
 
 #endif
 
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -40,6 +48,8 @@
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
+
+#include <heyoka/detail/simple_timer.hpp>
 
 namespace heyoka
 {
@@ -436,6 +446,192 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
 namespace detail
 {
 
+namespace
+{
+
+// Add a function to the llvm_state s for the evaluation
+// of a polynomial via Estrin's scheme. The polynomial in question
+// is the Taylor expansion that updates the state in a Taylor
+// integrator at the end of the timestep. nvars is the number
+// of variables in the ODE system, order is the Taylor order,
+// batch_size the batch size (will be 1 in the scalar
+// Taylor integrator, > 1 in the batch integrator).
+template <typename T>
+void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nvars, std::uint32_t order,
+                       std::uint32_t batch_size)
+{
+    assert(s.module().getNamedValue(name) == nullptr);
+
+    auto &builder = s.builder();
+
+    // Fetch the SIMD vector size from s.
+    const auto vector_size = s.vector_size<T>();
+
+    // Prepare the main function prototype. The arguments are:
+    // - an output pointer into which we will be writing
+    //   the updated state,
+    // - an input pointer with the jet of derivatives
+    //   (which also includes the current state at order 0),
+    // - an input pointer with the integration timesteps.
+    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    assert(f != nullptr);
+
+    // Setup the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto jet_ptr = out_ptr + 1;
+    jet_ptr->setName("jet_ptr");
+    jet_ptr->addAttr(llvm::Attribute::ReadOnly);
+    jet_ptr->addAttr(llvm::Attribute::NoCapture);
+    jet_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto h_ptr = jet_ptr + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Helper to run the Estrin scheme on the polynomial
+    // whose coefficients are stored in cf_vec. It will
+    // shrink cf_vec until it contains only 1 term,
+    // the result of the evaluation.
+    // https://en.wikipedia.org/wiki/Estrin%27s_scheme
+    auto run_estrin = [&builder](std::vector<llvm::Value *> &cf_vec, llvm::Value *h) {
+        assert(!cf_vec.empty());
+
+        while (cf_vec.size() != 1u) {
+            // Fill in the vector of coefficients for the next iteration.
+            std::vector<llvm::Value *> new_cf_vec;
+
+            for (decltype(cf_vec.size()) i = 0; i < cf_vec.size(); i += 2u) {
+                if (i + 1u == cf_vec.size()) {
+                    // We are at the last element of the vector
+                    // and the size of the vector is odd. Just append
+                    // the existing coefficient.
+                    new_cf_vec.push_back(cf_vec[i]);
+                } else {
+                    new_cf_vec.push_back(builder.CreateFAdd(cf_vec[i], builder.CreateFMul(cf_vec[i + 1u], h)));
+                }
+            }
+
+            // Replace the vector of coefficients
+            // with the new one.
+            new_cf_vec.swap(cf_vec);
+
+            // Update h if we are not at the last iteration.
+            if (cf_vec.size() != 1u) {
+                h = builder.CreateFMul(h, h);
+            }
+        }
+    };
+
+    if (vector_size == 0u) {
+        // Scalar mode.
+        for (std::uint32_t var_idx = 0; var_idx < nvars; ++var_idx) {
+            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
+                // Load the polynomial coefficients from the jet
+                // of derivatives.
+                std::vector<llvm::Value *> cf_vec;
+                for (std::uint32_t o = 0; o < order + 1u; ++o) {
+                    auto cf_ptr = builder.CreateInBoundsGEP(
+                        jet_ptr, builder.getInt32(o * nvars * batch_size + var_idx * batch_size + batch_idx),
+                        "cf_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx) + "_" + li_to_string(o) + "_ptr");
+                    cf_vec.emplace_back(builder.CreateLoad(
+                        cf_ptr, "cf_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx) + "_" + li_to_string(o)));
+                }
+
+                // Load the integration timestep. This is common to all
+                // variables and varies only by batch_idx.
+                llvm::Value *h = builder.CreateLoad(builder.CreateInBoundsGEP(h_ptr, builder.getInt32(batch_idx),
+                                                                              "h_" + li_to_string(batch_idx) + "_ptr"),
+                                                    "h_" + li_to_string(batch_idx));
+
+                // Run the Estrin scheme.
+                run_estrin(cf_vec, h);
+
+                // Store the result of the evaluation.
+                auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
+                                                         "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
+                                                             + "_ptr");
+                builder.CreateStore(cf_vec[0], res_ptr);
+            }
+        }
+    } else {
+        // Vector mode.
+        const auto n_sub_batch = batch_size / vector_size;
+
+        for (std::uint32_t var_idx = 0; var_idx < nvars; ++var_idx) {
+            for (std::uint32_t batch_idx = 0; batch_idx < n_sub_batch * vector_size; batch_idx += vector_size) {
+                std::vector<llvm::Value *> cf_vec;
+                for (std::uint32_t o = 0; o < order + 1u; ++o) {
+                    auto cf_ptr = builder.CreateInBoundsGEP(
+                        jet_ptr, builder.getInt32(o * nvars * batch_size + var_idx * batch_size + batch_idx),
+                        "cf_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx) + "_" + li_to_string(o) + "_ptr");
+                    cf_vec.emplace_back(load_vector_from_memory(builder, cf_ptr, vector_size,
+                                                                "cf_" + li_to_string(var_idx) + "_"
+                                                                    + li_to_string(batch_idx) + "_" + li_to_string(o)));
+                }
+
+                llvm::Value *h
+                    = load_vector_from_memory(builder,
+                                              builder.CreateInBoundsGEP(h_ptr, builder.getInt32(batch_idx),
+                                                                        "h_" + li_to_string(batch_idx) + "_ptr"),
+                                              vector_size, "h_" + li_to_string(batch_idx));
+
+                run_estrin(cf_vec, h);
+
+                auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
+                                                         "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
+                                                             + "_ptr");
+
+                detail::store_vector_to_memory(builder, res_ptr, cf_vec[0], vector_size);
+            }
+
+            for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
+                std::vector<llvm::Value *> cf_vec;
+                for (std::uint32_t o = 0; o < order + 1u; ++o) {
+                    auto cf_ptr = builder.CreateInBoundsGEP(
+                        jet_ptr, builder.getInt32(o * nvars * batch_size + var_idx * batch_size + batch_idx),
+                        "cf_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx) + "_" + li_to_string(o) + "_ptr");
+                    cf_vec.emplace_back(builder.CreateLoad(
+                        cf_ptr, "cf_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx) + "_" + li_to_string(o)));
+                }
+
+                llvm::Value *h = builder.CreateLoad(builder.CreateInBoundsGEP(h_ptr, builder.getInt32(batch_idx),
+                                                                              "h_" + li_to_string(batch_idx) + "_ptr"),
+                                                    "h_" + li_to_string(batch_idx));
+
+                run_estrin(cf_vec, h);
+
+                auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
+                                                         "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
+                                                             + "_ptr");
+                builder.CreateStore(cf_vec[0], res_ptr);
+            }
+        }
+    }
+
+    builder.CreateRetVoid();
+
+    s.verify_function(name);
+}
+
+} // namespace
+
 template <typename T>
 template <typename U>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state, T time, T rtol, T atol,
@@ -508,6 +704,14 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
         m_llvm.add_taylor_jet_batch<T>("jet_a", std::move(sys), m_order_a, 1);
     }
 
+    // Add the functions to update the state vector.
+    // NOTE: static cast is safe because we successfully
+    // added the functions for the derivatives.
+    taylor_add_estrin<T>(m_llvm, "estrin_r", static_cast<std::uint32_t>(n_vars), m_order_r, 1);
+    if (m_order_r != m_order_a) {
+        taylor_add_estrin<T>(m_llvm, "estrin_a", static_cast<std::uint32_t>(n_vars), m_order_a, 1);
+    }
+
     // Change the optimisation level
     // and run the optimisation pass.
     m_llvm.opt_level() = opt_level;
@@ -523,6 +727,15 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
         m_jet_f_a = m_jet_f_r;
     } else {
         m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+
+    // Fetch the function for updating the state vector
+    // at the end of the integration timestep.
+    m_update_f_r = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_r"));
+    if (m_order_r == m_order_a) {
+        m_update_f_a = m_update_f_r;
+    } else {
+        m_update_f_a = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_a"));
     }
 
     // Init the jet vector. Its maximum size is n_vars * (max_order + 1).
@@ -602,6 +815,14 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
         m_jet_f_a = m_jet_f_r;
     } else {
         m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+
+    // Same for the functions for the state update.
+    m_update_f_r = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_r"));
+    if (m_order_r == m_order_a) {
+        m_update_f_a = m_update_f_r;
+    } else {
+        m_update_f_a = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_a"));
     }
 }
 
@@ -732,16 +953,10 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
         h = -h;
     }
 
-    // Update the state.
-    // NOTE: this loop is already in a SIMD-friendly
-    // format, if we ever decide to JIT it.
-    auto cur_h = h;
-    for (std::uint32_t o = 1; o < order + 1u; ++o, cur_h *= h) {
-        const auto d_ptr = jet_ptr + o * nvars;
-
-        for (std::uint32_t i = 0; i < nvars; ++i) {
-            m_state[i] = detail::fma(cur_h, d_ptr[i], m_state[i]);
-        }
+    if (use_abs_tol) {
+        m_update_f_a(m_state.data(), jet_ptr, &h);
+    } else {
+        m_update_f_r(m_state.data(), jet_ptr, &h);
     }
 
     // Update the time.
@@ -1016,6 +1231,14 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
         m_llvm.add_taylor_jet_batch<T>("jet_a", std::move(sys), m_order_a, batch_size);
     }
 
+    // Add the functions to update the state vector.
+    // NOTE: static cast is safe because we successfully
+    // added the functions for the derivatives.
+    taylor_add_estrin<T>(m_llvm, "estrin_r", static_cast<std::uint32_t>(n_vars), m_order_r, batch_size);
+    if (m_order_r != m_order_a) {
+        taylor_add_estrin<T>(m_llvm, "estrin_a", static_cast<std::uint32_t>(n_vars), m_order_a, batch_size);
+    }
+
     // Change the optimisation level
     // and run the optimisation pass.
     m_llvm.opt_level() = opt_level;
@@ -1034,6 +1257,15 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
         m_jet_f_a = m_jet_f_r;
     } else {
         m_jet_f_a = m_llvm.fetch_taylor_jet_batch<T>("jet_a");
+    }
+
+    // Fetch the function for updating the state vector
+    // at the end of the integration timestep.
+    m_update_f_r = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_r"));
+    if (m_order_r == m_order_a) {
+        m_update_f_a = m_update_f_r;
+    } else {
+        m_update_f_a = reinterpret_cast<s_update_f_t>(m_llvm.jit_lookup("estrin_a"));
     }
 
     // Init the jet vector. Its maximum size is n_vars * (max_order + 1) * batch_size.
@@ -1094,7 +1326,6 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     m_rho_om1.resize(static_cast<jet_size_t>(m_batch_size));
     m_rho_o.resize(static_cast<jet_size_t>(m_batch_size));
     m_h.resize(static_cast<jet_size_t>(m_batch_size));
-    m_cur_h.resize(static_cast<jet_size_t>(m_batch_size));
 }
 
 template <typename T>
@@ -1203,6 +1434,9 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
         const auto use_abs_tol = m_rtol * m_max_abs_states[batch_idx] <= m_atol;
         const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
         order = std::max(order, cur_order);
+
+        // Record whether we are using absolute or relative
+        // tolerance for this element of the batch.
         m_use_abs_tol[batch_idx] = use_abs_tol;
     }
 
@@ -1316,31 +1550,10 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     }
 
     // Update the state.
-    assert(m_cur_h.size() == batch_size);
-    // Init the accumulator for the powers of the
-    // timestep.
-    std::copy(m_h.begin(), m_h.end(), m_cur_h.begin());
-    for (std::uint32_t o = 1; o < order + 1u; ++o) {
-        const auto d_ptr = jet_ptr + o * nvars * batch_size;
-
-        for (std::uint32_t i = 0; i < nvars; ++i) {
-            for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-                if (std::get<0>(res[batch_idx]) != taylor_outcome::success) {
-                    // Skip the current state if it was non-finite to begin
-                    // with or if it resulted in non-finite derivatives
-                    // or nan rhos.
-                    continue;
-                }
-
-                m_states[i * batch_size + batch_idx] = detail::fma(
-                    m_cur_h[batch_idx], d_ptr[i * batch_size + batch_idx], m_states[i * batch_size + batch_idx]);
-            }
-        }
-
-        // Update h.
-        for (std::uint32_t batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
-            m_cur_h[batch_idx] *= m_h[batch_idx];
-        }
+    if (order == m_order_a) {
+        m_update_f_a(m_states.data(), jet_ptr, m_h.data());
+    } else {
+        m_update_f_r(m_states.data(), jet_ptr, m_h.data());
     }
 
     // Update the times, store the timesteps and order in res.
