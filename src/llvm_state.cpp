@@ -121,6 +121,7 @@ struct llvm_state::jit {
 #if defined(HEYOKA_HAVE_REAL128)
     std::uint32_t m_vector_size_f128 = 0;
 #endif
+    bool m_has_avx512 = false;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
@@ -183,6 +184,7 @@ struct llvm_state::jit {
                                   std::boyer_moore_searcher(feature.begin(), feature.end()));
 
             if (it != target_features.end()) {
+                m_has_avx512 = true;
                 m_vector_size_dbl = 8;
                 return;
             }
@@ -476,6 +478,12 @@ void llvm_state::optimise()
         // so that the codegen uses all the features available on
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
+
+        if (m_jitter->m_has_avx512) {
+            for (auto &f : *m_module) {
+                f.addFnAttr("prefer-vector-width", "512");
+            }
+        }
 
         // Init the module pass manager.
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
