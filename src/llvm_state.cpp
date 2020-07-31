@@ -121,7 +121,11 @@ struct llvm_state::jit {
 #if defined(HEYOKA_HAVE_REAL128)
     std::uint32_t m_vector_size_f128 = 0;
 #endif
-    bool m_has_avx512 = false;
+    // This is a workaround flag to
+    // signal that AVX-512 is available.
+    // It is used in the module optimisation
+    // function to set specific function attributes.
+    bool m_have_avx512 = false;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
@@ -184,8 +188,12 @@ struct llvm_state::jit {
                                   std::boyer_moore_searcher(feature.begin(), feature.end()));
 
             if (it != target_features.end()) {
-                m_has_avx512 = true;
                 m_vector_size_dbl = 8;
+
+                // Set also the flag signalling that
+                // we have AVX-512.
+                m_have_avx512 = true;
+
                 return;
             }
 
@@ -479,7 +487,14 @@ void llvm_state::optimise()
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
 
-        if (m_jitter->m_has_avx512) {
+        if (m_jitter->m_have_avx512) {
+            // NOTE: currently LLVM forces 256-bit vector
+            // width when AVX-512 is available, due to clock
+            // frequency scaling concerns. It seems like for
+            // our purposes 512-bit vectors work fine,
+            // thus we force their use via a specific
+            // function attribute to be set on all the
+            // functions in the module.
             for (auto &f : *m_module) {
                 f.addFnAttr("prefer-vector-width", "512");
             }
