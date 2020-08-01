@@ -49,8 +49,6 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
-#include <heyoka/detail/simple_timer.hpp>
-
 namespace heyoka
 {
 
