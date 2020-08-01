@@ -637,7 +637,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
       // NOTE: init to optimisation level 0 in order
       // to delay the optimisation pass.
-      m_llvm{"adaptive taylor integrator", 0u}
+      m_llvm{kw::mname = "adaptive taylor integrator", kw::opt_level = 0u}
 {
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
@@ -1152,7 +1152,7 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     : m_batch_size(batch_size), m_states(std::move(states)), m_times(std::move(times)), m_rtol(rtol), m_atol(atol),
       // NOTE: init to optimisation level 0 in order
       // to delay the optimisation pass.
-      m_llvm{"adaptive batch taylor integrator", 0u}
+      m_llvm{kw::mname = "adaptive batch taylor integrator", kw::opt_level = 0u}
 {
     // Check input params.
     if (m_batch_size == 0u) {

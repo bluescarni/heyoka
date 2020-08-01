@@ -47,7 +47,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
     const auto batch_size = 23u;
 
-    llvm_state s{"", opt_level};
+    llvm_state s{kw::opt_level = opt_level};
 
     s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
     s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
@@ -94,7 +94,7 @@ TEST_CASE("taylor pow")
 
         // Number-number tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 1);
@@ -115,7 +115,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 2);
@@ -143,7 +143,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 1);
@@ -166,7 +166,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 2);
@@ -200,7 +200,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 3, 3);
@@ -253,7 +253,7 @@ TEST_CASE("taylor pow")
 
         // Variable-number tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
@@ -276,7 +276,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
@@ -306,7 +306,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
@@ -331,7 +331,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
@@ -367,7 +367,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
@@ -441,7 +441,7 @@ TEST_CASE("taylor pow")
 
         // Failure modes for non-implemented cases.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             REQUIRE_THROWS_MATCHES(
                 s.add_taylor_jet_batch<fp_t>("jet", {pow(1_dbl, x)}, 3, 3), std::invalid_argument,
@@ -450,7 +450,7 @@ TEST_CASE("taylor pow")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             REQUIRE_THROWS_MATCHES(
                 s.add_taylor_jet_batch<fp_t>("jet", {y, pow(y, x)}, 3, 3), std::invalid_argument,

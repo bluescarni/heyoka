@@ -34,7 +34,7 @@ int main()
 
     auto [x, y, z] = make_vars("x", "y", "z");
 
-    llvm_state s{""};
+    llvm_state s;
 
     s.add_function_batch<double>("bench", (x * y) + (x * z) + (y * z) + (x + y) + (x + z) + (y + z), batch_size);
 

@@ -31,7 +31,7 @@ using namespace heyoka_benchmark;
 
 int main()
 {
-    const auto batch_size = llvm_state{""}.vector_size<double>();
+    const auto batch_size = llvm_state{}.vector_size<double>();
 
     if (batch_size == 0u) {
         std::cout << "The vector size on the current machine is zero, exiting.\n";

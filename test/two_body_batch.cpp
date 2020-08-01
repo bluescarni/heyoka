@@ -53,7 +53,7 @@ TEST_CASE("two body batch")
 
         using fp_t = decltype(fp_x);
 
-        const auto batch_size = llvm_state{""}.vector_size<fp_t>();
+        const auto batch_size = llvm_state{}.vector_size<fp_t>();
 
         if (batch_size == 0u) {
             return;

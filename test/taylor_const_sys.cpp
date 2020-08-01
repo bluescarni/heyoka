@@ -43,7 +43,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
     const auto batch_size = 23u;
 
-    llvm_state s{"", opt_level};
+    llvm_state s{kw::opt_level = opt_level};
 
     s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
     s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
@@ -85,7 +85,7 @@ TEST_CASE("taylor const sys")
         auto [x, y, z] = make_vars("x", "y", "z");
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {prime(x) = expression{number{fp_t{1}}},
@@ -111,7 +111,7 @@ TEST_CASE("taylor const sys")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {prime(x) = expression{number{fp_t{1}}},
@@ -148,7 +148,7 @@ TEST_CASE("taylor const sys")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {prime(x) = expression{number{fp_t{1}}},
@@ -177,7 +177,7 @@ TEST_CASE("taylor const sys")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {prime(x) = expression{number{fp_t{1}}},
@@ -223,7 +223,7 @@ TEST_CASE("taylor const sys")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet",
                                          {prime(x) = expression{number{fp_t{1}}},

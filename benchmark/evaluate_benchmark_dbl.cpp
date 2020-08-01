@@ -61,7 +61,7 @@ using namespace std::chrono;
 int main()
 {
     // Init the LLVM machinery.
-    llvm_state s{"optimized"};
+    llvm_state s{kw::mname = "optimized"};
 
     auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
     std::cout << "ex: " << ex << "\n";

@@ -17,7 +17,7 @@ namespace heyoka::detail
 template <typename T>
 using uncvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
-template <typename>
+template <typename, typename...>
 inline constexpr bool always_false_v = false;
 
 } // namespace heyoka::detail
