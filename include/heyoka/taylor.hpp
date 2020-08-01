@@ -313,8 +313,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_rho_om1;
     std::vector<T> m_rho_o;
     std::vector<T> m_h;
+    std::vector<T> m_pinf;
+    std::vector<T> m_minf;
 
-    template <bool, bool>
     HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &,
                                     const std::vector<T> &);
 

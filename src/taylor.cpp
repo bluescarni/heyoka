@@ -855,6 +855,7 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 // a flag describing the outcome of the integration,
 // the integration timestep that was used and the
 // Taylor order that was used.
+//
 // NOTE: the safer adaptive timestep from
 // Jorba still needs to be implemented.
 template <typename T>
@@ -1321,6 +1322,8 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     m_rho_om1.resize(static_cast<jet_size_t>(m_batch_size));
     m_rho_o.resize(static_cast<jet_size_t>(m_batch_size));
     m_h.resize(static_cast<jet_size_t>(m_batch_size));
+    m_pinf.resize(static_cast<jet_size_t>(m_batch_size), std::numeric_limits<T>::infinity());
+    m_minf.resize(static_cast<jet_size_t>(m_batch_size), -std::numeric_limits<T>::infinity());
 }
 
 template <typename T>
@@ -1349,7 +1352,7 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
       m_rhofac_r(other.m_rhofac_r), m_rhofac_a(other.m_rhofac_a), m_llvm(other.m_llvm), m_jet(other.m_jet),
       m_dc(other.m_dc), m_max_abs_states(other.m_max_abs_states), m_use_abs_tol(other.m_use_abs_tol),
       m_max_abs_diff_om1(other.m_max_abs_diff_om1), m_max_abs_diff_o(other.m_max_abs_diff_o),
-      m_rho_om1(other.m_rho_om1), m_rho_o(other.m_rho_o), m_h(other.m_h)
+      m_rho_om1(other.m_rho_om1), m_rho_o(other.m_rho_o), m_h(other.m_h), m_pinf(other.m_pinf), m_minf(other.m_minf)
 {
     // Fetch the compiled functions for computing
     // the jet of derivatives.
@@ -1390,36 +1393,27 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
 
 // Implementation detail to make a single integration timestep.
-// The size of the timestep is automatically deduced for each
-// state vector. If LimitTimestep is true, then the integration
-// timestep for each state vector will be limited not to be greater
-// than the corresponding value in max_delta_ts in absolute value.
-// If Direction is true then the propagation is done forward
-// in time, otherwise backwards. In any case the values in
-// max_delta_ts can never be negative.
+// The magnitude of the timestep is automatically deduced for each
+// state vector, but it will always be not greater than
+// the absolute value of the corresponding element in max_delta_ts.
+// For each state vector, the propagation
+// is done forward in time if max_delta_t >= 0, backwards in
+// time otherwise.
+//
 // The function will write to res a triple for each state
 // vector, containing a flag describing the outcome of the integration,
 // the integration timestep that was used and the
 // Taylor order that was used.
-// NOTE: perhaps there's performance to be gained
-// by moving the timestep deduction logic and the
-// actual propagation in LLVM (e.g., unrolling
-// over the number of variables).
+//
 // NOTE: the safer adaptive timestep from
 // Jorba still needs to be implemented.
 template <typename T>
-template <bool LimitTimestep, bool Direction>
 void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res,
-                                              [[maybe_unused]] const std::vector<T> &max_delta_ts)
+                                              const std::vector<T> &max_delta_ts)
 {
     // Check preconditions.
-    if constexpr (LimitTimestep) {
-        assert(max_delta_ts.size() == m_batch_size);
-        assert(std::all_of(max_delta_ts.begin(), max_delta_ts.end(),
-                           [](const auto &x) { return detail::isfinite(x) && x >= 0; }));
-    } else {
-        assert(max_delta_ts.empty());
-    }
+    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) { return detail::isnan(x); }));
+    assert(max_delta_ts.size() == m_batch_size);
 
     // Cache locally the batch size.
     const auto batch_size = m_batch_size;
@@ -1579,14 +1573,14 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
             // Compute the timestep.
             auto h = rho_m * (use_abs_tol ? m_rhofac_a : m_rhofac_r);
 
-            if constexpr (LimitTimestep) {
-                // Make sure h does not exceed max_delta_t.
-                if (h > max_delta_ts[batch_idx]) {
-                    h = max_delta_ts[batch_idx];
-                    std::get<0>(res[batch_idx]) = taylor_outcome::time_limit;
-                }
+            // Make sure h does not exceed abs(max_delta_t).
+            const auto abs_delta_t = detail::abs(max_delta_ts[batch_idx]);
+            if (h > abs_delta_t) {
+                h = abs_delta_t;
+                std::get<0>(res[batch_idx]) = taylor_outcome::time_limit;
             }
-            if constexpr (!Direction) {
+
+            if (max_delta_ts[batch_idx] < T(0)) {
                 // When propagating backwards, invert the sign of the timestep.
                 h = -h;
             }
@@ -1622,13 +1616,13 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res)
 {
-    return step_impl<false, true>(res, std::vector<T>{});
+    return step_impl(res, m_pinf);
 }
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_backward(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res)
 {
-    return step_impl<false, false>(res, std::vector<T>{});
+    return step_impl(res, m_minf);
 }
 
 template <typename T>
