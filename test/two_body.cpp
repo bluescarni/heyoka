@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <array>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
@@ -23,6 +24,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -88,6 +90,7 @@ TEST_CASE("two body")
 {
     auto tester = [](auto fp_x, unsigned opt_level) {
         using std::abs;
+        using std::cos;
 
         using fp_t = decltype(fp_x);
 
@@ -100,9 +103,11 @@ TEST_CASE("two body")
         auto r01_m3
             = pow(x01 * x01 + y01 * y01 + z01 * z01, expression{number{fp_t{-3}}} / expression{number{fp_t{2}}});
 
-        // NOTE: this corresponds to a highly elliptic orbit.
-        std::vector<fp_t> init_state{fp_t{0.593},     fp_t{-0.593},   fp_t{0},  fp_t{0}, fp_t{0}, fp_t{0},
-                                     fp_t{-1.000001}, fp_t{1.000001}, fp_t{-1}, fp_t{1}, fp_t{0}, fp_t{0}};
+        const auto kep = std::array<fp_t, 6>{fp_t{1.5}, fp_t{.2}, fp_t{.3}, fp_t{.4}, fp_t{.5}, fp_t{.6}};
+        const auto [c_x, c_v] = kep_to_cart(kep, fp_t{1} / 4);
+
+        std::vector<fp_t> init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
+                                     c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
         taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
@@ -119,9 +124,25 @@ TEST_CASE("two body")
 
         for (auto i = 0; i < 200; ++i) {
             const auto [oc, h, ord] = tad.step();
-            REQUIRE(oc == taylor_adaptive<fp_t>::outcome::success);
-            REQUIRE(abs((en - tbp_energy(st)) / en) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
-            REQUIRE(abs((am - compute_am(st)) / am) <= std::numeric_limits<fp_t>::epsilon() * 1E4);
+            REQUIRE(oc == taylor_outcome::success);
+            REQUIRE(tbp_energy(st) == approximately(en, fp_t{1E2}));
+            REQUIRE(compute_am(st) == approximately(am, fp_t{1E2}));
+
+            const auto kep1 = cart_to_kep(std::array<fp_t, 3>{st[6], st[8], st[10]},
+                                          std::array<fp_t, 3>{st[0], st[2], st[4]}, fp_t{1} / 4);
+            const auto kep2 = cart_to_kep(std::array<fp_t, 3>{st[7], st[9], st[11]},
+                                          std::array<fp_t, 3>{st[1], st[3], st[5]}, fp_t{1} / 4);
+
+            REQUIRE(kep1[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep2[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep1[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep2[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep1[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(kep2[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(abs(cos(kep1[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(abs(cos(kep2[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(kep1[4] == approximately(fp_t{.5}, fp_t{1E2}));
+            REQUIRE(kep2[4] == approximately(fp_t{.5}, fp_t{1E2}));
         }
     };
 
@@ -183,7 +204,7 @@ TEST_CASE("two uniform spheres")
 
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
+        REQUIRE(oc == taylor_outcome::success);
         REQUIRE(std::abs((en - tus_energy(rs_val, st)) / en) <= 1E-11);
         REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
     }
@@ -257,7 +278,7 @@ TEST_CASE("mixed tb/spheres")
 
         // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
         auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
-        REQUIRE((oc == taylor_adaptive_dbl::outcome::success || oc == taylor_adaptive_dbl::outcome::time_limit));
+        REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
 
         if (get_regime(cur_t->get_state()) != cur_regime) {
             auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));

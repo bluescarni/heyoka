@@ -8,18 +8,25 @@
 
 #include <chrono>
 #include <initializer_list>
+#include <iostream>
 #include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 
-#include <iostream>
-
 using namespace heyoka;
 
 int main()
 {
+    const auto batch_size = llvm_state{""}.vector_size<double>();
+
+    if (batch_size == 0u) {
+        std::cout << "The vector size on the current machine is zero, exiting.\n";
+
+        return 0;
+    }
+
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
@@ -28,7 +35,6 @@ int main()
     auto z01 = z1 - z0;
     auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
 
-    const auto batch_size = 4u;
     const auto order = 20u;
 
     llvm_state s{""};
@@ -53,23 +59,25 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Do 10 evaluations.
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
-    jet_ptr(ptr);
+    // Do 400 evaluations.
+    for (auto i = 0; i < 40; ++i) {
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+        jet_ptr(ptr);
+    }
 
     const auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Order " << order << ", batch size " << batch_size << ": " << elapsed / 10 << "ns\n";
+    std::cout << "Order " << order << ", batch size " << batch_size << ": " << elapsed / 400 << "ns\n";
 
     return 0;
 }

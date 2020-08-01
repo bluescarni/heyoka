@@ -650,15 +650,7 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
     const auto u_idx0 = uname_to_index(var0.name());
     const auto u_idx1 = uname_to_index(var1.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = detail::create_constant_vector(builder, ret_acc, vector_size);
-    }
-
-    // NOTE: iteration in the [0, order] range
-    // (i.e., order inclusive).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j <= order; ++j) {
         // The indices for accessing the derivatives are:
         // - (order - j) * n_uvars * batch_size + u_idx0 * batch_size + batch_idx,
@@ -681,11 +673,11 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
                       ? builder.CreateLoad(arr_ptr1, "bo_mul_var_var_load")
                       : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_mul_var_var_load");
 
-        // Update ret_acc: ret_acc = ret_acc + v0*v1.
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(v0, v1), "bo_mul_var_var_ret_update");
+        // Add v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(v0, v1, "bo_mul_var_var_term_prod"));
     }
 
-    return ret_acc;
+    return llvm_pairwise_sum(builder, sum);
 }
 
 template <typename, typename V1, typename V2>
@@ -735,15 +727,9 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
 
-    // Accumulator for the result.
-    auto ret_acc = codegen<T>(s, number(0.));
-
-    if (vector_size > 0u) {
-        ret_acc = detail::create_constant_vector(builder, ret_acc, vector_size);
-    }
-
     // NOTE: iteration in the [1, order] range
     // (i.e., order inclusive).
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         // The indices for accessing the derivatives are:
         // - (order - j) * n_uvars * batch_size + idx * batch_size + batch_idx,
@@ -763,9 +749,12 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
         auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "bo_div_load")
                                       : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_div_load");
 
-        // Update ret_acc: ret_acc = ret_acc + v0*v1.
-        ret_acc = builder.CreateFAdd(ret_acc, builder.CreateFMul(v0, v1), "bo_div_ret_update");
+        // Add v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(v0, v1, "bo_div_term_prod"));
     }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
@@ -841,6 +830,17 @@ llvm::Value *taylor_diff_batch_bo_impl(llvm_state &s, const binary_operator &bo,
                                        std::uint32_t batch_size, std::uint32_t vector_size,
                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
+    // NOTE: some of the implementations
+    // require order to be at least 1 in order
+    // to be able to do pairwise summation.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of a binary operator (the order must be at least one)");
+    }
+
     // lhs and rhs must be u vars or numbers.
     auto check_arg = [](const expression &e) {
         std::visit(

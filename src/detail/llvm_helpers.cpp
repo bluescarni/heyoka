@@ -193,6 +193,32 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
     return vec;
 }
 
+// Pairwise summation of a vector of LLVM values.
+// https://en.wikipedia.org/wiki/Pairwise_summation
+llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
+{
+    assert(!sum.empty());
+
+    while (sum.size() != 1u) {
+        std::vector<llvm::Value *> new_sum;
+
+        for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
+            if (i + 1u == sum.size()) {
+                // We are at the last element of the vector
+                // and the size of the vector is odd. Just append
+                // the existing value.
+                new_sum.push_back(sum[i]);
+            } else {
+                new_sum.push_back(builder.CreateFAdd(sum[i], sum[i + 1u]));
+            }
+        }
+
+        new_sum.swap(sum);
+    }
+
+    return sum[0];
+}
+
 #if defined(__clang__)
 
 #pragma clang diagnostic pop

@@ -56,8 +56,11 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
@@ -118,6 +121,11 @@ struct llvm_state::jit {
 #if defined(HEYOKA_HAVE_REAL128)
     std::uint32_t m_vector_size_f128 = 0;
 #endif
+    // This is a workaround flag to
+    // signal that AVX-512 is available.
+    // It is used in the module optimisation
+    // function to set specific function attributes.
+    bool m_have_avx512 = false;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
@@ -181,6 +189,11 @@ struct llvm_state::jit {
 
             if (it != target_features.end()) {
                 m_vector_size_dbl = 8;
+
+                // Set also the flag signalling that
+                // we have AVX-512.
+                m_have_avx512 = true;
+
                 return;
             }
 
@@ -288,7 +301,53 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     m_builder->setFastMathFlags(fmf);
 }
 
+llvm_state::llvm_state(const llvm_state &other)
+    : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level)
+{
+    // Get the IR of other.
+    auto other_ir = other.dump_ir();
+
+    // Create the corresponding memory buffer.
+    auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
+
+    // Construct a new module from the parsed IR.
+    llvm::SMDiagnostic err;
+    m_module = llvm::parseIR(*mb, err, context());
+    if (!m_module) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        err.print("", ostr);
+
+        throw std::invalid_argument("Error parsing the IR while copying an llvm_state. The full error message:\n"
+                                    + ostr.str());
+    }
+
+    // Create a new builder for the module.
+    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+
+    // Set a couple of flags for faster math at the
+    // price of potential change of semantics.
+    llvm::FastMathFlags fmf;
+    fmf.setFast();
+    m_builder->setFastMathFlags(fmf);
+
+    // Run the compilation if other was compiled.
+    if (!other.m_module) {
+        compile();
+    }
+}
+
 llvm_state::llvm_state(llvm_state &&) noexcept = default;
+
+llvm_state &llvm_state::operator=(const llvm_state &other)
+{
+    if (this != &other) {
+        *this = llvm_state(other);
+    }
+
+    return *this;
+}
 
 llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
 
@@ -428,6 +487,19 @@ void llvm_state::optimise()
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
 
+        if (m_jitter->m_have_avx512) {
+            // NOTE: currently LLVM forces 256-bit vector
+            // width when AVX-512 is available, due to clock
+            // frequency scaling concerns. It seems like for
+            // our purposes 512-bit vectors work fine,
+            // thus we force their use via a specific
+            // function attribute to be set on all the
+            // functions in the module.
+            for (auto &f : *m_module) {
+                f.addFnAttr("prefer-vector-width", "512");
+            }
+        }
+
         // Init the module pass manager.
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
         // These are passes which set up target-specific info
@@ -479,6 +551,9 @@ void llvm_state::optimise()
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
+
+    // Store a snapshot of the IR before compiling.
+    m_ir_snapshot = dump_ir();
 
     m_jitter->add_module(std::move(m_module));
 }
@@ -918,12 +993,19 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
 std::string llvm_state::dump_ir() const
 {
-    check_uncompiled(__func__);
-
-    std::string out;
-    llvm::raw_string_ostream ostr(out);
-    m_module->print(ostr, nullptr);
-    return ostr.str();
+    if (m_module) {
+        // The module has not been compiled yet,
+        // get the IR from it.
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+        m_module->print(ostr, nullptr);
+        return ostr.str();
+    } else {
+        // The module has been compiled.
+        // Return the IR snapshot that
+        // was created before the compilation.
+        return m_ir_snapshot;
+    }
 }
 
 std::string llvm_state::dump_function_ir(const std::string &name) const
@@ -1657,6 +1739,25 @@ llvm_state::tjb_t<long double> llvm_state::fetch_taylor_jet_batch_ldbl(const std
 llvm_state::tjb_t<mppp::real128> llvm_state::fetch_taylor_jet_batch_f128(const std::string &name)
 {
     return fetch_taylor_jet_batch<mppp::real128>(name);
+}
+
+#endif
+
+std::uint32_t llvm_state::vector_size_dbl() const
+{
+    return m_jitter->m_vector_size_dbl;
+}
+
+std::uint32_t llvm_state::vector_size_ldbl() const
+{
+    return m_jitter->m_vector_size_ldbl;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::uint32_t llvm_state::vector_size_f128() const
+{
+    return m_jitter->m_vector_size_f128;
 }
 
 #endif

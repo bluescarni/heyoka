@@ -101,6 +101,8 @@ inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_s
     return ret;
 }
 
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
+
 } // namespace heyoka::detail
 
 #endif
