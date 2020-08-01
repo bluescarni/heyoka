@@ -304,9 +304,9 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
     }
 }
 
-// NOTE: the other kwargs will get the default values
-// specified in the implementation function.
-llvm_state::llvm_state() : llvm_state(kw::mname = "") {}
+// NOTE: this will ensure that all kwargs
+// are set to their default values.
+llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),

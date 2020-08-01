@@ -107,12 +107,7 @@ TEST_CASE("two body batch")
         for (std::uint32_t j = 0; j < 12u; ++j) {
             scalar_init.push_back(init_states[j * batch_size]);
         }
-        taylor_adaptive<fp_t> ta{sys,
-                                 std::move(scalar_init),
-                                 fp_t{0},
-                                 std::numeric_limits<fp_t>::epsilon(),
-                                 std::numeric_limits<fp_t>::epsilon(),
-                                 opt_level};
+        taylor_adaptive<fp_t> ta{sys, std::move(scalar_init), kw::opt_level = opt_level};
         const auto &st = ta.get_state();
         auto scal_st(ta.get_state());
 

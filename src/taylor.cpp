@@ -632,13 +632,15 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
 
 template <typename T>
 template <typename U>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state, T time, T rtol, T atol,
-                                              unsigned opt_level)
-    : m_state(std::move(state)), m_time(time), m_rtol(rtol), m_atol(atol),
-      // NOTE: init to optimisation level 0 in order
-      // to delay the optimisation pass.
-      m_llvm{kw::mname = "adaptive taylor integrator", kw::opt_level = 0u}
+void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T rtol, T atol,
+                                                 unsigned opt_level)
 {
+    // Assign the data members.
+    m_state = std::move(state);
+    m_time = time;
+    m_rtol = rtol;
+    m_atol = atol;
+
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
         throw std::invalid_argument(
@@ -782,20 +784,6 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(p_tag, U sys, std::vector<T> state
     // integration timestep.
     m_rhofac_r = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_r - 1u));
     m_rhofac_a = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_a - 1u));
-}
-
-template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, T time, T rtol, T atol,
-                                              unsigned opt_level)
-    : taylor_adaptive_impl(p_tag{}, std::move(sys), std::move(state), time, rtol, atol, opt_level)
-{
-}
-
-template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                                              T time, T rtol, T atol, unsigned opt_level)
-    : taylor_adaptive_impl(p_tag{}, std::move(sys), std::move(state), time, rtol, atol, opt_level)
-{
 }
 
 template <typename T>
@@ -1130,13 +1118,28 @@ const std::vector<expression> &taylor_adaptive_impl<T>::get_decomposition() cons
     return m_dc;
 }
 
-// Explicit instantiation of the implementation classes.
+// Explicit instantiation of the implementation classes/functions.
 template class taylor_adaptive_impl<double>;
+template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, double,
+                                                               double, double, unsigned);
+template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+                                                               std::vector<double>, double, double, double, unsigned);
 template class taylor_adaptive_impl<long double>;
+template void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
+                                                                    long double, long double, long double, unsigned);
+template void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+                                                                    std::vector<long double>, long double, long double,
+                                                                    long double, unsigned);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
+template void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
+                                                                      std::vector<mppp::real128>, mppp::real128,
+                                                                      mppp::real128, mppp::real128, unsigned);
+template void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+                                                                      std::vector<mppp::real128>, mppp::real128,
+                                                                      mppp::real128, mppp::real128, unsigned);
 
 #endif
 

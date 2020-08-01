@@ -52,6 +52,14 @@ IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 
+namespace detail
+{
+
+// Default value for the opt_level argument.
+inline constexpr unsigned default_opt_level = 3;
+
+} // namespace detail
+
 } // namespace kw
 
 class HEYOKA_DLL_PUBLIC llvm_state
@@ -94,17 +102,14 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
-    static auto kw_args_ctor_impl(KwArgs &&... kwargs)
+    static auto kw_args_ctor_impl(KwArgs &&... kw_args)
     {
-        igor::parser p{kwargs...};
+        igor::parser p{kw_args...};
 
-        if constexpr (p.has_other_than(kw::mname, kw::opt_level, kw::fast_math)) {
+        if constexpr (p.has_unnamed_arguments()) {
             static_assert(detail::always_false_v<KwArgs...>,
-                          "The keyword arguments constructor of llvm_state contains "
-                          "named arguments other than 'mname', 'opt_level' and 'fast_math'.");
-        } else if constexpr (p.has_unnamed_arguments()) {
-            static_assert(detail::always_false_v<KwArgs...>, "The keyword arguments constructor of llvm_state contains "
-                                                             "unnamed arguments.");
+                          "The variadic arguments in the construction of an llvm_state contain "
+                          "unnamed arguments.");
         } else {
             // Module name (defaults to empty string).
             auto mod_name = [&p]() -> std::string {
@@ -115,12 +120,12 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            // Optimisation level (defaults to 3).
+            // Optimisation level.
             auto opt_level = [&p]() -> unsigned {
                 if constexpr (p.has(kw::opt_level)) {
                     return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
                 } else {
-                    return 3;
+                    return kw::detail::default_opt_level;
                 }
             }();
 
@@ -149,7 +154,7 @@ public:
                                    && (sizeof...(KwArgs) > 1u
                                        || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
                                int> = 0>
-    explicit llvm_state(KwArgs &&... kwargs) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kwargs)...))
+    explicit llvm_state(KwArgs &&... kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
     llvm_state(const llvm_state &);

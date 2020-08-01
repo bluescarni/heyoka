@@ -70,10 +70,7 @@ TEST_CASE("e3bp")
 
     taylor_adaptive_dbl tad{{prime(xi) = diff(ham, pxi), prime(eta) = diff(ham, peta), prime(phi) = diff(ham, pphi),
                              prime(pxi) = -diff(ham, xi), prime(peta) = -diff(ham, eta), prime(pphi) = -diff(ham, phi)},
-                            init_state,
-                            0,
-                            1E-16,
-                            1E-16};
+                            init_state};
 
     const auto &st = tad.get_state();
 
