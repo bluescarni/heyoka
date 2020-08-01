@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -62,8 +63,14 @@ inline constexpr unsigned default_opt_level = 3;
 
 } // namespace kw
 
+class llvm_state;
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+
 class HEYOKA_DLL_PUBLIC llvm_state
 {
+    friend std::ostream &operator<<(std::ostream &, const llvm_state &);
+
     struct jit;
 
     std::unique_ptr<jit> m_jitter;
@@ -75,6 +82,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_use_fast_math;
+    std::string m_module_name;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -198,8 +206,8 @@ public:
     const unsigned &opt_level() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
-    std::string dump_ir() const;
-    std::string dump_function_ir(const std::string &) const;
+    std::string get_ir() const;
+    std::string get_function_ir(const std::string &) const;
     void dump_object_code(const std::string &) const;
 
     void verify_function(const std::string &);

@@ -39,7 +39,7 @@ int main()
     s.add_function_batch<double>("bench", (x * y) + (x * z) + (y * z) + (x + y) + (x + z) + (y + z), batch_size);
 
     // NOTE: uncomment to dump IR/object code.
-    // std::cout << s.dump_ir() << '\n';
+    // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("flops.o");
 
     s.compile();

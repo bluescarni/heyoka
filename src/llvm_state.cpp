@@ -13,10 +13,13 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <ios>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <ostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -284,10 +287,11 @@ struct llvm_state::jit {
 };
 
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup))
+    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
+      m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
-    m_module = std::make_unique<llvm::Module>(std::move(std::get<0>(tup)), context());
+    m_module = std::make_unique<llvm::Module>(m_module_name, context());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(*m_jitter->m_dl);
     m_module->setTargetTriple(m_jitter->m_triple->str());
@@ -310,10 +314,10 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
-      m_use_fast_math(other.m_use_fast_math)
+      m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name)
 {
     // Get the IR of other.
-    auto other_ir = other.dump_ir();
+    auto other_ir = other.get_ir();
 
     // Create the corresponding memory buffer.
     auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
@@ -563,7 +567,7 @@ void llvm_state::compile()
     check_uncompiled(__func__);
 
     // Store a snapshot of the IR before compiling.
-    m_ir_snapshot = dump_ir();
+    m_ir_snapshot = get_ir();
 
     m_jitter->add_module(std::move(m_module));
 }
@@ -1001,7 +1005,7 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
     return static_cast<std::uintptr_t>((*sym).getAddress());
 }
 
-std::string llvm_state::dump_ir() const
+std::string llvm_state::get_ir() const
 {
     if (m_module) {
         // The module has not been compiled yet,
@@ -1018,7 +1022,7 @@ std::string llvm_state::dump_ir() const
     }
 }
 
-std::string llvm_state::dump_function_ir(const std::string &name) const
+std::string llvm_state::get_function_ir(const std::string &name) const
 {
     check_uncompiled(__func__);
 
@@ -1771,5 +1775,28 @@ std::uint32_t llvm_state::vector_size_f128() const
 }
 
 #endif
+
+std::ostream &operator<<(std::ostream &os, const llvm_state &s)
+{
+    std::ostringstream oss;
+    oss << std::boolalpha;
+
+    oss << "Module name       : " << s.m_module_name << '\n';
+    oss << "Compiled          : " << !static_cast<bool>(s.m_module) << '\n';
+    oss << "Fast math         : " << s.m_use_fast_math << '\n';
+    oss << "Optimisation level: " << s.m_opt_level << '\n';
+    oss << "Target triple     : " << s.m_jitter->m_triple->str() << '\n';
+    oss << "Target CPU        : " << s.m_jitter->get_target_cpu() << '\n';
+    oss << "Target features   : " << s.m_jitter->get_target_features() << '\n';
+    oss << "Vector sizes      : " << s.m_jitter->get_vector_size<double>() << ", "
+        << s.m_jitter->get_vector_size<long double>()
+#if defined(HEYOKA_HAVE_REAL128)
+        << ", " << s.m_jitter->get_vector_size<mppp::real128>()
+#endif
+        << '\n';
+    oss << "IR size           : " << s.get_ir().size() << '\n';
+
+    return os << oss.str();
+}
 
 } // namespace heyoka

@@ -187,7 +187,8 @@ public:
 
     ~taylor_adaptive_impl();
 
-    std::string get_ir() const;
+    const llvm_state &get_llvm_state() const;
+
     const std::vector<expression> &get_decomposition() const;
 
     T get_time() const
@@ -476,7 +477,8 @@ public:
 
     ~taylor_adaptive_batch_impl();
 
-    std::string get_ir() const;
+    const llvm_state &get_llvm_state() const;
+
     const std::vector<expression> &get_decomposition() const;
 
     const std::vector<T> &get_times() const

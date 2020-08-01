@@ -1107,9 +1107,9 @@ void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
 }
 
 template <typename T>
-std::string taylor_adaptive_impl<T>::get_ir() const
+const llvm_state &taylor_adaptive_impl<T>::get_llvm_state() const
 {
-    return m_llvm.dump_ir();
+    return m_llvm;
 }
 
 template <typename T>
@@ -1670,9 +1670,9 @@ void taylor_adaptive_batch_impl<T>::set_states(const std::vector<T> &states)
 }
 
 template <typename T>
-std::string taylor_adaptive_batch_impl<T>::get_ir() const
+const llvm_state &taylor_adaptive_batch_impl<T>::get_llvm_state() const
 {
-    return m_llvm.dump_ir();
+    return m_llvm;
 }
 
 template <typename T>

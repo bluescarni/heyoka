@@ -44,7 +44,7 @@ int main()
                                               -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                              order, batch_size);
 
-    // std::cout << s.dump_ir() << '\n';
+    // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("tjb.o");
 
     s.compile();
