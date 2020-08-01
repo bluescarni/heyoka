@@ -38,11 +38,29 @@
 #endif
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
 {
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(mname);
+IGOR_MAKE_NAMED_ARGUMENT(opt_level);
+IGOR_MAKE_NAMED_ARGUMENT(fast_math);
+
+namespace detail
+{
+
+// Default value for the opt_level argument.
+inline constexpr unsigned default_opt_level = 3;
+
+} // namespace detail
+
+} // namespace kw
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {
@@ -56,6 +74,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     bool m_verify = true;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
+    bool m_use_fast_math;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -81,8 +100,63 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL llvm::Value *tjb_compute_sv_diff(const expression &, std::uint32_t, std::uint32_t, llvm::Value *,
                                                       std::uint32_t, std::uint32_t, std::uint32_t);
 
+    // Implementation details for the variadic constructor.
+    template <typename... KwArgs>
+    static auto kw_args_ctor_impl(KwArgs &&... kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments in the construction of an llvm_state contain "
+                          "unnamed arguments.");
+        } else {
+            // Module name (defaults to empty string).
+            auto mod_name = [&p]() -> std::string {
+                if constexpr (p.has(kw::mname)) {
+                    return std::forward<decltype(p(kw::mname))>(p(kw::mname));
+                } else {
+                    return "";
+                }
+            }();
+
+            // Optimisation level.
+            auto opt_level = [&p]() -> unsigned {
+                if constexpr (p.has(kw::opt_level)) {
+                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
+                } else {
+                    return kw::detail::default_opt_level;
+                }
+            }();
+
+            // Fast math flag (defaults to true).
+            auto fmath = [&p]() -> bool {
+                if constexpr (p.has(kw::fast_math)) {
+                    return std::forward<decltype(p(kw::fast_math))>(p(kw::fast_math));
+                } else {
+                    return true;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath};
+        }
+    }
+    explicit llvm_state(std::tuple<std::string, unsigned, bool> &&);
+
 public:
-    explicit llvm_state(const std::string &, unsigned = 3);
+    llvm_state();
+    // NOTE: enable the kwargs ctor only if:
+    // - there is at least 1 argument (i.e., cannot act as a def ctor),
+    // - if there is only 1 argument, it cannot be of type llvm_state
+    //   (so that it does not interfere with copy/move ctors).
+    template <typename... KwArgs,
+              std::enable_if_t<(sizeof...(KwArgs) > 0u)
+                                   && (sizeof...(KwArgs) > 1u
+                                       || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
+                               int> = 0>
+    explicit llvm_state(KwArgs &&... kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
+    {
+    }
     llvm_state(const llvm_state &);
     llvm_state(llvm_state &&) noexcept;
     llvm_state &operator=(const llvm_state &);

@@ -45,7 +45,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
     const auto batch_size = 23u;
 
-    llvm_state s{"", opt_level};
+    llvm_state s{kw::opt_level = opt_level};
 
     s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
     s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
@@ -93,7 +93,7 @@ TEST_CASE("taylor sincos")
 
         // Number-number tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 1, 1);
@@ -114,7 +114,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 1, 2);
@@ -142,7 +142,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 2, 1);
@@ -165,7 +165,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 2, 2);
@@ -199,7 +199,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 3, 3);
@@ -252,7 +252,7 @@ TEST_CASE("taylor sincos")
 
         // Variable tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 1, 1);
 
@@ -272,7 +272,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 1, 2);
 
@@ -299,7 +299,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 2, 1);
 
@@ -321,7 +321,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 2, 2);
 
@@ -354,7 +354,7 @@ TEST_CASE("taylor sincos")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 3, 3);
 

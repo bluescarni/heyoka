@@ -41,10 +41,7 @@ int main()
 
     taylor_adaptive<double> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
                                  vx0, vx1, vy0, vy1, vz0, vz1},
-                                std::move(init_state),
-                                0,
-                                std::numeric_limits<double>::epsilon(),
-                                std::numeric_limits<double>::epsilon()};
+                                std::move(init_state)};
 
     const auto &st = tad.get_state();
 

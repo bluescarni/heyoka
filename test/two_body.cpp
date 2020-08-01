@@ -11,7 +11,6 @@
 #include <array>
 #include <cmath>
 #include <initializer_list>
-#include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -112,10 +111,7 @@ TEST_CASE("two body")
         taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                   std::move(init_state),
-                                  fp_t{0},
-                                  std::numeric_limits<fp_t>::epsilon(),
-                                  std::numeric_limits<fp_t>::epsilon(),
-                                  opt_level};
+                                  kw::opt_level = opt_level};
 
         const auto &st = tad.get_state();
 
@@ -192,10 +188,7 @@ TEST_CASE("two uniform spheres")
 
     taylor_adaptive_dbl tad{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state),
-        0,
-        1E-16,
-        1E-16};
+        std::move(init_state)};
 
     const auto &st = tad.get_state();
 
@@ -232,18 +225,12 @@ TEST_CASE("mixed tb/spheres")
     // 2BP integrator.
     taylor_adaptive_dbl t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
                                vx0, vx1, vy0, vy1, vz0, vz1},
-                              init_state,
-                              0,
-                              1E-16,
-                              1E-16};
+                              init_state};
 
     // 2US integrator.
     taylor_adaptive_dbl t_2us{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state),
-        0,
-        1E-16,
-        1E-16};
+        std::move(init_state)};
 
     // Helper to compute the distance**2 between
     // the sphere's centres given a state vector.

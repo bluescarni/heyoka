@@ -53,7 +53,7 @@ TEST_CASE("two body batch")
 
         using fp_t = decltype(fp_x);
 
-        const auto batch_size = llvm_state{""}.vector_size<fp_t>();
+        const auto batch_size = llvm_state{}.vector_size<fp_t>();
 
         if (batch_size == 0u) {
             return;
@@ -82,7 +82,7 @@ TEST_CASE("two body batch")
         }
 
         // Generate the initial state/time vector for the batch integrator.
-        std::vector<fp_t> init_states(batch_size * 12u), times(batch_size);
+        std::vector<fp_t> init_states(batch_size * 12u);
         for (std::uint32_t i = 0; i < batch_size; ++i) {
             const auto [x, v] = kep_to_cart(v_kep[i], fp_t(1) / 4);
 
@@ -107,23 +107,12 @@ TEST_CASE("two body batch")
         for (std::uint32_t j = 0; j < 12u; ++j) {
             scalar_init.push_back(init_states[j * batch_size]);
         }
-        taylor_adaptive<fp_t> ta{sys,
-                                 std::move(scalar_init),
-                                 fp_t{0},
-                                 std::numeric_limits<fp_t>::epsilon(),
-                                 std::numeric_limits<fp_t>::epsilon(),
-                                 opt_level};
+        taylor_adaptive<fp_t> ta{sys, std::move(scalar_init), kw::opt_level = opt_level};
         const auto &st = ta.get_state();
         auto scal_st(ta.get_state());
 
         // Init the batch integrator.
-        taylor_adaptive_batch<fp_t> tab{sys,
-                                        std::move(init_states),
-                                        std::move(times),
-                                        std::numeric_limits<fp_t>::epsilon(),
-                                        std::numeric_limits<fp_t>::epsilon(),
-                                        batch_size,
-                                        opt_level};
+        taylor_adaptive_batch<fp_t> tab{sys, std::move(init_states), batch_size, kw::opt_level = opt_level};
 
         const auto &bst = tab.get_states();
         auto bst_copy(bst);

@@ -44,7 +44,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
     const auto batch_size = 23u;
 
-    llvm_state s{"", opt_level};
+    llvm_state s{kw::opt_level = opt_level};
 
     s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
     s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
@@ -89,7 +89,7 @@ TEST_CASE("taylor mul")
 
         // Number-number tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 1);
@@ -110,7 +110,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 2);
@@ -135,7 +135,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 1);
@@ -158,7 +158,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 2);
@@ -187,7 +187,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>(
                 "jet", {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 3, 3);
@@ -233,7 +233,7 @@ TEST_CASE("taylor mul")
 
         // Variable-number tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 1, 1);
 
@@ -253,7 +253,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 1, 2);
 
@@ -280,7 +280,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 2, 1);
 
@@ -302,7 +302,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 2, 2);
 
@@ -330,7 +330,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {y * 2_dbl, x * -4_dbl}, 3, 3);
 
@@ -380,7 +380,7 @@ TEST_CASE("taylor mul")
 
         // Number/variable tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 1, 1);
 
@@ -400,7 +400,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 1, 2);
 
@@ -427,7 +427,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 2, 1);
 
@@ -449,7 +449,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 2, 2);
 
@@ -477,7 +477,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {2_dbl * y, -4_dbl * x}, 3, 3);
 
@@ -527,7 +527,7 @@ TEST_CASE("taylor mul")
 
         // Variable/variable tests.
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 1, 1);
 
@@ -547,7 +547,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 1, 2);
 
@@ -574,7 +574,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 2, 1);
 
@@ -596,7 +596,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 2, 2);
 
@@ -629,7 +629,7 @@ TEST_CASE("taylor mul")
         }
 
         {
-            llvm_state s{"", opt_level};
+            llvm_state s{kw::opt_level = opt_level};
 
             s.add_taylor_jet_batch<fp_t>("jet", {x * y, y * x}, 3, 3);
 

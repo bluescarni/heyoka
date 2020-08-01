@@ -19,7 +19,7 @@ using namespace heyoka;
 
 int main()
 {
-    const auto batch_size = llvm_state{""}.vector_size<double>();
+    const auto batch_size = llvm_state{}.vector_size<double>();
 
     if (batch_size == 0u) {
         std::cout << "The vector size on the current machine is zero, exiting.\n";
@@ -37,7 +37,7 @@ int main()
 
     const auto order = 20u;
 
-    llvm_state s{""};
+    llvm_state s;
 
     auto dc = s.add_taylor_jet_batch<double>("jet",
                                              {x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,

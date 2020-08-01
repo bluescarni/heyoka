@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -28,6 +29,8 @@
 
 #endif
 
+#include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -50,6 +53,16 @@ enum class taylor_outcome {
     err_nf_derivative, // Non-finite derivative detected.
     err_nan_rho        // NaN estimation of the convergence radius.
 };
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(time);
+IGOR_MAKE_NAMED_ARGUMENT(times);
+IGOR_MAKE_NAMED_ARGUMENT(rtol);
+IGOR_MAKE_NAMED_ARGUMENT(atol);
+
+} // namespace kw
 
 namespace detail
 {
@@ -94,15 +107,77 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T, std::uint32_t> step_impl(T);
 
     // Private implementation-detail constructor machinery.
-    struct p_tag {
-    };
     template <typename U>
-    HEYOKA_DLL_LOCAL explicit taylor_adaptive_impl(p_tag, U, std::vector<T>, T, T, T, unsigned);
+    void finalise_ctor_impl(U, std::vector<T>, T, T, T, unsigned);
+    template <typename U, typename... KwArgs>
+    void finalise_ctor(U sys, std::vector<T> state, KwArgs &&... kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments in the construction of an adaptive Taylor integrator contain "
+                          "unnamed arguments.");
+        } else {
+            // Initial time (defaults to zero).
+            const auto time = [&p]() -> T {
+                if constexpr (p.has(kw::time)) {
+                    return std::forward<decltype(p(kw::time))>(p(kw::time));
+                } else {
+                    return T(0);
+                }
+            }();
+
+            // rtol (defaults to eps).
+            const auto rtol = [&p]() -> T {
+                if constexpr (p.has(kw::rtol)) {
+                    return std::forward<decltype(p(kw::rtol))>(p(kw::rtol));
+                } else {
+                    return std::numeric_limits<T>::epsilon();
+                }
+            }();
+
+            // atol (defaults to eps).
+            const auto atol = [&p]() -> T {
+                if constexpr (p.has(kw::atol)) {
+                    return std::forward<decltype(p(kw::atol))>(p(kw::atol));
+                } else {
+                    return std::numeric_limits<T>::epsilon();
+                }
+            }();
+
+            // Optimisation level.
+            auto opt_level = [&p]() -> unsigned {
+                if constexpr (p.has(kw::opt_level)) {
+                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
+                } else {
+                    return kw::detail::default_opt_level;
+                }
+            }();
+
+            finalise_ctor_impl(std::move(sys), std::move(state), time, rtol, atol, opt_level);
+        }
+    }
 
 public:
-    explicit taylor_adaptive_impl(std::vector<expression>, std::vector<T>, T, T, T, unsigned = 3);
-    explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, T, T, T,
-                                  unsigned = 3);
+    template <typename... KwArgs>
+    explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&... kw_args)
+        : // NOTE: init to optimisation level 0 in order
+          // to delay the optimisation pass.
+          // NOTE: explicitly setting opt_level
+          // *before* forwarding the kwargs overrides
+          // any opt_level setting that might be present in kw_args.
+          m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+    {
+        finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
+                                  KwArgs &&... kw_args)
+        : m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+    {
+        finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
+    }
 
     taylor_adaptive_impl(const taylor_adaptive_impl &);
     taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept;
@@ -320,17 +395,78 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
                                     const std::vector<T> &);
 
     // Private implementation-detail constructor machinery.
-    struct p_tag {
-    };
     template <typename U>
-    HEYOKA_DLL_LOCAL explicit taylor_adaptive_batch_impl(p_tag, U, std::vector<T>, std::vector<T>, T, T, std::uint32_t,
-                                                         unsigned);
+    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, T, unsigned);
+    template <typename U, typename... KwArgs>
+    void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&... kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments in the construction of an adaptive batch Taylor integrator contain "
+                          "unnamed arguments.");
+        } else {
+            // Initial times (defaults to a vector of zeroes).
+            auto times = [&p, batch_size]() -> std::vector<T> {
+                if constexpr (p.has(kw::times)) {
+                    return std::forward<decltype(p(kw::times))>(p(kw::times));
+                } else {
+                    return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
+                }
+            }();
+
+            // rtol (defaults to eps).
+            const auto rtol = [&p]() -> T {
+                if constexpr (p.has(kw::rtol)) {
+                    return std::forward<decltype(p(kw::rtol))>(p(kw::rtol));
+                } else {
+                    return std::numeric_limits<T>::epsilon();
+                }
+            }();
+
+            // atol (defaults to eps).
+            const auto atol = [&p]() -> T {
+                if constexpr (p.has(kw::atol)) {
+                    return std::forward<decltype(p(kw::atol))>(p(kw::atol));
+                } else {
+                    return std::numeric_limits<T>::epsilon();
+                }
+            }();
+
+            // Optimisation level.
+            auto opt_level = [&p]() -> unsigned {
+                if constexpr (p.has(kw::opt_level)) {
+                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
+                } else {
+                    return kw::detail::default_opt_level;
+                }
+            }();
+
+            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), rtol, atol, opt_level);
+        }
+    }
 
 public:
-    explicit taylor_adaptive_batch_impl(std::vector<expression>, std::vector<T>, std::vector<T>, T, T, std::uint32_t,
-                                        unsigned = 3);
-    explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>>, std::vector<T>, std::vector<T>,
-                                        T, T, std::uint32_t, unsigned = 3);
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states, std::uint32_t batch_size,
+                                        KwArgs &&... kw_args)
+        : // NOTE: init to optimisation level 0 in order
+          // to delay the optimisation pass.
+          // NOTE: explicitly setting opt_level
+          // *before* forwarding the kwargs overrides
+          // any opt_level setting that might be present in kw_args.
+          m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+    {
+        finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> states,
+                                        std::uint32_t batch_size, KwArgs &&... kw_args)
+        : m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+    {
+        finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
+    }
 
     taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &);
     taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept;

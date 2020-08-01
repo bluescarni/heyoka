@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <tuple>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -282,11 +283,11 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(const std::string &name, unsigned opt_level)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(opt_level)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
+    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup))
 {
     // Create the module.
-    m_module = std::make_unique<llvm::Module>(name, context());
+    m_module = std::make_unique<llvm::Module>(std::move(std::get<0>(tup)), context());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(*m_jitter->m_dl);
     m_module->setTargetTriple(m_jitter->m_triple->str());
@@ -294,15 +295,22 @@ llvm_state::llvm_state(const std::string &name, unsigned opt_level)
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
 
-    // Set a couple of flags for faster math at the
-    // price of potential change of semantics.
-    llvm::FastMathFlags fmf;
-    fmf.setFast();
-    m_builder->setFastMathFlags(fmf);
+    if (m_use_fast_math) {
+        // Set flags for faster math at the
+        // price of potential change of semantics.
+        llvm::FastMathFlags fmf;
+        fmf.setFast();
+        m_builder->setFastMathFlags(fmf);
+    }
 }
 
+// NOTE: this will ensure that all kwargs
+// are set to their default values.
+llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
+
 llvm_state::llvm_state(const llvm_state &other)
-    : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level)
+    : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
+      m_use_fast_math(other.m_use_fast_math)
 {
     // Get the IR of other.
     auto other_ir = other.dump_ir();
@@ -326,11 +334,13 @@ llvm_state::llvm_state(const llvm_state &other)
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
 
-    // Set a couple of flags for faster math at the
-    // price of potential change of semantics.
-    llvm::FastMathFlags fmf;
-    fmf.setFast();
-    m_builder->setFastMathFlags(fmf);
+    if (m_use_fast_math) {
+        // Set flags for faster math at the
+        // price of potential change of semantics.
+        llvm::FastMathFlags fmf;
+        fmf.setFast();
+        m_builder->setFastMathFlags(fmf);
+    }
 
     // Run the compilation if other was compiled.
     if (!other.m_module) {

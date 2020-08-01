@@ -39,7 +39,7 @@ TEST_CASE("vararg expression")
 
 #if defined(HEYOKA_HAVE_REAL128)
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_nary_function<mppp::real128>("foo", x + 1.1_f128);
 
@@ -51,7 +51,7 @@ TEST_CASE("vararg expression")
     }
 
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_nary_function<mppp::real128>("foo", log(x) + 3_dbl * log(x));
 
@@ -70,7 +70,7 @@ TEST_CASE("vector expression")
 
 #if defined(HEYOKA_HAVE_REAL128)
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_function<mppp::real128>("foo", x + 1.1_f128);
 
@@ -86,7 +86,7 @@ TEST_CASE("vector expression")
 #endif
 
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_function<double>("foo", x + y + z);
 
@@ -106,7 +106,7 @@ TEST_CASE("batch expression")
 
 #if defined(HEYOKA_HAVE_REAL128)
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_function_batch<mppp::real128>("foo", x + y + z, 4);
 
@@ -133,7 +133,7 @@ TEST_CASE("vector expressions")
 
 #if defined(HEYOKA_HAVE_REAL128)
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_vector_function<mppp::real128>("foo", {y / z, x * x - y * z});
 
@@ -152,7 +152,7 @@ TEST_CASE("vector expressions")
 #endif
 
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_vector_function<double>("foo", {x + y, x * x - y * z});
 
@@ -170,7 +170,7 @@ TEST_CASE("vector expressions")
     }
 
     {
-        llvm_state s{""};
+        llvm_state s;
 
         s.add_vector_function<long double>("foo", {y / z, x * x - y * z});
 
@@ -192,7 +192,7 @@ TEST_CASE("tj batch")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{""};
+    llvm_state s;
 
     s.add_taylor_jet_batch_dbl("tjb", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 20, 4);
 
@@ -203,7 +203,7 @@ TEST_CASE("log tmp test")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{""};
+    llvm_state s;
 
     s.add_taylor_jet_batch_dbl("tjb", {prime(x) = log(y), prime(y) = log(x)}, 2, 4);
 
