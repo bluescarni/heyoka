@@ -60,7 +60,7 @@ int main()
     }
 
     // Generate the initial state/time vector for the batch integrator.
-    std::vector<double> init_states(batch_size * 12u), times(batch_size);
+    std::vector<double> init_states(batch_size * 12u);
     for (std::uint32_t i = 0; i < batch_size; ++i) {
         const auto [x, v] = kep_to_cart(v_kep[i], 1. / 4);
 
@@ -79,12 +79,7 @@ int main()
     }
 
     // Init the batch integrator.
-    taylor_adaptive_batch<double> tad{sys,
-                                      std::move(init_states),
-                                      std::move(times),
-                                      std::numeric_limits<double>::epsilon(),
-                                      std::numeric_limits<double>::epsilon(),
-                                      batch_size};
+    taylor_adaptive_batch<double> tad{sys, std::move(init_states), batch_size};
 
     std::vector<std::tuple<taylor_outcome, double, std::uint32_t>> res(batch_size);
 

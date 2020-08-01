@@ -1150,13 +1150,16 @@ namespace detail
 
 template <typename T>
 template <typename U>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vector<T> states, std::vector<T> times,
-                                                          T rtol, T atol, std::uint32_t batch_size, unsigned opt_level)
-    : m_batch_size(batch_size), m_states(std::move(states)), m_times(std::move(times)), m_rtol(rtol), m_atol(atol),
-      // NOTE: init to optimisation level 0 in order
-      // to delay the optimisation pass.
-      m_llvm{kw::mname = "adaptive batch taylor integrator", kw::opt_level = 0u}
+void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> states, std::uint32_t batch_size,
+                                                       std::vector<T> times, T rtol, T atol, unsigned opt_level)
 {
+    // Init the data members.
+    m_batch_size = batch_size;
+    m_states = std::move(states);
+    m_times = std::move(times);
+    m_rtol = rtol;
+    m_atol = atol;
+
     // Check input params.
     if (m_batch_size == 0u) {
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
@@ -1164,21 +1167,28 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
 
     if (std::any_of(m_states.begin(), m_states.end(), [](const auto &x) { return !detail::isfinite(x); })) {
         throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
+            "A non-finite value was detected in the initial states of an adaptive Taylor integrator");
     }
 
     if (m_states.size() % m_batch_size != 0u) {
         throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a size of "
+                                    "integrator: the states vector has a size of "
                                     + std::to_string(m_states.size()) + ", which is not a multiple of the batch size ("
                                     + std::to_string(m_batch_size) + ")");
     }
 
     if (m_states.size() / m_batch_size != sys.size()) {
         throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a dimension of "
+                                    "integrator: the states vector has a dimension of "
                                     + std::to_string(m_states.size() / m_batch_size)
                                     + ", while the number of equations is " + std::to_string(sys.size()));
+    }
+
+    if (m_times.size() != m_batch_size) {
+        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
+                                    "integrator: the times vector has a size of "
+                                    + std::to_string(m_times.size()) + ", which is not equal to the batch size ("
+                                    + std::to_string(m_batch_size) + ")");
     }
 
     if (std::any_of(m_times.begin(), m_times.end(), [](const auto &x) { return !detail::isfinite(x); })) {
@@ -1325,24 +1335,6 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(p_tag, U sys, std::vec
     m_h.resize(static_cast<jet_size_t>(m_batch_size));
     m_pinf.resize(static_cast<jet_size_t>(m_batch_size), std::numeric_limits<T>::infinity());
     m_minf.resize(static_cast<jet_size_t>(m_batch_size), -std::numeric_limits<T>::infinity());
-}
-
-template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states,
-                                                          std::vector<T> times, T rtol, T atol,
-                                                          std::uint32_t batch_size, unsigned opt_level)
-    : taylor_adaptive_batch_impl(p_tag{}, std::move(sys), std::move(states), std::move(times), rtol, atol, batch_size,
-                                 opt_level)
-{
-}
-
-template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys,
-                                                          std::vector<T> states, std::vector<T> times, T rtol, T atol,
-                                                          std::uint32_t batch_size, unsigned opt_level)
-    : taylor_adaptive_batch_impl(p_tag{}, std::move(sys), std::move(states), std::move(times), rtol, atol, batch_size,
-                                 opt_level)
-{
 }
 
 template <typename T>
@@ -1691,11 +1683,32 @@ const std::vector<expression> &taylor_adaptive_batch_impl<T>::get_decomposition(
 
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch_impl<double>;
+template void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>,
+                                                                     std::uint32_t, std::vector<double>, double, double,
+                                                                     unsigned);
+template void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+                                                                     std::vector<double>, std::uint32_t,
+                                                                     std::vector<double>, double, double, unsigned);
+
 template class taylor_adaptive_batch_impl<long double>;
+template void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>,
+                                                                          std::vector<long double>, std::uint32_t,
+                                                                          std::vector<long double>, long double,
+                                                                          long double, unsigned);
+template void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<long double>, std::uint32_t, std::vector<long double>,
+    long double, long double, unsigned);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_batch_impl<mppp::real128>;
+template void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
+                                                                            std::vector<mppp::real128>, std::uint32_t,
+                                                                            std::vector<mppp::real128>, mppp::real128,
+                                                                            mppp::real128, unsigned);
+template void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, std::uint32_t,
+    std::vector<mppp::real128>, mppp::real128, mppp::real128, unsigned);
 
 #endif
 
