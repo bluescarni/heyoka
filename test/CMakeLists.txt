@@ -1,3 +1,9 @@
+# Find the xtensor bits, if requested.
+if(HEYOKA_WITH_XTENSOR)
+  find_package(xtensor REQUIRED)
+  find_package(xtensor-blas REQUIRED)
+endif()
+
 add_library(heyoka_test STATIC catch_main.cpp)
 target_compile_options(heyoka_test PRIVATE
   "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -46,3 +52,13 @@ ADD_HEYOKA_TESTCASE(two_body_batch)
 ADD_HEYOKA_TESTCASE(e3bp)
 ADD_HEYOKA_TESTCASE(fast_math_compare)
 #ADD_HEYOKA_TESTCASE(gp)
+
+if(HEYOKA_WITH_XTENSOR)
+  function(ADD_HEYOKA_XTENSOR_TESTCASE arg1)
+    ADD_HEYOKA_TESTCASE(${arg1})
+    target_link_libraries(${arg1} PRIVATE xtensor xtensor-blas)
+    target_compile_definitions(${arg1} PRIVATE HEYOKA_WITH_XTENSOR PRIVATE XTENSOR_USE_FLENS_BLAS)
+  endfunction()
+
+  ADD_HEYOKA_XTENSOR_TESTCASE(nbody)
+endif()
