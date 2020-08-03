@@ -199,6 +199,14 @@ public:
     {
         return m_state;
     }
+    const T *get_state_data() const
+    {
+        return m_state.data();
+    }
+    T *get_state_data()
+    {
+        return m_state.data();
+    }
 
     void set_state(const std::vector<T> &);
     void set_time(T);
