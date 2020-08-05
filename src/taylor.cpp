@@ -504,9 +504,8 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
     builder.SetInsertPoint(bb);
 
     // Helper to run the Estrin scheme on the polynomial
-    // whose coefficients are stored in cf_vec. It will
-    // shrink cf_vec until it contains only 1 term,
-    // the result of the evaluation.
+    // whose coefficients are stored in cf_vec. This
+    // will consume cf_vec.
     // https://en.wikipedia.org/wiki/Estrin%27s_scheme
     auto run_estrin = [&builder](std::vector<llvm::Value *> &cf_vec, llvm::Value *h) {
         assert(!cf_vec.empty());
@@ -535,6 +534,8 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                 h = builder.CreateFMul(h, h);
             }
         }
+
+        return cf_vec[0];
     };
 
     if (vector_size == 0u) {
@@ -559,13 +560,13 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                     "h_" + li_to_string(batch_idx));
 
                 // Run the Estrin scheme.
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 // Store the result of the evaluation.
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
-                builder.CreateStore(cf_vec[0], res_ptr);
+                builder.CreateStore(eval, res_ptr);
             }
         }
     } else {
@@ -590,13 +591,13 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                                         "h_" + li_to_string(batch_idx) + "_ptr"),
                                               vector_size, "h_" + li_to_string(batch_idx));
 
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
 
-                detail::store_vector_to_memory(builder, res_ptr, cf_vec[0], vector_size);
+                detail::store_vector_to_memory(builder, res_ptr, eval, vector_size);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -613,12 +614,12 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                                               "h_" + li_to_string(batch_idx) + "_ptr"),
                                                     "h_" + li_to_string(batch_idx));
 
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
-                builder.CreateStore(cf_vec[0], res_ptr);
+                builder.CreateStore(eval, res_ptr);
             }
         }
     }
