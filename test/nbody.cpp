@@ -16,6 +16,7 @@
 #include <xtensor/xio.hpp>
 #include <xtensor/xview.hpp>
 
+#include <heyoka/detail/simple_timer.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -124,21 +125,35 @@ TEST_CASE("N-body")
     const auto init_energy = get_energy();
     std::cout << "Initial energy: " << init_energy << '\n';
 
-    // NOTE: corresponds to circa 1 million years of integration time.
-    for (auto i = 0ul; i < 1330000ul; ++i) {
-        // NOTE: uncomment to print the orbital elements very 1000 steps.
-        // if (i % 1000 == 0) {
-        //     std::cout << "jup: "
-        //               << cart_to_kep(xt::view(s_array, 1, xt::range(0, 3)), xt::view(s_array, 1, xt::range(3, 6)),
-        //                              sun_mu)
-        //               << '\n';
-        //     std::cout << "sat: "
-        //               << cart_to_kep(xt::view(s_array, 2, xt::range(0, 3)), xt::view(s_array, 2, xt::range(3, 6)),
-        //                              sun_mu)
-        //               << '\n';
-        // }
+    {
+        detail::simple_timer st{"Integration time"};
+        // NOTE: corresponds to circa 1 million years of integration time.
+        for (auto i = 0ul; i < 1330000ul; ++i) {
+            // if (i % 100000 == 0) {
+            //     std::cout << "Energy diff : " << abs((init_energy - get_energy()) / init_energy) << '\n';
+            // }
 
-        ta.step();
+            // NOTE: uncomment to print the orbital elements very 1000 steps.
+            // if (i % 1000 == 0) {
+            //     std::cout << "jup: "
+            //               << cart_to_kep(xt::view(s_array, 1, xt::range(0, 3)), xt::view(s_array, 1, xt::range(3,
+            //               6)),
+            //                              sun_mu)
+            //               << '\n';
+            //     std::cout << "sat: "
+            //               << cart_to_kep(xt::view(s_array, 2, xt::range(0, 3)), xt::view(s_array, 2, xt::range(3,
+            //               6)),
+            //                              sun_mu)
+            //               << '\n';
+            // }
+
+            const auto step_res = ta.step();
+            REQUIRE(std::get<0>(step_res) == taylor_outcome::success);
+
+            // if (i % 100000 == 0) {
+            //     std::cout << std::get<1>(step_res) << '\n';
+            // }
+        }
     }
 
     std::cout << "Final time: " << ta.get_time() << '\n';
