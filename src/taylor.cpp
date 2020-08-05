@@ -624,8 +624,10 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
         }
     }
 
+    // Create the return value.
     builder.CreateRetVoid();
 
+    // Verify the function.
     s.verify_function(name);
 }
 
