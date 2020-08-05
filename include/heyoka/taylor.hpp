@@ -256,8 +256,8 @@ private:
 
             // Update min_h/max_h.
             assert(!Direction || h >= 0);
-            min_h = std::min(min_h, Direction ? h : std::abs(h));
-            max_h = std::max(max_h, Direction ? h : std::abs(h));
+            min_h = std::min(min_h, Direction ? h : -h);
+            max_h = std::max(max_h, Direction ? h : -h);
 
             // Check the max number of steps stopping criterion.
             if (max_steps != 0u && step_counter == max_steps) {

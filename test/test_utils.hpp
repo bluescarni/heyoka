@@ -29,8 +29,6 @@
 
 #endif
 
-#include <heyoka/detail/math_wrappers.hpp>
-
 namespace heyoka_test
 {
 
@@ -45,12 +43,14 @@ struct approximately {
 template <typename T>
 inline bool operator==(const T &cmp, const approximately<T> &a)
 {
+    using std::abs;
+
     const auto tol = std::numeric_limits<T>::epsilon() * a.m_eps_mul;
 
-    if (heyoka::detail::abs(cmp) < tol) {
-        return heyoka::detail::abs(cmp - a.m_value) <= tol;
+    if (abs(cmp) < tol) {
+        return abs(cmp - a.m_value) <= tol;
     } else {
-        return heyoka::detail::abs((cmp - a.m_value) / cmp) <= tol;
+        return abs((cmp - a.m_value) / cmp) <= tol;
     }
 }
 
