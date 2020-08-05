@@ -493,9 +493,25 @@ public:
     {
         return m_times;
     }
+    const T *get_times_data() const
+    {
+        return m_times.data();
+    }
+    T *get_times_data()
+    {
+        return m_times.data();
+    }
     const std::vector<T> &get_states() const
     {
         return m_states;
+    }
+    const T *get_states_data() const
+    {
+        return m_states.data();
+    }
+    T *get_states_data()
+    {
+        return m_states.data();
     }
 
     void set_states(const std::vector<T> &);
