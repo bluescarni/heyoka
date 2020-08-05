@@ -199,6 +199,14 @@ public:
     {
         return m_state;
     }
+    const T *get_state_data() const
+    {
+        return m_state.data();
+    }
+    T *get_state_data()
+    {
+        return m_state.data();
+    }
 
     void set_state(const std::vector<T> &);
     void set_time(T);
@@ -248,8 +256,8 @@ private:
 
             // Update min_h/max_h.
             assert(!Direction || h >= 0);
-            min_h = std::min(min_h, Direction ? h : std::abs(h));
-            max_h = std::max(max_h, Direction ? h : std::abs(h));
+            min_h = std::min(min_h, Direction ? h : -h);
+            max_h = std::max(max_h, Direction ? h : -h);
 
             // Check the max number of steps stopping criterion.
             if (max_steps != 0u && step_counter == max_steps) {
@@ -485,9 +493,25 @@ public:
     {
         return m_times;
     }
+    const T *get_times_data() const
+    {
+        return m_times.data();
+    }
+    T *get_times_data()
+    {
+        return m_times.data();
+    }
     const std::vector<T> &get_states() const
     {
         return m_states;
+    }
+    const T *get_states_data() const
+    {
+        return m_states.data();
+    }
+    T *get_states_data()
+    {
+        return m_states.data();
     }
 
     void set_states(const std::vector<T> &);

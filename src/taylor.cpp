@@ -504,9 +504,8 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
     builder.SetInsertPoint(bb);
 
     // Helper to run the Estrin scheme on the polynomial
-    // whose coefficients are stored in cf_vec. It will
-    // shrink cf_vec until it contains only 1 term,
-    // the result of the evaluation.
+    // whose coefficients are stored in cf_vec. This
+    // will consume cf_vec.
     // https://en.wikipedia.org/wiki/Estrin%27s_scheme
     auto run_estrin = [&builder](std::vector<llvm::Value *> &cf_vec, llvm::Value *h) {
         assert(!cf_vec.empty());
@@ -535,6 +534,8 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                 h = builder.CreateFMul(h, h);
             }
         }
+
+        return cf_vec[0];
     };
 
     if (vector_size == 0u) {
@@ -559,13 +560,13 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                     "h_" + li_to_string(batch_idx));
 
                 // Run the Estrin scheme.
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 // Store the result of the evaluation.
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
-                builder.CreateStore(cf_vec[0], res_ptr);
+                builder.CreateStore(eval, res_ptr);
             }
         }
     } else {
@@ -590,13 +591,13 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                                         "h_" + li_to_string(batch_idx) + "_ptr"),
                                               vector_size, "h_" + li_to_string(batch_idx));
 
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
 
-                detail::store_vector_to_memory(builder, res_ptr, cf_vec[0], vector_size);
+                detail::store_vector_to_memory(builder, res_ptr, eval, vector_size);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -613,18 +614,20 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                                               "h_" + li_to_string(batch_idx) + "_ptr"),
                                                     "h_" + li_to_string(batch_idx));
 
-                run_estrin(cf_vec, h);
+                auto eval = run_estrin(cf_vec, h);
 
                 auto res_ptr = builder.CreateInBoundsGEP(out_ptr, builder.getInt32(var_idx * batch_size + batch_idx),
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
-                builder.CreateStore(cf_vec[0], res_ptr);
+                builder.CreateStore(eval, res_ptr);
             }
         }
     }
 
+    // Create the return value.
     builder.CreateRetVoid();
 
+    // Verify the function.
     s.verify_function(name);
 }
 
@@ -635,6 +638,10 @@ template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T rtol, T atol,
                                                  unsigned opt_level)
 {
+    using std::ceil;
+    using std::exp;
+    using std::log;
+
     // Assign the data members.
     m_state = std::move(state);
     m_time = time;
@@ -673,8 +680,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Compute the two possible orders for the integration, ensuring that
     // they are at least 2.
-    const auto order_r_f = std::max(T(2), detail::ceil(-detail::log(m_rtol) / 2 + 1));
-    const auto order_a_f = std::max(T(2), detail::ceil(-detail::log(m_atol) / 2 + 1));
+    const auto order_r_f = std::max(T(2), ceil(-log(m_rtol) / 2 + 1));
+    const auto order_a_f = std::max(T(2), ceil(-log(m_atol) / 2 + 1));
 
     if (!detail::isfinite(order_r_f) || !detail::isfinite(order_a_f)) {
         throw std::invalid_argument(
@@ -782,8 +789,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Pre-compute the factors by which rho must
     // be multiplied in order to determine the
     // integration timestep.
-    m_rhofac_r = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_r - 1u));
-    m_rhofac_a = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_a - 1u));
+    m_rhofac_r = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (m_order_r - 1u));
+    m_rhofac_a = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (m_order_a - 1u));
 }
 
 template <typename T>
@@ -847,10 +854,14 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 template <typename T>
 std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 {
-    assert(!detail::isnan(max_delta_t));
+    using std::abs;
+    using std::isnan;
+    using std::pow;
+
+    assert(!isnan(max_delta_t));
 
     // Cache abs(max_delta_t).
-    const auto abs_max_delta_t = detail::abs(max_delta_t);
+    const auto abs_max_delta_t = abs(max_delta_t);
 
     // Propagate backwards?
     const auto backwards = max_delta_t < T(0);
@@ -867,7 +878,7 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
             return std::tuple{taylor_outcome::err_nf_state, T(0), std::uint32_t(0)};
         }
 
-        max_abs_state = std::max(max_abs_state, detail::abs(x));
+        max_abs_state = std::max(max_abs_state, abs(x));
     }
 
     // Fetch the Taylor order for this timestep, which will be
@@ -905,16 +916,16 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
         }
 
         // Update the max abs.
-        max_abs_diff_om1 = std::max(max_abs_diff_om1, detail::abs(diff_om1));
-        max_abs_diff_o = std::max(max_abs_diff_o, detail::abs(diff_o));
+        max_abs_diff_om1 = std::max(max_abs_diff_om1, abs(diff_om1));
+        max_abs_diff_o = std::max(max_abs_diff_o, abs(diff_o));
     }
 
     // Estimate rho at orders order - 1 and order.
-    const auto rho_om1 = use_abs_tol ? detail::pow(1 / max_abs_diff_om1, m_inv_order[order - 1u])
-                                     : detail::pow(max_abs_state / max_abs_diff_om1, m_inv_order[order - 1u]);
-    const auto rho_o = use_abs_tol ? detail::pow(1 / max_abs_diff_o, m_inv_order[order])
-                                   : detail::pow(max_abs_state / max_abs_diff_o, m_inv_order[order]);
-    if (detail::isnan(rho_om1) || detail::isnan(rho_o)) {
+    const auto rho_om1 = use_abs_tol ? pow(1 / max_abs_diff_om1, m_inv_order[order - 1u])
+                                     : pow(max_abs_state / max_abs_diff_om1, m_inv_order[order - 1u]);
+    const auto rho_o = use_abs_tol ? pow(1 / max_abs_diff_o, m_inv_order[order])
+                                   : pow(max_abs_state / max_abs_diff_o, m_inv_order[order]);
+    if (isnan(rho_om1) || isnan(rho_o)) {
         return std::tuple{taylor_outcome::err_nan_rho, T(0), std::uint32_t(0)};
     }
 
@@ -968,7 +979,9 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_backw
 template <typename T>
 std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step(T max_delta_t)
 {
-    if (detail::isnan(max_delta_t)) {
+    using std::isnan;
+
+    if (isnan(max_delta_t)) {
         throw std::invalid_argument(
             "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
@@ -1153,6 +1166,10 @@ template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> states, std::uint32_t batch_size,
                                                        std::vector<T> times, T rtol, T atol, unsigned opt_level)
 {
+    using std::ceil;
+    using std::exp;
+    using std::log;
+
     // Init the data members.
     m_batch_size = batch_size;
     m_states = std::move(states);
@@ -1210,8 +1227,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Compute the two possible orders for the integration, ensuring that
     // they are at least 2.
-    const auto order_r_f = std::max(T(2), detail::ceil(-detail::log(m_rtol) / 2 + 1));
-    const auto order_a_f = std::max(T(2), detail::ceil(-detail::log(m_atol) / 2 + 1));
+    const auto order_r_f = std::max(T(2), ceil(-log(m_rtol) / 2 + 1));
+    const auto order_a_f = std::max(T(2), ceil(-log(m_atol) / 2 + 1));
 
     if (!detail::isfinite(order_r_f) || !detail::isfinite(order_a_f)) {
         throw std::invalid_argument(
@@ -1321,8 +1338,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Pre-compute the factors by which rho must
     // be multiplied in order to determine the
     // integration timestep.
-    m_rhofac_r = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_r - 1u));
-    m_rhofac_a = 1 / (detail::exp(T(1)) * detail::exp(T(1))) * detail::exp((T(-7) / T(10)) / (m_order_a - 1u));
+    m_rhofac_r = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (m_order_r - 1u));
+    m_rhofac_a = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (m_order_a - 1u));
 
     // Prepare the temporary variables for use in the
     // stepping functions.
@@ -1404,8 +1421,12 @@ template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &res,
                                               const std::vector<T> &max_delta_ts)
 {
+    using std::abs;
+    using std::isnan;
+    using std::pow;
+
     // Check preconditions.
-    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) { return detail::isnan(x); }));
+    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) { return isnan(x); }));
     assert(max_delta_ts.size() == m_batch_size);
 
     // Cache locally the batch size.
@@ -1427,7 +1448,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
             const auto s_idx = i * batch_size + batch_idx;
 
             if (detail::isfinite(m_states[s_idx])) {
-                m_max_abs_states[batch_idx] = std::max(m_max_abs_states[batch_idx], detail::abs(m_states[s_idx]));
+                m_max_abs_states[batch_idx] = std::max(m_max_abs_states[batch_idx], abs(m_states[s_idx]));
             } else {
                 // Mark the current state vector as non-finite in res.
                 // NOTE: the timestep and order have already
@@ -1518,8 +1539,8 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
             }
 
             // Update the max abs.
-            m_max_abs_diff_om1[batch_idx] = std::max(m_max_abs_diff_om1[batch_idx], detail::abs(diff_om1));
-            m_max_abs_diff_o[batch_idx] = std::max(m_max_abs_diff_o[batch_idx], detail::abs(diff_o));
+            m_max_abs_diff_om1[batch_idx] = std::max(m_max_abs_diff_om1[batch_idx], abs(diff_om1));
+            m_max_abs_diff_o[batch_idx] = std::max(m_max_abs_diff_o[batch_idx], abs(diff_o));
         }
     }
 
@@ -1546,14 +1567,14 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
         const auto cur_order = use_abs_tol ? m_order_a : m_order_r;
 
         // Compute the rhos.
-        const auto rho_om1 = use_abs_tol ? detail::pow(1 / m_max_abs_diff_om1[batch_idx], m_inv_order[cur_order - 1u])
-                                         : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_om1[batch_idx],
-                                                       m_inv_order[cur_order - 1u]);
-        const auto rho_o = use_abs_tol ? detail::pow(1 / m_max_abs_diff_o[batch_idx], m_inv_order[cur_order])
-                                       : detail::pow(m_max_abs_states[batch_idx] / m_max_abs_diff_o[batch_idx],
-                                                     m_inv_order[cur_order]);
+        const auto rho_om1 = use_abs_tol ? pow(1 / m_max_abs_diff_om1[batch_idx], m_inv_order[cur_order - 1u])
+                                         : pow(m_max_abs_states[batch_idx] / m_max_abs_diff_om1[batch_idx],
+                                               m_inv_order[cur_order - 1u]);
+        const auto rho_o = use_abs_tol
+                               ? pow(1 / m_max_abs_diff_o[batch_idx], m_inv_order[cur_order])
+                               : pow(m_max_abs_states[batch_idx] / m_max_abs_diff_o[batch_idx], m_inv_order[cur_order]);
 
-        if (detail::isnan(rho_om1) || detail::isnan(rho_o)) {
+        if (isnan(rho_om1) || isnan(rho_o)) {
             // Mark the presence of NaN rho in res.
             std::get<0>(res[batch_idx]) = taylor_outcome::err_nan_rho;
 
@@ -1567,7 +1588,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
             auto h = rho_m * (use_abs_tol ? m_rhofac_a : m_rhofac_r);
 
             // Make sure h does not exceed abs(max_delta_t).
-            const auto abs_delta_t = detail::abs(max_delta_ts[batch_idx]);
+            const auto abs_delta_t = abs(max_delta_ts[batch_idx]);
             if (h > abs_delta_t) {
                 h = abs_delta_t;
                 std::get<0>(res[batch_idx]) = taylor_outcome::time_limit;
