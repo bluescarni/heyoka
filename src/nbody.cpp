@@ -120,6 +120,8 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     std::vector<std::pair<expression, expression>> retval;
 
     // Accumulators for the accelerations on the bodies.
+    // NOTE: no need to check n, we already successfully created
+    // vectors of size n above.
     std::vector<expression> x_acc(n, expression{number{0.}}), y_acc(x_acc), z_acc(x_acc);
 
     for (std::uint32_t i = 0; i < n; ++i) {
