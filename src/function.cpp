@@ -807,10 +807,8 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
                 throw std::invalid_argument("Unknown internal function: '" + f_name + "'");
             }
 
-            if (callee_f->empty()) {
-                // An internal function cannot be empty (i.e., we need declaration
-                // and definition).
-                throw std::invalid_argument("The internal function '" + f_name + "' is empty");
+            if (callee_f->isDeclaration()) {
+                throw std::invalid_argument("The internal function '" + f_name + "' cannot be just a declaration");
             }
 
             break;
@@ -822,7 +820,7 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
             if (callee_f) {
                 // The function declaration exists already. Check that it is only a
                 // declaration and not a definition.
-                if (!callee_f->empty()) {
+                if (!callee_f->isDeclaration()) {
                     throw std::invalid_argument(
                         "Cannot call the function '" + f_name
                         + "' as an external function, because it is defined as an internal module function");
@@ -862,9 +860,9 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
                 throw std::invalid_argument("Error getting the declaration of the intrinsic '" + f_name + "'");
             }
 
-            if (!callee_f->empty()) {
+            if (!callee_f->isDeclaration()) {
                 // It does not make sense to have a definition of a builtin.
-                throw std::invalid_argument("The intrinsic '" + f_name + "' must be an empty function");
+                throw std::invalid_argument("The intrinsic '" + f_name + "' must be only declared, not defined");
             }
         }
     }

@@ -259,7 +259,13 @@ struct llvm_state::jit {
         auto handle = m_compile_layer->add(m_main_jd, llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
 
         if (handle) {
-            throw std::invalid_argument("The function for adding a module to the jit failed");
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            ostr << handle;
+
+            throw std::invalid_argument("The function for adding a module to the jit failed. The full error message:\n"
+                                        + ostr.str());
         }
     }
 
