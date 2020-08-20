@@ -61,4 +61,5 @@ if(HEYOKA_WITH_XTENSOR)
   endfunction()
 
   ADD_HEYOKA_XTENSOR_TESTCASE(nbody)
+  ADD_HEYOKA_XTENSOR_TESTCASE(outer_ss)
 endif()
