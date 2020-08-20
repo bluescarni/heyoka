@@ -968,7 +968,7 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     verify_function_impl(f);
 
     // Add the function to m_sig_map.
-    std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
+    auto sig_args = std::vector{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
     auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
     [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
     assert(eret.second);
