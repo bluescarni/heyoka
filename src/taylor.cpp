@@ -838,6 +838,79 @@ taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl
 template <typename T>
 taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 
+namespace
+{
+
+template <typename T>
+auto eft_sum(const T &a, const T &b) noexcept
+{
+    const auto x = a + b;
+    const auto z = x - a;
+    const auto y = (a - (x - z)) + (b - z);
+
+    return std::pair{x, y};
+}
+
+template <typename T>
+auto eft_prod(const T &a, const T &b) noexcept
+{
+    using std::fma;
+
+    const auto x = a * b;
+    const auto y = fma(a, b, -x);
+
+    return std::pair{x, y};
+}
+
+template <typename T>
+auto eft_horner(T *__restrict__ p_pi, T *__restrict__ p_sigma, const T *__restrict__ p, T x, int n) noexcept
+{
+    assert(n > 0);
+
+    auto s = p[n];
+
+    for (auto i = n - 1; i >= 0; --i) {
+        const auto [p_i, pi_i] = eft_prod(s, x);
+        const auto [s_i, sigma_i] = eft_sum(p_i, p[i]);
+
+        s = s_i;
+
+        p_pi[i] = pi_i;
+        p_sigma[i] = sigma_i;
+    }
+
+    return s;
+}
+
+template <typename T>
+auto horner_sum(const T *__restrict__ p, const T *__restrict__ q, T x, int n) noexcept
+{
+    assert(n > 0);
+
+    auto r = p[n] + q[n];
+
+    for (auto i = n - 1; i >= 0; --i) {
+        // NOTE: FMA here?
+        // NOTE: interleave with eft_horner?
+        r = r * x + (p[i] + q[i]);
+    }
+
+    return r;
+}
+
+template <typename T>
+auto compensated_horner(T *__restrict__ p_pi, T *__restrict__ p_sigma, const T *__restrict__ p, T x, int n) noexcept
+{
+    assert(n > 0);
+
+    const auto h = eft_horner(p_pi, p_sigma, p, x, n);
+    const auto c = horner_sum(p_pi, p_sigma, x, n - 1);
+
+    return h + c;
+}
+
+} // namespace
+
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will
 // always be not greater than abs(max_delta_t). The propagation
@@ -955,6 +1028,27 @@ std::tuple<taylor_outcome, T, std::uint32_t> taylor_adaptive_impl<T>::step_impl(
     } else {
         m_update_f_r(m_state.data(), jet_ptr, &h);
     }
+
+#if 0
+    // Horner bits.
+    std::vector<T> cur_jet, p_pi, p_sigma;
+    cur_jet.resize(order + 1u);
+    p_pi.resize(order);
+    p_sigma.resize(order);
+
+    for (std::uint32_t i = 0; i < nvars; ++i) {
+        for (std::uint32_t o = 0; o < order + 1u; ++o) {
+            cur_jet[o] = jet_ptr[o * nvars + i];
+        }
+
+        const auto eval = compensated_horner(p_pi.data(), p_sigma.data(), cur_jet.data(), h, static_cast<int>(order));
+
+        // std::cout.precision(16);
+        // std::cout << "comp diff: " << abs((eval - m_state[i]) / m_state[i]) << '\n';
+
+        // m_state[i] = eval;
+    }
+#endif
 
     // Update the time.
     m_time += h;

@@ -129,9 +129,9 @@ TEST_CASE("N-body")
         detail::simple_timer st{"Integration time"};
         // NOTE: corresponds to circa 1 million years of integration time.
         for (auto i = 0ul; i < 1330000ul; ++i) {
-            // if (i % 100000 == 0) {
-            //     std::cout << "Energy diff : " << abs((init_energy - get_energy()) / init_energy) << '\n';
-            // }
+            if (i % 100000 == 0) {
+                std::cout << "Energy diff : " << abs((init_energy - get_energy()) / init_energy) << '\n';
+            }
 
             // NOTE: uncomment to print the orbital elements very 1000 steps.
             // if (i % 1000 == 0) {
