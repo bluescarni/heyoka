@@ -292,9 +292,9 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup)))
+      m_module_name(std::move(std::get<0>(tup))), m_segmented_functions(std::get<3>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -320,7 +320,8 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
-      m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name)
+      m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
+      m_segmented_functions(other.m_segmented_functions)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -1202,15 +1203,17 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
     auto diff_arr = m_builder->CreateAlloca(array_type, 0, "diff_arr");
     assert(diff_arr != nullptr);
 
-    // Fill-in the order-0 row of the derivatives array.
-    // Use a separate block for clarity.
-    auto *init_bb = llvm::BasicBlock::Create(context(), "order_0_init", f);
-    assert(init_bb != nullptr);
-    m_builder->CreateBr(init_bb);
-    m_builder->SetInsertPoint(init_bb);
-
     // Fetch the SIMD vector size from the JIT machinery.
     const auto vector_size = m_jitter->get_vector_size<T>();
+
+    // Fill-in the order-0 row of the derivatives array.
+    // Use a separate block for clarity if requested.
+    if (m_segmented_functions) {
+        auto *init_bb = llvm::BasicBlock::Create(context(), "order_0_init", f);
+        assert(init_bb != nullptr);
+        m_builder->CreateBr(init_bb);
+        m_builder->SetInsertPoint(init_bb);
+    }
 
     // Load the initial values for the state variables from in_out.
     for (std::uint32_t i = 0; i < n_eq; ++i) {
@@ -1403,12 +1406,14 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
             // The expression of the first-order derivative.
             const auto &ex = dc[i];
 
-            // Place the computation in its own block for clarity.
-            auto *cur_bb = llvm::BasicBlock::Create(
-                context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(sv_idx), f);
-            assert(cur_bb != nullptr);
-            m_builder->CreateBr(cur_bb);
-            m_builder->SetInsertPoint(cur_bb);
+            // Place the computation in its own block for clarity, if requested.
+            if (m_segmented_functions) {
+                auto *cur_bb = llvm::BasicBlock::Create(
+                    context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(sv_idx), f);
+                assert(cur_bb != nullptr);
+                m_builder->CreateBr(cur_bb);
+                m_builder->SetInsertPoint(cur_bb);
+            }
 
             if (vector_size == 0u) {
                 // Scalar mode.
@@ -1496,11 +1501,13 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
         for (auto i = n_eq; i < n_uvars; ++i) {
             const auto &ex = dc[i];
 
-            auto *cur_bb = llvm::BasicBlock::Create(
-                context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(i), f);
-            assert(cur_bb != nullptr);
-            m_builder->CreateBr(cur_bb);
-            m_builder->SetInsertPoint(cur_bb);
+            if (m_segmented_functions) {
+                auto *cur_bb = llvm::BasicBlock::Create(
+                    context(), "block_" + detail::li_to_string(cur_order) + "_" + detail::li_to_string(i), f);
+                assert(cur_bb != nullptr);
+                m_builder->CreateBr(cur_bb);
+                m_builder->SetInsertPoint(cur_bb);
+            }
 
             if (vector_size == 0u) {
                 // Scalar mode.
@@ -1558,10 +1565,12 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
         }
     }
 
-    auto *final_bb = llvm::BasicBlock::Create(context(), "finalise", f);
-    assert(final_bb != nullptr);
-    m_builder->CreateBr(final_bb);
-    m_builder->SetInsertPoint(final_bb);
+    if (m_segmented_functions) {
+        auto *final_bb = llvm::BasicBlock::Create(context(), "finalise", f);
+        assert(final_bb != nullptr);
+        m_builder->CreateBr(final_bb);
+        m_builder->SetInsertPoint(final_bb);
+    }
 
     // The last step is to write the highest-order derivatives to in_out.
     for (auto i = n_uvars; i < dc.size(); ++i) {
@@ -1787,14 +1796,15 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     std::ostringstream oss;
     oss << std::boolalpha;
 
-    oss << "Module name       : " << s.m_module_name << '\n';
-    oss << "Compiled          : " << !static_cast<bool>(s.m_module) << '\n';
-    oss << "Fast math         : " << s.m_use_fast_math << '\n';
-    oss << "Optimisation level: " << s.m_opt_level << '\n';
-    oss << "Target triple     : " << s.m_jitter->m_triple->str() << '\n';
-    oss << "Target CPU        : " << s.m_jitter->get_target_cpu() << '\n';
-    oss << "Target features   : " << s.m_jitter->get_target_features() << '\n';
-    oss << "Vector sizes      : " << s.m_jitter->get_vector_size<double>() << ", "
+    oss << "Module name        : " << s.m_module_name << '\n';
+    oss << "Compiled           : " << !static_cast<bool>(s.m_module) << '\n';
+    oss << "Fast math          : " << s.m_use_fast_math << '\n';
+    oss << "Segmented functions: " << s.m_segmented_functions << '\n';
+    oss << "Optimisation level : " << s.m_opt_level << '\n';
+    oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
+    oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
+    oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
+    oss << "Vector sizes       : " << s.m_jitter->get_vector_size<double>() << ", "
         << s.m_jitter->get_vector_size<long double>()
 #if defined(HEYOKA_HAVE_REAL128)
         << ", " << s.m_jitter->get_vector_size<mppp::real128>()
