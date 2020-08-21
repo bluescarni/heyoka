@@ -123,10 +123,16 @@ TEST_CASE("outer solar system")
     xt::view(s_array, 0, xt::range(0, 3)) -= init_com;
     xt::view(s_array, 1, xt::range(0, 3)) -= init_com;
     xt::view(s_array, 2, xt::range(0, 3)) -= init_com;
+    xt::view(s_array, 3, xt::range(0, 3)) -= init_com;
+    xt::view(s_array, 4, xt::range(0, 3)) -= init_com;
+    xt::view(s_array, 5, xt::range(0, 3)) -= init_com;
 
     xt::view(s_array, 0, xt::range(3, 6)) -= init_com_v;
     xt::view(s_array, 1, xt::range(3, 6)) -= init_com_v;
     xt::view(s_array, 2, xt::range(3, 6)) -= init_com_v;
+    xt::view(s_array, 3, xt::range(3, 6)) -= init_com_v;
+    xt::view(s_array, 4, xt::range(3, 6)) -= init_com_v;
+    xt::view(s_array, 5, xt::range(3, 6)) -= init_com_v;
 
     std::cout << "New COM         : " << get_com() << '\n';
     std::cout << "New COM velocity: " << get_com_v() << '\n';
