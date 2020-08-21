@@ -52,6 +52,7 @@ namespace kw
 IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
+IGOR_MAKE_NAMED_ARGUMENT(segmented_functions);
 
 namespace detail
 {
@@ -83,6 +84,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_ir_snapshot;
     bool m_use_fast_math;
     std::string m_module_name;
+    bool m_segmented_functions;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -146,10 +148,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath};
+            // Segmented functions (defaults to false).
+            auto sfuncs = [&p]() -> bool {
+                if constexpr (p.has(kw::segmented_functions)) {
+                    return std::forward<decltype(p(kw::segmented_functions))>(p(kw::segmented_functions));
+                } else {
+                    return false;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, sfuncs};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
 
 public:
     llvm_state();
