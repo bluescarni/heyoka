@@ -6,20 +6,21 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_TYPE_TRAITS_HPP
-#define HEYOKA_DETAIL_TYPE_TRAITS_HPP
+#ifndef HEYOKA_CONFIG_HPP
+#define HEYOKA_CONFIG_HPP
 
-#include <type_traits>
+#cmakedefine HEYOKA_WITH_MPPP
 
-namespace heyoka::detail
-{
+#if defined(HEYOKA_WITH_MPPP)
 
-template <typename T>
-using uncvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+#include <mp++/config.hpp>
 
-template <typename, typename...>
-inline constexpr bool always_false_v = false;
+#if defined(MPPP_WITH_QUADMATH)
 
-} // namespace heyoka::detail
+#define HEYOKA_HAVE_REAL128
+
+#endif
+
+#endif
 
 #endif

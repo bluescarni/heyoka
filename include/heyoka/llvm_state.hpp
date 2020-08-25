@@ -9,10 +9,13 @@
 #ifndef HEYOKA_LLVM_STATE_HPP
 #define HEYOKA_LLVM_STATE_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -26,29 +29,62 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
 {
 
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(mname);
+IGOR_MAKE_NAMED_ARGUMENT(opt_level);
+IGOR_MAKE_NAMED_ARGUMENT(fast_math);
+IGOR_MAKE_NAMED_ARGUMENT(segmented_functions);
+
+namespace detail
+{
+
+// Default value for the opt_level argument.
+inline constexpr unsigned default_opt_level = 3;
+
+} // namespace detail
+
+} // namespace kw
+
+class llvm_state;
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+
 class HEYOKA_DLL_PUBLIC llvm_state
 {
-    class jit;
+    friend std::ostream &operator<<(std::ostream &, const llvm_state &);
+
+    struct jit;
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<llvm::IRBuilder<>> m_builder;
-    std::unique_ptr<llvm::legacy::FunctionPassManager> m_fpm;
-    std::unique_ptr<llvm::legacy::PassManager> m_pm;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     bool m_verify = true;
     unsigned m_opt_level;
+    std::string m_ir_snapshot;
+    bool m_use_fast_math;
+    std::string m_module_name;
+    bool m_segmented_functions;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -60,68 +96,272 @@ class HEYOKA_DLL_PUBLIC llvm_state
     template <typename T>
     HEYOKA_DLL_LOCAL void add_varargs_expression(const std::string &, const expression &,
                                                  const std::vector<std::string> &);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_vecargs_expression(const std::string &, const expression &);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_vecargs_expressions(const std::string &, const std::vector<expression> &);
+    template <typename T>
+    HEYOKA_DLL_LOCAL void add_batch_expression_impl(const std::string &, const expression &, std::uint32_t);
 
     // Implementation details for Taylor integration.
-    template <typename T>
-    HEYOKA_DLL_LOCAL auto add_taylor_stepper_impl(const std::string &, std::vector<expression>, std::uint32_t);
-    template <typename T>
-    HEYOKA_DLL_LOCAL auto taylor_add_uvars_diff(const std::string &, const std::vector<expression> &, std::uint32_t,
-                                                std::uint32_t);
-    template <typename T>
-    HEYOKA_DLL_LOCAL auto taylor_add_sv_diff(const std::string &, std::uint32_t, const variable &);
-    template <typename T>
-    HEYOKA_DLL_LOCAL auto taylor_add_sv_diff(const std::string &, std::uint32_t, const number &);
-    template <typename T>
-    HEYOKA_DLL_LOCAL void taylor_add_stepper_func(const std::string &, const std::vector<expression> &,
-                                                  const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
-                                                  std::uint32_t);
     template <typename T, typename U>
-    HEYOKA_DLL_LOCAL auto add_taylor_jet_impl(const std::string &, U, std::uint32_t);
+    HEYOKA_DLL_LOCAL auto add_taylor_jet_batch_impl(const std::string &, U, std::uint32_t, std::uint32_t);
     template <typename T>
-    HEYOKA_DLL_LOCAL void taylor_add_jet_func(const std::string &, const std::vector<expression> &,
-                                              const std::vector<llvm::Function *> &, std::uint32_t, std::uint32_t,
-                                              std::uint32_t);
+    HEYOKA_DLL_LOCAL llvm::Value *tjb_compute_sv_diff(const expression &, std::uint32_t, std::uint32_t, llvm::Value *,
+                                                      std::uint32_t, std::uint32_t, std::uint32_t);
+
+    // Implementation details for the variadic constructor.
+    template <typename... KwArgs>
+    static auto kw_args_ctor_impl(KwArgs &&... kw_args)
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments in the construction of an llvm_state contain "
+                          "unnamed arguments.");
+        } else {
+            // Module name (defaults to empty string).
+            auto mod_name = [&p]() -> std::string {
+                if constexpr (p.has(kw::mname)) {
+                    return std::forward<decltype(p(kw::mname))>(p(kw::mname));
+                } else {
+                    return "";
+                }
+            }();
+
+            // Optimisation level.
+            auto opt_level = [&p]() -> unsigned {
+                if constexpr (p.has(kw::opt_level)) {
+                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
+                } else {
+                    return kw::detail::default_opt_level;
+                }
+            }();
+
+            // Fast math flag (defaults to true).
+            auto fmath = [&p]() -> bool {
+                if constexpr (p.has(kw::fast_math)) {
+                    return std::forward<decltype(p(kw::fast_math))>(p(kw::fast_math));
+                } else {
+                    return true;
+                }
+            }();
+
+            // Segmented functions (defaults to false).
+            auto sfuncs = [&p]() -> bool {
+                if constexpr (p.has(kw::segmented_functions)) {
+                    return std::forward<decltype(p(kw::segmented_functions))>(p(kw::segmented_functions));
+                } else {
+                    return false;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, sfuncs};
+        }
+    }
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
 
 public:
-    explicit llvm_state(const std::string &, unsigned = 3);
-    llvm_state(const llvm_state &) = delete;
+    llvm_state();
+    // NOTE: enable the kwargs ctor only if:
+    // - there is at least 1 argument (i.e., cannot act as a def ctor),
+    // - if there is only 1 argument, it cannot be of type llvm_state
+    //   (so that it does not interfere with copy/move ctors).
+    template <typename... KwArgs,
+              std::enable_if_t<(sizeof...(KwArgs) > 0u)
+                                   && (sizeof...(KwArgs) > 1u
+                                       || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
+                               int> = 0>
+    explicit llvm_state(KwArgs &&... kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
+    {
+    }
+    llvm_state(const llvm_state &);
     llvm_state(llvm_state &&) noexcept;
-    llvm_state &operator=(const llvm_state &) = delete;
+    llvm_state &operator=(const llvm_state &);
     llvm_state &operator=(llvm_state &&) noexcept;
     ~llvm_state();
+
+    std::uint32_t vector_size_dbl() const;
+    std::uint32_t vector_size_ldbl() const;
+#if defined(HEYOKA_HAVE_REAL128)
+    std::uint32_t vector_size_f128() const;
+#endif
+    template <typename T>
+    std::uint32_t vector_size() const
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            return vector_size_dbl();
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return vector_size_ldbl();
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return vector_size_f128();
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 
     llvm::Module &module();
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
     bool &verify();
+    unsigned &opt_level();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
     const bool &verify() const;
+    const unsigned &opt_level() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
-    std::string dump() const;
-    std::string dump_function(const std::string &) const;
+    std::string get_ir() const;
+    std::string get_function_ir(const std::string &) const;
+    void dump_object_code(const std::string &) const;
 
     void verify_function(const std::string &);
 
-    unsigned get_opt_level() const;
-    void set_opt_level(unsigned);
     void optimise();
 
-    void add_dbl(const std::string &, const expression &);
-    void add_ldbl(const std::string &, const expression &);
+    void add_nary_function_dbl(const std::string &, const expression &);
+    void add_nary_function_ldbl(const std::string &, const expression &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_nary_function_f128(const std::string &, const expression &);
+#endif
+    template <typename T>
+    void add_nary_function(const std::string &name, const expression &ex)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_nary_function_dbl(name, ex);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_nary_function_ldbl(name, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_nary_function_f128(name, ex);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 
-    std::vector<expression> add_taylor_stepper_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    std::vector<expression> add_taylor_stepper_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
-    std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<expression>, std::uint32_t);
-    std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<expression>, std::uint32_t);
-    std::vector<expression> add_taylor_jet_dbl(const std::string &, std::vector<std::pair<expression, expression>>,
-                                               std::uint32_t);
-    std::vector<expression> add_taylor_jet_ldbl(const std::string &, std::vector<std::pair<expression, expression>>,
-                                                std::uint32_t);
+    void add_function_dbl(const std::string &, const expression &);
+    void add_function_ldbl(const std::string &, const expression &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_function_f128(const std::string &, const expression &);
+#endif
+    template <typename T>
+    void add_function(const std::string &name, const expression &ex)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_function_dbl(name, ex);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_function_ldbl(name, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_function_f128(name, ex);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    void add_vector_function_dbl(const std::string &, const std::vector<expression> &);
+    void add_vector_function_ldbl(const std::string &, const std::vector<expression> &);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_vector_function_f128(const std::string &, const std::vector<expression> &);
+#endif
+    template <typename T>
+    void add_vector_function(const std::string &name, const std::vector<expression> &es)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_vector_function_dbl(name, es);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_vector_function_ldbl(name, es);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_vector_function_f128(name, es);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    void add_function_batch_dbl(const std::string &, const expression &, std::uint32_t);
+    void add_function_batch_ldbl(const std::string &, const expression &, std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    void add_function_batch_f128(const std::string &, const expression &, std::uint32_t);
+#endif
+    template <typename T>
+    void add_function_batch(const std::string &name, const expression &ex, std::uint32_t batch_size)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            add_function_batch_dbl(name, ex, batch_size);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            add_function_batch_ldbl(name, ex, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            add_function_batch_f128(name, ex, batch_size);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    std::vector<expression> add_taylor_jet_batch_dbl(const std::string &, std::vector<expression>, std::uint32_t,
+                                                     std::uint32_t);
+    std::vector<expression> add_taylor_jet_batch_ldbl(const std::string &, std::vector<expression>, std::uint32_t,
+                                                      std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    std::vector<expression> add_taylor_jet_batch_f128(const std::string &, std::vector<expression>, std::uint32_t,
+                                                      std::uint32_t);
+#endif
+    template <typename T>
+    std::vector<expression> add_taylor_jet_batch(const std::string &name, std::vector<expression> sys,
+                                                 std::uint32_t order, std::uint32_t batch_size)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            return add_taylor_jet_batch_dbl(name, std::move(sys), order, batch_size);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return add_taylor_jet_batch_ldbl(name, std::move(sys), order, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return add_taylor_jet_batch_f128(name, std::move(sys), order, batch_size);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    std::vector<expression> add_taylor_jet_batch_dbl(const std::string &,
+                                                     std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                     std::uint32_t);
+    std::vector<expression> add_taylor_jet_batch_ldbl(const std::string &,
+                                                      std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                      std::uint32_t);
+#if defined(HEYOKA_HAVE_REAL128)
+    std::vector<expression> add_taylor_jet_batch_f128(const std::string &,
+                                                      std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                      std::uint32_t);
+#endif
+    template <typename T>
+    std::vector<expression> add_taylor_jet_batch(const std::string &name,
+                                                 std::vector<std::pair<expression, expression>> sys,
+                                                 std::uint32_t order, std::uint32_t batch_size)
+    {
+        if constexpr (std::is_same_v<T, double>) {
+            return add_taylor_jet_batch_dbl(name, std::move(sys), order, batch_size);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return add_taylor_jet_batch_ldbl(name, std::move(sys), order, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return add_taylor_jet_batch_f128(name, std::move(sys), order, batch_size);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 
     void compile();
 
@@ -139,9 +379,9 @@ private:
     // This function will check if ptr is compatible with the signature of
     // the function called "name" which was added via one of the add_*()
     // overloads.
-    // NOTE: this function is supposed to be called only within
-    // a fetch_*() overload, thus we don't do compiled/uncompiled
-    // checks.
+    // NOTE: this function is supposed to be called only
+    // with a pointer obtained via jit_lookup, thus we don't need
+    // compiled/uncompiled checks.
     template <typename Ret, typename... Args>
     auto sig_check(const std::string &name, Ret (*ptr)(Args...)) const
     {
@@ -176,7 +416,7 @@ private:
     // Machinery to construct a function pointer
     // type with signature T(T, T, ..., T).
     // This type will be used in the implementation
-    // of the N-ary fetch_* overloads.
+    // of the fetch_nary_* overloads.
     template <typename T, std::size_t>
     using always_same_t = T;
 
@@ -191,45 +431,115 @@ private:
 
 public:
     template <std::size_t N>
-    auto fetch_dbl(const std::string &name)
+    auto fetch_nary_function_dbl(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<double, N>>(jit_lookup(name)));
     }
     template <std::size_t N>
-    auto fetch_ldbl(const std::string &name)
+    auto fetch_nary_function_ldbl(const std::string &name)
     {
         return sig_check(name, reinterpret_cast<vararg_f_ptr<long double, N>>(jit_lookup(name)));
     }
-
-private:
-    template <typename T>
-    auto fetch_taylor_stepper_impl(const std::string &name)
+#if defined(HEYOKA_HAVE_REAL128)
+    template <std::size_t N>
+    auto fetch_nary_function_f128(const std::string &name)
     {
-        using ret_t = void (*)(T *, T, std::uint32_t);
-
-        return sig_check(name, reinterpret_cast<ret_t>(jit_lookup(name)));
+        return sig_check(name, reinterpret_cast<vararg_f_ptr<mppp::real128, N>>(jit_lookup(name)));
+    }
+#endif
+    template <typename T, std::size_t N>
+    auto fetch_nary_function(const std::string &name)
+    {
+        return sig_check(name, reinterpret_cast<vararg_f_ptr<T, N>>(jit_lookup(name)));
     }
 
-public:
-    using ts_dbl_t = void (*)(double *, double, std::uint32_t);
-    using ts_ldbl_t = void (*)(long double *, long double, std::uint32_t);
-    ts_dbl_t fetch_taylor_stepper_dbl(const std::string &);
-    ts_ldbl_t fetch_taylor_stepper_ldbl(const std::string &);
-
-private:
     template <typename T>
-    auto fetch_taylor_jet_impl(const std::string &name)
+    using sf_t = T (*)(const T *);
+    sf_t<double> fetch_function_dbl(const std::string &);
+    sf_t<long double> fetch_function_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    sf_t<mppp::real128> fetch_function_f128(const std::string &);
+#endif
+    template <typename T>
+    sf_t<T> fetch_function(const std::string &name)
     {
-        using ret_t = void (*)(T *, std::uint32_t);
-
-        return sig_check(name, reinterpret_cast<ret_t>(jit_lookup(name)));
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
+            return sig_check(name, reinterpret_cast<sf_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
     }
 
-public:
-    using tj_dbl_t = void (*)(double *, std::uint32_t);
-    using tj_ldbl_t = void (*)(long double *, std::uint32_t);
-    tj_dbl_t fetch_taylor_jet_dbl(const std::string &);
-    tj_ldbl_t fetch_taylor_jet_ldbl(const std::string &);
+    // NOTE: remember documenting that
+    // these pointers are restricted.
+    template <typename T>
+    using vf_t = void (*)(T *, const T *);
+    vf_t<double> fetch_vector_function_dbl(const std::string &);
+    vf_t<long double> fetch_vector_function_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    vf_t<mppp::real128> fetch_vector_function_f128(const std::string &);
+#endif
+    template <typename T>
+    vf_t<T> fetch_vector_function(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
+            return sig_check(name, reinterpret_cast<vf_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    // NOTE: remember documenting that
+    // these pointers are restricted.
+    template <typename T>
+    using sfb_t = void (*)(T *, const T *);
+    sfb_t<double> fetch_function_batch_dbl(const std::string &);
+    sfb_t<long double> fetch_function_batch_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    sfb_t<mppp::real128> fetch_function_batch_f128(const std::string &);
+#endif
+    template <typename T>
+    sfb_t<T> fetch_function_batch(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
+            return sig_check(name, reinterpret_cast<sfb_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
+
+    template <typename T>
+    using tjb_t = void (*)(T *);
+    tjb_t<double> fetch_taylor_jet_batch_dbl(const std::string &);
+    tjb_t<long double> fetch_taylor_jet_batch_ldbl(const std::string &);
+#if defined(HEYOKA_HAVE_REAL128)
+    tjb_t<mppp::real128> fetch_taylor_jet_batch_f128(const std::string &);
+#endif
+    template <typename T>
+    tjb_t<T> fetch_taylor_jet_batch(const std::string &name)
+    {
+        if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>
+#if defined(HEYOKA_HAVE_REAL128)
+                      || std::is_same_v<T, mppp::real128>
+#endif
+        ) {
+            return sig_check(name, reinterpret_cast<tjb_t<T>>(jit_lookup(name)));
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    }
 };
 
 } // namespace heyoka

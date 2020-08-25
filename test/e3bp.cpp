@@ -58,10 +58,10 @@ TEST_CASE("e3bp")
           + (pphi * pphi) / (2_dbl * a * a * (xi * xi - 1_dbl) * (1_dbl - eta * eta)) - mu1 / (a * (xi - eta))
           - mu2 / (a * (xi + eta));
 
-    llvm_state ham_llvm{"ham tracing"};
-    ham_llvm.add_dbl("ham", ham);
+    llvm_state ham_llvm{kw::mname = "ham tracing"};
+    ham_llvm.add_nary_function_dbl("ham", ham);
     ham_llvm.compile();
-    auto h_trace = ham_llvm.fetch_dbl<5>("ham");
+    auto h_trace = ham_llvm.fetch_nary_function<double, 5>("ham");
 
     // NOTE: initial conditions for the periodic orbit from the paper.
     std::vector<double> init_state
@@ -70,10 +70,7 @@ TEST_CASE("e3bp")
 
     taylor_adaptive_dbl tad{{prime(xi) = diff(ham, pxi), prime(eta) = diff(ham, peta), prime(phi) = diff(ham, pphi),
                              prime(pxi) = -diff(ham, xi), prime(peta) = -diff(ham, eta), prime(pphi) = -diff(ham, phi)},
-                            init_state,
-                            0,
-                            1E-16,
-                            1E-16};
+                            init_state};
 
     const auto &st = tad.get_state();
 

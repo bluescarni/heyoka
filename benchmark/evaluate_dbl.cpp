@@ -68,7 +68,8 @@ int main()
     expression_generator generator({"x", "y"}, engine);
     auto ex = generator(2, 4);
     // uncomment for this expression
-    // auto ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
+    ex = "x"_var * "x"_var + "y"_var + "y"_var * "y"_var - "y"_var * "x"_var;
+
     std::cout << "ex: " << ex << "\n";
 
     unsigned N = 10000u;
@@ -115,8 +116,7 @@ int main()
               << 1. / (static_cast<double>(duration.count()) / N) << "M\n";
     //
     // Init the LLVM machinery.
-    // llvm_state s{"optimized"};
-    //
+    // llvm_state s{kw::mname = "optimized"};    //
     //// 6 - we time the function call from llvm batch
     // auto func_batch = s.fetch_batch("f");
     // out = std::vector<double>(10000, 0.12345);

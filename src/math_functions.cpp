@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -17,12 +19,18 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Function.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -31,7 +39,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -43,11 +50,45 @@ namespace detail
 namespace
 {
 
-// NOTE: this code is very similar to the function invocation
-// code for builtins in function.cpp. Perhaps in the future
-// we can avoid repetition.
+// Helper to run the Taylor init phase of a unary
+// function in scalar or vector format.
 template <typename T>
-llvm::Value *taylor_init_sin(llvm_state &s, const function &f, llvm::Value *arr)
+llvm::Value *taylor_init_batch_unary_func(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                          std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    if (vector_size == 0u) {
+        // Scalar case.
+
+        // Create the function argument. The codegen for the argument
+        // comes from taylor_init_batch().
+        std::vector<llvm::Value *> args_v{taylor_init_batch<T>(s, f.args()[0], arr, batch_idx, batch_size, 0)};
+        assert(args_v[0] != nullptr);
+
+        return function_codegen_from_values<T>(s, f, args_v);
+    } else {
+        // Vector case.
+        auto &builder = s.builder();
+
+        // Create the function argument in vector form.
+        auto vec = taylor_init_batch<T>(s, f.args()[0], arr, batch_idx, batch_size, vector_size);
+
+        // Decompose the vector into a set of scalar values.
+        auto scalars = vector_to_scalars(builder, vec);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> init_vals;
+        for (auto scal : scalars) {
+            init_vals.push_back(function_codegen_from_values<T>(s, f, {scal}));
+        }
+
+        // Build a vector with the results.
+        return scalars_to_vector(builder, init_vals);
+    }
+}
+
+template <typename T>
+llvm::Value *taylor_init_batch_sin(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -55,156 +96,103 @@ llvm::Value *taylor_init_sin(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.sin");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.sin'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.sin'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.sin' must be an empty function");
-    }
-
-    // Create the function argument. The codegen for the argument
-    // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
-    assert(args_v[0] != nullptr);
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_sin_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return taylor_init_batch_unary_func<T>(s, f, arr, batch_idx, batch_size, vector_size);
 }
 
 // Derivative of sin(number).
 template <typename T>
-llvm::Function *taylor_diff_sin_impl(llvm_state &s, const number &, std::uint32_t, const std::string &name,
-                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t, const number &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &builder = s.builder();
-
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
-
-    s.verify_function(name);
-
-    return f;
+    return taylor_diff_batch_zero<T>(s, vector_size);
 }
 
 // Derivative of sin(variable).
 template <typename T>
-llvm::Function *taylor_diff_sin_impl(llvm_state &s, const variable &var, std::uint32_t idx, const std::string &name,
-                                     std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
+                                        std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                        std::uint32_t batch_size, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of sin() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // Accumulator for the result.
-    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
-
-    // Initial value for the for-loop. We will be operating
-    // in the range [1, order] (i.e., order inclusive).
-    // NOTE: because we are always assuming that order
-    // is at least 1, we can leave the for-loop
-    // in the do-while form from the original
-    // LLVM docs, as we are sure the loop body
-    // is always evaluated at least once.
-    auto start_val = builder.getInt32(1);
-
-    // Make the new basic block for the loop header,
-    // inserting after current block.
-    auto *preheader_bb = builder.GetInsertBlock();
-    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop", f);
-
-    // Insert an explicit fall through from the current block to the loop_bb.
-    builder.CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
-    builder.SetInsertPoint(loop_bb);
-
-    // Start the PHI node with an entry for Start.
-    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "j");
-    j_var->addIncoming(start_val, preheader_bb);
-
-    // Loop body.
-    // Compute the indices for accessing the derivatives in this loop iteration.
-    // The indices are:
-    // - (order - j_var) * n_uvars + idx + 1,
-    // - j_var * n_uvars + u_idx.
-    // NOTE: the +1 is because we are accessing the cosine
-    // of the u var, which is conventionally placed
-    // right after the sine in the decomposition.
+    // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
-    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
-                                      builder.getInt32(idx + 1u));
-    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
-    // Convert into pointers.
-    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
-    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
-    // Load the values.
-    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
-    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
-    // Update ret_acc: ret_acc = ret_acc + j*v0*v1.
-    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(ret_acc),
-                                           builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context())),
-                                                              builder.CreateFMul(v0, v1))),
-                        ret_acc);
 
-    // Compute the next value of the iteration.
-    // NOTE: addition works regardless of integral signedness.
-    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+    // NOTE: iteration in the [1, order] range
+    // (i.e., order included).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 1; j <= order; ++j) {
+        // The indices for accessing the derivatives in this loop iteration:
+        // - (order - j) * n_uvars * batch_size + (idx + 1) * batch_size + batch_idx,
+        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
+        // NOTE: the +1 is because we are accessing the cosine
+        // of the u var, which is conventionally placed
+        // right after the sine in the decomposition.
+        auto arr_ptr0
+            = builder.CreateInBoundsGEP(diff_arr,
+                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
+                                                                               + (idx + 1u) * batch_size + batch_idx)},
+                                        "sin_ptr");
+        auto arr_ptr1 = builder.CreateInBoundsGEP(
+            diff_arr,
+            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+            "sin_ptr");
 
-    // Compute the end condition.
-    // NOTE: we use the unsigned less-than-or-equal predicate.
-    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULE, next_j_var, order, "loopcond");
+        // Load the values.
+        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "sin_load")
+                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "sin_load");
+        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "sin_load")
+                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "sin_load");
 
-    // Create the "after loop" block and insert it.
-    auto *loop_end_bb = builder.GetInsertBlock();
-    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop", f);
+        auto fac = codegen<T>(s, number(static_cast<T>(j)));
+        if (vector_size > 0u) {
+            fac = create_constant_vector(builder, fac, vector_size);
+        }
 
-    // Insert the conditional branch into the end of loop_end_bb.
-    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+        // Add j*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+    }
 
-    // Any new code will be inserted in after_bb.
-    builder.SetInsertPoint(after_bb);
-
-    // Add a new entry to the PHI node for the backedge.
-    j_var->addIncoming(next_j_var, loop_end_bb);
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: ret_acc / order
-    builder.CreateRet(
-        builder.CreateFDiv(builder.CreateLoad(ret_acc), builder.CreateUIToFP(order, to_llvm_type<T>(s.context()))));
+    // NOTE: worthwhile to replace division with multiplication
+    // by inverse or better let LLVM do it?
+    auto div = codegen<T>(s, number(static_cast<T>(order)));
+    if (vector_size > 0u) {
+        div = create_constant_vector(builder, div, vector_size);
+    }
 
-    s.verify_function(name);
-
-    return f;
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_diff_sin_impl(llvm_state &, const U &, std::uint32_t, const std::string &, std::uint32_t,
-                                     const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_sin_impl(llvm_state &, std::uint32_t, const U &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a sine");
 }
 
 template <typename T>
-llvm::Function *taylor_diff_sin(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
-                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_sin(llvm_state &s, const function &func, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size,
+                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -212,9 +200,12 @@ llvm::Function *taylor_diff_sin(llvm_state &s, const function &func, std::uint32
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&s, idx, &name, n_uvars, &cd_uvars](
-                          const auto &v) { return taylor_diff_sin_impl<T>(s, v, idx, name, n_uvars, cd_uvars); },
-                      func.args()[0].value());
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_batch_sin_impl<T>(s, idx, v, order, n_uvars, diff_arr, batch_idx, batch_size,
+                                                 vector_size, cd_uvars);
+        },
+        func.args()[0].value());
 }
 
 } // namespace
@@ -227,10 +218,22 @@ expression sin(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.sin";
-    fc.ldbl_name() = "llvm.sin";
+    fc.name_dbl() = "llvm.sin";
+    fc.name_ldbl() = "llvm.sin";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_sin128";
+#endif
     fc.display_name() = "sin";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -309,10 +312,16 @@ expression sin(expression e)
 
         return retval;
     };
-    fc.taylor_init_dbl_f() = detail::taylor_init_sin<double>;
-    fc.taylor_init_ldbl_f() = detail::taylor_init_sin<long double>;
-    fc.taylor_diff_dbl_f() = detail::taylor_diff_sin<double>;
-    fc.taylor_diff_ldbl_f() = detail::taylor_diff_sin<long double>;
+    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_sin<double>;
+    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_sin<mppp::real128>;
+#endif
+    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_sin<double>;
+    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_sin<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -324,7 +333,8 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_init_cos(llvm_state &s, const function &f, llvm::Value *arr)
+llvm::Value *taylor_init_batch_cos(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -332,156 +342,100 @@ llvm::Value *taylor_init_cos(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.cos");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.cos'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.cos'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.cos' must be an empty function");
-    }
-
-    // Create the function argument. The codegen for the argument
-    // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
-    assert(args_v[0] != nullptr);
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_cos_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return taylor_init_batch_unary_func<T>(s, f, arr, batch_idx, batch_size, vector_size);
 }
 
 // Derivative of cos(number).
 template <typename T>
-llvm::Function *taylor_diff_cos_impl(llvm_state &s, const number &, std::uint32_t, const std::string &name,
-                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t, const number &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &builder = s.builder();
-
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
-
-    s.verify_function(name);
-
-    return f;
+    return taylor_diff_batch_zero<T>(s, vector_size);
 }
 
-// Derivative of cos(variable).
 template <typename T>
-llvm::Function *taylor_diff_cos_impl(llvm_state &s, const variable &var, std::uint32_t idx, const std::string &name,
-                                     std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
+                                        std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                        std::uint32_t batch_size, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of cos() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // Accumulator for the result.
-    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
-
-    // Initial value for the for-loop. We will be operating
-    // in the range [1, order] (i.e., order inclusive).
-    // NOTE: because we are always assuming that order
-    // is at least 1, we can leave the for-loop
-    // in the do-while form from the original
-    // LLVM docs, as we are sure the loop body
-    // is always evaluated at least once.
-    auto start_val = builder.getInt32(1);
-
-    // Make the new basic block for the loop header,
-    // inserting after current block.
-    auto *preheader_bb = builder.GetInsertBlock();
-    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop", f);
-
-    // Insert an explicit fall through from the current block to the loop_bb.
-    builder.CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
-    builder.SetInsertPoint(loop_bb);
-
-    // Start the PHI node with an entry for Start.
-    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "j");
-    j_var->addIncoming(start_val, preheader_bb);
-
-    // Loop body.
-    // Compute the indices for accessing the derivatives in this loop iteration.
-    // The indices are:
-    // - (order - j_var) * n_uvars + idx - 1,
-    // - j_var * n_uvars + u_idx.
-    // NOTE: the -1 is because we are accessing the sine
-    // of the u var, which is conventionally placed
-    // right before the cosine in the decomposition.
+    // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
-    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
-                                      builder.getInt32(idx - 1u));
-    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
-    // Convert into pointers.
-    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
-    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
-    // Load the values.
-    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
-    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
-    // Update ret_acc: ret_acc = ret_acc + j*v0*v1.
-    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(ret_acc),
-                                           builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context())),
-                                                              builder.CreateFMul(v0, v1))),
-                        ret_acc);
 
-    // Compute the next value of the iteration.
-    // NOTE: addition works regardless of integral signedness.
-    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+    // NOTE: iteration in the [1, order] range
+    // (i.e., order included).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 1; j <= order; ++j) {
+        // The indices for accessing the derivatives in this loop iteration:
+        // - (order - j) * n_uvars * batch_size + (idx - 1) * batch_size + batch_idx,
+        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
+        // NOTE: the -1 is because we are accessing the sine
+        // of the u var, which is conventionally placed
+        // right before the cosine in the decomposition.
+        auto arr_ptr0
+            = builder.CreateInBoundsGEP(diff_arr,
+                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
+                                                                               + (idx - 1u) * batch_size + batch_idx)},
+                                        "cos_ptr");
+        auto arr_ptr1 = builder.CreateInBoundsGEP(
+            diff_arr,
+            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+            "cos_ptr");
 
-    // Compute the end condition.
-    // NOTE: we use the unsigned less-than-or-equal predicate.
-    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULE, next_j_var, order, "loopcond");
+        // Load the values.
+        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "cos_load")
+                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "cos_load");
+        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "cos_load")
+                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "cos_load");
 
-    // Create the "after loop" block and insert it.
-    auto *loop_end_bb = builder.GetInsertBlock();
-    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop", f);
+        auto fac = codegen<T>(s, number(static_cast<T>(j)));
+        if (vector_size > 0u) {
+            fac = create_constant_vector(builder, fac, vector_size);
+        }
 
-    // Insert the conditional branch into the end of loop_end_bb.
-    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+        // Add j*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+    }
 
-    // Any new code will be inserted in after_bb.
-    builder.SetInsertPoint(after_bb);
-
-    // Add a new entry to the PHI node for the backedge.
-    j_var->addIncoming(next_j_var, loop_end_bb);
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: -ret_acc / order
-    builder.CreateRet(builder.CreateFNeg(
-        builder.CreateFDiv(builder.CreateLoad(ret_acc), builder.CreateUIToFP(order, to_llvm_type<T>(s.context())))));
+    auto div = codegen<T>(s, number(-static_cast<T>(order)));
+    if (vector_size > 0u) {
+        div = create_constant_vector(builder, div, vector_size);
+    }
 
-    s.verify_function(name);
-
-    return f;
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_diff_cos_impl(llvm_state &, const U &, std::uint32_t, const std::string &, std::uint32_t,
-                                     const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_cos_impl(llvm_state &, std::uint32_t, const U &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
 }
 
 template <typename T>
-llvm::Function *taylor_diff_cos(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
-                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_cos(llvm_state &s, const function &func, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size,
+                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -489,9 +443,12 @@ llvm::Function *taylor_diff_cos(llvm_state &s, const function &func, std::uint32
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&s, idx, &name, n_uvars, &cd_uvars](
-                          const auto &v) { return taylor_diff_cos_impl<T>(s, v, idx, name, n_uvars, cd_uvars); },
-                      func.args()[0].value());
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_batch_cos_impl<T>(s, idx, v, order, n_uvars, diff_arr, batch_idx, batch_size,
+                                                 vector_size, cd_uvars);
+        },
+        func.args()[0].value());
 }
 
 } // namespace
@@ -504,10 +461,22 @@ expression cos(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.cos";
-    fc.ldbl_name() = "llvm.cos";
+    fc.name_dbl() = "llvm.cos";
+    fc.name_ldbl() = "llvm.cos";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_cos128";
+#endif
     fc.display_name() = "cos";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument("Inconsistent number of arguments when taking the derivative of the cosine (1 "
@@ -576,10 +545,16 @@ expression cos(expression e)
 
         return u_vars_defs.size() - 1u;
     };
-    fc.taylor_init_dbl_f() = detail::taylor_init_cos<double>;
-    fc.taylor_init_ldbl_f() = detail::taylor_init_cos<long double>;
-    fc.taylor_diff_dbl_f() = detail::taylor_diff_cos<double>;
-    fc.taylor_diff_ldbl_f() = detail::taylor_diff_cos<long double>;
+    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_cos<double>;
+    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_cos<mppp::real128>;
+#endif
+    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_cos<double>;
+    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_cos<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -591,7 +566,8 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_init_log(llvm_state &s, const function &f, llvm::Value *arr)
+llvm::Value *taylor_init_batch_log(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -599,172 +575,108 @@ llvm::Value *taylor_init_log(llvm_state &s, const function &f, llvm::Value *arr)
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.log");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.log'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(1, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.log'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.log' must be an empty function");
-    }
-
-    // Create the function argument. The codegen for the argument
-    // comes from taylor_init.
-    std::vector<llvm::Value *> args_v(1, invoke_taylor_init<T>(s, f.args()[0], arr));
-    assert(args_v[0] != nullptr);
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_log_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
-
-    return r;
+    return taylor_init_batch_unary_func<T>(s, f, arr, batch_idx, batch_size, vector_size);
 }
 
-// Derivative of log(number).
 template <typename T>
-llvm::Function *taylor_diff_log_impl(llvm_state &s, const number &, std::uint32_t, const std::string &name,
-                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t, const number &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &builder = s.builder();
-
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
-
-    s.verify_function(name);
-
-    return f;
+    return taylor_diff_batch_zero<T>(s, vector_size);
 }
 
 // Derivative of log(variable).
 template <typename T>
-llvm::Function *taylor_diff_log_impl(llvm_state &s, const variable &var, std::uint32_t idx, const std::string &name,
-                                     std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
+                                        std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                        std::uint32_t batch_size, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of log() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // Accumulator for the result.
-    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
-
-    // Pre-create loop and afterloop blocks. Note that these have just
-    // been created, they have not been inserted yet in the IR.
-    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop");
-    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop");
-
-    // NOTE: because we want to iterate in the [1, order) range,
-    // we don't want to ever execute the loop body if order is 1.
-    // Thus, check the condition and jump to the afterloop
-    // if needed.
-    auto *skip_cond = builder.CreateICmp(llvm::CmpInst::ICMP_EQ, builder.getInt32(1), order, "skipcond");
-    builder.CreateCondBr(skip_cond, after_bb, loop_bb);
-
-    // Initial value for the loop variable (i = 1).
-    auto start_val = builder.getInt32(1);
-    assert(start_val != nullptr);
-
-    // Get a reference to the current block for
-    // later usage in the phi node.
-    auto *preheader_bb = builder.GetInsertBlock();
-    assert(preheader_bb != nullptr);
-
-    // Add the loop block and start insertion into it.
-    f->getBasicBlockList().push_back(loop_bb);
-    builder.SetInsertPoint(loop_bb);
-
-    // Create the phi node and add the first pair of arguments.
-    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "i");
-    assert(j_var != nullptr);
-    j_var->addIncoming(start_val, preheader_bb);
-
-    // Loop body.
-    // Compute the indices for accessing the derivatives in this loop iteration.
-    // The indices are:
-    // - (order - j_var) * n_uvars + idx,
-    // - j_var * n_uvars + u_idx.
+    // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
-    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
-                                      builder.getInt32(idx));
-    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
-    // Convert into pointers.
-    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
-    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
-    // Load the values.
-    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
-    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
-    // Update ret_acc: ret_acc = ret_acc + (order-j)*v0*v1.
-    builder.CreateStore(
-        builder.CreateFAdd(
-            builder.CreateLoad(ret_acc),
-            builder.CreateFMul(builder.CreateFSub(builder.CreateUIToFP(order, to_llvm_type<T>(s.context())),
-                                                  builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context()))),
-                               builder.CreateFMul(v0, v1))),
-        ret_acc);
 
-    // Compute the next value of the iteration.
-    // NOTE: addition works regardless of integral signedness.
-    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
-    assert(next_j_var != nullptr);
+    // NOTE: iteration in the [1, order) range
+    // (i.e., order excluded).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 1; j <= order; ++j) {
+        // The indices for accessing the derivatives in this loop iteration:
+        // - (order - j) * n_uvars * batch_size + idx * batch_size + batch_idx,
+        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
+        auto arr_ptr0 = builder.CreateInBoundsGEP(
+            diff_arr,
+            {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size + idx * batch_size + batch_idx)},
+            "log_ptr");
+        auto arr_ptr1 = builder.CreateInBoundsGEP(
+            diff_arr,
+            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+            "log_ptr");
 
-    // Compute the end condition.
-    // NOTE: we use the unsigned less-than predicate.
-    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next_j_var, order, "loopcond");
-    assert(end_cond != nullptr);
+        // Load the values.
+        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "log_load")
+                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "log_load");
+        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "log_load")
+                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "log_load");
 
-    // Get a reference to the current block for later use,
-    // and insert the "after loop" block.
-    auto *loop_end_bb = builder.GetInsertBlock();
-    assert(loop_end_bb != nullptr);
-    f->getBasicBlockList().push_back(after_bb);
+        auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
+        if (vector_size > 0u) {
+            fac = create_constant_vector(builder, fac, vector_size);
+        }
 
-    // Insert the conditional branch into the end of loop_end_bb.
-    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+        // Add (order-j)*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+    }
 
-    // Any new code will be inserted in after_bb.
-    builder.SetInsertPoint(after_bb);
-
-    // Add a new entry to the PHI node for the backedge.
-    j_var->addIncoming(next_j_var, loop_end_bb);
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
-    auto bn_idx = builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx));
-    auto b0_idx = builder.getInt32(u_idx);
-    auto bn = builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, bn_idx));
-    auto b0 = builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, b0_idx));
-    builder.CreateRet(builder.CreateFDiv(
-        builder.CreateFSub(bn, builder.CreateFDiv(builder.CreateLoad(ret_acc),
-                                                  builder.CreateUIToFP(order, to_llvm_type<T>(s.context())))),
-        b0));
+    auto arr_ptrn = builder.CreateInBoundsGEP(
+        diff_arr,
+        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+        "log_ptr");
+    auto arr_ptr0 = builder.CreateInBoundsGEP(
+        diff_arr, {builder.getInt32(0), builder.getInt32(u_idx * batch_size + batch_idx)}, "log_ptr");
 
-    s.verify_function(name);
+    auto bn = (vector_size == 0u) ? builder.CreateLoad(arr_ptrn, "log_load")
+                                  : load_vector_from_memory(builder, arr_ptrn, vector_size, "log_load");
+    auto b0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "log_load")
+                                  : load_vector_from_memory(builder, arr_ptr0, vector_size, "log_load");
 
-    return f;
+    auto div = codegen<T>(s, number(static_cast<T>(order)));
+    if (vector_size > 0u) {
+        div = create_constant_vector(builder, div, vector_size);
+    }
+
+    return builder.CreateFDiv(builder.CreateFSub(bn, builder.CreateFDiv(ret_acc, div)), b0);
 }
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_diff_log_impl(llvm_state &, const U &, std::uint32_t, const std::string &, std::uint32_t,
-                                     const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_log_impl(llvm_state &, std::uint32_t, const U &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
 }
 
 template <typename T>
-llvm::Function *taylor_diff_log(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
-                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_log(llvm_state &s, const function &func, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size,
+                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -772,9 +684,12 @@ llvm::Function *taylor_diff_log(llvm_state &s, const function &func, std::uint32
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&s, idx, &name, n_uvars, &cd_uvars](
-                          const auto &v) { return taylor_diff_log_impl<T>(s, v, idx, name, n_uvars, cd_uvars); },
-                      func.args()[0].value());
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_batch_log_impl<T>(s, idx, v, order, n_uvars, diff_arr, batch_idx, batch_size,
+                                                 vector_size, cd_uvars);
+        },
+        func.args()[0].value());
 }
 
 } // namespace
@@ -787,10 +702,22 @@ expression log(expression e)
     args.emplace_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.log";
-    fc.ldbl_name() = "llvm.log";
+    fc.name_dbl() = "llvm.log";
+    fc.name_ldbl() = "llvm.log";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_log128";
+#endif
     fc.display_name() = "log";
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -841,10 +768,16 @@ expression log(expression e)
 
         return 1. / args[0];
     };
-    fc.taylor_init_dbl_f() = detail::taylor_init_log<double>;
-    fc.taylor_init_ldbl_f() = detail::taylor_init_log<long double>;
-    fc.taylor_diff_dbl_f() = detail::taylor_diff_log<double>;
-    fc.taylor_diff_ldbl_f() = detail::taylor_diff_log<long double>;
+    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_log<double>;
+    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_log<mppp::real128>;
+#endif
+    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_log<double>;
+    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_log<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -856,42 +789,14 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
+llvm::Value *taylor_init_batch_pow(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
 {
     if (f.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
                                     "the pow() function (2 arguments were expected, but "
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
-
-    // Lookup the intrinsic ID.
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.pow");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.pow'");
-    }
-
-    // Fetch the function.
-    const std::vector<llvm::Type *> arg_types(2, to_llvm_type<T>(s.context()));
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.pow'");
-    }
-    if (!callee_f->empty()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.pow' must be an empty function");
-    }
-
-    // Create the function arguments. The codegen for the arguments
-    // comes from taylor_init.
-    std::vector<llvm::Value *> args_v{invoke_taylor_init<T>(s, f.args()[0], arr),
-                                      invoke_taylor_init<T>(s, f.args()[1], arr)};
-    assert(args_v[0] != nullptr);
-    assert(args_v[1] != nullptr);
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "taylor_init_pow_tmp");
-    assert(r != nullptr);
-    r->setTailCall(true);
 
     // Disable verification in the llvm
     // machinery when we are generating code
@@ -900,143 +805,137 @@ llvm::Value *taylor_init_pow(llvm_state &s, const function &f, llvm::Value *arr)
     // pow intrinsic mangling.
     s.verify() = false;
 
-    return r;
+    if (vector_size == 0u) {
+        // Scalar case.
+
+        // Create the function arguments. The codegen for the arguments
+        // comes from taylor_init_batch.
+        std::vector<llvm::Value *> args_v{taylor_init_batch<T>(s, f.args()[0], arr, batch_idx, batch_size, 0),
+                                          taylor_init_batch<T>(s, f.args()[1], arr, batch_idx, batch_size, 0)};
+
+        return function_codegen_from_values<T>(s, f, args_v);
+    } else {
+        // Vector case.
+        auto &builder = s.builder();
+
+        // Create the function arguments in vector form.
+        auto vec0 = taylor_init_batch<T>(s, f.args()[0], arr, batch_idx, batch_size, vector_size);
+        auto vec1 = taylor_init_batch<T>(s, f.args()[1], arr, batch_idx, batch_size, vector_size);
+
+        // Decompose the vectors into sets of scalar values.
+        auto scalars0 = vector_to_scalars(builder, vec0);
+        auto scalars1 = vector_to_scalars(builder, vec1);
+        assert(scalars0.size() == scalars1.size());
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> init_vals;
+        for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
+            init_vals.push_back(function_codegen_from_values<T>(s, f, {scalars0[i], scalars1[i]}));
+        }
+
+        // Build a vector with the results.
+        return scalars_to_vector(builder, init_vals);
+    }
 }
 
 // Derivative of pow(number, number).
 template <typename T>
-llvm::Function *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, std::uint32_t,
-                                     const std::string &name, std::uint32_t,
-                                     const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t, const number &, const number &, std::uint32_t,
+                                        std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
+                                        std::uint32_t vector_size, const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &builder = s.builder();
-
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // The derivative of a constant is always zero.
-    builder.CreateRet(invoke_codegen<T>(s, number(0.)));
-
-    s.verify_function(name);
-
-    return f;
+    return taylor_diff_batch_zero<T>(s, vector_size);
 }
 
 // Derivative of pow(variable, number).
 template <typename T>
-llvm::Function *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num, std::uint32_t idx,
-                                     const std::string &name, std::uint32_t n_uvars,
-                                     const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const variable &var, const number &num,
+                                        std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
+                                        std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of pow() (the order must be at least one)");
+    }
+
     auto &builder = s.builder();
 
-    auto [f, diff_ptr, order] = taylor_diff_common<T>(s, name);
-
-    // Accumulator for the result.
-    auto ret_acc = builder.CreateAlloca(to_llvm_type<T>(s.context()), 0, "ret_acc");
-    builder.CreateStore(invoke_codegen<T>(s, number(0.)), ret_acc);
-
-    // Pre-convert the order to a float and compute order * num (n * alpha
-    // in the AD formulae).
-    auto ord_f = builder.CreateUIToFP(order, to_llvm_type<T>(s.context()), "ord_f");
-    assert(ord_f != nullptr);
-    auto ord_num = builder.CreateFMul(ord_f, invoke_codegen<T>(s, num), "ord_num");
-    assert(ord_num != nullptr);
-
-    // Initial value for the for-loop. We will be operating
-    // in the range [0, order) (i.e., order *not* included).
-    // NOTE: because we are always assuming that order
-    // is at least 1, we can leave the for-loop
-    // in the do-while form from the original
-    // LLVM docs, as we are sure the loop body
-    // is always evaluated at least once.
-    auto start_val = builder.getInt32(0);
-
-    // Make the new basic block for the loop header,
-    // inserting after current block.
-    auto *preheader_bb = builder.GetInsertBlock();
-    auto *loop_bb = llvm::BasicBlock::Create(s.context(), "loop", f);
-
-    // Insert an explicit fall through from the current block to the loop_bb.
-    builder.CreateBr(loop_bb);
-
-    // Start insertion in loop_bb.
-    builder.SetInsertPoint(loop_bb);
-
-    // Start the PHI node with an entry for Start.
-    auto *j_var = builder.CreatePHI(builder.getInt32Ty(), 2, "j");
-    j_var->addIncoming(start_val, preheader_bb);
-
-    // Loop body.
-    // Compute the indices for accessing the derivatives in this loop iteration.
-    // The indices are:
-    // - (order - j_var) * n_uvars + u_idx,
-    // - j_var * n_uvars + idx.
+    // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
-    auto arr_idx0 = builder.CreateAdd(builder.CreateMul(builder.CreateSub(order, j_var), builder.getInt32(n_uvars)),
-                                      builder.getInt32(u_idx));
-    auto arr_idx1 = builder.CreateAdd(builder.CreateMul(j_var, builder.getInt32(n_uvars)), builder.getInt32(idx));
-    // Convert into pointers.
-    auto arr_ptr0 = builder.CreateInBoundsGEP(diff_ptr, arr_idx0, "diff_ptr0");
-    auto arr_ptr1 = builder.CreateInBoundsGEP(diff_ptr, arr_idx1, "diff_ptr1");
-    // Load the values.
-    auto v0 = builder.CreateLoad(arr_ptr0, "diff_load0");
-    auto v1 = builder.CreateLoad(arr_ptr1, "diff_load1");
-    // Compute the scalar factor: order * num - j * (num + 1).
-    auto scal_f
-        = builder.CreateFSub(ord_num,
-                             builder.CreateFMul(builder.CreateUIToFP(j_var, to_llvm_type<T>(s.context()), "j_float"),
-                                                invoke_codegen<T>(s, num + number{T(1)})),
-                             "scal_f");
-    // Update ret_acc: ret_acc = ret_acc + scal_f*v0*v1.
-    builder.CreateStore(
-        builder.CreateFAdd(builder.CreateLoad(ret_acc), builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1))),
-        ret_acc);
 
-    // Compute the next value of the iteration.
-    // NOTE: addition works regardless of integral signedness.
-    auto *next_j_var = builder.CreateAdd(j_var, builder.getInt32(1), "next_j");
+    // NOTE: iteration in the [0, order) range
+    // (i.e., order *not* included).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 0; j < order; ++j) {
+        // The indices for accessing the derivatives in this loop iteration:
+        // - (order - j) * n_uvars * batch_size + u_idx * batch_size + batch_idx,
+        // - j * n_uvars * batch_size + idx * batch_size + batch_idx.
+        auto arr_ptr0
+            = builder.CreateInBoundsGEP(diff_arr,
+                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
+                                                                               + u_idx * batch_size + batch_idx)},
+                                        "pow_ptr");
+        auto arr_ptr1 = builder.CreateInBoundsGEP(
+            diff_arr, {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + idx * batch_size + batch_idx)},
+            "pow_ptr");
 
-    // Compute the end condition.
-    // NOTE: we use the unsigned less-than predicate, because order is *not* included.
-    auto *end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next_j_var, order, "loopcond");
+        // Load the values.
+        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "pow_load")
+                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "pow_load");
+        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "pow_load")
+                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "pow_load");
 
-    // Create the "after loop" block and insert it.
-    auto *loop_end_bb = builder.GetInsertBlock();
-    auto *after_bb = llvm::BasicBlock::Create(s.context(), "afterloop", f);
+        // Compute the scalar factor: order * num - j * (num + 1).
+        auto scal_f = codegen<T>(s, number(static_cast<T>(order)) * num
+                                        - number(static_cast<T>(j)) * (num + number(static_cast<T>(1))));
+        if (vector_size > 0u) {
+            scal_f = create_constant_vector(builder, scal_f, vector_size);
+        }
 
-    // Insert the conditional branch into the end of loop_end_bb.
-    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+        // Add scal_f*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
+    }
 
-    // Any new code will be inserted in after_bb.
-    builder.SetInsertPoint(after_bb);
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
-    // Add a new entry to the PHI node for the backedge.
-    j_var->addIncoming(next_j_var, loop_end_bb);
+    // Compute the final divisor: order * (zero-th derivative of u_idx).
+    auto ord_f = codegen<T>(s, number(static_cast<T>(order)));
+    if (vector_size > 0u) {
+        ord_f = create_constant_vector(builder, ord_f, vector_size);
+    }
 
-    // Compute the final divisor: ord_f * (zero-th derivative of u_idx).
-    auto div = builder.CreateFMul(
-        ord_f, builder.CreateLoad(builder.CreateInBoundsGEP(diff_ptr, builder.getInt32(u_idx))), "divisor");
+    auto arr_ptr0 = builder.CreateInBoundsGEP(
+        diff_arr, {builder.getInt32(0), builder.getInt32(u_idx * batch_size + batch_idx)}, "pow_ptr");
+    auto b0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "pow_load")
+                                  : load_vector_from_memory(builder, arr_ptr0, vector_size, "pow_load");
+
+    auto div = builder.CreateFMul(ord_f, b0, "pow_div");
 
     // Compute and return the result: ret_acc / div.
-    builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(ret_acc), div));
-
-    s.verify_function(name);
-
-    return f;
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U1, typename U2>
-llvm::Function *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, std::uint32_t, const std::string &,
-                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *taylor_diff_batch_pow_impl(llvm_state &, std::uint32_t, const U1 &, const U2 &, std::uint32_t,
+                                        std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
 }
 
 template <typename T>
-llvm::Function *taylor_diff_pow(llvm_state &s, const function &func, std::uint32_t idx, const std::string &name,
-                                std::uint32_t n_uvars, const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_pow(llvm_state &s, const function &func, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size,
+                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     if (func.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -1045,8 +944,9 @@ llvm::Function *taylor_diff_pow(llvm_state &s, const function &func, std::uint32
     }
 
     return std::visit(
-        [&s, idx, &name, n_uvars, &cd_uvars](const auto &v1, const auto &v2) {
-            return taylor_diff_pow_impl<T>(s, v1, v2, idx, name, n_uvars, cd_uvars);
+        [&](const auto &v1, const auto &v2) {
+            return taylor_diff_batch_pow_impl<T>(s, idx, v1, v2, order, n_uvars, diff_arr, batch_idx, batch_size,
+                                                 vector_size, cd_uvars);
         },
         func.args()[0].value(), func.args()[1].value());
 }
@@ -1062,14 +962,27 @@ expression pow(expression e1, expression e2)
     args.emplace_back(std::move(e2));
 
     function fc{std::move(args)};
-    fc.dbl_name() = "llvm.pow";
-    fc.ldbl_name() = "llvm.pow";
+    fc.name_dbl() = "llvm.pow";
+    fc.name_ldbl() = "llvm.pow";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_pow128";
+#endif
     fc.display_name() = "pow";
     // Disable verification whenever
     // we codegen the pow() function, due
     // to what looks like an LLVM verification bug.
     fc.disable_verify() = true;
-    fc.ty() = function::type::builtin;
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 2u) {
             throw std::invalid_argument(
@@ -1119,10 +1032,16 @@ expression pow(expression e1, expression e2)
         }
         return args[1] * std::pow(args[0], args[1] - 1.) + std::log(args[0]) * std::pow(args[0], args[1]);
     };
-    fc.taylor_init_dbl_f() = detail::taylor_init_pow<double>;
-    fc.taylor_init_ldbl_f() = detail::taylor_init_pow<long double>;
-    fc.taylor_diff_dbl_f() = detail::taylor_diff_pow<double>;
-    fc.taylor_diff_ldbl_f() = detail::taylor_diff_pow<long double>;
+    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_pow<double>;
+    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_pow<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_pow<mppp::real128>;
+#endif
+    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_pow<double>;
+    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_pow<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_pow<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }

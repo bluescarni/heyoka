@@ -6,8 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <ostream>
@@ -22,7 +25,12 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/detail/assert_nonnull_ret.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -36,6 +44,12 @@ namespace heyoka
 number::number(double x) : m_value(x) {}
 
 number::number(long double x) : m_value(x) {}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+number::number(mppp::real128 x) : m_value(x) {}
+
+#endif
 
 number::number(const number &) = default;
 
@@ -66,12 +80,24 @@ std::size_t hash(const number &n)
 {
     return std::visit(
         [](const auto &v) {
-            if (std::isnan(v)) {
-                // Make all nan return the same hash value.
-                return std::size_t(0);
+#if defined(HEYOKA_HAVE_REAL128)
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, mppp::real128>) {
+                // NOTE: the real128 hash already guarantees
+                // that all nan values return the same hash.
+                return mppp::hash(v);
             } else {
-                return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+#endif
+                if (std::isnan(v)) {
+                    // Make all nan return the same hash value.
+                    return std::size_t(0);
+                } else {
+                    return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
+                }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
         },
         n.value());
 }
@@ -146,13 +172,23 @@ bool operator==(const number &n1, const number &n2)
         using type2 = detail::uncvref_t<decltype(v2)>;
 
         if constexpr (std::is_same_v<type1, type2>) {
-            // NOTE: make nan compare equal, for consistency
-            // with hashing.
-            if (std::isnan(v1) && std::isnan(v2)) {
-                return true;
+#if defined(HEYOKA_HAVE_REAL128)
+            if constexpr (std::is_same_v<type1, mppp::real128>) {
+                // NOTE: the real128_equal_to() function considers
+                // all nan equal.
+                return mppp::real128_equal_to(v1, v2);
             } else {
-                return v1 == v2;
+#endif
+                // NOTE: make nan compare equal, for consistency
+                // with hashing.
+                if (std::isnan(v1) && std::isnan(v2)) {
+                    return true;
+                } else {
+                    return v1 == v2;
+                }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
         } else {
             return false;
         }
@@ -219,14 +255,14 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const number &,
 
 llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 {
-    heyoka_assert_nonnull_ret(std::visit(
+    return std::visit(
         [&s](const auto &v) { return llvm::ConstantFP::get(s.context(), llvm::APFloat(static_cast<double>(v))); },
-        n.value()));
+        n.value());
 }
 
 llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
 {
-    heyoka_assert_nonnull_ret(std::visit(
+    return std::visit(
         [&s](const auto &v) {
             // NOTE: the idea here is that we first fetch the FP
             // semantics of the LLVM type long double corresponds
@@ -240,8 +276,23 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
             return llvm::ConstantFP::get(s.context(),
                                          llvm::APFloat(sem, detail::li_to_string(static_cast<long double>(v))));
         },
-        n.value()));
+        n.value());
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const number &n)
+{
+    return std::visit(
+        [&s](const auto &v) {
+            const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
+            return llvm::ConstantFP::get(s.context(),
+                                         llvm::APFloat(sem, detail::li_to_string(static_cast<mppp::real128>(v))));
+        },
+        n.value());
+}
+
+#endif
 
 std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &)
 {
@@ -251,14 +302,44 @@ std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vec
 
 // NOTE: for numbers, the Taylor init phase is
 // just the codegen.
-llvm::Value *taylor_init_dbl(llvm_state &s, const number &n, llvm::Value *)
+llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t vector_size)
 {
-    return codegen_dbl(s, n);
+    auto ret = codegen_dbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
 
-llvm::Value *taylor_init_ldbl(llvm_state &s, const number &n, llvm::Value *)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
 {
-    return codegen_ldbl(s, n);
+    auto ret = codegen_ldbl(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
 }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t vector_size)
+{
+    auto ret = codegen_f128(s, n);
+
+    if (vector_size > 0u) {
+        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+    }
+
+    return ret;
+}
+
+#endif
 
 } // namespace heyoka

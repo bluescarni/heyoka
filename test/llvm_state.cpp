@@ -6,20 +6,15 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_TYPE_TRAITS_HPP
-#define HEYOKA_DETAIL_TYPE_TRAITS_HPP
+#include <iostream>
 
-#include <type_traits>
+#include <heyoka/llvm_state.hpp>
 
-namespace heyoka::detail
+#include "catch.hpp"
+
+using namespace heyoka;
+
+TEST_CASE("basic")
 {
-
-template <typename T>
-using uncvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
-template <typename, typename...>
-inline constexpr bool always_false_v = false;
-
-} // namespace heyoka::detail
-
-#endif
+    std::cout << llvm_state{kw::mname = "sample state"} << '\n';
+}

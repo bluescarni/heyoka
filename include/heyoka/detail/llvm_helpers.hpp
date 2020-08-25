@@ -9,26 +9,29 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
-#include <stdexcept>
 #include <string>
-#include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 
@@ -62,94 +65,43 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
             static_assert(always_false_v<T>,
                           "Cannot deduce the LLVM type corresponding to 'long double' on this platform.");
         }
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        auto ret = llvm::Type::getFP128Ty(c);
+        assert(ret != nullptr);
+        return ret;
+#endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type in to_llvm_type().");
     }
 }
 
-template <typename T, typename U>
-inline llvm::Value *invoke_codegen(llvm_state &s, const U &x)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, x);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, x);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_codegen().");
-    }
-}
+HEYOKA_DLL_PUBLIC llvm::Value *create_constant_vector(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 
-template <typename T, typename U>
-inline llvm::Value *invoke_taylor_init(llvm_state &s, const U &x, llvm::Value *arr)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_init_dbl(s, x, arr);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_init_ldbl(s, x, arr);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_init().");
-    }
-}
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t,
+                                                       const std::string & = "");
 
-template <typename T, typename U>
-inline llvm::Function *invoke_taylor_diff(llvm_state &s, const U &x, std::uint32_t idx, const std::string &name,
-                                          std::uint32_t n_uvars,
-                                          const std::unordered_map<std::uint32_t, number> &cd_uvars)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, x, idx, name, n_uvars, cd_uvars);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, x, idx, name, n_uvars, cd_uvars);
-    } else {
-        static_assert(always_false_v<T>, "Unhandled type in invoke_taylor_diff().");
-    }
-}
+HEYOKA_DLL_PUBLIC llvm::Value *store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *, std::uint32_t);
 
-// Common boilerplate for the implementation of
-// functions computing Taylor derivatives.
+HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilder<> &, const std::vector<llvm::Value *> &);
+
+// Helper to return the (null) Taylor derivative of a constant,
+// as a scalar or as a vector.
 template <typename T>
-inline auto taylor_diff_common(llvm_state &s, const std::string &name)
+inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_size)
 {
-    auto &builder = s.builder();
+    auto ret = codegen<T>(s, number(0.));
 
-    // Check the function name.
-    if (s.module().getFunction(name) != nullptr) {
-        throw std::invalid_argument("Cannot add the function '" + name
-                                    + "' when building a function for the computation of a Taylor derivative: the "
-                                      "function already exists in the LLVM module");
+    if (vector_size > 0u) {
+        ret = create_constant_vector(s.builder(), ret, vector_size);
     }
 
-    // Prepare the function prototype. The arguments are:
-    // - const float pointer to the derivatives array,
-    // - 32-bit integer (order of the derivative).
-    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())), builder.getInt32Ty()};
-
-    // The function will return the n-th derivative as a float.
-    auto *ft = llvm::FunctionType::get(to_llvm_type<T>(s.context()), fargs, false);
-    assert(ft != nullptr);
-
-    // Now create the function. Don't need to call it from outside,
-    // thus internal linkage.
-    auto *f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, name, s.module());
-    assert(f != nullptr);
-
-    // Setup the function arugments.
-    auto arg_it = f->args().begin();
-    arg_it->setName("diff_ptr");
-    arg_it->addAttr(llvm::Attribute::ReadOnly);
-    arg_it->addAttr(llvm::Attribute::NoCapture);
-    auto diff_ptr = arg_it;
-
-    (++arg_it)->setName("order");
-    auto order = arg_it;
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
-    assert(bb != nullptr);
-    builder.SetInsertPoint(bb);
-
-    return std::tuple{f, diff_ptr, order};
+    return ret;
 }
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
 
 } // namespace heyoka::detail
 

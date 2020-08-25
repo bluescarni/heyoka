@@ -9,19 +9,28 @@
 #ifndef HEYOKA_BINARY_OPERATOR_HPP
 #define HEYOKA_BINARY_OPERATOR_HPP
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
-#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -92,17 +101,100 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const binary_operator &);
+
+#endif
+
+template <typename T>
+inline llvm::Value *codegen(llvm_state &s, const binary_operator &bo)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return codegen_dbl(s, bo);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return codegen_ldbl(s, bo);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return codegen_f128(s, bo);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
                                                                                std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const binary_operator &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const binary_operator &, llvm::Value *);
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_dbl(llvm_state &, const binary_operator &, std::uint32_t,
-                                                  const std::string &, std::uint32_t,
-                                                  const std::unordered_map<std::uint32_t, number> &);
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_diff_ldbl(llvm_state &, const binary_operator &, std::uint32_t,
-                                                   const std::string &, std::uint32_t,
-                                                   const std::unordered_map<std::uint32_t, number> &);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_dbl(llvm_state &, const binary_operator &, llvm::Value *,
+                                                     std::uint32_t, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_ldbl(llvm_state &, const binary_operator &, llvm::Value *,
+                                                      std::uint32_t, std::uint32_t, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_f128(llvm_state &, const binary_operator &, llvm::Value *,
+                                                      std::uint32_t, std::uint32_t, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Value *taylor_init_batch(llvm_state &s, const binary_operator &bo, llvm::Value *arr,
+                                      std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_init_batch_dbl(s, bo, arr, batch_idx, batch_size, vector_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_init_batch_ldbl(s, bo, arr, batch_idx, batch_size, vector_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_init_batch_f128(s, bo, arr, batch_idx, batch_size, vector_size);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_dbl(llvm_state &, const binary_operator &, std::uint32_t,
+                                                     std::uint32_t, std::uint32_t, llvm::Value *, std::uint32_t,
+                                                     std::uint32_t, std::uint32_t,
+                                                     const std::unordered_map<std::uint32_t, number> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const binary_operator &, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t, llvm::Value *, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t,
+                                                      const std::unordered_map<std::uint32_t, number> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_f128(llvm_state &, const binary_operator &, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t, llvm::Value *, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t,
+                                                      const std::unordered_map<std::uint32_t, number> &);
+
+#endif
+
+template <typename T>
+inline llvm::Value *taylor_diff_batch(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
+                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                      std::uint32_t batch_size, std::uint32_t vector_size,
+                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_diff_batch_dbl(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                     cd_uvars);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_diff_batch_ldbl(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                      cd_uvars);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_diff_batch_f128(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                      cd_uvars);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 } // namespace heyoka
 

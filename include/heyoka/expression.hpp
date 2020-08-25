@@ -9,11 +9,15 @@
 #ifndef HEYOKA_EXPRESSION_HPP
 #define HEYOKA_EXPRESSION_HPP
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -21,8 +25,15 @@
 
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -64,6 +75,16 @@ HEYOKA_DLL_PUBLIC expression operator""_dbl(unsigned long long);
 
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(long double);
 HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <char... Chars>
+inline expression operator"" _f128()
+{
+    return expression{number{mppp::literals::operator"" _rq<Chars...>()}};
+}
+
+#endif
 
 HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 
@@ -153,6 +174,97 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const expression &);
 HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const expression &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const expression &);
+
+#endif
+
+template <typename T>
+inline llvm::Value *codegen(llvm_state &s, const expression &ex)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return codegen_dbl(s, ex);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return codegen_ldbl(s, ex);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return codegen_f128(s, ex);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
+                                                                               std::vector<expression> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_dbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
+                                                     std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_ldbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_f128(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
+                                                      std::uint32_t, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Value *taylor_init_batch(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t batch_idx,
+                                      std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_init_batch_dbl(s, ex, arr, batch_idx, batch_size, vector_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_init_batch_ldbl(s, ex, arr, batch_idx, batch_size, vector_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_init_batch_f128(s, ex, arr, batch_idx, batch_size, vector_size);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_dbl(llvm_state &, const expression &, std::uint32_t, std::uint32_t,
+                                                     std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
+                                                     std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const expression &, std::uint32_t, std::uint32_t,
+                                                      std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
+                                                      std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_batch_f128(llvm_state &, const expression &, std::uint32_t, std::uint32_t,
+                                                      std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
+                                                      std::uint32_t, const std::unordered_map<std::uint32_t, number> &);
+
+#endif
+
+template <typename T>
+inline llvm::Value *taylor_diff_batch(llvm_state &s, const expression &e, std::uint32_t idx, std::uint32_t order,
+                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                      std::uint32_t batch_size, std::uint32_t vector_size,
+                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_diff_batch_dbl(s, e, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_diff_batch_ldbl(s, e, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                      cd_uvars);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_diff_batch_f128(s, e, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                      cd_uvars);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)

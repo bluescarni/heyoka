@@ -6,26 +6,46 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
+#include <array>
 #include <cmath>
 #include <initializer_list>
-#include <limits>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 // Small helper to compute the angular momentum
 // wrt the origin given a state vector.
 template <typename T>
 T compute_am(const std::vector<T> &st)
 {
+    using std::sqrt;
+
     auto vx0 = st[0];
     auto vx1 = st[1];
     auto vy0 = st[2];
@@ -44,17 +64,19 @@ T compute_am(const std::vector<T> &st)
     T am1[] = {y1 * vz1 - z1 * vy1, z1 * vx1 - x1 * vz1, x1 * vy1 - y1 * vx1};
     T am[] = {am0[0] + am1[0], am0[1] + am1[1], am0[2] + am1[2]};
 
-    return std::sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
+    return sqrt(am[0] * am[0] + am[1] * am[1] + am[2] * am[2]);
 }
 
 // Two-body problem energy from the state vector.
 template <typename T>
 T tbp_energy(const std::vector<T> &st)
 {
+    using std::sqrt;
+
     auto Dx = st[6] - st[7];
     auto Dy = st[8] - st[9];
     auto Dz = st[10] - st[11];
-    auto dist = std::sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
+    auto dist = sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
     auto U = -1 / dist;
 
     auto v2_0 = st[0] * st[0] + st[2] * st[2] + st[4] * st[4];
@@ -63,69 +85,67 @@ T tbp_energy(const std::vector<T> &st)
     return T(1) / T(2) * (v2_0 + v2_1) + U;
 }
 
-TEST_CASE("two body dbl")
+TEST_CASE("two body")
 {
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+    auto tester = [](auto fp_x, unsigned opt_level) {
+        using std::abs;
+        using std::cos;
 
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
+        using fp_t = decltype(fp_x);
 
-    // NOTE: this corresponds to a highly elliptic orbit.
-    std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
+        auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
+            = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 
-    taylor_adaptive_dbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3, vx0,
-                             vx1, vy0, vy1, vz0, vz1},
-                            std::move(init_state),
-                            0,
-                            std::numeric_limits<double>::epsilon(),
-                            std::numeric_limits<double>::epsilon()};
+        auto x01 = x1 - x0;
+        auto y01 = y1 - y0;
+        auto z01 = z1 - z0;
+        auto r01_m3
+            = pow(x01 * x01 + y01 * y01 + z01 * z01, expression{number{fp_t{-3}}} / expression{number{fp_t{2}}});
 
-    const auto &st = tad.get_state();
+        const auto kep = std::array<fp_t, 6>{fp_t{1.5}, fp_t{.2}, fp_t{.3}, fp_t{.4}, fp_t{.5}, fp_t{.6}};
+        const auto [c_x, c_v] = kep_to_cart(kep, fp_t{1} / 4);
 
-    const auto en = tbp_energy(st);
-    const auto am = compute_am(st);
+        std::vector<fp_t> init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
+                                     c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
-    for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
-        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<double>::epsilon() * 1E4);
-        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<double>::epsilon() * 1E4);
-    }
-}
+        taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
+                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                  std::move(init_state),
+                                  kw::opt_level = opt_level};
 
-TEST_CASE("two body ldbl")
-{
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+        const auto &st = tad.get_state();
 
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_ldbl / 2_ldbl);
+        const auto en = tbp_energy(st);
+        const auto am = compute_am(st);
 
-    std::vector<long double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
+        for (auto i = 0; i < 200; ++i) {
+            const auto [oc, h, ord] = tad.step();
+            REQUIRE(oc == taylor_outcome::success);
+            REQUIRE(tbp_energy(st) == approximately(en, fp_t{1E2}));
+            REQUIRE(compute_am(st) == approximately(am, fp_t{1E2}));
 
-    taylor_adaptive_ldbl tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
-                              vx0, vx1, vy0, vy1, vz0, vz1},
-                             std::move(init_state),
-                             0,
-                             std::numeric_limits<long double>::epsilon(),
-                             std::numeric_limits<long double>::epsilon()};
+            const auto kep1 = cart_to_kep(std::array<fp_t, 3>{st[6], st[8], st[10]},
+                                          std::array<fp_t, 3>{st[0], st[2], st[4]}, fp_t{1} / 4);
+            const auto kep2 = cart_to_kep(std::array<fp_t, 3>{st[7], st[9], st[11]},
+                                          std::array<fp_t, 3>{st[1], st[3], st[5]}, fp_t{1} / 4);
 
-    const auto &st = tad.get_state();
+            REQUIRE(kep1[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep2[0] == approximately(fp_t{1.5}, fp_t{1E2}));
+            REQUIRE(kep1[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep2[1] == approximately(fp_t{.2}, fp_t{1E3}));
+            REQUIRE(kep1[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(kep2[2] == approximately(fp_t{.3}, fp_t{1E2}));
+            REQUIRE(abs(cos(kep1[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(abs(cos(kep2[3])) == approximately(abs(cos(fp_t{.4})), fp_t{1E3}));
+            REQUIRE(kep1[4] == approximately(fp_t{.5}, fp_t{1E2}));
+            REQUIRE(kep2[4] == approximately(fp_t{.5}, fp_t{1E2}));
+        }
+    };
 
-    const auto en = tbp_energy(st);
-    const auto am = compute_am(st);
-
-    for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_ldbl::outcome::success);
-        REQUIRE(std::abs((en - tbp_energy(st)) / en) <= std::numeric_limits<long double>::epsilon() * 1E4);
-        REQUIRE(std::abs((am - compute_am(st)) / am) <= std::numeric_limits<long double>::epsilon() * 1E4);
-    }
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }
 
 // Energy of two uniform overlapping spheres.
@@ -168,10 +188,7 @@ TEST_CASE("two uniform spheres")
 
     taylor_adaptive_dbl tad{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state),
-        0,
-        1E-16,
-        1E-16};
+        std::move(init_state)};
 
     const auto &st = tad.get_state();
 
@@ -180,7 +197,7 @@ TEST_CASE("two uniform spheres")
 
     for (auto i = 0; i < 200; ++i) {
         const auto [oc, h, ord] = tad.step();
-        REQUIRE(oc == taylor_adaptive_dbl::outcome::success);
+        REQUIRE(oc == taylor_outcome::success);
         REQUIRE(std::abs((en - tus_energy(rs_val, st)) / en) <= 1E-11);
         REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
     }
@@ -208,18 +225,12 @@ TEST_CASE("mixed tb/spheres")
     // 2BP integrator.
     taylor_adaptive_dbl t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
                                vx0, vx1, vy0, vy1, vz0, vz1},
-                              init_state,
-                              0,
-                              1E-16,
-                              1E-16};
+                              init_state};
 
     // 2US integrator.
     taylor_adaptive_dbl t_2us{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
-        std::move(init_state),
-        0,
-        1E-16,
-        1E-16};
+        std::move(init_state)};
 
     // Helper to compute the distance**2 between
     // the sphere's centres given a state vector.
@@ -254,7 +265,7 @@ TEST_CASE("mixed tb/spheres")
 
         // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
         auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
-        REQUIRE((oc == taylor_adaptive_dbl::outcome::success || oc == taylor_adaptive_dbl::outcome::time_limit));
+        REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
 
         if (get_regime(cur_t->get_state()) != cur_regime) {
             auto cur_dist = std::sqrt(compute_dist2(cur_t->get_state()));

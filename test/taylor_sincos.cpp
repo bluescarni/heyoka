@@ -6,371 +6,412 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cmath>
 #include <initializer_list>
+#include <random>
+#include <tuple>
+#include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/number.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
+
+static std::mt19937 rng;
 
 using namespace heyoka;
+using namespace heyoka_test;
 
-TEST_CASE("dbl")
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+template <typename T, typename U>
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 {
-    using Catch::Matchers::Message;
+    const auto batch_size = 23u;
 
-    auto x = "x"_var, y = "y"_var;
+    llvm_state s{kw::opt_level = opt_level};
 
-    // Number-number tests.
-    {
-        llvm_state s{"", 0};
+    s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
+    s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
 
-        s.add_taylor_jet_dbl("jet", {sin(2_dbl) + cos(3_dbl), x + y}, 1);
+    s.compile();
 
-        s.compile();
+    auto jptr_batch = s.fetch_taylor_jet_batch<T>("jet_batch");
+    auto jptr_scalar = s.fetch_taylor_jet_batch<T>("jet_scalar");
 
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
+    std::vector<T> jet_batch;
+    jet_batch.resize(8 * batch_size);
+    std::uniform_real_distribution<float> dist(-10.f, 10.f);
+    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
 
-        double jet[4] = {2, 3};
+    std::vector<T> jet_scalar;
+    jet_scalar.resize(8);
 
-        jptr(jet, 1);
+    jptr_batch(jet_batch.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-    }
+    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+        // Assign the initial values of x and y.
+        for (auto i = 0u; i < 2u; ++i) {
+            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
+        }
 
-    {
-        llvm_state s{"", 0};
+        jptr_scalar(jet_scalar.data());
 
-        s.add_taylor_jet_dbl("jet", {sin(2_dbl) + cos(3_dbl), x + y}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == 0.5 * (jet[2] + jet[3]));
-    }
-
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {sin(2_dbl) + cos(3_dbl), x + y}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (jet[2] + jet[3])));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.) + std::cos(3.)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5 * (jet[2] + jet[3])));
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6. * (2 * jet[4] + 2 * jet[5])));
-    }
-
-    // Variable tests.
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {sin(y), cos(x)}, 1);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[4] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-    }
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {sin(y), cos(x)}, 2);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[6] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
-    }
-    {
-        llvm_state s{"", 0};
-
-        s.add_taylor_jet_dbl("jet", {sin(y), cos(x)}, 3);
-
-        s.compile();
-
-        auto jptr = s.fetch_taylor_jet_dbl("jet");
-
-        double jet[8] = {2, 3};
-
-        jptr(jet, 1);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-
-        jptr(jet, 2);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
-
-        jptr(jet, 3);
-
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.)));
-        REQUIRE(jet[3] == Approx(std::cos(2.)));
-        REQUIRE(jet[4] == Approx(0.5 * std::cos(3.) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5 * std::sin(2.) * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6. * (-std::sin(3.) * jet[3] * jet[3] + std::cos(3.) * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6. * (-std::cos(2.) * jet[2] * jet[2] - std::sin(2.) * 2 * jet[4])));
+        for (auto i = 2u; i < 8u; ++i) {
+            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+        }
     }
 }
 
-TEST_CASE("ldbl")
+TEST_CASE("taylor sincos")
 {
-    using Catch::Matchers::Message;
+    auto tester = [](auto fp_x, unsigned opt_level) {
+        using std::sin;
+        using std::cos;
 
-    auto x = "x"_var, y = "y"_var;
+        using fp_t = decltype(fp_x);
 
-    // Number-number tests.
-    {
-        llvm_state s{"", 0};
+        using Catch::Matchers::Message;
 
-        s.add_taylor_jet_ldbl("jet", {sin(2_ldbl) + cos(3_ldbl), x + y}, 1);
+        auto x = "x"_var, y = "y"_var;
 
-        s.compile();
+        // Number-number tests.
+        {
+            llvm_state s{kw::opt_level = opt_level};
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 1, 1);
 
-        long double jet[4] = {2, 3};
+            s.compile();
 
-        jptr(jet, 1);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
-    }
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
 
-    {
-        llvm_state s{"", 0};
+            jptr(jet.data());
 
-        s.add_taylor_jet_ldbl("jet", {sin(2_ldbl) + cos(3_ldbl), x + y}, 2);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
+        }
 
-        s.compile();
+        {
+            llvm_state s{kw::opt_level = opt_level};
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 1, 2);
 
-        long double jet[6] = {2, 3};
+            s.compile();
 
-        jptr(jet, 1);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
+            jet.resize(8);
 
-        jptr(jet, 2);
+            jptr(jet.data());
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == 0.5l * (jet[2] + jet[3]));
-    }
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -4);
 
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 5);
 
-        s.add_taylor_jet_ldbl("jet", {sin(2_ldbl) + cos(3_ldbl), x + y}, 3);
+            REQUIRE(jet[4] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
 
-        s.compile();
+            REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
+            REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
+        }
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+        {
+            llvm_state s{kw::opt_level = opt_level};
 
-        long double jet[8] = {2, 3};
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 2, 1);
 
-        jptr(jet, 1);
+            s.compile();
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        jptr(jet, 2);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5l * (jet[2] + jet[3])));
+            jptr(jet.data());
 
-        jptr(jet, 3);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
+            REQUIRE(jet[4] == 0);
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
+        }
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(2.l) + std::cos(3.l)));
-        REQUIRE(jet[3] == 5);
-        REQUIRE(jet[4] == 0);
-        REQUIRE(jet[5] == Approx(0.5l * (jet[2] + jet[3])));
-        REQUIRE(jet[6] == 0);
-        REQUIRE(jet[7] == Approx(1 / 6.l * (2 * jet[4] + 2 * jet[5])));
-    }
+        {
+            llvm_state s{kw::opt_level = opt_level};
 
-    // Variable tests.
-    {
-        llvm_state s{"", 0};
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 2, 2);
 
-        s.add_taylor_jet_ldbl("jet", {sin(y), cos(x)}, 1);
+            s.compile();
 
-        s.compile();
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
+            jet.resize(12);
 
-        long double jet[4] = {2, 3};
+            jptr(jet.data());
 
-        jptr(jet, 1);
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -4);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-    }
-    {
-        llvm_state s{"", 0};
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 5);
 
-        s.add_taylor_jet_ldbl("jet", {sin(y), cos(x)}, 2);
+            REQUIRE(jet[4] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
 
-        s.compile();
+            REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
+            REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            REQUIRE(jet[8] == 0);
+            REQUIRE(jet[9] == 0);
 
-        long double jet[6] = {2, 3};
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[4] + jet[6])));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[5] + jet[7])));
+        }
 
-        jptr(jet, 1);
+        {
+            llvm_state s{kw::opt_level = opt_level};
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
+            s.add_taylor_jet_batch<fp_t>(
+                "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y}, 3, 3);
 
-        jptr(jet, 2);
+            s.compile();
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
-    }
-    {
-        llvm_state s{"", 0};
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
 
-        s.add_taylor_jet_ldbl("jet", {sin(y), cos(x)}, 3);
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}};
+            jet.resize(24);
 
-        s.compile();
+            jptr(jet.data());
 
-        auto jptr = s.fetch_taylor_jet_ldbl("jet");
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -4);
+            REQUIRE(jet[2] == -1);
 
-        long double jet[8] = {2, 3};
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == 5);
+            REQUIRE(jet[5] == -2);
 
-        jptr(jet, 1);
+            REQUIRE(jet[6] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[7] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[8] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
+            REQUIRE(jet[9] == approximately(jet[0] + jet[3]));
+            REQUIRE(jet[10] == approximately(jet[1] + jet[4]));
+            REQUIRE(jet[11] == approximately(jet[2] + jet[5]));
 
-        jptr(jet, 2);
+            REQUIRE(jet[12] == 0);
+            REQUIRE(jet[13] == 0);
+            REQUIRE(jet[14] == 0);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[6] + jet[9])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[7] + jet[10])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[8] + jet[11])));
 
-        jptr(jet, 3);
+            REQUIRE(jet[18] == 0);
+            REQUIRE(jet[19] == 0);
+            REQUIRE(jet[20] == 0);
 
-        REQUIRE(jet[0] == 2);
-        REQUIRE(jet[1] == 3);
-        REQUIRE(jet[2] == Approx(std::sin(3.l)));
-        REQUIRE(jet[3] == Approx(std::cos(2.l)));
-        REQUIRE(jet[4] == Approx(0.5l * std::cos(3.l) * jet[3]));
-        REQUIRE(jet[5] == Approx(-0.5l * std::sin(2.l) * jet[2]));
-        REQUIRE(jet[6] == Approx(1 / 6.l * (-std::sin(3.l) * jet[3] * jet[3] + std::cos(3.l) * 2 * jet[5])));
-        REQUIRE(jet[7] == Approx(1 / 6.l * (-std::cos(2.l) * jet[2] * jet[2] - std::sin(2.l) * 2 * jet[4])));
-    }
+            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (2 * jet[15] + 2 * jet[18])));
+            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (2 * jet[16] + 2 * jet[19])));
+            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
+        }
+
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
+                                   opt_level);
+
+        // Variable tests.
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 1, 1);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(jet[1])));
+            REQUIRE(jet[3] == approximately(cos(jet[0])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 1, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}};
+            jet.resize(8);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -4);
+
+            REQUIRE(jet[4] == approximately(sin(jet[2])));
+            REQUIRE(jet[5] == approximately(sin(jet[3])));
+
+            REQUIRE(jet[6] == approximately(cos(jet[0])));
+            REQUIRE(jet[7] == approximately(cos(jet[1])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 2, 1);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(6);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(jet[1])));
+            REQUIRE(jet[3] == approximately(cos(jet[0])));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] * cos(jet[1])));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * -jet[2] * sin(jet[0])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 2, 2);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{-4}};
+            jet.resize(12);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -4);
+
+            REQUIRE(jet[4] == approximately(sin(jet[2])));
+            REQUIRE(jet[5] == approximately(sin(jet[3])));
+
+            REQUIRE(jet[6] == approximately(cos(jet[0])));
+            REQUIRE(jet[7] == approximately(cos(jet[1])));
+
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[6] * cos(jet[2])));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[7] * cos(jet[3])));
+
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * -jet[4] * sin(jet[0])));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * -jet[5] * sin(jet[1])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            s.add_taylor_jet_batch<fp_t>("jet", {sin(y), cos(x)}, 3, 3);
+
+            s.compile();
+
+            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-5}, fp_t{3}, fp_t{-4}, fp_t{6}};
+            jet.resize(24);
+
+            jptr(jet.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -1);
+            REQUIRE(jet[2] == -5);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == -4);
+            REQUIRE(jet[5] == 6);
+
+            REQUIRE(jet[6] == approximately(sin(jet[3])));
+            REQUIRE(jet[7] == approximately(sin(jet[4])));
+            REQUIRE(jet[8] == approximately(sin(jet[5])));
+
+            REQUIRE(jet[9] == approximately(cos(jet[0])));
+            REQUIRE(jet[10] == approximately(cos(jet[1])));
+            REQUIRE(jet[11] == approximately(cos(jet[2])));
+
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[9] * cos(jet[3])));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[10] * cos(jet[4])));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[11] * cos(jet[5])));
+
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * -jet[6] * sin(jet[0])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * -jet[7] * sin(jet[1])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * -jet[8] * sin(jet[2])));
+
+            REQUIRE(jet[18]
+                    == approximately(fp_t{1} / 6 * (2 * jet[15] * cos(jet[3]) - jet[9] * jet[9] * sin(jet[3]))));
+            REQUIRE(jet[19]
+                    == approximately(fp_t{1} / 6 * (2 * jet[16] * cos(jet[4]) - jet[10] * jet[10] * sin(jet[4]))));
+            REQUIRE(jet[20]
+                    == approximately(fp_t{1} / 6 * (2 * jet[17] * cos(jet[5]) - jet[11] * jet[11] * sin(jet[5]))));
+
+            REQUIRE(jet[21]
+                    == approximately(fp_t{1} / 6 * (-2 * jet[12] * sin(jet[0]) - jet[6] * jet[6] * cos(jet[0]))));
+            REQUIRE(jet[22]
+                    == approximately(fp_t{1} / 6 * (-2 * jet[13] * sin(jet[1]) - jet[7] * jet[7] * cos(jet[1]))));
+            REQUIRE(jet[23]
+                    == approximately(fp_t{1} / 6 * (-2 * jet[14] * sin(jet[2]) - jet[8] * jet[8] * cos(jet[2]))));
+        }
+
+        // Do the batch/scalar comparison.
+        compare_batch_scalar<fp_t>({sin(y), cos(x)}, opt_level);
+    };
+
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
 }
