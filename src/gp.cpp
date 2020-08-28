@@ -379,7 +379,7 @@ void crossover(expression &e1, expression &e2, splitmix64 &engine)
 }
 
 // Crossover targeting specific node_ids
-void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, splitmix64 &)
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
