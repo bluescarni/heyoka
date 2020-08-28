@@ -782,6 +782,92 @@ expression log(expression e)
     return expression{std::move(fc)};
 }
 
+expression exp(expression e)
+{
+    std::vector<expression> args;
+    args.emplace_back(std::move(e));
+
+    function fc{std::move(args)};
+    fc.name_dbl() = "llvm.exp";
+    fc.name_ldbl() = "llvm.exp";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_exp128";
+#endif
+    fc.display_name() = "exp";
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
+    fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when taking the derivative of the exponential (1 "
+                "argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return exp(args[0]) * diff(args[0], s);
+    };
+
+    fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the exponential from doubles (1 "
+                "argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::exp(eval_dbl(args[0], map));
+    };
+    fc.eval_batch_dbl_f() = [](std::vector<double> &out, const std::vector<expression> &args,
+                               const std::unordered_map<std::string, std::vector<double>> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when evaluating the exponential in batches of "
+                                        "doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+        eval_batch_dbl(out, args[0], map);
+        for (auto &el : out) {
+            el = std::exp(el);
+        }
+    };
+    fc.eval_num_dbl_f() = [](const std::vector<double> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the numerical value of the "
+                                        "exponential over doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::exp(args[0]);
+    };
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
+        if (args.size() != 1u || i != 0u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments or derivative requested when computing the derivative of std::exp over doubles");
+        }
+
+        return std::exp(args[0]);
+    };
+//    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_log<double>;
+//    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_log<long double>;
+//#if defined(HEYOKA_HAVE_REAL128)
+//    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_log<mppp::real128>;
+//#endif
+//    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_log<double>;
+//    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_log<long double>;
+//#if defined(HEYOKA_HAVE_REAL128)
+//    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_log<mppp::real128>;
+//#endif
+
+    return expression{std::move(fc)};
+}
+
 namespace detail
 {
 

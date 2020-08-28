@@ -52,6 +52,7 @@ inline bool isfinite<mppp::real128>(mppp::real128 x)
 // and needs to be investigated more.
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_pow128(__float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_exp128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cos128(__float128);
 
