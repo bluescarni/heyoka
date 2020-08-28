@@ -35,6 +35,11 @@ __float128 heyoka_log128(__float128 x)
     return mppp::log(mppp::real128{x}).m_value;
 }
 
+__float128 heyoka_exp128(__float128 x)
+{
+    return mppp::exp(mppp::real128{x}).m_value;
+}
+
 __float128 heyoka_sin128(__float128 x)
 {
     return mppp::sin(mppp::real128{x}).m_value;

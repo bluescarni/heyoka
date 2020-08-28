@@ -23,5 +23,5 @@ ADD_HEYOKA_BENCHMARK(flops_benchmark_dbl)
 ADD_HEYOKA_BENCHMARK(taylor_jet_batch_benchmark)
 ADD_HEYOKA_BENCHMARK(two_body_step)
 ADD_HEYOKA_BENCHMARK(two_body_step_batch)
-ADD_HEYOKA_BENCHMARK(taylor_parameters)
+ADD_HEYOKA_BENCHMARK(taylor_eqq_with_param)
 

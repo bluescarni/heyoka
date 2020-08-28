@@ -70,7 +70,7 @@ int main()
     auto exs = exs_original;
     start = high_resolution_clock::now();
     for (auto i = 0u; i < N; ++i) {
-        mutate(exs[i], generator, 0.1, engine);
+        mutate(exs[i], generator, 0.1, engine, 2, 5, 0);
     }
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);

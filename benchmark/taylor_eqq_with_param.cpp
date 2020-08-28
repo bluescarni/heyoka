@@ -24,21 +24,21 @@ using namespace heyoka;
 int main()
 {
     // System Dimension
-    auto n_neurons = 50u;
-    auto n_in = 4u;
-    auto n_out = 2u;
+    auto n_neurons = 100u;
+    auto n_in = 2u;
+    auto n_out = 1u;
 
-    // System state
+    // System state (letter a is used to make sure the state comes before the weights w)
     std::vector<expression> x;
-    for (auto i = 0u; i < n_in; ++i) {
-        x.emplace_back(variable{"x" + std::to_string(i)});
+    for (auto i = 0u; i < 4; ++i) {
+        x.emplace_back(variable{"a" + std::to_string(i)});
     }
 
-    // Network weights and biases
+    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to 10000 parameters)
     auto n_w = (n_in + 1) * n_neurons + (n_neurons + 1) * n_out;
     std::vector<expression> w;
     for (auto i = 0u; i < n_w; ++i) {
-        w.emplace_back(variable{"w" + std::to_string(i)});
+        w.emplace_back(variable{"w" + std::to_string(i + 1000)});
     }
 
     // We compute the outputs of the first (and only) layer of neurons
@@ -82,8 +82,10 @@ int main()
     dynamics.push_back(x[2]);
     dynamics.push_back(x[3]);
     // dynamics
-    dynamics.push_back(out[0]);
-    dynamics.push_back(out[1]);
+    auto f0 = diff(out[0], "a0");
+    auto f1 = diff(out[0], "a1");
+    dynamics.push_back(f0);
+    dynamics.push_back(f1);
     // parameters
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
         dynamics.push_back(0_dbl);
@@ -91,13 +93,13 @@ int main()
 
     // Setting the initial conditions (random weights and biases initialization)
     detail::random_engine_type engine(123u);
-    std::vector<double> ic = {0., 0., 0., 0.};
+    std::vector<double> ic = {0, 0, 0, 0};
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-        ic.push_back(std::uniform_real_distribution<>(-1., 1.)(engine));
+        ic.push_back(std::uniform_real_distribution<>(-1, 1)(engine));
     }
 
     // Defining the integrator
-    std::cout << "Calling LLVM: " << std::endl;
+    std::cout << "\nCompiling the Taylor Integrator (" << std::to_string(w.size()) << " parameters)." <<  std::endl;
     auto start = high_resolution_clock::now();
     taylor_adaptive_dbl neural_network_ode{dynamics, ic};
     auto stop = high_resolution_clock::now();
@@ -105,17 +107,47 @@ int main()
     std::cout << "Microseconds: " << duration.count() << std::endl;
 
     // Calling the integrator
-    std::cout << "Calling the integrator: " << std::endl;
+    std::cout << "\nCalling the Taylor Integrator." <<  std::endl;
     start = high_resolution_clock::now();
-    neural_network_ode.propagate_until(1000.);
+    // Longer times result in reaching liit cycles and thus loss of precision
+    //auto dt = 10;
+    //auto state = neural_network_ode.get_state();
+    //std::unordered_map<std::string, double> eval_map;
+    //eval_map["a0"] = state[0];
+    //eval_map["a1"] = state[1];
+    //for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
+    //    eval_map["w" + std::to_string(i + 10000)] = ic[4 + i];
+    //}
+    //auto V = eval_dbl(out[0], eval_map);
+    //auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    //for (auto i = 0u; i < 1000; ++i) {
+    //    neural_network_ode.step();
+    //    state = neural_network_ode.get_state();
+    //    eval_map["a0"] = state[0];
+    //    eval_map["a1"] = state[1];
+    //    V = eval_dbl(out[0], eval_map);
+    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
+    //              << std::endl;
+    //}
+    //for (auto i = 0u; i < 1000; ++i) {
+    //    neural_network_ode.step_backward();
+    //    state = neural_network_ode.get_state();
+    //    eval_map["a0"] = state[0];
+    //    eval_map["a1"] = state[1];
+    //    V = eval_dbl(out[0], eval_map);
+    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
+    //              << std::endl;
+    //}
+    neural_network_ode.propagate_until(10.);
     neural_network_ode.propagate_until(0.);
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Microseconds: " << duration.count() << std::endl;
-    std::cout << "Error in x:" << neural_network_ode.get_state()[0] << std::endl;
-    std::cout << "Error in y:" << neural_network_ode.get_state()[1] << std::endl;
-    std::cout << "Error in vx:" << neural_network_ode.get_state()[2] << std::endl;
-    std::cout << "Error in vy:" << neural_network_ode.get_state()[3] << std::endl;
-
+    auto error = neural_network_ode.get_state();
+    std::transform(error.begin(), error.begin() + n_in, ic.begin(), error.begin(), [](auto a, auto b) { return
+    std::abs(a - b); }); std::cout << "Error:" << *std::max_element(error.begin(), error.begin() + n_in) <<
+    std::endl;
     return 0;
 }
