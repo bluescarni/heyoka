@@ -90,7 +90,7 @@ TEST_CASE("taylor log")
 
         auto x = "x"_var, y = "y"_var;
 
-        // Number-number tests.
+        // Number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
