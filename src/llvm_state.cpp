@@ -620,6 +620,8 @@ void llvm_state::compile()
 
         if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
             // Make sure to close the file before throwing.
+            // NOTE: the file will be removed by the fr object
+            // destructor.
             llvm::sys::fs::closeFile(fd);
 
             throw std::invalid_argument("The target machine can't emit a file of this type");
@@ -1202,7 +1204,9 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
                 // do the codegen for the constant itself, otherwise
-                // return 0.
+                // return 0. No need for normalization as the only
+                // nonzero value that can be produced here is the first-order
+                // derivative.
                 auto ret = (order == 1u) ? codegen<T>(*this, v) : codegen<T>(*this, number{0.});
 
                 if (vector_size > 0u) {
