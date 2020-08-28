@@ -15,10 +15,10 @@
 #include <vector>
 
 #include <heyoka/binary_operator.hpp>
-#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
+#include <heyoka/splitmix64.hpp>
 
 namespace heyoka
 {
@@ -35,10 +35,10 @@ private:
     std::vector<expression (*)(expression, expression)> m_b_funcs;
     std::vector<double> m_weights;
     double m_range_dbl;
-    mutable detail::splitmix64 m_e;
+    mutable splitmix64 m_e;
 
 public:
-    explicit expression_generator(const std::vector<std::string> &, detail::splitmix64 &);
+    explicit expression_generator(const std::vector<std::string> &, splitmix64 &);
     expression operator()(unsigned, unsigned, unsigned = 0u) const;
 
     // getters
@@ -64,11 +64,11 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression_gene
 // expression manipulators
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
-HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::splitmix64 &,
-                              const unsigned, const unsigned, const unsigned = 0u);
+HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, splitmix64 &, const unsigned,
+                              const unsigned, const unsigned = 0u);
 HEYOKA_DLL_PUBLIC void mutate(expression &, size_t, const expression_generator &, const unsigned, const unsigned);
-HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::splitmix64 &);
-HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::splitmix64 &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, splitmix64 &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, splitmix64 &);
 
 } // namespace heyoka
 

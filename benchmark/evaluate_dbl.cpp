@@ -10,12 +10,12 @@
 #include <iostream>
 #include <random>
 
-#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/gp.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/splitmix64.hpp>
 #include <heyoka/variable.hpp>
 
 using namespace heyoka;
@@ -63,7 +63,7 @@ using namespace std::chrono;
 int main()
 {
     std::random_device rd;
-    detail::splitmix64 engine(rd());
+    splitmix64 engine(rd());
     // Here we define the type of expression (two variables, default choices for the operators)
     expression_generator generator({"x", "y"}, engine);
     auto ex = generator(2, 4);

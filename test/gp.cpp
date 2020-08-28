@@ -8,10 +8,10 @@
 
 #include <random>
 
-#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/gp.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/splitmix64.hpp>
 #include <heyoka/variable.hpp>
 
 #include "catch.hpp"
@@ -23,7 +23,7 @@ using namespace Catch::literals;
 
 TEST_CASE("expression_generator")
 {
-    detail::splitmix64 engine(123456789ul);
+    splitmix64 engine(123456789ul);
     // Construction
     {
         CHECK_NOTHROW(expression_generator({"x", "y"}, engine));
@@ -71,7 +71,7 @@ TEST_CASE("expression_generator")
 
 TEST_CASE("setters and getters")
 {
-    detail::splitmix64 engine(123456789ul);
+    splitmix64 engine(123456789ul);
     expression_generator generator({"x", "y"}, engine);
     // Test default values
     REQUIRE(generator.get_bos()
@@ -105,7 +105,7 @@ TEST_CASE("setters and getters")
 
 TEST_CASE("streaming operator")
 {
-    detail::splitmix64 engine(123456789ul);
+    splitmix64 engine(123456789ul);
     expression_generator generator({"x", "y"}, engine);
     CHECK_NOTHROW(std::cout << generator);
 }
@@ -164,7 +164,7 @@ TEST_CASE("fetch from node id")
 
 TEST_CASE("mutations")
 {
-    detail::splitmix64 engine(123456789ul);
+    splitmix64 engine(123456789ul);
     expression_generator generator({"x", "y"}, engine);
     // ex = (((y * (y * x)) * ((y + 0.688871) + (x * y))) - (y + (x + (y + y))))
     auto ex = generator(2, 4);

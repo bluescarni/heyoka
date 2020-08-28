@@ -10,13 +10,13 @@
 // http://prng.di.unimi.it/splitmix64.c
 // by Sebastiano Vigna.
 
-#ifndef HEYOKA_DETAIL_SPLITMIX64_PLUS_HPP
-#define HEYOKA_DETAIL_SPLITMIX64_PLUS_HPP
+#ifndef HEYOKA_SPLITMIX64_PLUS_HPP
+#define HEYOKA_SPLITMIX64_PLUS_HPP
 
 #include <cstdint>
 #include <limits>
 
-namespace heyoka::detail
+namespace heyoka
 {
 
 // NOTE: constexpr implementation, thus usable at compile-time.
@@ -52,6 +52,6 @@ struct splitmix64 {
     std::uint64_t m_state;
 };
 
-} // namespace heyoka::detail
+} // namespace heyoka
 
 #endif

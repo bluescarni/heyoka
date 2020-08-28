@@ -12,9 +12,9 @@
 #include <random>
 #include <vector>
 
-#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
+#include <heyoka/splitmix64.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -93,7 +93,7 @@ int main()
     }
 
     // Setting the initial conditions (random weights and biases initialization)
-    detail::splitmix64 engine(123u);
+    splitmix64 engine(123u);
     std::vector<double> ic = {0, 0, 0, 0};
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
         ic.push_back(std::uniform_real_distribution<>(-1, 1)(engine));

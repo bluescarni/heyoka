@@ -88,7 +88,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
 }
 } // namespace detail
 
-expression_generator::expression_generator(const std::vector<std::string> &vars, detail::splitmix64 &engine)
+expression_generator::expression_generator(const std::vector<std::string> &vars, splitmix64 &engine)
     : m_vars(vars), m_b_funcs(), m_e(engine)
 {
     // These are the default blocks for a random expression.
@@ -173,26 +173,26 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         }
         case node_type::var: {
             // We return one of the variables in m_vars
-            auto symbol = *random_element(m_vars.begin(), m_vars.end(), m_e);
+            auto symbol = *detail::random_element(m_vars.begin(), m_vars.end(), m_e);
             return expression{variable{symbol}};
             break;
         }
         case node_type::bo: {
             // We return one of the binary oprators in m_bos with randomly constructed arguments
-            auto bo_type = *random_element(m_bos.begin(), m_bos.end(), m_e);
+            auto bo_type = *detail::random_element(m_bos.begin(), m_bos.end(), m_e);
             return expression{binary_operator(bo_type, this->operator()(min_depth, max_depth, depth + 1),
                                               this->operator()(min_depth, max_depth, depth + 1))};
             break;
         }
         case node_type::u_fun: {
             // We return one of the unary functions in m_u_funcs with randomly constructed argument
-            auto u_f = *random_element(m_u_funcs.begin(), m_u_funcs.end(), m_e);
+            auto u_f = *detail::random_element(m_u_funcs.begin(), m_u_funcs.end(), m_e);
             return u_f(this->operator()(min_depth, max_depth, depth + 1));
             break;
         }
         case node_type::b_fun: {
             // We return one of the binary functions in m_b_funcs with randomly constructed arguments
-            auto b_f = *random_element(m_b_funcs.begin(), m_b_funcs.end(), m_e);
+            auto b_f = *detail::random_element(m_b_funcs.begin(), m_b_funcs.end(), m_e);
             return b_f(this->operator()(min_depth, max_depth, depth + 1),
                        this->operator()(min_depth, max_depth, depth + 1));
             break;
@@ -312,7 +312,7 @@ std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
 }
 
 // Version randomly selecting nodes during traversal (PROBABLY WILL BE REMOVED)
-void mutate(expression &e, const expression_generator &generator, const double mut_p, detail::splitmix64 &engine,
+void mutate(expression &e, const expression_generator &generator, const double mut_p, splitmix64 &engine,
             const unsigned min_depth, const unsigned max_depth, unsigned depth)
 {
     std::uniform_real_distribution<> rng01(0., 1.);
@@ -365,7 +365,7 @@ expression *fetch_from_node_id(expression &ex, std::size_t node_id)
 }
 
 // Crossover
-void crossover(expression &e1, expression &e2, detail::splitmix64 &engine)
+void crossover(expression &e1, expression &e2, splitmix64 &engine)
 {
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
     std::uniform_int_distribution<std::size_t> t2(0, count_nodes(e2) - 1u);
@@ -379,7 +379,7 @@ void crossover(expression &e1, expression &e2, detail::splitmix64 &engine)
 }
 
 // Crossover targeting specific node_ids
-void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, detail::splitmix64 &)
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, splitmix64 &)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);

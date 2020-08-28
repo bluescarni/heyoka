@@ -2,8 +2,8 @@
 #include <iostream>
 #include <random>
 
-#include <heyoka/detail/splitmix64.hpp>
 #include <heyoka/gp.hpp>
+#include <heyoka/splitmix64.hpp>
 
 using namespace heyoka;
 using namespace std::chrono;
@@ -38,7 +38,7 @@ int main()
 {
     unsigned N = 10000;
     std::random_device rd;
-    detail::splitmix64 engine(rd());
+    splitmix64 engine(rd());
     // Here we define the type of expression (two variables, default choices for the operators)
     expression_generator generator({"x", "y"}, engine);
     // 0 - We generate N expressions and count the nodes
