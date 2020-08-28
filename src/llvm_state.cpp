@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <initializer_list>
 #include <ios>
@@ -32,6 +34,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
@@ -292,9 +295,10 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_segmented_functions(std::get<3>(tup))
+      m_module_name(std::move(std::get<0>(tup))), m_segmented_functions(std::get<3>(tup)),
+      m_save_object_code(std::get<4>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -321,7 +325,8 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
       m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
-      m_segmented_functions(other.m_segmented_functions)
+      m_segmented_functions(other.m_segmented_functions), m_save_object_code(other.m_save_object_code),
+      m_object_code(other.m_object_code)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -575,6 +580,75 @@ void llvm_state::compile()
 
     // Store a snapshot of the IR before compiling.
     m_ir_snapshot = get_ir();
+
+    // Store also the object code, if requested.
+    if (m_save_object_code) {
+        // Create a name model for the llvm temporary file machinery.
+        const auto model = (std::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
+
+        // Create a unique file.
+        // NOTE: this will also open the file. fd is the file
+        // descriptor, res_path will be the full path to the file.
+        int fd;
+        llvm::SmallString<128> res_path;
+        const auto res = llvm::sys::fs::createUniqueFile(model, fd, res_path);
+
+        if (res) {
+            throw std::invalid_argument(
+                "The function to create a unique temporary file failed. The full error message:\n" + res.message());
+        }
+
+        // RAII helper to remove the unique file that was
+        // created above.
+        struct file_remover {
+            llvm::SmallString<128> &path;
+
+            ~file_remover()
+            {
+                std::filesystem::remove(std::filesystem::path{path.c_str()});
+            }
+        } fr{res_path};
+
+        // Create a stream from the file descriptor.
+        // The 'false' parameter indicates not to close
+        // the file upon destruction of dest (we will be
+        // closing the file manually).
+        llvm::raw_fd_ostream dest(fd, false);
+
+        // Setup the machinery for dumping the object code.
+        llvm::legacy::PassManager pass;
+
+        if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
+            // Make sure to close the file before throwing.
+            // NOTE: the file will be removed by the fr object
+            // destructor.
+            llvm::sys::fs::closeFile(fd);
+
+            throw std::invalid_argument("The target machine can't emit a file of this type");
+        }
+
+        // Dump the object code.
+        pass.run(*m_module);
+
+        // Close the file.
+        llvm::sys::fs::closeFile(fd);
+
+        // Re-open it for reading in binary mode.
+        std::ifstream ifile(res_path.c_str(), std::ios::binary);
+        if (!ifile.good()) {
+            throw std::invalid_argument("Could not open the temporary file '" + std::string(res_path.c_str())
+                                        + "' for writing");
+        }
+        // Enable exceptions on ifile.
+        ifile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+        // Dump into a stringstream.
+        std::ostringstream oss;
+        oss << ifile.rdbuf();
+
+        // Assign the read data.
+        m_object_code = oss.str();
+    }
 
     m_jitter->add_module(std::move(m_module));
 }
@@ -1045,24 +1119,40 @@ std::string llvm_state::get_function_ir(const std::string &name) const
 
 void llvm_state::dump_object_code(const std::string &filename) const
 {
-    check_uncompiled(__func__);
+    const auto compiled = !m_module;
+
+    if (compiled && !m_save_object_code) {
+        throw std::invalid_argument("Cannot dump the object code after compilation if the 'save_object_code' "
+                                    "keyword argument was not set to true when constructing the llvm_state object");
+    }
 
     std::error_code ec;
     llvm::raw_fd_ostream dest(filename, ec, llvm::sys::fs::OF_None);
 
     if (ec) {
         throw std::invalid_argument("Could not open the file '" + filename
-                                    + "' for dumping object code. The error message is: ec.message()");
+                                    + "' for dumping object code. The full error message:\n" + ec.message());
     }
 
-    llvm::legacy::PassManager pass;
-    auto file_type = llvm::CGFT_ObjectFile;
+    if (compiled) {
+        // The module has been compiled already, dump the saved
+        // object code image.
+        dest << m_object_code;
+    } else {
+        // The module has not been compiled yet, run the JIT
+        // and dump the object code.
+        llvm::legacy::PassManager pass;
 
-    if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, file_type)) {
-        throw std::invalid_argument("The target machine can't emit a file of this type");
+        if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
+            // Close and remove the file before throwing.
+            dest.close();
+            std::filesystem::remove(std::filesystem::path{filename});
+
+            throw std::invalid_argument("The target machine can't emit a file of this type");
+        }
+
+        pass.run(*m_module);
     }
-
-    pass.run(*m_module);
 }
 
 // Compute the derivative of order "order" of a state variable.
@@ -1114,7 +1204,9 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
                 // do the codegen for the constant itself, otherwise
-                // return 0.
+                // return 0. No need for normalization as the only
+                // nonzero value that can be produced here is the first-order
+                // derivative.
                 auto ret = (order == 1u) ? codegen<T>(*this, v) : codegen<T>(*this, number{0.});
 
                 if (vector_size > 0u) {
