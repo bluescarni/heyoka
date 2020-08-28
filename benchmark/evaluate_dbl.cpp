@@ -82,7 +82,7 @@ int main()
     auto args_vd = vv_to_vd(args_vv);
     auto start = high_resolution_clock::now();
     for (auto &args : args_vd) {
-        auto res = eval_dbl(ex, args);
+        eval_dbl(ex, args);
     }
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);

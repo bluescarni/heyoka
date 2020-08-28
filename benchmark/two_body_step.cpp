@@ -43,8 +43,6 @@ int main()
                                  vx0, vx1, vy0, vy1, vz0, vz1},
                                 std::move(init_state)};
 
-    const auto &st = tad.get_state();
-
     auto start = std::chrono::high_resolution_clock::now();
 
     // Do 400 steps.

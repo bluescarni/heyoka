@@ -60,7 +60,7 @@ int main()
     // 2 - We time the node counter
     start = high_resolution_clock::now();
     for (auto i = 0u; i < N; ++i) {
-        auto n = count_nodes(exs_original[i]);
+        count_nodes(exs_original[i]);
     }
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
