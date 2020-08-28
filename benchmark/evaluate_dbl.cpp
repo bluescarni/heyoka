@@ -63,7 +63,7 @@ using namespace std::chrono;
 int main()
 {
     std::random_device rd;
-    detail::random_engine_type engine(rd());
+    detail::splitmix64 engine(rd());
     // Here we define the type of expression (two variables, default choices for the operators)
     expression_generator generator({"x", "y"}, engine);
     auto ex = generator(2, 4);

@@ -9,7 +9,8 @@
 #ifndef HEYOKA_GP_HPP
 #define HEYOKA_GP_HPP
 
-#include <cstdint>
+#include <cstddef>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -21,16 +22,11 @@
 
 namespace heyoka
 {
-namespace detail
-{
-// void extract_subtree_impl(expression &, const expression &, const size_t, size_t &);
-// void count_nodes_impl(const expression &, size_t &);
-} // namespace detail
 
 class HEYOKA_DLL_PUBLIC expression_generator
 {
 public:
-    enum node_type { num, var, bo, u_fun, b_fun };
+    enum class node_type { num, var, bo, u_fun, b_fun };
 
 private:
     std::vector<std::string> m_vars;
@@ -39,10 +35,10 @@ private:
     std::vector<expression (*)(expression, expression)> m_b_funcs;
     std::vector<double> m_weights;
     double m_range_dbl;
-    mutable detail::random_engine_type m_e;
+    mutable detail::splitmix64 m_e;
 
 public:
-    explicit expression_generator(const std::vector<std::string> &, detail::random_engine_type &);
+    explicit expression_generator(const std::vector<std::string> &, detail::splitmix64 &);
     expression operator()(unsigned, unsigned, unsigned = 0u) const;
 
     // getters
@@ -68,11 +64,11 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression_gene
 // expression manipulators
 HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
-HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::random_engine_type &,
+HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, detail::splitmix64 &,
                               const unsigned, const unsigned, const unsigned = 0u);
 HEYOKA_DLL_PUBLIC void mutate(expression &, size_t, const expression_generator &, const unsigned, const unsigned);
-HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::random_engine_type &);
-HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::random_engine_type &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, detail::splitmix64 &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, detail::splitmix64 &);
 
 } // namespace heyoka
 

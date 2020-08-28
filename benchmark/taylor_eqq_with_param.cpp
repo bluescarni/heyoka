@@ -34,7 +34,8 @@ int main()
         x.emplace_back(variable{"a" + std::to_string(i)});
     }
 
-    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to 10000 parameters)
+    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to 10000
+    // parameters)
     auto n_w = (n_in + 1) * n_neurons + (n_neurons + 1) * n_out;
     std::vector<expression> w;
     for (auto i = 0u; i < n_w; ++i) {
@@ -92,14 +93,14 @@ int main()
     }
 
     // Setting the initial conditions (random weights and biases initialization)
-    detail::random_engine_type engine(123u);
+    detail::splitmix64 engine(123u);
     std::vector<double> ic = {0, 0, 0, 0};
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
         ic.push_back(std::uniform_real_distribution<>(-1, 1)(engine));
     }
 
     // Defining the integrator
-    std::cout << "\nCompiling the Taylor Integrator (" << std::to_string(w.size()) << " parameters)." <<  std::endl;
+    std::cout << "\nCompiling the Taylor Integrator (" << std::to_string(w.size()) << " parameters)." << std::endl;
     auto start = high_resolution_clock::now();
     taylor_adaptive_dbl neural_network_ode{dynamics, ic};
     auto stop = high_resolution_clock::now();
@@ -107,20 +108,20 @@ int main()
     std::cout << "Microseconds: " << duration.count() << std::endl;
 
     // Calling the integrator
-    std::cout << "\nCalling the Taylor Integrator." <<  std::endl;
+    std::cout << "\nCalling the Taylor Integrator." << std::endl;
     start = high_resolution_clock::now();
     // Longer times result in reaching liit cycles and thus loss of precision
-    //auto dt = 10;
-    //auto state = neural_network_ode.get_state();
-    //std::unordered_map<std::string, double> eval_map;
-    //eval_map["a0"] = state[0];
-    //eval_map["a1"] = state[1];
-    //for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
+    // auto dt = 10;
+    // auto state = neural_network_ode.get_state();
+    // std::unordered_map<std::string, double> eval_map;
+    // eval_map["a0"] = state[0];
+    // eval_map["a1"] = state[1];
+    // for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
     //    eval_map["w" + std::to_string(i + 10000)] = ic[4 + i];
     //}
-    //auto V = eval_dbl(out[0], eval_map);
-    //auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //for (auto i = 0u; i < 1000; ++i) {
+    // auto V = eval_dbl(out[0], eval_map);
+    // auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    // for (auto i = 0u; i < 1000; ++i) {
     //    neural_network_ode.step();
     //    state = neural_network_ode.get_state();
     //    eval_map["a0"] = state[0];
@@ -130,7 +131,7 @@ int main()
     //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
     //              << std::endl;
     //}
-    //for (auto i = 0u; i < 1000; ++i) {
+    // for (auto i = 0u; i < 1000; ++i) {
     //    neural_network_ode.step_backward();
     //    state = neural_network_ode.get_state();
     //    eval_map["a0"] = state[0];
@@ -146,8 +147,8 @@ int main()
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Microseconds: " << duration.count() << std::endl;
     auto error = neural_network_ode.get_state();
-    std::transform(error.begin(), error.begin() + n_in, ic.begin(), error.begin(), [](auto a, auto b) { return
-    std::abs(a - b); }); std::cout << "Error:" << *std::max_element(error.begin(), error.begin() + n_in) <<
-    std::endl;
+    std::transform(error.begin(), error.begin() + n_in, ic.begin(), error.begin(),
+                   [](auto a, auto b) { return std::abs(a - b); });
+    std::cout << "Error:" << *std::max_element(error.begin(), error.begin() + n_in) << std::endl;
     return 0;
 }

@@ -6,13 +6,18 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <iostream>
+#include <iterator>
 #include <random>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
 #include <heyoka/gp.hpp>
@@ -20,17 +25,16 @@
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
-#include <heyoka/detail/type_traits.hpp>
-
 namespace heyoka
 {
 
 namespace detail
 {
+
 template <typename It, typename Rng>
 It random_element(It start, It end, Rng &g)
 {
-    std::uniform_int_distribution<> dis(0, std::distance(start, end) - 1);
+    std::uniform_int_distribution<decltype(std::distance(start, end))> dis(0, std::distance(start, end) - 1);
     std::advance(start, dis(g));
     return start;
 }
@@ -67,7 +71,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
 {
     ++node_counter;
     std::visit(
-        [&e, &node_counter](auto &node) {
+        [&node_counter](auto &node) {
             using type = detail::uncvref_t<decltype(node)>;
             if constexpr (std::is_same_v<type, binary_operator>) {
                 // code for binary_operator
@@ -84,7 +88,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
 }
 } // namespace detail
 
-expression_generator::expression_generator(const std::vector<std::string> &vars, detail::random_engine_type &engine)
+expression_generator::expression_generator(const std::vector<std::string> &vars, detail::splitmix64 &engine)
     : m_vars(vars), m_b_funcs(), m_e(engine)
 {
     // These are the default blocks for a random expression.
@@ -106,9 +110,9 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
     node_type type;
     if (depth < min_depth) {
         // If the node depth is below the minimum desired, we force leaves (num or var) to be not selected
-        double n_bos = m_bos.size();
-        double n_u_fun = m_u_funcs.size();
-        double n_b_fun = m_b_funcs.size();
+        double n_bos = static_cast<double>(m_bos.size());
+        double n_u_fun = static_cast<double>(m_u_funcs.size());
+        double n_b_fun = static_cast<double>(m_b_funcs.size());
         std::discrete_distribution<> dis({n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2]});
         switch (dis(m_e)) {
             case 0:
@@ -123,7 +127,7 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         }
     } else if (depth >= max_depth) {
         // If the node depth is above the maximum desired, we force leaves (num or var) to be selected
-        double n_var = m_vars.size();
+        double n_var = static_cast<double>(m_vars.size());
         std::discrete_distribution<> dis({n_var * m_weights[3], m_weights[4]});
         switch (dis(m_e)) {
             case 0:
@@ -135,10 +139,10 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         }
     } else {
         // else we can get anything
-        double n_bos = m_bos.size();
-        double n_u_fun = m_u_funcs.size();
-        double n_b_fun = m_b_funcs.size();
-        double n_var = m_vars.size();
+        double n_bos = static_cast<double>(m_bos.size());
+        double n_u_fun = static_cast<double>(m_u_funcs.size());
+        double n_b_fun = static_cast<double>(m_b_funcs.size());
+        double n_var = static_cast<double>(m_vars.size());
         std::discrete_distribution<> dis(
             {n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2], n_var * m_weights[3], m_weights[4]});
         switch (dis(m_e)) {
@@ -308,15 +312,15 @@ std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
 }
 
 // Version randomly selecting nodes during traversal (PROBABLY WILL BE REMOVED)
-void mutate(expression &e, const expression_generator &generator, const double mut_p,
-            detail::random_engine_type &engine, const unsigned min_depth, const unsigned max_depth, unsigned depth)
+void mutate(expression &e, const expression_generator &generator, const double mut_p, detail::splitmix64 &engine,
+            const unsigned min_depth, const unsigned max_depth, unsigned depth)
 {
     std::uniform_real_distribution<> rng01(0., 1.);
     if (rng01(engine) < mut_p) {
         e = generator(min_depth, max_depth, depth);
     } else {
         std::visit(
-            [&e, &generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
+            [&generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
                 if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
                     // code for binary_operator
                     mutate(node.lhs(), generator, mut_p, engine, min_depth, max_depth, depth + 1);
@@ -333,7 +337,7 @@ void mutate(expression &e, const expression_generator &generator, const double m
 }
 // Version targeting a node
 void mutate(expression &e, size_t node_id, const expression_generator &generator, const unsigned min_depth,
-                const unsigned max_depth)
+            const unsigned max_depth)
 {
     auto e_sub_ptr = fetch_from_node_id(e, node_id);
     if (!e_sub_ptr) {
@@ -361,7 +365,7 @@ expression *fetch_from_node_id(expression &ex, std::size_t node_id)
 }
 
 // Crossover
-void crossover(expression &e1, expression &e2, detail::random_engine_type &engine)
+void crossover(expression &e1, expression &e2, detail::splitmix64 &engine)
 {
     std::uniform_int_distribution<std::size_t> t1(0, count_nodes(e1) - 1u);
     std::uniform_int_distribution<std::size_t> t2(0, count_nodes(e2) - 1u);
@@ -375,8 +379,7 @@ void crossover(expression &e1, expression &e2, detail::random_engine_type &engin
 }
 
 // Crossover targeting specific node_ids
-void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2,
-               detail::random_engine_type &engine)
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, detail::splitmix64 &)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);
