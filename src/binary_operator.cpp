@@ -458,29 +458,16 @@ template <bool AddOrSub, typename T>
 llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, const variable &var, std::uint32_t order,
                                               std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                               std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
-    auto &builder = s.builder();
-
-    // Fetch the index of the u variable.
-    const auto u_idx = uname_to_index(var.name());
-
-    // Load the derivative of the variable from diff_arr.
-    // The index is order * n_uvars * batch_size + u_idx * batch_size + batch_idx.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-        "bo_addsub_num_var_ptr");
-
-    auto ret = (vector_size == 0u)
-                   ? builder.CreateLoad(ptr, "bo_addsub_num_var_load")
-                   : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_addsub_num_var_load");
+    auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
+                                      vector_size, cd_uvars);
 
     if constexpr (AddOrSub) {
         return ret;
     } else {
         // Negate if we are doing a subtraction.
-        return builder.CreateFNeg(ret);
+        return s.builder().CreateFNeg(ret);
     }
 }
 
@@ -489,23 +476,10 @@ template <bool AddOrSub, typename T>
 llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var, const number &, std::uint32_t order,
                                               std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                               std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
-    auto &builder = s.builder();
-
-    // Fetch the index of the u variable.
-    const auto u_idx = uname_to_index(var.name());
-
-    // Load the derivative of the variable from diff_arr.
-    // The index is order * n_uvars * batch_size + u_idx * batch_size + batch_idx.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-        "bo_addsub_var_num_ptr");
-
-    // NOTE: does not matter here plus or minus.
-    return (vector_size == 0u) ? builder.CreateLoad(ptr, "bo_addsub_num_var_load")
-                               : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_addsub_num_var_load");
+    return tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
+                                  vector_size, cd_uvars);
 }
 
 // Derivative of var +- var.
@@ -514,37 +488,17 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var
                                               std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                               std::uint32_t batch_idx, std::uint32_t batch_size,
                                               std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
-    auto &builder = s.builder();
-
-    // Fetch the indices of the u variables.
-    const auto u_idx0 = uname_to_index(var0.name());
-    const auto u_idx1 = uname_to_index(var1.name());
-
-    // Load the derivatives from diff_arr. The indices are:
-    // order * n_uvars * batch_size + (u_idx0, u_idx1) * batch_size + batch_idx.
-    auto arr_ptr0 = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx0 * batch_size + batch_idx)},
-        "bo_addsub_var_var_ptr");
-    auto arr_ptr1 = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
-        "bo_addsub_var_var_ptr");
-
-    // Load the values.
-    auto v0 = (vector_size == 0u)
-                  ? builder.CreateLoad(arr_ptr0, "bo_addsub_var_var_load")
-                  : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_addsub_var_var_load");
-    auto v1 = (vector_size == 0u)
-                  ? builder.CreateLoad(arr_ptr1, "bo_addsub_var_var_load")
-                  : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_addsub_var_var_load");
+    auto v0 = tjb_load_derivative<T>(s, uname_to_index(var0.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
+                                     vector_size, cd_uvars);
+    auto v1 = tjb_load_derivative<T>(s, uname_to_index(var1.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
+                                     vector_size, cd_uvars);
 
     if constexpr (AddOrSub) {
-        return builder.CreateFAdd(v0, v1);
+        return s.builder().CreateFAdd(v0, v1);
     } else {
-        return builder.CreateFSub(v0, v1);
+        return s.builder().CreateFSub(v0, v1);
     }
 }
 
@@ -600,25 +554,13 @@ template <typename T>
 llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var, const number &num, std::uint32_t order,
                                            std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                            std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
+    auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
+                                      vector_size, cd_uvars);
+
     auto &builder = s.builder();
-
-    // Fetch the index of the u variable.
-    const auto u_idx = uname_to_index(var.name());
-
-    // Load the derivative of the variable from diff_arr.
-    // The index is order * n_uvars * batch_size + u_idx * batch_size + batch_idx.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-        "bo_mul_var_num_ptr");
-
-    auto ret = (vector_size == 0u) ? builder.CreateLoad(ptr, "bo_mul_var_num_load")
-                                   : detail::load_vector_from_memory(builder, ptr, vector_size, "bo_mul_var_num_load");
-
     auto mul = codegen<T>(s, num);
-
     if (vector_size > 0u) {
         mul = detail::create_constant_vector(builder, mul, vector_size);
     }
@@ -642,7 +584,7 @@ template <typename T>
 llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, const variable &var1,
                                            std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                            std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     auto &builder = s.builder();
 
@@ -650,28 +592,13 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
     const auto u_idx0 = uname_to_index(var0.name());
     const auto u_idx1 = uname_to_index(var1.name());
 
+    // NOTE: iteration in the [0, order] range
+    // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j <= order; ++j) {
-        // The indices for accessing the derivatives are:
-        // - (order - j) * n_uvars * batch_size + u_idx0 * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx.
-        auto arr_ptr0
-            = builder.CreateInBoundsGEP(diff_arr,
-                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
-                                                                               + u_idx0 * batch_size + batch_idx)},
-                                        "bo_mul_var_var_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
-            "bo_mul_var_var_ptr");
-
-        // Load the values.
-        auto v0 = (vector_size == 0u)
-                      ? builder.CreateLoad(arr_ptr0, "bo_mul_var_var_load")
-                      : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_mul_var_var_load");
-        auto v1 = (vector_size == 0u)
-                      ? builder.CreateLoad(arr_ptr1, "bo_mul_var_var_load")
-                      : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_mul_var_var_load");
+        auto v0 = tjb_load_derivative<T>(s, u_idx0, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                         cd_uvars);
+        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1, "bo_mul_var_var_term_prod"));
@@ -720,7 +647,7 @@ template <typename T, typename U,
 llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, const U &nv, const variable &var1,
                                            std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                            std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
 {
     auto &builder = s.builder();
 
@@ -731,23 +658,9 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        // The indices for accessing the derivatives are:
-        // - (order - j) * n_uvars * batch_size + idx * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx.
-        auto arr_ptr0 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size + idx * batch_size + batch_idx)},
-            "bo_div_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx1 * batch_size + batch_idx)},
-            "bo_div_ptr");
-
-        // Load the values.
-        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "bo_div_load")
-                                      : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_div_load");
-        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "bo_div_load")
-                                      : detail::load_vector_from_memory(builder, arr_ptr1, vector_size, "bo_div_load");
+        auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
+                                         cd_uvars);
+        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1, "bo_div_term_prod"));
@@ -758,12 +671,7 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
-    // The index is thus just u_idx1 * batch_size + batch_idx.
-    auto div_ptr = builder.CreateInBoundsGEP(
-        diff_arr, {builder.getInt32(0), builder.getInt32(u_idx1 * batch_size + batch_idx)}, "bo_div_div_ptr");
-
-    auto div = (vector_size == 0u) ? builder.CreateLoad(div_ptr, "bo_div_div")
-                                   : detail::load_vector_from_memory(builder, div_ptr, vector_size, "bo_div_div");
+    auto div = tjb_load_derivative<T>(s, u_idx1, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
 
     if constexpr (std::is_same_v<U, number>) {
         // nv is a number. Negate the accumulator
@@ -772,15 +680,8 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     } else {
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
-        // The index will be order * n_uvars * batch_size + u_idx0 * batch_size + batch_idx.
-        const auto u_idx0 = uname_to_index(nv.name());
-        auto arr_ptr0 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx0 * batch_size + batch_idx)});
-
-        auto diff_nv_v = (vector_size == 0u)
-                             ? builder.CreateLoad(arr_ptr0, "bo_div_diff_nv")
-                             : detail::load_vector_from_memory(builder, arr_ptr0, vector_size, "bo_div_diff_nv");
+        auto diff_nv_v = tjb_load_derivative<T>(s, uname_to_index(nv.name()), order, n_uvars, diff_arr, batch_idx,
+                                                batch_size, vector_size, cd_uvars);
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
         return builder.CreateFDiv(builder.CreateFSub(diff_nv_v, ret_acc), div);

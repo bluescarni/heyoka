@@ -17,6 +17,7 @@
 #include <limits>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 #include <llvm/IR/IRBuilder.h>
@@ -102,6 +103,45 @@ inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_s
 }
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
+
+// Helper to load the value of the derivative of a u variable
+// from an array in the computation of a Taylor jet:
+// - u_idx is the index of the u variable,
+// - order is the derivative order,
+// - n_uvars the total number of u variables,
+// - diff_arr is the array of derivatives,
+// - batch_idx and batch_size the batch index/size,
+// - vector_size the SIMD vector size (will be zero in scalar mode),
+// - cd_uvars the list of u variables whose first-order derivatives
+//   are constants.
+template <typename T>
+inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std::uint32_t order, std::uint32_t n_uvars,
+                                        llvm::Value *diff_arr, std::uint32_t batch_idx, std::uint32_t batch_size,
+                                        std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    // Sanity checks.
+    assert(u_idx < n_uvars);
+    assert(batch_idx < batch_size);
+
+    auto &builder = s.builder();
+
+    if (auto it = cd_uvars.find(u_idx); true || it == cd_uvars.end() || order == 0u) {
+        auto arr_ptr = builder.CreateInBoundsGEP(
+            diff_arr,
+            {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+            "diff_arr_ptr");
+
+        return (vector_size == 0u) ? builder.CreateLoad(arr_ptr, "diff_arr_load")
+                                   : load_vector_from_memory(builder, arr_ptr, vector_size, "diff_arr_load");
+    } else {
+        auto retval = (order == 1u) ? codegen<T>(s, it->second) : codegen<T>(s, number(static_cast<T>(0)));
+        if (vector_size > 0u) {
+            retval = create_constant_vector(builder, retval, vector_size);
+        }
+        return retval;
+    }
+}
 
 } // namespace heyoka::detail
 

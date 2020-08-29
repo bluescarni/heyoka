@@ -141,7 +141,7 @@ int main()
     //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
     //              << std::endl;
     //}
-    neural_network_ode.propagate_until(10.);
+    neural_network_ode.propagate_until(1000.);
     neural_network_ode.propagate_until(0.);
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
