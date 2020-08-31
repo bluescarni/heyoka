@@ -111,14 +111,13 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &, std::vecto
 // - n_uvars the total number of u variables,
 // - diff_arr is the array of derivatives,
 // - batch_idx and batch_size the batch index/size,
-// - vector_size the SIMD vector size (will be zero in scalar mode),
-// - cd_uvars the list of u variables whose first-order derivatives
-//   are constants.
+// - vector_size the SIMD vector size (will be zero in scalar mode).
+// NOTE: see a838c9b0d803b7ab13e83834ac46e3df0963b158 for a commit
+// containing the cd_uvars machinery.
 template <typename T>
 inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std::uint32_t order, std::uint32_t n_uvars,
                                         llvm::Value *diff_arr, std::uint32_t batch_idx, std::uint32_t batch_size,
-                                        std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        std::uint32_t vector_size)
 {
     // Sanity checks.
     assert(u_idx < n_uvars);
@@ -126,21 +125,13 @@ inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std:
 
     auto &builder = s.builder();
 
-    if (auto it = cd_uvars.find(u_idx); true || it == cd_uvars.end() || order == 0u) {
-        auto arr_ptr = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-            "diff_arr_ptr");
+    auto arr_ptr = builder.CreateInBoundsGEP(
+        diff_arr,
+        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
+        "diff_arr_ptr");
 
-        return (vector_size == 0u) ? builder.CreateLoad(arr_ptr, "diff_arr_load")
-                                   : load_vector_from_memory(builder, arr_ptr, vector_size, "diff_arr_load");
-    } else {
-        auto retval = (order == 1u) ? codegen<T>(s, it->second) : codegen<T>(s, number(static_cast<T>(0)));
-        if (vector_size > 0u) {
-            retval = create_constant_vector(builder, retval, vector_size);
-        }
-        return retval;
-    }
+    return (vector_size == 0u) ? builder.CreateLoad(arr_ptr, "diff_arr_load")
+                               : load_vector_from_memory(builder, arr_ptr, vector_size, "diff_arr_load");
 }
 
 } // namespace heyoka::detail

@@ -113,7 +113,7 @@ template <typename T>
 llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
                                         std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                         std::uint32_t batch_size, std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -137,9 +137,8 @@ llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const 
         // of the u var, which is conventionally placed
         // right after the sine in the decomposition.
         assert(idx + 1u < n_uvars);
-        auto v0 = tjb_load_derivative<T>(s, idx + 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, idx + 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
@@ -342,7 +341,7 @@ template <typename T>
 llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
                                         std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                         std::uint32_t batch_size, std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -366,9 +365,8 @@ llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const 
         // of the u var, which is conventionally placed
         // right before the cosine in the decomposition.
         assert(idx > 0u);
-        auto v0 = tjb_load_derivative<T>(s, idx - 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, idx - 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
@@ -562,7 +560,7 @@ template <typename T>
 llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
                                         std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                         std::uint32_t batch_size, std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     // NOTE: not much use in allowing zero-order
     // derivatives, which in general might complicate
@@ -588,10 +586,8 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
     if (order > 1u) {
         std::vector<llvm::Value *> sum;
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                             cd_uvars);
-            auto v1
-                = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+            auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+            auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
             auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
             if (vector_size > 0u) {
@@ -616,8 +612,8 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
     }
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
-    auto bn = tjb_load_derivative<T>(s, u_idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
-    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    auto bn = tjb_load_derivative<T>(s, u_idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
     auto div = codegen<T>(s, number(static_cast<T>(order)));
     if (vector_size > 0u) {
@@ -780,7 +776,7 @@ template <typename T>
 llvm::Value *taylor_diff_batch_exp_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
                                         std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                         std::uint32_t batch_size, std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: not much use in allowing zero-order
@@ -800,9 +796,8 @@ llvm::Value *taylor_diff_batch_exp_impl(llvm_state &s, std::uint32_t idx, const 
     // (i.e., order excluded).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
         if (vector_size > 0u) {
@@ -1016,7 +1011,7 @@ template <typename T>
 llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const variable &var, const number &num,
                                         std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                         std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                        const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                        const std::unordered_map<std::uint32_t, number> &)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -1036,9 +1031,8 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
     // (i.e., order *not* included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         // Compute the scalar factor: order * num - j * (num + 1).
         auto scal_f = codegen<T>(s, number(static_cast<T>(order)) * num
@@ -1059,7 +1053,7 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
     if (vector_size > 0u) {
         ord_f = create_constant_vector(builder, ord_f, vector_size);
     }
-    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
     auto div = builder.CreateFMul(ord_f, b0, "pow_div");
 
     // Compute and return the result: ret_acc / div.

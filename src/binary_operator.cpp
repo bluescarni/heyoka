@@ -458,10 +458,10 @@ template <bool AddOrSub, typename T>
 llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, const variable &var, std::uint32_t order,
                                               std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                               std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                              const std::unordered_map<std::uint32_t, number> &)
 {
     auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                      vector_size, cd_uvars);
+                                      vector_size);
 
     if constexpr (AddOrSub) {
         return ret;
@@ -476,10 +476,10 @@ template <bool AddOrSub, typename T>
 llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var, const number &, std::uint32_t order,
                                               std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                               std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                              const std::unordered_map<std::uint32_t, number> &)
 {
     return tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                  vector_size, cd_uvars);
+                                  vector_size);
 }
 
 // Derivative of var +- var.
@@ -488,12 +488,12 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var
                                               std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                               std::uint32_t batch_idx, std::uint32_t batch_size,
                                               std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                              const std::unordered_map<std::uint32_t, number> &)
 {
     auto v0 = tjb_load_derivative<T>(s, uname_to_index(var0.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                     vector_size, cd_uvars);
+                                     vector_size);
     auto v1 = tjb_load_derivative<T>(s, uname_to_index(var1.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                     vector_size, cd_uvars);
+                                     vector_size);
 
     if constexpr (AddOrSub) {
         return s.builder().CreateFAdd(v0, v1);
@@ -554,10 +554,10 @@ template <typename T>
 llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var, const number &num, std::uint32_t order,
                                            std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
                                            std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                           const std::unordered_map<std::uint32_t, number> &)
 {
     auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                      vector_size, cd_uvars);
+                                      vector_size);
 
     auto &builder = s.builder();
     auto mul = codegen<T>(s, num);
@@ -584,7 +584,7 @@ template <typename T>
 llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, const variable &var1,
                                            std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                            std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                           const std::unordered_map<std::uint32_t, number> &)
 {
     auto &builder = s.builder();
 
@@ -596,9 +596,8 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
     // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j <= order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, u_idx0, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, u_idx0, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1, "bo_mul_var_var_term_prod"));
@@ -647,7 +646,7 @@ template <typename T, typename U,
 llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, const U &nv, const variable &var1,
                                            std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
                                            std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
+                                           const std::unordered_map<std::uint32_t, number> &)
 {
     auto &builder = s.builder();
 
@@ -658,9 +657,8 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     // (i.e., order inclusive).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                         cd_uvars);
-        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+        auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1, "bo_div_term_prod"));
@@ -671,7 +669,7 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
-    auto div = tjb_load_derivative<T>(s, u_idx1, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    auto div = tjb_load_derivative<T>(s, u_idx1, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
     if constexpr (std::is_same_v<U, number>) {
         // nv is a number. Negate the accumulator
@@ -681,7 +679,7 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
         auto diff_nv_v = tjb_load_derivative<T>(s, uname_to_index(nv.name()), order, n_uvars, diff_arr, batch_idx,
-                                                batch_size, vector_size, cd_uvars);
+                                                batch_size, vector_size);
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
         return builder.CreateFDiv(builder.CreateFSub(diff_nv_v, ret_acc), div);
