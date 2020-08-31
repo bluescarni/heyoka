@@ -133,27 +133,12 @@ llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const 
     // (i.e., order included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        // The indices for accessing the derivatives in this loop iteration:
-        // - (order - j) * n_uvars * batch_size + (idx + 1) * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
         // NOTE: the +1 is because we are accessing the cosine
         // of the u var, which is conventionally placed
         // right after the sine in the decomposition.
-        auto arr_ptr0
-            = builder.CreateInBoundsGEP(diff_arr,
-                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
-                                                                               + (idx + 1u) * batch_size + batch_idx)},
-                                        "sin_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-            "sin_ptr");
-
-        // Load the values.
-        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "sin_load")
-                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "sin_load");
-        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "sin_load")
-                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "sin_load");
+        assert(idx + 1u < n_uvars);
+        auto v0 = tjb_load_derivative<T>(s, idx + 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
@@ -168,8 +153,6 @@ llvm::Value *taylor_diff_batch_sin_impl(llvm_state &s, std::uint32_t idx, const 
     auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: ret_acc / order
-    // NOTE: worthwhile to replace division with multiplication
-    // by inverse or better let LLVM do it?
     auto div = codegen<T>(s, number(static_cast<T>(order)));
     if (vector_size > 0u) {
         div = create_constant_vector(builder, div, vector_size);
@@ -378,27 +361,12 @@ llvm::Value *taylor_diff_batch_cos_impl(llvm_state &s, std::uint32_t idx, const 
     // (i.e., order included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        // The indices for accessing the derivatives in this loop iteration:
-        // - (order - j) * n_uvars * batch_size + (idx - 1) * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
         // NOTE: the -1 is because we are accessing the sine
         // of the u var, which is conventionally placed
         // right before the cosine in the decomposition.
-        auto arr_ptr0
-            = builder.CreateInBoundsGEP(diff_arr,
-                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
-                                                                               + (idx - 1u) * batch_size + batch_idx)},
-                                        "cos_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-            "cos_ptr");
-
-        // Load the values.
-        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "cos_load")
-                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "cos_load");
-        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "cos_load")
-                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "cos_load");
+        assert(idx > 0u);
+        auto v0 = tjb_load_derivative<T>(s, idx - 1u, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         auto fac = codegen<T>(s, number(static_cast<T>(j)));
         if (vector_size > 0u) {
@@ -578,6 +546,7 @@ llvm::Value *taylor_init_batch_log(llvm_state &s, const function &f, llvm::Value
     return taylor_init_batch_unary_func<T>(s, f, arr, batch_idx, batch_size, vector_size);
 }
 
+// Derivative of log(number).
 template <typename T>
 llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t, const number &, std::uint32_t, std::uint32_t,
                                         llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
@@ -593,8 +562,7 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
                                         std::uint32_t batch_size, std::uint32_t vector_size,
                                         const std::unordered_map<std::uint32_t, number> &)
 {
-    // NOTE: pairwise summation requires order 1 at least.
-    // NOTE: also not much use in allowing zero-order
+    // NOTE: not much use in allowing zero-order
     // derivatives, which in general might complicate
     // the implementation.
     if (order == 0u) {
@@ -607,52 +575,45 @@ llvm::Value *taylor_diff_batch_log_impl(llvm_state &s, std::uint32_t idx, const 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
+    // The result of the summation.
+    llvm::Value *ret_acc;
+
     // NOTE: iteration in the [1, order) range
-    // (i.e., order excluded).
-    std::vector<llvm::Value *> sum;
-    for (std::uint32_t j = 1; j <= order; ++j) {
-        // The indices for accessing the derivatives in this loop iteration:
-        // - (order - j) * n_uvars * batch_size + idx * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + u_idx * batch_size + batch_idx.
-        auto arr_ptr0 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size + idx * batch_size + batch_idx)},
-            "log_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr,
-            {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-            "log_ptr");
+    // (i.e., order excluded). If order is 1,
+    // we need to special case as the pairwise
+    // summation function requires a series
+    // with at least 1 element.
+    if (order > 1u) {
+        std::vector<llvm::Value *> sum;
+        for (std::uint32_t j = 1; j < order; ++j) {
+            auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+            auto v1 = tjb_load_derivative<T>(s, u_idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
-        // Load the values.
-        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "log_load")
-                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "log_load");
-        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "log_load")
-                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "log_load");
+            auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
+            if (vector_size > 0u) {
+                fac = create_constant_vector(builder, fac, vector_size);
+            }
 
-        auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
-        if (vector_size > 0u) {
-            fac = create_constant_vector(builder, fac, vector_size);
+            // Add (order-j)*v0*v1 to the sum.
+            sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
         }
 
-        // Add (order-j)*v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+        // Compute the result of the summation.
+        ret_acc = llvm_pairwise_sum(builder, sum);
+    } else {
+        // If the order is 1, the summation will be empty.
+        // Init the result of the summation with zero.
+        ret_acc = codegen<T>(s, number(static_cast<T>(0)));
+
+        // Turn it into a vector if needed.
+        if (vector_size > 0u) {
+            ret_acc = create_constant_vector(builder, ret_acc, vector_size);
+        }
     }
 
-    // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
-
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
-    auto arr_ptrn = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-        "log_ptr");
-    auto arr_ptr0 = builder.CreateInBoundsGEP(
-        diff_arr, {builder.getInt32(0), builder.getInt32(u_idx * batch_size + batch_idx)}, "log_ptr");
-
-    auto bn = (vector_size == 0u) ? builder.CreateLoad(arr_ptrn, "log_load")
-                                  : load_vector_from_memory(builder, arr_ptrn, vector_size, "log_load");
-    auto b0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "log_load")
-                                  : load_vector_from_memory(builder, arr_ptr0, vector_size, "log_load");
+    auto bn = tjb_load_derivative<T>(s, u_idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
     auto div = codegen<T>(s, number(static_cast<T>(order)));
     if (vector_size > 0u) {
@@ -782,6 +743,117 @@ expression log(expression e)
     return expression{std::move(fc)};
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_init_batch_exp(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the exponential (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_init_batch_unary_func<T>(s, f, arr, batch_idx, batch_size, vector_size);
+}
+
+// Derivative of exp(number).
+template <typename T>
+llvm::Value *taylor_diff_batch_exp_impl(llvm_state &s, std::uint32_t, const number &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
+{
+    return taylor_diff_batch_zero<T>(s, vector_size);
+}
+
+// Derivative of exp(variable).
+template <typename T>
+llvm::Value *taylor_diff_batch_exp_impl(llvm_state &s, std::uint32_t idx, const variable &var, std::uint32_t order,
+                                        std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                        std::uint32_t batch_size, std::uint32_t vector_size,
+                                        const std::unordered_map<std::uint32_t, number> &)
+{
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of exp() (the order must be at least one)");
+    }
+
+    auto &builder = s.builder();
+
+    // Fetch the index of the variable.
+    const auto u_idx = uname_to_index(var.name());
+
+    // NOTE: iteration in the [0, order) range
+    // (i.e., order excluded).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 0; j < order; ++j) {
+        auto v0 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+
+        auto fac = codegen<T>(s, number(static_cast<T>(order - j)));
+        if (vector_size > 0u) {
+            fac = create_constant_vector(builder, fac, vector_size);
+        }
+
+        // Add (order-j)*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+    }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
+
+    // Finalise the return value: ret_acc / n.
+    auto div = codegen<T>(s, number(static_cast<T>(order)));
+    if (vector_size > 0u) {
+        div = create_constant_vector(builder, div, vector_size);
+    }
+
+    return builder.CreateFDiv(ret_acc, div);
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_diff_batch_exp_impl(llvm_state &, std::uint32_t, const U &, std::uint32_t, std::uint32_t,
+                                        llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        const std::unordered_map<std::uint32_t, number> &)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of an exponential");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_batch_exp(llvm_state &s, const function &func, std::uint32_t idx, std::uint32_t order,
+                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
+                                   std::uint32_t batch_size, std::uint32_t vector_size,
+                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the exponential (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) {
+            return taylor_diff_batch_exp_impl<T>(s, idx, v, order, n_uvars, diff_arr, batch_idx, batch_size,
+                                                 vector_size, cd_uvars);
+        },
+        func.args()[0].value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression exp(expression e)
 {
     std::vector<expression> args;
@@ -828,9 +900,10 @@ expression exp(expression e)
     fc.eval_batch_dbl_f() = [](std::vector<double> &out, const std::vector<expression> &args,
                                const std::unordered_map<std::string, std::vector<double>> &map) {
         if (args.size() != 1u) {
-            throw std::invalid_argument("Inconsistent number of arguments when evaluating the exponential in batches of "
-                                        "doubles (1 argument was expected, but "
-                                        + std::to_string(args.size()) + " arguments were provided");
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the exponential in batches of "
+                "doubles (1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
         }
         eval_batch_dbl(out, args[0], map);
         for (auto &el : out) {
@@ -848,22 +921,22 @@ expression exp(expression e)
     };
     fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
         if (args.size() != 1u || i != 0u) {
-            throw std::invalid_argument(
-                "Inconsistent number of arguments or derivative requested when computing the derivative of std::exp over doubles");
+            throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
+                                        "derivative of std::exp over doubles");
         }
 
         return std::exp(args[0]);
     };
-//    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_log<double>;
-//    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_log<long double>;
-//#if defined(HEYOKA_HAVE_REAL128)
-//    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_log<mppp::real128>;
-//#endif
-//    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_log<double>;
-//    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_log<long double>;
-//#if defined(HEYOKA_HAVE_REAL128)
-//    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_log<mppp::real128>;
-//#endif
+    fc.taylor_init_batch_dbl_f() = detail::taylor_init_batch_exp<double>;
+    fc.taylor_init_batch_ldbl_f() = detail::taylor_init_batch_exp<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_init_batch_f128_f() = detail::taylor_init_batch_exp<mppp::real128>;
+#endif
+    fc.taylor_diff_batch_dbl_f() = detail::taylor_diff_batch_exp<double>;
+    fc.taylor_diff_batch_ldbl_f() = detail::taylor_diff_batch_exp<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_batch_f128_f() = detail::taylor_diff_batch_exp<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -958,23 +1031,8 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
     // (i.e., order *not* included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        // The indices for accessing the derivatives in this loop iteration:
-        // - (order - j) * n_uvars * batch_size + u_idx * batch_size + batch_idx,
-        // - j * n_uvars * batch_size + idx * batch_size + batch_idx.
-        auto arr_ptr0
-            = builder.CreateInBoundsGEP(diff_arr,
-                                        {builder.getInt32(0), builder.getInt32((order - j) * n_uvars * batch_size
-                                                                               + u_idx * batch_size + batch_idx)},
-                                        "pow_ptr");
-        auto arr_ptr1 = builder.CreateInBoundsGEP(
-            diff_arr, {builder.getInt32(0), builder.getInt32(j * n_uvars * batch_size + idx * batch_size + batch_idx)},
-            "pow_ptr");
-
-        // Load the values.
-        auto v0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "pow_load")
-                                      : load_vector_from_memory(builder, arr_ptr0, vector_size, "pow_load");
-        auto v1 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr1, "pow_load")
-                                      : load_vector_from_memory(builder, arr_ptr1, vector_size, "pow_load");
+        auto v0 = tjb_load_derivative<T>(s, u_idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v1 = tjb_load_derivative<T>(s, idx, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
 
         // Compute the scalar factor: order * num - j * (num + 1).
         auto scal_f = codegen<T>(s, number(static_cast<T>(order)) * num
@@ -995,12 +1053,7 @@ llvm::Value *taylor_diff_batch_pow_impl(llvm_state &s, std::uint32_t idx, const 
     if (vector_size > 0u) {
         ord_f = create_constant_vector(builder, ord_f, vector_size);
     }
-
-    auto arr_ptr0 = builder.CreateInBoundsGEP(
-        diff_arr, {builder.getInt32(0), builder.getInt32(u_idx * batch_size + batch_idx)}, "pow_ptr");
-    auto b0 = (vector_size == 0u) ? builder.CreateLoad(arr_ptr0, "pow_load")
-                                  : load_vector_from_memory(builder, arr_ptr0, vector_size, "pow_load");
-
+    auto b0 = tjb_load_derivative<T>(s, u_idx, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
     auto div = builder.CreateFMul(ord_f, b0, "pow_div");
 
     // Compute and return the result: ret_acc / div.

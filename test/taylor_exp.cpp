@@ -79,10 +79,10 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
     }
 }
 
-TEST_CASE("taylor log")
+TEST_CASE("taylor exp")
 {
     auto tester = [](auto fp_x, unsigned opt_level) {
-        using std::log;
+        using std::exp;
 
         using fp_t = decltype(fp_x);
 
@@ -94,7 +94,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 1);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(expression{number{fp_t(2)}}), x + y}, 1, 1);
 
             s.compile();
 
@@ -107,14 +107,14 @@ TEST_CASE("taylor log")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(log(fp_t{2})));
+            REQUIRE(jet[2] == approximately(exp(fp_t{2})));
             REQUIRE(jet[3] == 5);
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 2);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(expression{number{fp_t(2)}}), x + y}, 1, 2);
 
             s.compile();
 
@@ -131,8 +131,8 @@ TEST_CASE("taylor log")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == approximately(log(fp_t{2})));
-            REQUIRE(jet[5] == approximately(log(fp_t{2})));
+            REQUIRE(jet[4] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[5] == approximately(exp(fp_t{2})));
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -141,7 +141,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 1);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(expression{number{fp_t(2)}}), x + y}, 2, 1);
 
             s.compile();
 
@@ -154,16 +154,16 @@ TEST_CASE("taylor log")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(log(fp_t{2})));
+            REQUIRE(jet[2] == approximately(exp(fp_t{2})));
             REQUIRE(jet[3] == 5);
             REQUIRE(jet[4] == 0);
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + log(fp_t{2}))));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + exp(fp_t{2}))));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 2);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(expression{number{fp_t(2)}}), x + y}, 2, 2);
 
             s.compile();
 
@@ -180,8 +180,8 @@ TEST_CASE("taylor log")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == approximately(log(fp_t{2})));
-            REQUIRE(jet[5] == approximately(log(fp_t{2})));
+            REQUIRE(jet[4] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[5] == approximately(exp(fp_t{2})));
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -189,14 +189,14 @@ TEST_CASE("taylor log")
             REQUIRE(jet[8] == 0);
             REQUIRE(jet[9] == 0);
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[6] + log(fp_t{2}))));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[7] + log(fp_t{2}))));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[6] + exp(fp_t{2}))));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[7] + exp(fp_t{2}))));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(expression{number{fp_t(2)}}), x + y}, 3, 3);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(expression{number{fp_t(2)}}), x + y}, 3, 3);
 
             s.compile();
 
@@ -215,9 +215,9 @@ TEST_CASE("taylor log")
             REQUIRE(jet[4] == -3);
             REQUIRE(jet[5] == 0);
 
-            REQUIRE(jet[6] == approximately(log(fp_t{2})));
-            REQUIRE(jet[7] == approximately(log(fp_t{2})));
-            REQUIRE(jet[8] == approximately(log(fp_t{2})));
+            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[7] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[8] == approximately(exp(fp_t{2})));
 
             REQUIRE(jet[9] == 5);
             REQUIRE(jet[10] == -5);
@@ -227,9 +227,9 @@ TEST_CASE("taylor log")
             REQUIRE(jet[13] == 0);
             REQUIRE(jet[14] == 0);
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + log(fp_t{2}))));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + log(fp_t{2}))));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[11] + log(fp_t{2}))));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + exp(fp_t{2}))));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + exp(fp_t{2}))));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[11] + exp(fp_t{2}))));
 
             REQUIRE(jet[18] == 0);
             REQUIRE(jet[19] == 0);
@@ -241,13 +241,13 @@ TEST_CASE("taylor log")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({log(expression{number{fp_t(2)}}), x + y}, opt_level);
+        compare_batch_scalar<fp_t>({exp(expression{number{fp_t(2)}}), x + y}, opt_level);
 
         // Variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(y), log(x)}, 1, 1);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(y), exp(x)}, 1, 1);
 
             s.compile();
 
@@ -260,14 +260,14 @@ TEST_CASE("taylor log")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(log(fp_t{3})));
-            REQUIRE(jet[3] == approximately(log(fp_t{2})));
+            REQUIRE(jet[2] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[3] == approximately(exp(fp_t{2})));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(y), log(x)}, 1, 2);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(y), exp(x)}, 1, 2);
 
             s.compile();
 
@@ -284,17 +284,17 @@ TEST_CASE("taylor log")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(log(fp_t{3})));
-            REQUIRE(jet[5] == approximately(log(fp_t{5})));
+            REQUIRE(jet[4] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[5] == approximately(exp(fp_t{5})));
 
-            REQUIRE(jet[6] == approximately(log(fp_t{2})));
-            REQUIRE(jet[7] == approximately(log(fp_t{4})));
+            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[7] == approximately(exp(fp_t{4})));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(y), log(x)}, 2, 1);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(y), exp(x)}, 2, 1);
 
             s.compile();
 
@@ -307,16 +307,16 @@ TEST_CASE("taylor log")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(log(fp_t{3})));
-            REQUIRE(jet[3] == approximately(log(fp_t{2})));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] / jet[1]));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] / jet[0]));
+            REQUIRE(jet[2] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[3] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[2] * jet[3]));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] * jet[3]));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(y), log(x)}, 2, 2);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(y), exp(x)}, 2, 2);
 
             s.compile();
 
@@ -333,23 +333,23 @@ TEST_CASE("taylor log")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(log(fp_t{3})));
-            REQUIRE(jet[5] == approximately(log(fp_t{5})));
+            REQUIRE(jet[4] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[5] == approximately(exp(fp_t{5})));
 
-            REQUIRE(jet[6] == approximately(log(fp_t{2})));
-            REQUIRE(jet[7] == approximately(log(fp_t{4})));
+            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[7] == approximately(exp(fp_t{4})));
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[6] / jet[2]));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[7] / jet[3]));
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[4] * jet[6]));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[5] * jet[7]));
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] / jet[0]));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] / jet[1]));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] * jet[6]));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] * jet[7]));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet", {log(y), log(x)}, 3, 3);
+            s.add_taylor_jet_batch<fp_t>("jet", {exp(y), exp(x)}, 3, 3);
 
             s.compile();
 
@@ -368,39 +368,33 @@ TEST_CASE("taylor log")
             REQUIRE(jet[4] == 5);
             REQUIRE(jet[5] == 6);
 
-            REQUIRE(jet[6] == approximately(log(fp_t{3})));
-            REQUIRE(jet[7] == approximately(log(fp_t{5})));
-            REQUIRE(jet[8] == approximately(log(fp_t{6})));
+            REQUIRE(jet[6] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[7] == approximately(exp(fp_t{5})));
+            REQUIRE(jet[8] == approximately(exp(fp_t{6})));
 
-            REQUIRE(jet[9] == approximately(log(fp_t{2})));
-            REQUIRE(jet[10] == approximately(log(fp_t{4})));
-            REQUIRE(jet[11] == approximately(log(fp_t{3})));
+            REQUIRE(jet[9] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[10] == approximately(exp(fp_t{4})));
+            REQUIRE(jet[11] == approximately(exp(fp_t{3})));
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[9] / jet[3]));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[10] / jet[4]));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[11] / jet[5]));
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[6] * jet[9]));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[7] * jet[10]));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[8] * jet[11]));
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] / jet[0]));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] / jet[1]));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] / jet[2]));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] * jet[9]));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] * jet[10]));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] * jet[11]));
 
-            REQUIRE(jet[18]
-                    == approximately(fp_t{1} / 6 * (2 * jet[15] * jet[3] - jet[9] * jet[9]) / (jet[3] * jet[3])));
-            REQUIRE(jet[19]
-                    == approximately(fp_t{1} / 6 * (2 * jet[16] * jet[4] - jet[10] * jet[10]) / (jet[4] * jet[4])));
-            REQUIRE(jet[20]
-                    == approximately(fp_t{1} / 6 * (2 * jet[17] * jet[5] - jet[11] * jet[11]) / (jet[5] * jet[5])));
+            REQUIRE(jet[18] == approximately(fp_t{1} / 6 * (jet[6] * jet[9] * jet[9] + jet[6] * 2 * jet[12])));
+            REQUIRE(jet[19] == approximately(fp_t{1} / 6 * (jet[7] * jet[10] * jet[10] + jet[7] * 2 * jet[13])));
+            REQUIRE(jet[20] == approximately(fp_t{1} / 6 * (jet[8] * jet[11] * jet[11] + jet[8] * 2 * jet[14])));
 
-            REQUIRE(jet[21]
-                    == approximately(fp_t{1} / 6 * (2 * jet[12] * jet[0] - jet[6] * jet[6]) / (jet[0] * jet[0])));
-            REQUIRE(jet[22]
-                    == approximately(fp_t{1} / 6 * (2 * jet[13] * jet[1] - jet[7] * jet[7]) / (jet[1] * jet[1])));
-            REQUIRE(jet[23]
-                    == approximately(fp_t{1} / 6 * (2 * jet[14] * jet[2] - jet[8] * jet[8]) / (jet[2] * jet[2])));
+            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (jet[9] * jet[6] * jet[6] + jet[9] * 2 * jet[15])));
+            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (jet[10] * jet[7] * jet[7] + jet[10] * 2 * jet[16])));
+            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (jet[11] * jet[8] * jet[8] + jet[11] * 2 * jet[17])));
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({log(y), log(x)}, opt_level);
+        compare_batch_scalar<fp_t>({exp(y), exp(x)}, opt_level);
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
