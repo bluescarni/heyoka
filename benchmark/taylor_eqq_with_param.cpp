@@ -24,7 +24,7 @@ using namespace heyoka;
 int main()
 {
     // System Dimension
-    auto n_neurons = 100u;
+    auto n_neurons = 10u;
     auto n_in = 2u;
     auto n_out = 1u;
 
@@ -55,7 +55,7 @@ int main()
             hidden[i] += w[ji] * x[j];
         }
         // the non linearity
-        hidden[i] = sin(hidden[i]);
+        hidden[i] = 1_dbl/(1_dbl+exp(hidden[i]));
     }
 
     // We compute the outputs of the output layer
@@ -74,7 +74,7 @@ int main()
             out[i] += w[ji] * hidden[j];
         }
         // the non linearity
-        out[i] = sin(out[i]);
+        out[i] = 1_dbl/(1_dbl+exp(out[i]));
     }
 
     // Assembling the dynamics (weights and biases derivatives are zero)
@@ -117,7 +117,7 @@ int main()
     // eval_map["a0"] = state[0];
     // eval_map["a1"] = state[1];
     // for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-    //    eval_map["w" + std::to_string(i + 10000)] = ic[4 + i];
+    //    eval_map["w" + std::to_string(i + 1000)] = ic[4 + i];
     //}
     // auto V = eval_dbl(out[0], eval_map);
     // auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
@@ -141,7 +141,7 @@ int main()
     //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
     //              << std::endl;
     //}
-    neural_network_ode.propagate_until(10.);
+    neural_network_ode.propagate_until(100.);
     neural_network_ode.propagate_until(0.);
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);

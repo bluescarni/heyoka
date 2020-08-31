@@ -92,7 +92,7 @@ int main()
     for (auto i = 0u; i < N / 2; ++i) {
         std::size_t n2 = std::uniform_int_distribution<std::size_t>(0, n_nodes[2 * i] - 1u)(engine);
         std::size_t n3 = std::uniform_int_distribution<std::size_t>(0, n_nodes[2 * i + 1] - 1u)(engine);
-        crossover(exs[2 * i], exs[2 * i + 1], n2, n3, engine);
+        crossover(exs[2 * i], exs[2 * i + 1], n2, n3);
     }
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
