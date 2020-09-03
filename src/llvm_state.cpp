@@ -387,6 +387,7 @@ llvm::Module &llvm_state::module()
 
 llvm::IRBuilder<> &llvm_state::builder()
 {
+    check_uncompiled(__func__);
     return *m_builder;
 }
 
@@ -418,6 +419,7 @@ const llvm::Module &llvm_state::module() const
 
 const llvm::IRBuilder<> &llvm_state::builder() const
 {
+    check_uncompiled(__func__);
     return *m_builder;
 }
 
@@ -470,9 +472,13 @@ void llvm_state::check_add_name(const std::string &name) const
     }
 }
 
-void llvm_state::verify_function_impl(llvm::Function *f)
+void llvm_state::verify_function(llvm::Function *f)
 {
-    assert(f != nullptr);
+    check_uncompiled(__func__);
+
+    if (f == nullptr) {
+        throw std::invalid_argument("Cannot verify a null function pointer");
+    }
 
     std::string err_report;
     llvm::raw_string_ostream ostr(err_report);
@@ -496,7 +502,7 @@ void llvm_state::verify_function(const std::string &name)
     }
 
     // Run the actual check.
-    verify_function_impl(f);
+    verify_function(f);
 }
 
 void llvm_state::optimise()
@@ -728,7 +734,7 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
     // can be added safely.
 
     // Verify it.
-    verify_function_impl(f);
+    verify_function(f);
 
     // Add the function to m_sig_map.
     std::vector<std::type_index> sig_args(vars.size(), std::type_index(typeid(T)));
@@ -839,7 +845,7 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     m_builder->CreateRet(codegen<T>(*this, e));
 
     // Verify the function.
-    verify_function_impl(f);
+    verify_function(f);
 
     // Add the function to m_sig_map.
     std::vector<std::type_index> sig_args{std::type_index(typeid(const T *))};
@@ -944,7 +950,7 @@ void llvm_state::add_vecargs_expressions(const std::string &name, const std::vec
     m_builder->CreateRetVoid();
 
     // Verify the function.
-    verify_function_impl(f);
+    verify_function(f);
 
     // Add the function to m_sig_map.
     std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
@@ -1040,7 +1046,7 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     m_builder->CreateRetVoid();
 
     // Verify the function.
-    verify_function_impl(f);
+    verify_function(f);
 
     // Add the function to m_sig_map.
     auto sig_args = std::vector{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
@@ -1100,20 +1106,6 @@ std::string llvm_state::get_ir() const
         // Return the IR snapshot that
         // was created before the compilation.
         return m_ir_snapshot;
-    }
-}
-
-std::string llvm_state::get_function_ir(const std::string &name) const
-{
-    check_uncompiled(__func__);
-
-    if (auto f = m_module->getFunction(name)) {
-        std::string out;
-        llvm::raw_string_ostream ostr(out);
-        f->print(ostr);
-        return ostr.str();
-    } else {
-        throw std::invalid_argument("Could not locate the function called '" + name + "'");
     }
 }
 
@@ -1725,7 +1717,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
     m_builder->CreateRetVoid();
 
     // Verify it.
-    verify_function_impl(f);
+    verify_function(f);
 
     // Add the function to m_sig_map. The signature is void(T *).
     std::vector<std::type_index> sig_args{std::type_index(typeid(T *))};
@@ -1902,7 +1894,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
         << ", " << s.m_jitter->get_vector_size<mppp::real128>()
 #endif
         << '\n';
-    oss << "IR size           : " << s.get_ir().size() << '\n';
+    oss << "IR size            : " << s.get_ir().size() << '\n';
 
     return os << oss.str();
 }

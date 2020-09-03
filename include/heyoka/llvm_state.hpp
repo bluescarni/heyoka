@@ -93,7 +93,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_add_name(const std::string &) const;
-    HEYOKA_DLL_LOCAL void verify_function_impl(llvm::Function *);
 
     // Implementation details for expressions.
     template <typename T>
@@ -230,10 +229,10 @@ public:
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
     std::string get_ir() const;
-    std::string get_function_ir(const std::string &) const;
     void dump_object_code(const std::string &) const;
 
     void verify_function(const std::string &);
+    void verify_function(llvm::Function *);
 
     void optimise();
 
