@@ -659,27 +659,10 @@ void llvm_state::compile()
     m_jitter->add_module(std::move(m_module));
 }
 
-namespace detail
+bool llvm_state::is_compiled() const
 {
-
-namespace
-{
-
-// RAII helper to reset the verify
-// flag of an LLVM state to true
-// upon destruction.
-struct verify_resetter {
-    explicit verify_resetter(llvm_state &s) : m_s(s) {}
-    ~verify_resetter()
-    {
-        m_s.verify() = true;
-    }
-    llvm_state &m_s;
-};
-
-} // namespace
-
-} // namespace detail
+    return !m_module;
+}
 
 template <typename T>
 void llvm_state::add_varargs_expression(const std::string &name, const expression &e,
