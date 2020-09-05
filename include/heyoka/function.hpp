@@ -65,7 +65,6 @@ public:
         std::uint32_t, std::uint32_t, const std::unordered_map<std::uint32_t, number> &)>;
 
 private:
-    bool m_disable_verify = false;
     std::string m_name_dbl, m_name_ldbl,
 #if defined(HEYOKA_HAVE_REAL128)
         m_name_f128,
@@ -114,7 +113,6 @@ public:
     function &operator=(const function &);
     function &operator=(function &&) noexcept;
 
-    bool &disable_verify();
     std::string &name_dbl();
     std::string &name_ldbl();
 #if defined(HEYOKA_HAVE_REAL128)
@@ -149,7 +147,6 @@ public:
     taylor_diff_batch_t &taylor_diff_batch_f128_f();
 #endif
 
-    const bool &disable_verify() const;
     const std::string &name_dbl() const;
     const std::string &name_ldbl() const;
 #if defined(HEYOKA_HAVE_REAL128)

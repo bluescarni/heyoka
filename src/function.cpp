@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -82,7 +83,7 @@ function::function(std::vector<expression> args)
 }
 
 function::function(const function &f)
-    : m_disable_verify(f.m_disable_verify), m_name_dbl(f.m_name_dbl), m_name_ldbl(f.m_name_ldbl),
+    : m_name_dbl(f.m_name_dbl), m_name_ldbl(f.m_name_ldbl),
 #if defined(HEYOKA_HAVE_REAL128)
       m_name_f128(f.m_name_f128),
 #endif
@@ -123,11 +124,6 @@ function &function::operator=(const function &f)
 }
 
 function &function::operator=(function &&) noexcept = default;
-
-bool &function::disable_verify()
-{
-    return m_disable_verify;
-}
 
 std::string &function::name_dbl()
 {
@@ -267,11 +263,6 @@ function::taylor_diff_batch_t &function::taylor_diff_batch_f128_f()
 }
 
 #endif
-
-const bool &function::disable_verify() const
-{
-    return m_disable_verify;
-}
 
 const std::string &function::name_dbl() const
 {
@@ -429,7 +420,6 @@ std::ostream &operator<<(std::ostream &os, const function &f)
 
 void swap(function &f0, function &f1) noexcept
 {
-    std::swap(f0.disable_verify(), f1.disable_verify());
     std::swap(f0.name_dbl(), f1.name_dbl());
     std::swap(f0.name_ldbl(), f1.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
@@ -470,8 +460,7 @@ void swap(function &f0, function &f1) noexcept
 
 std::size_t hash(const function &f)
 {
-    auto retval = std::hash<bool>{}(f.disable_verify());
-    retval += std::hash<std::string>{}(f.name_dbl());
+    auto retval = std::hash<std::string>{}(f.name_dbl());
     retval += std::hash<std::string>{}(f.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
     retval += std::hash<std::string>{}(f.name_f128());
@@ -767,10 +756,6 @@ const auto &function_attributes_from_type(const function &f)
 template <typename T>
 llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
 {
-    if (f.disable_verify()) {
-        s.verify() = false;
-    }
-
     // Create the function arguments.
     std::vector<llvm::Value *> args_v;
     for (const auto &arg : f.args()) {
@@ -850,12 +835,10 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
             }
 
             // NOTE: for generic intrinsics to work, we need to specify
-            // the desired argument types. See:
+            // the desired argument type. See:
             // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
             // And the docs of the getDeclaration() function.
-            const std::vector<llvm::Type *> arg_types(args_v.size(), to_llvm_type<T>(s.context()));
-
-            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, {to_llvm_type<T>(s.context())});
 
             if (!callee_f) {
                 throw std::invalid_argument("Error getting the declaration of the intrinsic '" + f_name + "'");

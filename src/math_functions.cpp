@@ -957,13 +957,6 @@ llvm::Value *taylor_init_batch_pow(llvm_state &s, const function &f, llvm::Value
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    // Disable verification in the llvm
-    // machinery when we are generating code
-    // for the Taylor init phase. This is due
-    // to the verification issue with the
-    // pow intrinsic mangling.
-    s.verify() = false;
-
     if (vector_size == 0u) {
         // Scalar case.
 
@@ -1107,10 +1100,6 @@ expression pow(expression e1, expression e2)
     fc.name_f128() = "heyoka_pow128";
 #endif
     fc.display_name() = "pow";
-    // Disable verification whenever
-    // we codegen the pow() function, due
-    // to what looks like an LLVM verification bug.
-    fc.disable_verify() = true;
     fc.ty_dbl() = function::type::builtin;
     fc.ty_ldbl() = function::type::builtin;
 #if defined(HEYOKA_HAVE_REAL128)
