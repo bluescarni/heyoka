@@ -396,11 +396,6 @@ llvm::LLVMContext &llvm_state::context()
     return m_jitter->get_context();
 }
 
-bool &llvm_state::verify()
-{
-    return m_verify;
-}
-
 unsigned &llvm_state::opt_level()
 {
     return m_opt_level;
@@ -426,11 +421,6 @@ const llvm::IRBuilder<> &llvm_state::builder() const
 const llvm::LLVMContext &llvm_state::context() const
 {
     return m_jitter->get_context();
-}
-
-const bool &llvm_state::verify() const
-{
-    return m_verify;
 }
 
 const unsigned &llvm_state::opt_level() const
@@ -482,7 +472,7 @@ void llvm_state::verify_function(llvm::Function *f)
 
     std::string err_report;
     llvm::raw_string_ostream ostr(err_report);
-    if (llvm::verifyFunction(*f, &ostr) && m_verify) {
+    if (llvm::verifyFunction(*f, &ostr)) {
         // Remove function before throwing.
         const auto fname = std::string(f->getName());
         f->eraseFromParent();
@@ -728,8 +718,6 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
 
 void llvm_state::add_nary_function_dbl(const std::string &name, const expression &e)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -744,8 +732,6 @@ void llvm_state::add_nary_function_dbl(const std::string &name, const expression
 
 void llvm_state::add_nary_function_ldbl(const std::string &name, const expression &e)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -762,8 +748,6 @@ void llvm_state::add_nary_function_ldbl(const std::string &name, const expressio
 
 void llvm_state::add_nary_function_f128(const std::string &name, const expression &e)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -781,8 +765,6 @@ void llvm_state::add_nary_function_f128(const std::string &name, const expressio
 template <typename T>
 void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -862,8 +844,6 @@ void llvm_state::add_function_f128(const std::string &name, const expression &e)
 template <typename T>
 void llvm_state::add_vecargs_expressions(const std::string &name, const std::vector<expression> &es)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 
@@ -970,8 +950,6 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     if (batch_size == 0u) {
         throw std::invalid_argument("Cannot add an expression in batch mode if the batch size is zero");
     }
-
-    detail::verify_resetter vr{*this};
 
     check_uncompiled(__func__);
     check_add_name(name);
@@ -1202,8 +1180,6 @@ template <typename T, typename U>
 auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::uint32_t order,
                                            std::uint32_t batch_size)
 {
-    detail::verify_resetter vr{*this};
-
     check_uncompiled(__func__);
     check_add_name(name);
 

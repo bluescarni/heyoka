@@ -80,7 +80,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<llvm::IRBuilder<>> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
-    bool m_verify = true;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_use_fast_math;
@@ -217,14 +216,12 @@ public:
     llvm::Module &module();
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
-    bool &verify();
     unsigned &opt_level();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
-    const bool &verify() const;
     const unsigned &opt_level() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
@@ -554,26 +551,6 @@ public:
         }
     }
 };
-
-namespace detail
-{
-
-// RAII helper to reset the verify
-// flag of an LLVM state to true
-// upon destruction.
-// NOTE: this machinery should be removed
-// once the issue with funcion verification
-// is solved.
-struct verify_resetter {
-    explicit verify_resetter(llvm_state &s) : m_s(s) {}
-    ~verify_resetter()
-    {
-        m_s.verify() = true;
-    }
-    llvm_state &m_s;
-};
-
-} // namespace detail
 
 } // namespace heyoka
 
