@@ -42,6 +42,7 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -1006,6 +1007,28 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &s, const function &f, std::uint3
                                     + "' does not provide a function for float128 Taylor diff");
     }
     return td(s, f, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+}
+
+#endif
+
+tfp taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                      bool high_accuracy)
+{
+    throw;
+}
+
+tfp taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    throw;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    throw;
 }
 
 #endif

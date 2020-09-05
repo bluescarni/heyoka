@@ -34,6 +34,7 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -581,6 +582,31 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &s, const expression &e, std::uin
             }
         },
         e.value());
+}
+
+#endif
+
+tfp taylor_u_init_dbl(llvm_state &s, const expression &e, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                      bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_u_init_dbl(s, arg, arr, batch_size, high_accuracy); },
+                      e.value());
+}
+
+tfp taylor_u_init_ldbl(llvm_state &s, const expression &e, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_u_init_ldbl(s, arg, arr, batch_size, high_accuracy); },
+                      e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_u_init_f128(llvm_state &s, const expression &e, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_u_init_f128(s, arg, arr, batch_size, high_accuracy); },
+                      e.value());
 }
 
 #endif

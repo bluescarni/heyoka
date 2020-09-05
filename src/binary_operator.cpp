@@ -41,6 +41,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -816,6 +817,59 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &s, const binary_operator &bo, st
 {
     return detail::taylor_diff_batch_bo_impl<mppp::real128>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size,
                                                             vector_size, cd_uvars);
+}
+
+#endif
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+tfp taylor_u_init_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<tfp> &arr,
+                          std::uint32_t batch_size, bool high_accuracy)
+{
+    // Do the Taylor init for lhs and rhs.
+    auto l = taylor_u_init<T>(s, bo.lhs(), arr, batch_size, high_accuracy);
+    auto r = taylor_u_init<T>(s, bo.rhs(), arr, batch_size, high_accuracy);
+
+    // Do the codegen for the corresponding operation.
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return tfp_add(s, l, r);
+        case binary_operator::type::sub:
+            return tfp_sub(s, l, r);
+        case binary_operator::type::mul:
+            return tfp_mul(s, l, r);
+        default:
+            return tfp_div(s, l, r);
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+tfp taylor_u_init_dbl(llvm_state &s, const binary_operator &bo, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                      bool high_accuracy)
+{
+    return detail::taylor_u_init_bo_impl<double>(s, bo, arr, batch_size, high_accuracy);
+}
+
+tfp taylor_u_init_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return detail::taylor_u_init_bo_impl<long double>(s, bo, arr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_u_init_f128(llvm_state &s, const binary_operator &bo, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return detail::taylor_u_init_bo_impl<mppp::real128>(s, bo, arr, batch_size, high_accuracy);
 }
 
 #endif

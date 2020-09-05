@@ -35,6 +35,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 
 namespace heyoka
 {
@@ -316,6 +317,32 @@ template <typename T>
 HEYOKA_DLL_PUBLIC llvm::Value *function_codegen_from_values(llvm_state &, const function &,
                                                             const std::vector<llvm::Value *> &);
 
+}
+
+HEYOKA_DLL_PUBLIC tfp taylor_u_init_dbl(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC tfp taylor_u_init_ldbl(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC tfp taylor_u_init_f128(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, bool);
+
+#endif
+
+template <typename T>
+inline tfp taylor_u_init(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                         bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_u_init_dbl(s, f, arr, batch_size, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_u_init_ldbl(s, f, arr, batch_size, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_u_init_f128(s, f, arr, batch_size, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
 }
 
 } // namespace heyoka

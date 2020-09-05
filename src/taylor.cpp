@@ -47,6 +47,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -1734,5 +1735,156 @@ template void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
 #endif
 
 } // namespace detail
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+auto taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx, std::uint32_t batch_size,
+                           bool high_accuracy)
+{
+    auto &builder = s.builder();
+
+    // Fetch the pointer from in.
+    // TODO overflow check.
+    auto ptr = builder.CreateInBoundsGEP(in, {builder.getInt32(var_idx * batch_size)});
+
+    // Load in vector mode.
+    auto v = load_vector_from_memory(builder, ptr, batch_size, "o0_init_" + li_to_string(var_idx));
+
+    if (high_accuracy) {
+        return tfp{std::pair{v, create_constant_vector(builder, codegen<T>(s, number(0.)), batch_size)}};
+    } else {
+        return tfp{v};
+    }
+}
+
+// Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
+// is the number of equations/variables in the ODE sys, dc its Taylor decomposition.
+// order is the max derivative order desired, batch_size the batch size, high_accuracy
+// specifies whether to use extended precision techniques in the computation.
+// 'in' must be a pointer to an array whose first n_eq * batch_size elements represent
+// the derivatives of order 0 of the variables of the ODE.
+//
+// The return value is the jet of derivatives of the u variables.
+template <typename T>
+auto taylor_compute_jet(llvm_state &s, llvm::Value *in, const std::vector<expression> &dc, std::uint32_t n_eq,
+                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+{
+    // Init the return value.
+    std::vector<tfp> retval;
+
+    // Start loading the order-0 derivatives of the state variables from 'in'.
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        retval.push_back(taylor_load_sv_order0<T>(s, in, i, batch_size, high_accuracy));
+    }
+
+    // Compute the order-0 derivatives of the other u variables.
+    for (auto i = n_eq; i < n_uvars; ++i) {
+        retval.push_back(taylor_u_init<T>(s, dc[i], retval, batch_size, high_accuracy));
+    }
+}
+
+template <typename T, typename U>
+auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
+                         bool high_accuracy)
+{
+    verify_resetter vr{s};
+
+    if (s.is_compiled()) {
+        throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
+                                    "to an llvm_state after compilation");
+    }
+
+    if (order == 0u) {
+        throw std::invalid_argument("The order of a Taylor jet cannot be zero");
+    }
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
+    }
+
+    // Record the number of equations/variables.
+    const auto n_eq = sys.size();
+
+    // Decompose the system of equations.
+    auto dc = taylor_decompose(std::move(sys));
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = dc.size() - n_eq;
+
+    // Overflow checking. We want to make sure we can do all computations
+    // using uint32_t. We need to be able to:
+    // - index into the jet array (size n_eq * (order + 1) * batch_size),
+    // - index into the internal derivatives array (size n_uvars * order * batch_size).
+    // NOTE: even though some automatic differentiation formulae have
+    // sums up to i = order (and thus could formally overflow in a
+    // for loop), we invoke them only up to order = order - 1.
+    // TODO update overflow checking.
+    // TODO move it into the taylor_compute_jet() function?
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || n_eq > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)
+        || n_uvars > std::numeric_limits<std::uint32_t>::max() / (order * batch_size)) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the number of variables while adding a Taylor jet");
+    }
+
+    // Prepare the main function prototype. The only argument is a float pointer to in/out array.
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(s.context()))};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(s.builder().getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        throw std::invalid_argument(
+            "Unable to create a function for the computation of the jet of Taylor derivatives with name '" + name
+            + "'");
+    }
+
+    // Set the name of the function argument.
+    auto in_out = f->args().begin();
+    in_out->setName("in_out");
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    assert(bb != nullptr);
+    s.builder().SetInsertPoint(bb);
+
+    // Emit the code for the computation of the jet of derivatives.
+    // TODO overflow checks on these casts.
+    taylor_compute_jet<T>(s, &*in_out, dc, static_cast<std::uint32_t>(n_eq), static_cast<std::uint32_t>(n_uvars), order,
+                          batch_size, high_accuracy);
+
+    // Finish off the function.
+    s.builder().CreateRetVoid();
+
+    // Verify it.
+    s.verify_function(f);
+
+    return dc;
+}
+
+} // namespace
+
+} // namespace detail
+
+std::vector<expression> taylor_add_jet_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+}
+
+std::vector<expression> taylor_add_jet_dbl(llvm_state &s, const std::string &name,
+                                           std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                                           std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+}
 
 } // namespace heyoka

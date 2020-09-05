@@ -42,6 +42,13 @@ namespace heyoka
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
 
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<expression>,
+                                                             std::uint32_t, std::uint32_t, bool);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_dbl(llvm_state &, const std::string &,
+                                                             std::vector<std::pair<expression, expression>>,
+                                                             std::uint32_t, std::uint32_t, bool);
+
 // Enum to represnt the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome {
