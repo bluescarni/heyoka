@@ -21,10 +21,12 @@ namespace heyoka
 {
 
 // LLVM floating-point type for use in the Taylor machinery.
+// It represents either a single floating-point operand (normal mode),
+// or a pair of floating-point operands (high accuracy mode) for
+// the implementation of double-length arithmetics.
 using tfp = std::variant<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
 
 HEYOKA_DLL_PUBLIC tfp tfp_add(llvm_state &, const tfp &, const tfp &);
-HEYOKA_DLL_PUBLIC tfp tfp_neg(llvm_state &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_sub(llvm_state &, const tfp &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_mul(llvm_state &, const tfp &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_div(llvm_state &, const tfp &, const tfp &);

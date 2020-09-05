@@ -552,26 +552,6 @@ public:
     }
 };
 
-namespace detail
-{
-
-// RAII helper to reset the verify
-// flag of an LLVM state to true
-// upon destruction.
-// NOTE: this machinery should be removed
-// once the issue with funcion verification
-// is solved.
-struct verify_resetter {
-    explicit verify_resetter(llvm_state &s) : m_s(s) {}
-    ~verify_resetter()
-    {
-        m_s.verify() = true;
-    }
-    llvm_state &m_s;
-};
-
-} // namespace detail
-
 } // namespace heyoka
 
 #endif

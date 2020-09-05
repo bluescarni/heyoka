@@ -6,20 +6,15 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <cassert>
-#include <initializer_list>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <variant>
-#include <vector>
 
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Operator.h>
-#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/tfp.hpp>
@@ -33,17 +28,21 @@ namespace detail
 namespace
 {
 
+// RAII helper to temporarily disable all fast math flags that might
+// be set in an LLVM builder. On destruction, the original fast math
+// flags will be restored.
 struct fm_disabler {
     llvm_state &m_s;
     llvm::FastMathFlags m_orig_fmf;
 
     explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
     {
-        llvm::FastMathFlags new_fmf;
-        m_s.builder().setFastMathFlags(new_fmf);
+        // Set the new flags (all fast math options are disabled).
+        m_s.builder().setFastMathFlags(llvm::FastMathFlags{});
     }
     ~fm_disabler()
     {
+        // Restore the original flags.
         m_s.builder().setFastMathFlags(m_orig_fmf);
     }
 };
@@ -70,11 +69,13 @@ tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
                 detail::fm_disabler fmd(s);
 
+                // Knuth's TwoSum algorithm.
                 auto x = builder.CreateFAdd(a.first, b.first);
                 auto z = builder.CreateFSub(x, a.first);
                 auto y = builder.CreateFAdd(builder.CreateFSub(a.first, builder.CreateFSub(x, z)),
                                             builder.CreateFSub(b.first, z));
 
+                // Double-length addition without normalisation.
                 return std::pair{x, builder.CreateFAdd(y, builder.CreateFAdd(a.second, b.second))};
             } else {
                 throw std::invalid_argument(
@@ -84,6 +85,13 @@ tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
         x, y);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Helper to negate a tfp.
 tfp tfp_neg(llvm_state &s, const tfp &x)
 {
     return std::visit(
@@ -101,9 +109,14 @@ tfp tfp_neg(llvm_state &s, const tfp &x)
         x);
 }
 
+} // namespace
+
+} // namespace detail
+
+// x + y = x + (-y).
 tfp tfp_sub(llvm_state &s, const tfp &x, const tfp &y)
 {
-    return tfp_add(s, x, tfp_neg(s, y));
+    return tfp_add(s, x, detail::tfp_neg(s, y));
 }
 
 namespace detail
@@ -112,40 +125,17 @@ namespace detail
 namespace
 {
 
+// Helper to invoke the fma builtin used in the implementation
+// of tfp_mul().
 llvm::Value *tfp_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
 {
     assert(x->getType() == y->getType());
     assert(x->getType() == z->getType());
 
-    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID("llvm.fma");
-    if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic 'llvm.fma'");
-    }
-
-    // NOTE: for generic intrinsics to work, we need to specify
-    // the desired argument types. See:
-    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
-    // And the docs of the getDeclaration() function.
-    const std::vector<llvm::Type *> arg_types(1u, x->getType());
-
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
-
-    if (!callee_f) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic 'llvm.fma'");
-    }
-
-    if (!callee_f->isDeclaration()) {
-        // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic 'llvm.fma' must be only declared, not defined");
-    }
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, {x, y, z});
-    assert(r != nullptr);
-
-    return r;
+    return llvm_invoke_intrinsic(s, "llvm.fma", {x->getType()}, {x, y, z});
 }
 
+// TwoProductFMA algorithm of Ogita et al.
 // NOTE: this assumes fast math has already been disabled.
 auto tfp_eft_prod(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
@@ -179,6 +169,10 @@ tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
                 detail::fm_disabler fmd(s);
 
+                // mul2 algorithm of Dekker without normalisation.
+                // TODO check if this can be simplified, Dekker actually
+                // does not do the multiplication of the errors of a and b.
+                // But maybe in our case it's needed because we don't normalise?
                 auto [x, y] = detail::tfp_eft_prod(s, a.first, b.first);
 
                 return std::pair{x, detail::tfp_fma(s, b.first, a.second,
@@ -210,6 +204,7 @@ tfp tfp_div(llvm_state &s, const tfp &x, const tfp &y)
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
                 detail::fm_disabler fmd(s);
 
+                // div2 algorithm of Dekker without normalisation.
                 auto c = builder.CreateFDiv(a.first, b.first);
                 auto [u, uu] = detail::tfp_eft_prod(s, c, b.first);
                 auto cc = builder.CreateFDiv(

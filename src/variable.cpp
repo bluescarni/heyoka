@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -256,7 +258,7 @@ tfp taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<tfp> 
         throw std::invalid_argument("Out of bounds access in the Taylor initialization phase of a variable");
     }
 
-    return arr[idx];
+    return arr[boost::numeric_cast<decltype(arr.size())>(idx)];
 }
 
 tfp taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t batch_size,

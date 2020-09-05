@@ -1743,8 +1743,8 @@ namespace
 {
 
 template <typename T>
-auto taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx, std::uint32_t batch_size,
-                           bool high_accuracy)
+tfp taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx, std::uint32_t batch_size,
+                          bool high_accuracy)
 {
     auto &builder = s.builder();
 
@@ -1756,9 +1756,9 @@ auto taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx
     auto v = load_vector_from_memory(builder, ptr, batch_size, "o0_init_" + li_to_string(var_idx));
 
     if (high_accuracy) {
-        return tfp{std::pair{v, create_constant_vector(builder, codegen<T>(s, number(0.)), batch_size)}};
+        return std::pair{v, create_constant_vector(builder, codegen<T>(s, number(0.)), batch_size)};
     } else {
-        return tfp{v};
+        return v;
     }
 }
 
@@ -1792,8 +1792,6 @@ template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
                          bool high_accuracy)
 {
-    verify_resetter vr{s};
-
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
                                     "to an llvm_state after compilation");

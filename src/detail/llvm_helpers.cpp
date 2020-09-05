@@ -18,7 +18,10 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
@@ -217,6 +220,38 @@ llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Val
     }
 
     return sum[0];
+}
+
+// Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
+// overloaded intrinsics.
+llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const std::vector<llvm::Type *> &types,
+                                   const std::vector<llvm::Value *> &args)
+{
+    // Fetch the intrinsic ID from the name.
+    const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
+    if (intrinsic_ID == 0) {
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + name + "'");
+    }
+
+    // Fetch the declaration.
+    // NOTE: for generic intrinsics to work, we need to specify
+    // the desired argument type(s). See:
+    // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
+    // And the docs of the getDeclaration() function.
+    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, types);
+    if (callee_f == nullptr) {
+        throw std::invalid_argument("Error getting the declaration of the intrinsic '" + name + "'");
+    }
+    if (!callee_f->isDeclaration()) {
+        // It does not make sense to have a definition of a builtin.
+        throw std::invalid_argument("The intrinsic '" + name + "' must be only declared, not defined");
+    }
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args);
+    assert(r != nullptr);
+
+    return r;
 }
 
 #if defined(__clang__)

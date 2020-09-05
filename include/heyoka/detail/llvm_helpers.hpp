@@ -133,6 +133,10 @@ inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std:
                                : load_vector_from_memory(builder, arr_ptr, vector_size, "diff_arr_load");
 }
 
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::string &,
+                                                     const std::vector<llvm::Type *> &,
+                                                     const std::vector<llvm::Value *> &);
+
 } // namespace heyoka::detail
 
 #endif
