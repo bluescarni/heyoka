@@ -358,7 +358,7 @@ tfp taylor_u_init_number_impl(llvm_state &s, const number &n, const std::vector<
     auto ret = create_constant_vector(s.builder(), codegen<T>(s, n), batch_size);
 
     if (high_accuracy) {
-        return std::pair{ret, create_constant_vector(s.builder(), codegen<T>(s, number(0.)), batch_size)};
+        return std::pair{ret, create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size)};
     } else {
         return ret;
     }

@@ -92,7 +92,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilder<> &, const std:
 template <typename T>
 inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_size)
 {
-    auto ret = codegen<T>(s, number(0.));
+    auto ret = codegen<T>(s, number{0.});
 
     if (vector_size > 0u) {
         ret = create_constant_vector(s.builder(), ret, vector_size);
