@@ -50,4 +50,9 @@ __float128 heyoka_cos128(__float128 x)
     return mppp::cos(mppp::real128{x}).m_value;
 }
 
+__float128 heyoka_fma128(__float128 x, __float128 y, __float128 z)
+{
+    return mppp::fma(mppp::real128{x}, mppp::real128{y}, mppp::real128{z}).m_value;
+}
+
 #endif
