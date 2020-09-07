@@ -222,7 +222,7 @@ llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Val
     if (vector_size == 0u) {
         return builder.CreateLoad(ptr, "diff_load");
     } else {
-        return detail::load_vector_from_memory(builder, ptr, vector_size, "diff_load");
+        return detail::load_vector_from_memory(builder, ptr, vector_size);
     }
 }
 

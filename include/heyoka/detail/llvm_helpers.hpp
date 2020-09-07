@@ -17,8 +17,10 @@
 #include <limits>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
@@ -34,6 +36,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 
 namespace heyoka::detail
 {
@@ -78,10 +81,9 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
 
 HEYOKA_DLL_PUBLIC llvm::Value *create_constant_vector(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t,
-                                                       const std::string & = "");
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &, llvm::Value *);
 
@@ -130,12 +132,36 @@ inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std:
         "diff_arr_ptr");
 
     return (vector_size == 0u) ? builder.CreateLoad(arr_ptr, "diff_arr_load")
-                               : load_vector_from_memory(builder, arr_ptr, vector_size, "diff_arr_load");
+                               : load_vector_from_memory(builder, arr_ptr, vector_size);
 }
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::string &,
                                                      const std::vector<llvm::Type *> &,
                                                      const std::vector<llvm::Value *> &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
+                                                    const std::vector<llvm::Value *> &,
+                                                    const std::vector<llvm::Attribute::AttrKind> & = {});
+
+// Helper to create a constant tfp.
+template <typename T>
+inline tfp tfp_constant(llvm_state &s, const number &num, std::uint32_t batch_size, bool high_accuracy)
+{
+    auto ret = create_constant_vector(s.builder(), codegen<T>(s, num), batch_size);
+
+    if (high_accuracy) {
+        return std::pair{ret, create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size)};
+    } else {
+        return ret;
+    }
+}
+
+// Helper to create a zero tfp.
+template <typename T>
+inline tfp tfp_zero(llvm_state &s, std::uint32_t batch_size, bool high_accuracy)
+{
+    return tfp_constant<T>(s, number{0.}, batch_size, high_accuracy);
+}
 
 } // namespace heyoka::detail
 

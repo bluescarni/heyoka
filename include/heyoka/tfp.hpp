@@ -9,8 +9,10 @@
 #ifndef HEYOKA_TFP_HPP
 #define HEYOKA_TFP_HPP
 
+#include <cstdint>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <llvm/IR/Value.h>
 
@@ -30,6 +32,18 @@ HEYOKA_DLL_PUBLIC tfp tfp_add(llvm_state &, const tfp &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_sub(llvm_state &, const tfp &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_mul(llvm_state &, const tfp &, const tfp &);
 HEYOKA_DLL_PUBLIC tfp tfp_div(llvm_state &, const tfp &, const tfp &);
+
+HEYOKA_DLL_PUBLIC tfp tfp_neg(llvm_state &, const tfp &);
+
+HEYOKA_DLL_PUBLIC llvm::Value *tfp_cast(llvm_state &, const tfp &);
+
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC tfp taylor_load_derivative(const std::vector<tfp> &, std::uint32_t, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC tfp tfp_pairwise_sum(llvm_state &, std::vector<tfp> &);
+
+} // namespace detail
 
 } // namespace heyoka
 

@@ -1016,4 +1016,26 @@ tfp taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<tfp> 
 
 #endif
 
+tfp taylor_diff_dbl(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
+                    std::uint32_t, std::uint32_t, bool)
+{
+    throw;
+}
+
+tfp taylor_diff_ldbl(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
+                     std::uint32_t, std::uint32_t, bool)
+{
+    throw;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_diff_f128(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
+                     std::uint32_t, std::uint32_t, bool)
+{
+    throw;
+}
+
+#endif
+
 } // namespace heyoka

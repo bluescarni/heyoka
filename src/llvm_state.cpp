@@ -1140,9 +1140,9 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                     "sv_diff_ptr");
 
                 // Load the value, as a scalar or vector.
-                auto diff_load = (vector_size == 0u) ? m_builder->CreateLoad(diff_ptr, "sv_diff_load")
-                                                     : detail::load_vector_from_memory(*m_builder, diff_ptr,
-                                                                                       vector_size, "sv_diff_load");
+                auto diff_load = (vector_size == 0u)
+                                     ? m_builder->CreateLoad(diff_ptr, "sv_diff_load")
+                                     : detail::load_vector_from_memory(*m_builder, diff_ptr, vector_size);
 
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
@@ -1313,9 +1313,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                                                                + detail::li_to_string(batch_idx));
                 assert(in_ptr != nullptr);
 
-                auto vec = detail::load_vector_from_memory(*m_builder, in_ptr, vector_size,
-                                                           "o0_init_load_" + detail::li_to_string(i) + "_"
-                                                               + detail::li_to_string(batch_idx));
+                auto vec = detail::load_vector_from_memory(*m_builder, in_ptr, vector_size);
                 assert(vec != nullptr);
 
                 auto diff_ptr = m_builder->CreateInBoundsGEP(

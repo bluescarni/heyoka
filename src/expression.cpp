@@ -611,4 +611,55 @@ tfp taylor_u_init_f128(llvm_state &s, const expression &e, const std::vector<tfp
 
 #endif
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+tfp taylor_diff_impl(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return std::visit(
+        [&](const auto &v) -> tfp {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_diff<T>(s, v, arr, n_uvars, order, idx, batch_size, high_accuracy);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives can be computed only for binary operators or functions");
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+tfp taylor_diff_dbl(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+
+{
+    return detail::taylor_diff_impl<double>(s, ex, arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+tfp taylor_diff_ldbl(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_diff_impl<long double>(s, ex, arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_diff_impl<mppp::real128>(s, ex, arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+#endif
+
 } // namespace heyoka
