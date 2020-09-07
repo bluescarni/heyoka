@@ -137,11 +137,38 @@ llvm::Value *tfp_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value 
     assert(x->getType() == y->getType());
     assert(x->getType() == z->getType());
 
-#if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
     auto x_t = llvm::cast<llvm::VectorType>(x->getType())->getElementType();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+    if (x_t == llvm::Type::getX86_FP80Ty(s.context())) {
+        // NOTE: there seems to be an LLVM bug when trying
+        // to use the fma intrinsic with extended precision
+        // arguments. For the moment, let's delegate
+        // to the fmal() C function and re-visit in newer
+        // LLVM versions.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x), y_scalars = vector_to_scalars(builder, y),
+             z_scalars = vector_to_scalars(builder, z);
+
+        // Execute the fma function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "fmal", llvm::Type::getX86_FP80Ty(s.context()), {x_scalars[i], y_scalars[i], z_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
         // to call an external function.
         auto &builder = s.builder();
@@ -165,12 +192,10 @@ llvm::Value *tfp_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value 
 
         // Reconstruct the return value as a vector.
         return scalars_to_vector(builder, res_scalars);
+#endif
     } else {
-#endif
         return llvm_invoke_intrinsic(s, "llvm.fma", {x->getType()}, {x, y, z});
-#if defined(HEYOKA_HAVE_REAL128)
     }
-#endif
 }
 
 // TwoProductFMA algorithm of Ogita et al.
