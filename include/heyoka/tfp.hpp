@@ -23,8 +23,8 @@ namespace heyoka
 {
 
 // LLVM floating-point type for use in the Taylor machinery.
-// It represents either a single floating-point operand (normal mode),
-// or a pair of floating-point operands (high accuracy mode) for
+// It represents either a single floating-point vector operand (normal mode),
+// or a pair of floating-point vector operands (high accuracy mode) for
 // the implementation of double-length arithmetics.
 // NOTE: the high accuracy algorithms require fast math to be disabled.
 using tfp = std::variant<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
