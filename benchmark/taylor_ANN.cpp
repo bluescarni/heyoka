@@ -21,12 +21,20 @@
 using namespace std::chrono;
 using namespace heyoka;
 
+template <typename Enumeration>
+auto as_integer(Enumeration const value)
+    -> typename std::underlying_type<Enumeration>::type
+{
+    return static_cast<typename std::underlying_type<Enumeration>::type>(value);
+}
+
 int main()
 {
     // System Dimension
-    auto n_neurons = 10u;
+    auto n_neurons = 5u;
     auto n_in = 2u;
     auto n_out = 1u;
+    unsigned offset_w_names = 1000u;
 
     // System state (letter a is used to make sure the state comes before the weights w)
     std::vector<expression> x;
@@ -34,12 +42,12 @@ int main()
         x.emplace_back(variable{"a" + std::to_string(i)});
     }
 
-    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to 10000
+    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to offset_w_names - 1)
     // parameters)
     auto n_w = (n_in + 1) * n_neurons + (n_neurons + 1) * n_out;
     std::vector<expression> w;
     for (auto i = 0u; i < n_w; ++i) {
-        w.emplace_back(variable{"w" + std::to_string(i + 1000)});
+        w.emplace_back(variable{"w" + std::to_string(i + offset_w_names)});
     }
 
     // We compute the outputs of the first (and only) layer of neurons
@@ -55,7 +63,7 @@ int main()
             hidden[i] += w[ji] * x[j];
         }
         // the non linearity
-        hidden[i] = 1_dbl/(1_dbl+exp(hidden[i]));
+        hidden[i] = sin(-hidden[i]);
     }
 
     // We compute the outputs of the output layer
@@ -74,7 +82,7 @@ int main()
             out[i] += w[ji] * hidden[j];
         }
         // the non linearity
-        out[i] = 1_dbl/(1_dbl+exp(out[i]));
+        out[i] = sin(-out[i]);
     }
 
     // Assembling the dynamics (weights and biases derivatives are zero)
@@ -96,7 +104,7 @@ int main()
     splitmix64 engine(123u);
     std::vector<double> ic = {0, 0, 0, 0};
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-        ic.push_back(std::uniform_real_distribution<>(-1, 1)(engine));
+        ic.push_back(std::uniform_real_distribution<>(-1., 1)(engine));
     }
 
     // Defining the integrator
@@ -110,45 +118,46 @@ int main()
     // Calling the integrator
     std::cout << "\nCalling the Taylor Integrator." << std::endl;
     start = high_resolution_clock::now();
-    // Longer times result in reaching liit cycles and thus loss of precision
-    // auto dt = 10;
-    // auto state = neural_network_ode.get_state();
-    // std::unordered_map<std::string, double> eval_map;
-    // eval_map["a0"] = state[0];
-    // eval_map["a1"] = state[1];
-    // for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-    //    eval_map["w" + std::to_string(i + 1000)] = ic[4 + i];
-    //}
-    // auto V = eval_dbl(out[0], eval_map);
-    // auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    // for (auto i = 0u; i < 1000; ++i) {
-    //    neural_network_ode.step();
-    //    state = neural_network_ode.get_state();
-    //    eval_map["a0"] = state[0];
-    //    eval_map["a1"] = state[1];
-    //    V = eval_dbl(out[0], eval_map);
-    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
-    //              << std::endl;
-    //}
-    // for (auto i = 0u; i < 1000; ++i) {
-    //    neural_network_ode.step_backward();
-    //    state = neural_network_ode.get_state();
-    //    eval_map["a0"] = state[0];
-    //    eval_map["a1"] = state[1];
-    //    V = eval_dbl(out[0], eval_map);
-    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
-    //              << std::endl;
-    //}
-    neural_network_ode.propagate_until(100.);
-    neural_network_ode.propagate_until(0.);
-    stop = high_resolution_clock::now();
-    duration = duration_cast<microseconds>(stop - start);
-    std::cout << "Microseconds: " << duration.count() << std::endl;
-    auto error = neural_network_ode.get_state();
-    std::transform(error.begin(), error.begin() + n_in, ic.begin(), error.begin(),
-                   [](auto a, auto b) { return std::abs(a - b); });
-    std::cout << "Error:" << *std::max_element(error.begin(), error.begin() + n_in) << std::endl;
+    // Longer times result in reaching limit cycles and thus loss of precision
+    auto state = neural_network_ode.get_state();
+    std::unordered_map<std::string, double> eval_map;
+    eval_map["a0"] = state[0];
+    eval_map["a1"] = state[1];
+    for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
+       eval_map["w" + std::to_string(i + 1000)] = ic[4 + i];
+    }
+    auto V = eval_dbl(out[0], eval_map);
+    auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    for (auto i = 0u; i < 100; ++i) {
+       auto res = neural_network_ode.step();
+       state = neural_network_ode.get_state();
+       eval_map["a0"] = state[0];
+       eval_map["a1"] = state[1];
+       V = eval_dbl(out[0], eval_map);
+       auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+       std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0 << ", " << as_integer(std::get<0>(res))
+                 << std::endl;
+    }
+    for (auto i = 0u; i < 100; ++i) {
+       neural_network_ode.step_backward();
+       state = neural_network_ode.get_state();
+       eval_map["a0"] = state[0];
+       eval_map["a1"] = state[1];
+       V = eval_dbl(out[0], eval_map);
+       auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+       std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
+                 << std::endl;
+    }
+
+
+    //neural_network_ode.propagate_until(100.);
+    //neural_network_ode.propagate_until(0.);
+    //stop = high_resolution_clock::now();
+    //duration = duration_cast<microseconds>(stop - start);
+    //std::cout << "Microseconds: " << duration.count() << std::endl;
+    //auto error = neural_network_ode.get_state();
+    //std::transform(error.begin(), error.begin() + n_in, ic.begin(), error.begin(),
+    //               [](auto a, auto b) { return std::abs(a - b); });
+    //std::cout << "Error:" << *std::max_element(error.begin(), error.begin() + n_in) << std::endl;
     return 0;
 }
