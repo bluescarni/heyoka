@@ -58,11 +58,10 @@ public:
     // Taylor integration function types.
     using taylor_decompose_t
         = std::function<std::vector<expression>::size_type(function &&, std::vector<expression> &)>;
-    using taylor_init_batch_t = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *,
-                                                            std::uint32_t, std::uint32_t, std::uint32_t)>;
-    using taylor_diff_batch_t = std::function<llvm::Value *(
-        llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t, llvm::Value *, std::uint32_t,
-        std::uint32_t, std::uint32_t, const std::unordered_map<std::uint32_t, number> &)>;
+    using taylor_u_init_t
+        = std::function<tfp(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t, bool)>;
+    using taylor_diff_t = std::function<tfp(llvm_state &, const function &, const std::vector<tfp> &, std::uint32_t,
+                                            std::uint32_t, std::uint32_t, std::uint32_t, bool)>;
 
 private:
     std::string m_name_dbl, m_name_ldbl,
@@ -91,16 +90,16 @@ private:
     deval_num_dbl_t m_deval_num_dbl_f;
 
     taylor_decompose_t m_taylor_decompose_f;
-    taylor_init_batch_t m_taylor_init_batch_dbl_f, m_taylor_init_batch_ldbl_f
+    taylor_u_init_t m_taylor_u_init_dbl_f, m_taylor_u_init_ldbl_f
 #if defined(HEYOKA_HAVE_REAL128)
         ,
-        m_taylor_init_batch_f128_f
+        m_taylor_u_init_f128_f
 #endif
         ;
-    taylor_diff_batch_t m_taylor_diff_batch_dbl_f, m_taylor_diff_batch_ldbl_f
+    taylor_diff_t m_taylor_diff_dbl_f, m_taylor_diff_ldbl_f
 #if defined(HEYOKA_HAVE_REAL128)
         ,
-        m_taylor_diff_batch_f128_f
+        m_taylor_diff_f128_f
 #endif
         ;
 
@@ -136,15 +135,15 @@ public:
     eval_num_dbl_t &eval_num_dbl_f();
     deval_num_dbl_t &deval_num_dbl_f();
     taylor_decompose_t &taylor_decompose_f();
-    taylor_init_batch_t &taylor_init_batch_dbl_f();
-    taylor_init_batch_t &taylor_init_batch_ldbl_f();
+    taylor_u_init_t &taylor_u_init_dbl_f();
+    taylor_u_init_t &taylor_u_init_ldbl_f();
 #if defined(HEYOKA_HAVE_REAL128)
-    taylor_init_batch_t &taylor_init_batch_f128_f();
+    taylor_u_init_t &taylor_u_init_f128_f();
 #endif
-    taylor_diff_batch_t &taylor_diff_batch_dbl_f();
-    taylor_diff_batch_t &taylor_diff_batch_ldbl_f();
+    taylor_diff_t &taylor_diff_dbl_f();
+    taylor_diff_t &taylor_diff_ldbl_f();
 #if defined(HEYOKA_HAVE_REAL128)
-    taylor_diff_batch_t &taylor_diff_batch_f128_f();
+    taylor_diff_t &taylor_diff_f128_f();
 #endif
 
     const std::string &name_dbl() const;
@@ -170,15 +169,15 @@ public:
     const eval_num_dbl_t &eval_num_dbl_f() const;
     const deval_num_dbl_t &deval_num_dbl_f() const;
     const taylor_decompose_t &taylor_decompose_f() const;
-    const taylor_init_batch_t &taylor_init_batch_dbl_f() const;
-    const taylor_init_batch_t &taylor_init_batch_ldbl_f() const;
+    const taylor_u_init_t &taylor_u_init_dbl_f() const;
+    const taylor_u_init_t &taylor_u_init_ldbl_f() const;
 #if defined(HEYOKA_HAVE_REAL128)
-    const taylor_init_batch_t &taylor_init_batch_f128_f() const;
+    const taylor_u_init_t &taylor_u_init_f128_f() const;
 #endif
-    const taylor_diff_batch_t &taylor_diff_batch_dbl_f() const;
-    const taylor_diff_batch_t &taylor_diff_batch_ldbl_f() const;
+    const taylor_diff_t &taylor_diff_dbl_f() const;
+    const taylor_diff_t &taylor_diff_ldbl_f() const;
 #if defined(HEYOKA_HAVE_REAL128)
-    const taylor_diff_batch_t &taylor_diff_batch_f128_f() const;
+    const taylor_diff_t &taylor_diff_f128_f() const;
 #endif
 };
 
