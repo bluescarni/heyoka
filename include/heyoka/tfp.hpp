@@ -26,6 +26,7 @@ namespace heyoka
 // It represents either a single floating-point operand (normal mode),
 // or a pair of floating-point operands (high accuracy mode) for
 // the implementation of double-length arithmetics.
+// NOTE: the high accuracy algorithms require fast math to be disabled.
 using tfp = std::variant<llvm::Value *, std::pair<llvm::Value *, llvm::Value *>>;
 
 HEYOKA_DLL_PUBLIC tfp tfp_add(llvm_state &, const tfp &, const tfp &);

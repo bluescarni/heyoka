@@ -18,7 +18,6 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -37,35 +36,6 @@
 namespace heyoka
 {
 
-namespace detail
-{
-
-namespace
-{
-
-// RAII helper to temporarily disable all fast math flags that might
-// be set in an LLVM builder. On destruction, the original fast math
-// flags will be restored.
-struct fm_disabler {
-    llvm_state &m_s;
-    llvm::FastMathFlags m_orig_fmf;
-
-    explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
-    {
-        // Set the new flags (all fast math options are disabled).
-        m_s.builder().setFastMathFlags(llvm::FastMathFlags{});
-    }
-    ~fm_disabler()
-    {
-        // Restore the original flags.
-        m_s.builder().setFastMathFlags(m_orig_fmf);
-    }
-};
-
-} // namespace
-
-} // namespace detail
-
 tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
 {
     return std::visit(
@@ -82,8 +52,6 @@ tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                detail::fm_disabler fmd(s);
-
                 // Knuth's TwoSum algorithm.
                 auto x = builder.CreateFAdd(a.first, b.first);
                 auto z = builder.CreateFSub(x, a.first);
@@ -109,8 +77,6 @@ tfp tfp_neg(llvm_state &s, const tfp &x)
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
                 return builder.CreateFNeg(a);
             } else {
-                detail::fm_disabler fmd(s);
-
                 return std::pair{builder.CreateFNeg(a.first), builder.CreateFNeg(a.second)};
             }
         },
@@ -131,7 +97,6 @@ namespace
 
 // Helper to invoke the fma primitive used in the implementation
 // of tfp_mul().
-// NOTE: this assumes fast math has already been disabled.
 llvm::Value *tfp_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
 {
     assert(x->getType() == y->getType());
@@ -199,7 +164,6 @@ llvm::Value *tfp_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value 
 }
 
 // TwoProductFMA algorithm of Ogita et al.
-// NOTE: this assumes fast math has already been disabled.
 auto tfp_eft_prod(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
     auto &builder = s.builder();
@@ -230,8 +194,6 @@ tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                detail::fm_disabler fmd(s);
-
                 // mul2 algorithm of Dekker without normalisation.
                 // TODO check if this can be simplified, Dekker actually
                 // does not do the multiplication of the errors of a and b.
@@ -265,8 +227,6 @@ tfp tfp_div(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                detail::fm_disabler fmd(s);
-
                 // div2 algorithm of Dekker without normalisation.
                 auto c = builder.CreateFDiv(a.first, b.first);
                 auto [u, uu] = detail::tfp_eft_prod(s, c, b.first);
@@ -344,8 +304,6 @@ llvm::Value *tfp_cast(llvm_state &s, const tfp &x)
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
                 return a;
             } else {
-                detail::fm_disabler fmd(s);
-
                 return builder.CreateFAdd(a.first, a.second);
             }
         },

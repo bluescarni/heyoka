@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -32,6 +33,7 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
@@ -1742,6 +1744,25 @@ namespace detail
 namespace
 {
 
+// RAII helper to temporarily disable all fast math flags that might
+// be set in an LLVM builder. On destruction, the original fast math
+// flags will be restored.
+struct fm_disabler {
+    llvm_state &m_s;
+    llvm::FastMathFlags m_orig_fmf;
+
+    explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
+    {
+        // Set the new flags (all fast math options are disabled).
+        m_s.builder().setFastMathFlags(llvm::FastMathFlags{});
+    }
+    ~fm_disabler()
+    {
+        // Restore the original flags.
+        m_s.builder().setFastMathFlags(m_orig_fmf);
+    }
+};
+
 // Helper to load from the array 'in' the zero-order derivative of the state variable at index var_idx.
 template <typename T>
 tfp taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx, std::uint32_t batch_size,
@@ -1881,6 +1902,13 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
+    }
+
+    // NOTE: in high accuracy mode we need
+    // to disable all fast math flags in the builder.
+    std::optional<fm_disabler> fmd;
+    if (high_accuracy) {
+        fmd.emplace(s);
     }
 
     // Record the number of equations/variables.
