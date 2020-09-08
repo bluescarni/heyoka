@@ -9,6 +9,8 @@
 #include <chrono>
 #include <initializer_list>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <heyoka/expression.hpp>
@@ -17,9 +19,18 @@
 
 using namespace heyoka;
 
-int main()
+int main(int argc, char *argv[])
 {
-    const auto batch_size = llvm_state{}.vector_size<double>();
+    auto batch_size = 1u;
+
+    if (argc > 1) {
+        auto bs = std::stoi(argv[1]);
+        if (bs <= 0) {
+            throw std::invalid_argument("The batch size must be positive, but it is " + std::string(argv[1])
+                                        + " instead");
+        }
+        batch_size = static_cast<unsigned>(bs);
+    }
 
     if (batch_size == 0u) {
         std::cout << "The vector size on the current machine is zero, exiting.\n";
@@ -57,11 +68,13 @@ int main()
     }
     auto ptr = jet.data();
 
+    // Warm up.
+    jet_ptr(ptr);
+
     auto start = std::chrono::high_resolution_clock::now();
 
     // Do 400 evaluations.
     for (auto i = 0; i < 40; ++i) {
-        jet_ptr(ptr);
         jet_ptr(ptr);
         jet_ptr(ptr);
         jet_ptr(ptr);
