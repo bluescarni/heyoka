@@ -1763,31 +1763,6 @@ struct fm_disabler {
     }
 };
 
-// Helper to load from the array 'in' the zero-order derivative of the state variable at index var_idx.
-template <typename T>
-tfp taylor_load_sv_order0(llvm_state &s, llvm::Value *in, std::uint32_t var_idx, std::uint32_t batch_size,
-                          bool high_accuracy)
-{
-    auto &builder = s.builder();
-
-    // Fetch the pointer from in.
-    if (var_idx > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error(
-            "Overflow while loading the zero-order derivatives in the computation of a Taylor jet");
-    }
-    auto ptr = builder.CreateInBoundsGEP(in, {builder.getInt32(var_idx * batch_size)});
-
-    // Load the value in vector mode.
-    auto v = load_vector_from_memory(builder, ptr, batch_size);
-
-    // Convert to a double-length floating-point value if requested.
-    if (high_accuracy) {
-        return std::pair{v, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size)};
-    } else {
-        return v;
-    }
-}
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number), n_uvars the number of variables in
@@ -1837,22 +1812,18 @@ tfp taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vecto
 // n_uvars the total number of u variables in the decomposition.
 // order is the max derivative order desired, batch_size the batch size, high_accuracy
 // specifies whether to use extended precision techniques in the computation.
-// 'in' must be a pointer to an array whose first n_eq * batch_size elements represent
-// the derivatives of order 0 of the variables of the ODE.
+// order0 contains the zero order derivatives of the state variables.
 //
-// The return value is the jet of derivatives of the u variables up to order 'order - 1',
+// The return value is the jet of derivatives of all u variables up to order 'order - 1',
 // plus the derivatives of order 'order' of the state variables.
 template <typename T>
-auto taylor_compute_jet(llvm_state &s, llvm::Value *in, const std::vector<expression> &dc, std::uint32_t n_eq,
+auto taylor_compute_jet(llvm_state &s, std::vector<tfp> order0, const std::vector<expression> &dc, std::uint32_t n_eq,
                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
 {
-    // Init the return value.
-    std::vector<tfp> retval;
+    assert(order0.size() == n_eq);
 
-    // Start loading the order-0 derivatives of the state variables from 'in'.
-    for (std::uint32_t i = 0; i < n_eq; ++i) {
-        retval.push_back(taylor_load_sv_order0<T>(s, in, i, batch_size, high_accuracy));
-    }
+    // Init the return value with the order 0 of the state variables.
+    auto retval(std::move(order0));
 
     // Compute the order-0 derivatives of the other u variables.
     for (auto i = n_eq; i < n_uvars; ++i) {
@@ -1883,6 +1854,40 @@ auto taylor_compute_jet(llvm_state &s, llvm::Value *in, const std::vector<expres
     }
 
     assert(retval.size() == static_cast<decltype(retval.size())>(n_uvars) * order + n_eq);
+
+    return retval;
+}
+
+// Given an input pointer 'in', load the first n * batch_size values in it as n tfp values
+// with vector size batch_size.
+template <typename T>
+auto taylor_load_values_as_tfp(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size,
+                               bool high_accuracy)
+{
+    assert(batch_size > 0u);
+
+    // Overflow check.
+    if (n > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("Overflow while loading values as tfps");
+    }
+
+    auto &builder = s.builder();
+
+    std::vector<tfp> retval;
+    for (std::uint32_t i = 0; i < n; ++i) {
+        // Fetch the pointer from in.
+        auto ptr = builder.CreateInBoundsGEP(in, {builder.getInt32(i * batch_size)});
+
+        // Load the value in vector mode.
+        auto v = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Create the tfp and add it to retval.
+        if (high_accuracy) {
+            retval.emplace_back(std::pair{v, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size)});
+        } else {
+            retval.emplace_back(v);
+        }
+    }
 
     return retval;
 }
@@ -1943,9 +1948,13 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     assert(bb != nullptr);
     s.builder().SetInsertPoint(bb);
 
-    // Emit the code for the computation of the jet of derivatives.
+    // Load the order zero derivatives from the input pointer.
+    auto order0_arr = taylor_load_values_as_tfp<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size,
+                                                   high_accuracy);
+
+    // Compute the jet of derivatives.
     auto diff_arr
-        = taylor_compute_jet<T>(s, &*in_out, dc, boost::numeric_cast<std::uint32_t>(n_eq),
+        = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
                                 boost::numeric_cast<std::uint32_t>(n_uvars), order, batch_size, high_accuracy);
 
     // Write the derivatives to in_out.
