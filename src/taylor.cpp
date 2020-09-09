@@ -1882,11 +1882,7 @@ auto taylor_load_values_as_tfp(llvm_state &s, llvm::Value *in, std::uint32_t n, 
         auto v = load_vector_from_memory(builder, ptr, batch_size);
 
         // Create the tfp and add it to retval.
-        if (high_accuracy) {
-            retval.emplace_back(std::pair{v, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size)});
-        } else {
-            retval.emplace_back(v);
-        }
+        retval.push_back(tfp_from_vector(s, v, high_accuracy));
     }
 
     return retval;
@@ -1970,7 +1966,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
             // Index in the jet of derivatives.
             const auto arr_idx = cur_order * n_uvars + j;
             assert(arr_idx < diff_arr.size());
-            const auto fp_vec = tfp_cast(s, diff_arr[arr_idx]);
+            const auto fp_vec = tfp_to_vector(s, diff_arr[arr_idx]);
 
             // Index in the output array.
             const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;

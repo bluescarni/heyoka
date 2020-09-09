@@ -16,6 +16,8 @@
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Type.h>
@@ -294,20 +296,48 @@ tfp tfp_pairwise_sum(llvm_state &s, std::vector<tfp> &sum)
 
 } // namespace detail
 
-// Cast a tfp back to an LLVM floating-point value.
-llvm::Value *tfp_cast(llvm_state &s, const tfp &x)
+// Cast a tfp back to an LLVM floating-point vector.
+llvm::Value *tfp_to_vector(llvm_state &s, const tfp &x)
 {
     return std::visit(
         [&s](const auto &a) {
-            auto &builder = s.builder();
-
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
                 return a;
             } else {
-                return builder.CreateFAdd(a.first, a.second);
+                return s.builder().CreateFAdd(a.first, a.second);
             }
         },
         x);
+}
+
+// Helper to create a tfp from an input vector. In normal mode,
+// it will just return x. Otherwise, it will return x paired
+// to a zero-filled error vector.
+tfp tfp_from_vector(llvm_state &s, llvm::Value *x, bool high_accuracy)
+{
+    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x->getType())) {
+        if (!high_accuracy) {
+            // In normal mode, just return x converted to a tfp.
+            return x;
+        }
+
+        // In high accuracy mode, we need to init the error component to zero.
+        auto &builder = s.builder();
+
+        // Determine the scalar type.
+        auto x_t = vec_t->getElementType();
+
+        // Fetch the vector width.
+        const auto vector_size = vec_t->getNumElements();
+
+        // Create a scalar zero of type x_t.
+        auto s_zero = builder.CreateUIToFP(builder.getInt32(0), x_t);
+
+        return std::pair{
+            x, detail::create_constant_vector(builder, s_zero, boost::numeric_cast<std::uint32_t>(vector_size))};
+    } else {
+        throw std::invalid_argument("Cannot create a tfp from a non-vector value");
+    }
 }
 
 } // namespace heyoka

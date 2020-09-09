@@ -89,12 +89,8 @@ tfp taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector
     // Build a vector with the results.
     auto ret = scalars_to_vector(builder, init_vals);
 
-    if (high_accuracy) {
-        // NOTE: in high accuracy mode return a tfp with zero error.
-        return std::pair{ret, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size)};
-    } else {
-        return ret;
-    }
+    // Turn it into a tfp and return it.
+    return tfp_from_vector(s, ret, high_accuracy);
 }
 
 template <typename T>
@@ -948,12 +944,8 @@ tfp taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<tfp> &
     // Build a vector with the results.
     auto ret = scalars_to_vector(builder, init_vals);
 
-    if (high_accuracy) {
-        // NOTE: in high accuracy mode return a tfp with zero error.
-        return std::pair{ret, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size)};
-    } else {
-        return ret;
-    }
+    // Turn it into a tfp and return it.
+    return tfp_from_vector(s, ret, high_accuracy);
 }
 
 // Derivative of pow(number, number).

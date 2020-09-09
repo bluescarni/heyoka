@@ -149,11 +149,7 @@ inline tfp tfp_constant(llvm_state &s, const number &num, std::uint32_t batch_si
 {
     auto ret = create_constant_vector(s.builder(), codegen<T>(s, num), batch_size);
 
-    if (high_accuracy) {
-        return std::pair{ret, create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size)};
-    } else {
-        return ret;
-    }
+    return tfp_from_vector(s, ret, high_accuracy);
 }
 
 // Helper to create a zero tfp.

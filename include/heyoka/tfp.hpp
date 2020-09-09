@@ -36,7 +36,8 @@ HEYOKA_DLL_PUBLIC tfp tfp_div(llvm_state &, const tfp &, const tfp &);
 
 HEYOKA_DLL_PUBLIC tfp tfp_neg(llvm_state &, const tfp &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *tfp_cast(llvm_state &, const tfp &);
+HEYOKA_DLL_PUBLIC llvm::Value *tfp_to_vector(llvm_state &, const tfp &);
+HEYOKA_DLL_PUBLIC tfp tfp_from_vector(llvm_state &, llvm::Value *, bool);
 
 namespace detail
 {
