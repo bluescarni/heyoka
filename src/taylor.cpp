@@ -1922,7 +1922,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     assert(dc.size() > n_eq);
     const auto n_uvars = dc.size() - n_eq;
 
-    // Prepare the main function prototype. The only argument is a float pointer to in/out array.
+    // Prepare the function prototype. The only argument is a float pointer to in/out array.
     std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(to_llvm_type<T>(s.context()))};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(s.builder().getVoidTy(), fargs, false);
