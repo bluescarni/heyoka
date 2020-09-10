@@ -183,7 +183,7 @@ auto tfp_eft_prod(llvm_state &s, llvm::Value *a, llvm::Value *b)
 tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
 {
     return std::visit(
-        [&s](const auto &a, const auto &b) -> tfp {
+        [&s, &x, &y](const auto &a, const auto &b) -> tfp {
             using t1 = detail::uncvref_t<decltype(a)>;
             using t2 = detail::uncvref_t<decltype(b)>;
 
@@ -196,15 +196,7 @@ tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                // mul2 algorithm of Dekker without normalisation.
-                // TODO check if this can be simplified, Dekker actually
-                // does not do the multiplication of the errors of a and b.
-                // But maybe in our case it's needed because we don't normalise?
-                auto [x, y] = detail::tfp_eft_prod(s, a.first, b.first);
-
-                return std::pair{x, detail::tfp_fma(s, b.first, a.second,
-                                                    detail::tfp_fma(s, a.first, b.second,
-                                                                    detail::tfp_fma(s, a.second, b.second, y)))};
+                return tfp_from_vector(s, builder.CreateFMul(tfp_to_vector(s, x), tfp_to_vector(s, y)), true);
             } else {
                 throw std::invalid_argument(
                     "Invalid combination of argument in tfp_mul(): the input tfp variants must contain the same types");
@@ -216,7 +208,7 @@ tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
 tfp tfp_div(llvm_state &s, const tfp &x, const tfp &y)
 {
     return std::visit(
-        [&s](const auto &a, const auto &b) -> tfp {
+        [&s, &x, &y](const auto &a, const auto &b) -> tfp {
             using t1 = detail::uncvref_t<decltype(a)>;
             using t2 = detail::uncvref_t<decltype(b)>;
 
@@ -229,16 +221,7 @@ tfp tfp_div(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                // div2 algorithm of Dekker without normalisation.
-                auto c = builder.CreateFDiv(a.first, b.first);
-                auto [u, uu] = detail::tfp_eft_prod(s, c, b.first);
-                auto cc = builder.CreateFDiv(
-                    builder.CreateFSub(builder.CreateFAdd(builder.CreateFAdd(builder.CreateFNeg(uu), a.second),
-                                                          detail::tfp_fma(s, builder.CreateFNeg(c), b.second, a.first)),
-                                       u),
-                    b.first);
-
-                return std::pair{c, cc};
+                return tfp_from_vector(s, builder.CreateFDiv(tfp_to_vector(s, x), tfp_to_vector(s, y)), true);
             } else {
                 throw std::invalid_argument(
                     "Invalid combination of argument in tfp_div(): the input tfp variants must contain the same types");

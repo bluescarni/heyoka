@@ -1514,8 +1514,10 @@ struct fm_disabler {
 
     explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
     {
-        // Set the new flags (all fast math options are disabled).
-        m_s.builder().setFastMathFlags(llvm::FastMathFlags{});
+        // Set the new flags (allow only fp contract).
+        llvm::FastMathFlags fmf;
+        fmf.setAllowContract();
+        m_s.builder().setFastMathFlags(fmf);
     }
     ~fm_disabler()
     {
@@ -1667,7 +1669,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     }
 
     // NOTE: in high accuracy mode we need
-    // to disable all fast math flags in the builder.
+    // to disable fast math flags in the builder.
     std::optional<fm_disabler> fmd;
     if (high_accuracy) {
         fmd.emplace(s);
@@ -2047,7 +2049,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     const auto order = static_cast<std::uint32_t>(order_f);
 
     // NOTE: in high accuracy mode we need
-    // to disable all fast math flags in the builder.
+    // to disable fast math flags in the builder.
     std::optional<fm_disabler> fmd;
     if (high_accuracy) {
         fmd.emplace(s);
