@@ -104,6 +104,70 @@ std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name,
     }
 }
 
+HEYOKA_DLL_PUBLIC std::vector<expression>
+taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<expression>, double, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
+                                                                        std::vector<expression>, long double,
+                                                                        std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
+                                                                        std::vector<expression>, mppp::real128,
+                                                                        std::uint32_t, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                                 T tol, std::uint32_t order, bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, order, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, order, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, order, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
+                                                                       std::vector<std::pair<expression, expression>>,
+                                                                       double, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
+                                                                        std::vector<std::pair<expression, expression>>,
+                                                                        long double, std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
+                                                                        std::vector<std::pair<expression, expression>>,
+                                                                        mppp::real128, std::uint32_t, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name,
+                                                 std::vector<std::pair<expression, expression>> sys, T tol,
+                                                 std::uint32_t order, bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, order, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, order, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, order, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 // Enum to represnt the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome {
