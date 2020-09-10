@@ -1824,6 +1824,12 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *a_v, llvm::Value *b_
     return llvm_invoke_intrinsic(s, "llvm.minnum", {a_v->getType()}, {a_v, abs_b_v});
 }
 
+// Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+    return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+}
+
 // Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
 llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
