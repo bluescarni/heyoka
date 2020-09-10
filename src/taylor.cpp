@@ -1806,28 +1806,124 @@ namespace detail
 namespace
 {
 
-// Helper to compute max(a_v, abs(b_v)) in the Taylor stepper implementation.
-llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *a_v, llvm::Value *b_v)
+// Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
+llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    // Compute abs(b).
-    auto abs_b_v = llvm_invoke_intrinsic(s, "llvm.fabs", {b_v->getType()}, {b_v});
-    // Return max(a, abs(b)).
-    return llvm_invoke_intrinsic(s, "llvm.maxnum", {a_v->getType()}, {a_v, abs_b_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_maxabs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_maxabs128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Compute abs(b).
+        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        // Return max(a, abs(b)).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, abs_y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
 }
 
-// Helper to compute min(a_v, abs(b_v)) in the Taylor stepper implementation.
-llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *a_v, llvm::Value *b_v)
+// Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
+llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    // Compute abs(b).
-    auto abs_b_v = llvm_invoke_intrinsic(s, "llvm.fabs", {b_v->getType()}, {b_v});
-    // Return min(a, abs(b)).
-    return llvm_invoke_intrinsic(s, "llvm.minnum", {a_v->getType()}, {a_v, abs_b_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minabs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minabs128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Compute abs(b).
+        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        // Return min(a, abs(b)).
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
 }
 
 // Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
 llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minnum128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minnum128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
 }
 
 // Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
@@ -1866,12 +1962,6 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
-}
-
-// Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-    return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
 }
 
 // Helper to run the Estrin scheme on the polynomial
