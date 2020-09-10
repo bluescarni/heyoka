@@ -914,50 +914,47 @@ std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::
     return tdf(std::move(f), u_vars_defs);
 }
 
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t)
 {
     throw;
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
     throw;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
     throw;
 }
 
 #endif
 
-llvm::Value *taylor_diff_batch_dbl(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size,
-                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_dbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                   llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                   const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
 }
 
-llvm::Value *taylor_diff_batch_ldbl(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_batch_f128(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_f128(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    const std::unordered_map<std::uint32_t, number> &)
 {
     throw;
 }
