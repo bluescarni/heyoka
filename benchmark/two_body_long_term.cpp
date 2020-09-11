@@ -105,7 +105,10 @@ void run_integration()
             // time which is greater than the current time).
             it = std::upper_bound(it, save_times.end(), ta.get_time());
         }
-        ta.step();
+        auto [res, h] = ta.step();
+        if (res != heyoka::taylor_outcome::success) {
+            throw std::runtime_error("Error status detected: " + std::to_string(static_cast<int>(res)));
+        }
     }
 }
 
