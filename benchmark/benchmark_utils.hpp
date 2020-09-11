@@ -14,6 +14,15 @@
 #include <initializer_list>
 #include <utility>
 
+#if defined(HEYOKA_WITH_XTENSOR)
+
+#include <cstddef>
+
+#include <xtensor/xfixed.hpp>
+#include <xtensor/xshape.hpp>
+
+#endif
+
 namespace heyoka_benchmark
 {
 
@@ -121,6 +130,14 @@ inline std::pair<std::array<T, 3>, std::array<T, 3>> kep_to_cart(std::array<T, 6
 
     return std::pair{x, v};
 }
+
+#if defined(HEYOKA_WITH_XTENSOR)
+
+// 1-D array type of fixed size N.
+template <typename T, std::size_t N>
+using vNd = xt::xtensor_fixed<T, xt::xshape<N>>;
+
+#endif
 
 } // namespace heyoka_benchmark
 
