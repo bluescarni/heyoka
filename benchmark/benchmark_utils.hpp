@@ -12,12 +12,14 @@
 #include <array>
 #include <cmath>
 #include <initializer_list>
+#include <type_traits>
 #include <utility>
 
 #if defined(HEYOKA_WITH_XTENSOR)
 
 #include <cstddef>
 
+#include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xfixed.hpp>
 #include <xtensor/xshape.hpp>
 
@@ -136,6 +138,42 @@ inline std::pair<std::array<T, 3>, std::array<T, 3>> kep_to_cart(std::array<T, 6
 // 1-D array type of fixed size N.
 template <typename T, std::size_t N>
 using vNd = xt::xtensor_fixed<T, xt::xshape<N>>;
+
+template <typename E1, typename E2, typename T>
+inline vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
+{
+    static_assert(std::is_same_v<typename E1::value_type, T>);
+    static_assert(std::is_same_v<typename E2::value_type, T>);
+
+    using std::acos;
+
+    const auto h = xt::linalg::cross(x, v);
+    const auto e_v = xt::linalg::cross(v, h) / mu - x / xt::linalg::norm(x);
+    const vNd<T, 3> n = {-h[1], h[0], T(0)};
+
+    auto nu = acos(xt::linalg::dot(e_v, x)[0] / (xt::linalg::norm(e_v) * xt::linalg::norm(x)));
+    if (xt::linalg::dot(x, v)[0] < 0) {
+        nu = 2 * acos(T(-1)) - nu;
+    }
+
+    const auto i = acos(h[2] / xt::linalg::norm(h));
+
+    const auto e = xt::linalg::norm(e_v);
+
+    auto Om = acos(n[0] / xt::linalg::norm(n));
+    if (n[1] < 0) {
+        Om = 2 * acos(T(-1)) - Om;
+    }
+
+    auto om = acos(xt::linalg::dot(n, e_v)[0] / (xt::linalg::norm(n) * xt::linalg::norm(e_v)));
+    if (e_v[2] < 0) {
+        om = 2 * acos(T(-1)) - om;
+    }
+
+    const auto a = 1 / (2 / xt::linalg::norm(x) - xt::linalg::dot(v, v)[0] / mu);
+
+    return {a, e, i, om, Om, nu};
+}
 
 #endif
 

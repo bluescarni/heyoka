@@ -166,7 +166,26 @@ void run_integration()
         if (it != save_times.end() && ta.get_time() >= *it) {
             // We are at or past the current saving time, record
             // the time, energy error and orbital elements.
-            of << ta.get_time() << " " << abs((init_energy - get_energy()) / init_energy) << std::endl;
+            of << ta.get_time() << " " << abs((init_energy - get_energy()) / init_energy) << " ";
+
+            // Store the state.
+            for (auto val : s_array) {
+                of << val << " ";
+            }
+
+            // Store the orbital elements wrt the Sun.
+            for (auto i = 1u; i < 6u; ++i) {
+                auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
+                auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
+
+                auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+
+                for (auto oe : kep) {
+                    of << oe << " ";
+                }
+            }
+
+            of << std::endl;
 
             // Locate the next saving time (that is, the first saving
             // time which is greater than the current time).
