@@ -63,8 +63,8 @@ tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
                 // Double-length addition without normalisation.
                 return std::pair{x, builder.CreateFAdd(y, builder.CreateFAdd(a.second, b.second))};
             } else {
-                throw std::invalid_argument(
-                    "Invalid combination of argument in tfp_add(): the input tfp variants must contain the same types");
+                throw std::invalid_argument("Invalid combination of arguments in tfp_add(): the input tfp variants "
+                                            "must contain the same types");
             }
         },
         x, y);
@@ -198,8 +198,8 @@ tfp tfp_mul(llvm_state &s, const tfp &x, const tfp &y)
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
                 return tfp_from_vector(s, builder.CreateFMul(tfp_to_vector(s, x), tfp_to_vector(s, y)), true);
             } else {
-                throw std::invalid_argument(
-                    "Invalid combination of argument in tfp_mul(): the input tfp variants must contain the same types");
+                throw std::invalid_argument("Invalid combination of arguments in tfp_mul(): the input tfp variants "
+                                            "must contain the same types");
             }
         },
         x, y);
@@ -223,8 +223,8 @@ tfp tfp_div(llvm_state &s, const tfp &x, const tfp &y)
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
                 return tfp_from_vector(s, builder.CreateFDiv(tfp_to_vector(s, x), tfp_to_vector(s, y)), true);
             } else {
-                throw std::invalid_argument(
-                    "Invalid combination of argument in tfp_div(): the input tfp variants must contain the same types");
+                throw std::invalid_argument("Invalid combination of arguments in tfp_div(): the input tfp variants "
+                                            "must contain the same types");
             }
         },
         x, y);
