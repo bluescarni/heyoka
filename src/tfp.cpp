@@ -54,11 +54,9 @@ tfp tfp_add(llvm_state &s, const tfp &x, const tfp &y)
                                      std::pair<llvm::Value *,
                                                llvm::Value
                                                    *>> && std::is_same_v<t2, std::pair<llvm::Value *, llvm::Value *>>) {
-                // Knuth's TwoSum algorithm.
+                // Dekker's FastTwoSum algorithm.
                 auto x = builder.CreateFAdd(a.first, b.first);
-                auto z = builder.CreateFSub(x, a.first);
-                auto y = builder.CreateFAdd(builder.CreateFSub(a.first, builder.CreateFSub(x, z)),
-                                            builder.CreateFSub(b.first, z));
+                auto y = builder.CreateFAdd(builder.CreateFSub(a.first, x), b.first);
 
                 // Double-length addition without normalisation.
                 return std::pair{x, builder.CreateFAdd(y, builder.CreateFAdd(a.second, b.second))};
