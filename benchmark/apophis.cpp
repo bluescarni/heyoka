@@ -39,9 +39,18 @@ void to_screen(const taylor_adaptive<Fp_type> &taylor)
     std::cout << "v_a = [" << st[15] << ", " << st[16] << ", " << st[17] << "]" << std::endl;
 }
 
+// In this benchmark we integrate the simplified dynamics of the asteroid Apophis over 100 years, including
+// its 2029 Earth close encounter. The dynamics is that of a full three body problem in cartesian coordinates (Cowell's
+// method) the initial position of the planets are derived by starting at the Apophis-Earth close encounter conditions
+// as computed from the JPL Horizon web service integrating back in quedruple precision for 50 years. From these initial
+// conditions, a ground truth trajectory and time grid is established integrating forward with the Taylor adaptive
+// method for 100 years. The same integration is then made using single precision.
+
+// The benchmark output is quite verbose, but the final numbers that count are the relative precision on r and v and the
+// CPU time.
+
 int main()
 {
-
     // Bodies are Sun, Earth and Apophis.
     const auto masses = std::vector{1.989e30, 5.9722e24, 6.1e10};
     // Position at 2029-Apr-13 21:42:00.0000 in the J2000 frame (solar system barycenter)
@@ -123,12 +132,17 @@ int main()
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s" << std::endl;
 
-    // Uncomment these lines to print to screen the error on the radius magnitude
-    //for (decltype(times_d.size()) i = 0u; i < times_d.size(); ++i) {
-    //    auto r_q = sqrt(baseline_s[i][12]*baseline_s[i][12]+baseline_s[i][13]*baseline_s[i][13]+baseline_s[i][14]*baseline_s[i][14]);
-    //    auto r_d = sqrt(states_d[i][12]*states_d[i][12]+states_d[i][13]*states_d[i][13]+states_d[i][14]*states_d[i][14]);
-    //    std::cout << times_d[i] << ", " << r_q << ", " << r_d << ", " << abs(r_d-r_q) << ","
-    //              << std::endl;
-    //}
+    for (decltype(times_d.size()) i = 0u; i < times_d.size(); ++i) {
+        auto r_q = sqrt(baseline_s[i][12] * baseline_s[i][12] + baseline_s[i][13] * baseline_s[i][13]
+                        + baseline_s[i][14] * baseline_s[i][14]);
+        auto r_d = sqrt(states_d[i][12] * states_d[i][12] + states_d[i][13] * states_d[i][13]
+                        + states_d[i][14] * states_d[i][14]);
+        auto v_q = sqrt(baseline_s[i][15] * baseline_s[i][15] + baseline_s[i][16] * baseline_s[i][16]
+                        + baseline_s[i][17] * baseline_s[i][17]);
+        auto v_d = sqrt(states_d[i][15] * states_d[i][15] + states_d[i][16] * states_d[i][16]
+                        + states_d[i][17] * states_d[i][17]);
+        // Uncomment these lines to print to screen the error on the radius and velocity magnitude
+        std::cout << times_d[i] << ", " << abs(r_d - r_q) << ", " << abs(v_q - v_d) << "," << std::endl;
+    }
     return 0;
 }
