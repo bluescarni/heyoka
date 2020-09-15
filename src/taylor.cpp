@@ -1505,7 +1505,7 @@ namespace detail
 namespace
 {
 
-// RAII helper to temporarily disable all fast math flags that might
+// RAII helper to temporarily disable most fast math flags that might
 // be set in an LLVM builder. On destruction, the original fast math
 // flags will be restored.
 struct fm_disabler {
