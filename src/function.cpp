@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <iterator>
 #include <memory>
 #include <ostream>
@@ -42,6 +43,7 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -81,7 +83,7 @@ function::function(std::vector<expression> args)
 }
 
 function::function(const function &f)
-    : m_disable_verify(f.m_disable_verify), m_name_dbl(f.m_name_dbl), m_name_ldbl(f.m_name_ldbl),
+    : m_name_dbl(f.m_name_dbl), m_name_ldbl(f.m_name_ldbl),
 #if defined(HEYOKA_HAVE_REAL128)
       m_name_f128(f.m_name_f128),
 #endif
@@ -96,15 +98,15 @@ function::function(const function &f)
 #endif
       m_diff_f(f.m_diff_f), m_eval_dbl_f(f.m_eval_dbl_f), m_eval_batch_dbl_f(f.m_eval_batch_dbl_f),
       m_eval_num_dbl_f(f.m_eval_num_dbl_f), m_deval_num_dbl_f(f.m_deval_num_dbl_f),
-      m_taylor_decompose_f(f.m_taylor_decompose_f), m_taylor_init_batch_dbl_f(f.m_taylor_init_batch_dbl_f),
-      m_taylor_init_batch_ldbl_f(f.m_taylor_init_batch_ldbl_f),
+      m_taylor_decompose_f(f.m_taylor_decompose_f), m_taylor_u_init_dbl_f(f.m_taylor_u_init_dbl_f),
+      m_taylor_u_init_ldbl_f(f.m_taylor_u_init_ldbl_f),
 #if defined(HEYOKA_HAVE_REAL128)
-      m_taylor_init_batch_f128_f(f.m_taylor_init_batch_f128_f),
+      m_taylor_u_init_f128_f(f.m_taylor_u_init_f128_f),
 #endif
-      m_taylor_diff_batch_dbl_f(f.m_taylor_diff_batch_dbl_f), m_taylor_diff_batch_ldbl_f(f.m_taylor_diff_batch_ldbl_f)
+      m_taylor_diff_dbl_f(f.m_taylor_diff_dbl_f), m_taylor_diff_ldbl_f(f.m_taylor_diff_ldbl_f)
 #if defined(HEYOKA_HAVE_REAL128)
       ,
-      m_taylor_diff_batch_f128_f(f.m_taylor_diff_batch_f128_f)
+      m_taylor_diff_f128_f(f.m_taylor_diff_f128_f)
 #endif
 {
 }
@@ -122,11 +124,6 @@ function &function::operator=(const function &f)
 }
 
 function &function::operator=(function &&) noexcept = default;
-
-bool &function::disable_verify()
-{
-    return m_disable_verify;
-}
 
 std::string &function::name_dbl()
 {
@@ -229,48 +226,43 @@ function::taylor_decompose_t &function::taylor_decompose_f()
     return m_taylor_decompose_f;
 }
 
-function::taylor_init_batch_t &function::taylor_init_batch_dbl_f()
+function::taylor_u_init_t &function::taylor_u_init_dbl_f()
 {
-    return m_taylor_init_batch_dbl_f;
+    return m_taylor_u_init_dbl_f;
 }
 
-function::taylor_init_batch_t &function::taylor_init_batch_ldbl_f()
+function::taylor_u_init_t &function::taylor_u_init_ldbl_f()
 {
-    return m_taylor_init_batch_ldbl_f;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-function::taylor_init_batch_t &function::taylor_init_batch_f128_f()
-{
-    return m_taylor_init_batch_f128_f;
-}
-
-#endif
-
-function::taylor_diff_batch_t &function::taylor_diff_batch_dbl_f()
-{
-    return m_taylor_diff_batch_dbl_f;
-}
-
-function::taylor_diff_batch_t &function::taylor_diff_batch_ldbl_f()
-{
-    return m_taylor_diff_batch_ldbl_f;
+    return m_taylor_u_init_ldbl_f;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-function::taylor_diff_batch_t &function::taylor_diff_batch_f128_f()
+function::taylor_u_init_t &function::taylor_u_init_f128_f()
 {
-    return m_taylor_diff_batch_f128_f;
+    return m_taylor_u_init_f128_f;
 }
 
 #endif
 
-const bool &function::disable_verify() const
+function::taylor_diff_t &function::taylor_diff_dbl_f()
 {
-    return m_disable_verify;
+    return m_taylor_diff_dbl_f;
 }
+
+function::taylor_diff_t &function::taylor_diff_ldbl_f()
+{
+    return m_taylor_diff_ldbl_f;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+function::taylor_diff_t &function::taylor_diff_f128_f()
+{
+    return m_taylor_diff_f128_f;
+}
+
+#endif
 
 const std::string &function::name_dbl() const
 {
@@ -373,40 +365,40 @@ const function::taylor_decompose_t &function::taylor_decompose_f() const
     return m_taylor_decompose_f;
 }
 
-const function::taylor_init_batch_t &function::taylor_init_batch_dbl_f() const
+const function::taylor_u_init_t &function::taylor_u_init_dbl_f() const
 {
-    return m_taylor_init_batch_dbl_f;
+    return m_taylor_u_init_dbl_f;
 }
 
-const function::taylor_init_batch_t &function::taylor_init_batch_ldbl_f() const
+const function::taylor_u_init_t &function::taylor_u_init_ldbl_f() const
 {
-    return m_taylor_init_batch_ldbl_f;
+    return m_taylor_u_init_ldbl_f;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-const function::taylor_init_batch_t &function::taylor_init_batch_f128_f() const
+const function::taylor_u_init_t &function::taylor_u_init_f128_f() const
 {
-    return m_taylor_init_batch_f128_f;
+    return m_taylor_u_init_f128_f;
 }
 
 #endif
 
-const function::taylor_diff_batch_t &function::taylor_diff_batch_dbl_f() const
+const function::taylor_diff_t &function::taylor_diff_dbl_f() const
 {
-    return m_taylor_diff_batch_dbl_f;
+    return m_taylor_diff_dbl_f;
 }
 
-const function::taylor_diff_batch_t &function::taylor_diff_batch_ldbl_f() const
+const function::taylor_diff_t &function::taylor_diff_ldbl_f() const
 {
-    return m_taylor_diff_batch_ldbl_f;
+    return m_taylor_diff_ldbl_f;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-const function::taylor_diff_batch_t &function::taylor_diff_batch_f128_f() const
+const function::taylor_diff_t &function::taylor_diff_f128_f() const
 {
-    return m_taylor_diff_batch_f128_f;
+    return m_taylor_diff_f128_f;
 }
 
 #endif
@@ -428,7 +420,6 @@ std::ostream &operator<<(std::ostream &os, const function &f)
 
 void swap(function &f0, function &f1) noexcept
 {
-    std::swap(f0.disable_verify(), f1.disable_verify());
     std::swap(f0.name_dbl(), f1.name_dbl());
     std::swap(f0.name_ldbl(), f1.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
@@ -455,22 +446,21 @@ void swap(function &f0, function &f1) noexcept
     std::swap(f0.deval_num_dbl_f(), f1.deval_num_dbl_f());
 
     std::swap(f0.taylor_decompose_f(), f1.taylor_decompose_f());
-    std::swap(f0.taylor_init_batch_dbl_f(), f1.taylor_init_batch_dbl_f());
-    std::swap(f0.taylor_init_batch_ldbl_f(), f1.taylor_init_batch_ldbl_f());
+    std::swap(f0.taylor_u_init_dbl_f(), f1.taylor_u_init_dbl_f());
+    std::swap(f0.taylor_u_init_ldbl_f(), f1.taylor_u_init_ldbl_f());
 #if defined(HEYOKA_HAVE_REAL128)
-    std::swap(f0.taylor_init_batch_f128_f(), f1.taylor_init_batch_f128_f());
+    std::swap(f0.taylor_u_init_f128_f(), f1.taylor_u_init_f128_f());
 #endif
-    std::swap(f0.taylor_diff_batch_dbl_f(), f1.taylor_diff_batch_dbl_f());
-    std::swap(f0.taylor_diff_batch_ldbl_f(), f1.taylor_diff_batch_ldbl_f());
+    std::swap(f0.taylor_diff_dbl_f(), f1.taylor_diff_dbl_f());
+    std::swap(f0.taylor_diff_ldbl_f(), f1.taylor_diff_ldbl_f());
 #if defined(HEYOKA_HAVE_REAL128)
-    std::swap(f0.taylor_diff_batch_f128_f(), f1.taylor_diff_batch_f128_f());
+    std::swap(f0.taylor_diff_f128_f(), f1.taylor_diff_f128_f());
 #endif
 }
 
 std::size_t hash(const function &f)
 {
-    auto retval = std::hash<bool>{}(f.disable_verify());
-    retval += std::hash<std::string>{}(f.name_dbl());
+    auto retval = std::hash<std::string>{}(f.name_dbl());
     retval += std::hash<std::string>{}(f.name_ldbl());
 #if defined(HEYOKA_HAVE_REAL128)
     retval += std::hash<std::string>{}(f.name_f128());
@@ -509,15 +499,15 @@ std::size_t hash(const function &f)
     retval += std::hash<bool>{}(static_cast<bool>(f.deval_num_dbl_f()));
 
     retval += std::hash<bool>{}(static_cast<bool>(f.taylor_decompose_f()));
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_batch_dbl_f()));
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_batch_ldbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_u_init_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_u_init_ldbl_f()));
 #if defined(HEYOKA_HAVE_REAL128)
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_init_batch_f128_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_u_init_f128_f()));
 #endif
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_batch_dbl_f()));
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_batch_ldbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_dbl_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_ldbl_f()));
 #if defined(HEYOKA_HAVE_REAL128)
-    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_batch_f128_f()));
+    retval += std::hash<bool>{}(static_cast<bool>(f.taylor_diff_f128_f()));
 #endif
 
     return retval;
@@ -567,15 +557,15 @@ bool operator==(const function &f1, const function &f2)
            && static_cast<bool>(f1.eval_num_dbl_f()) == static_cast<bool>(f2.eval_num_dbl_f())
            && static_cast<bool>(f1.deval_num_dbl_f()) == static_cast<bool>(f2.deval_num_dbl_f())
            && static_cast<bool>(f1.taylor_decompose_f()) == static_cast<bool>(f2.taylor_decompose_f())
-           && static_cast<bool>(f1.taylor_init_batch_dbl_f()) == static_cast<bool>(f2.taylor_init_batch_dbl_f())
-           && static_cast<bool>(f1.taylor_init_batch_ldbl_f()) == static_cast<bool>(f2.taylor_init_batch_ldbl_f())
+           && static_cast<bool>(f1.taylor_u_init_dbl_f()) == static_cast<bool>(f2.taylor_u_init_dbl_f())
+           && static_cast<bool>(f1.taylor_u_init_ldbl_f()) == static_cast<bool>(f2.taylor_u_init_ldbl_f())
 #if defined(HEYOKA_HAVE_REAL128)
-           && static_cast<bool>(f1.taylor_init_batch_f128_f()) == static_cast<bool>(f2.taylor_init_batch_f128_f())
+           && static_cast<bool>(f1.taylor_u_init_f128_f()) == static_cast<bool>(f2.taylor_u_init_f128_f())
 #endif
-           && static_cast<bool>(f1.taylor_diff_batch_dbl_f()) == static_cast<bool>(f2.taylor_diff_batch_dbl_f())
-           && static_cast<bool>(f1.taylor_diff_batch_ldbl_f()) == static_cast<bool>(f2.taylor_diff_batch_ldbl_f())
+           && static_cast<bool>(f1.taylor_diff_dbl_f()) == static_cast<bool>(f2.taylor_diff_dbl_f())
+           && static_cast<bool>(f1.taylor_diff_ldbl_f()) == static_cast<bool>(f2.taylor_diff_ldbl_f())
 #if defined(HEYOKA_HAVE_REAL128)
-           && static_cast<bool>(f1.taylor_diff_batch_f128_f()) == static_cast<bool>(f2.taylor_diff_batch_f128_f())
+           && static_cast<bool>(f1.taylor_diff_f128_f()) == static_cast<bool>(f2.taylor_diff_f128_f())
 #endif
         ;
 }
@@ -766,10 +756,6 @@ const auto &function_attributes_from_type(const function &f)
 template <typename T>
 llvm::Value *function_codegen_impl(llvm_state &s, const function &f)
 {
-    if (f.disable_verify()) {
-        s.verify() = false;
-    }
-
     // Create the function arguments.
     std::vector<llvm::Value *> args_v;
     for (const auto &arg : f.args()) {
@@ -849,12 +835,10 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
             }
 
             // NOTE: for generic intrinsics to work, we need to specify
-            // the desired argument types. See:
+            // the desired argument type. See:
             // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
             // And the docs of the getDeclaration() function.
-            const std::vector<llvm::Type *> arg_types(args_v.size(), to_llvm_type<T>(s.context()));
-
-            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, arg_types);
+            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, {to_llvm_type<T>(s.context())});
 
             if (!callee_f) {
                 throw std::invalid_argument("Error getting the declaration of the intrinsic '" + f_name + "'");
@@ -930,82 +914,123 @@ std::vector<expression>::size_type taylor_decompose_in_place(function &&f, std::
     return tdf(std::move(f), u_vars_defs);
 }
 
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                   std::uint32_t)
 {
-    auto &ti = f.taylor_init_batch_dbl_f();
-    if (!ti) {
-        throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for double Taylor init");
-    }
-    return ti(s, f, arr, batch_idx, batch_size, vector_size);
+    throw;
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
-    auto &ti = f.taylor_init_batch_ldbl_f();
-    if (!ti) {
-        throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for long double Taylor init");
-    }
-    return ti(s, f, arr, batch_idx, batch_size, vector_size);
+    throw;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_init_batch_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t)
 {
-    auto &ti = f.taylor_init_batch_f128_f();
-    if (!ti) {
-        throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for float128 Taylor init");
-    }
-    return ti(s, f, arr, batch_idx, batch_size, vector_size);
+    throw;
 }
 
 #endif
 
-llvm::Value *taylor_diff_batch_dbl(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size,
-                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_dbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                   llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                   const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &td = f.taylor_diff_batch_dbl_f();
-    if (!td) {
-        throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for double Taylor diff");
-    }
-    return td(s, f, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    throw;
 }
 
-llvm::Value *taylor_diff_batch_ldbl(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_ldbl(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &td = f.taylor_diff_batch_ldbl_f();
-    if (!td) {
-        throw std::invalid_argument("The function '" + f.display_name()
-                                    + "' does not provide a function for long double Taylor diff");
-    }
-    return td(s, f, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    throw;
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_batch_f128(llvm_state &s, const function &f, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_batch_f128(llvm_state &, const function &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                    const std::unordered_map<std::uint32_t, number> &)
 {
-    auto &td = f.taylor_diff_batch_f128_f();
+    throw;
+}
+
+#endif
+
+tfp taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                      bool high_accuracy)
+{
+    auto &ti = f.taylor_u_init_dbl_f();
+    if (!ti) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for double Taylor init");
+    }
+    return ti(s, f, arr, batch_size, high_accuracy);
+}
+
+tfp taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    auto &ti = f.taylor_u_init_ldbl_f();
+    if (!ti) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for long double Taylor init");
+    }
+    return ti(s, f, arr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    auto &ti = f.taylor_u_init_f128_f();
+    if (!ti) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for float128 Taylor init");
+    }
+    return ti(s, f, arr, batch_size, high_accuracy);
+}
+
+#endif
+
+tfp taylor_diff_dbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    auto &td = f.taylor_diff_dbl_f();
+    if (!td) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for double Taylor diff");
+    }
+    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+tfp taylor_diff_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    auto &td = f.taylor_diff_ldbl_f();
+    if (!td) {
+        throw std::invalid_argument("The function '" + f.display_name()
+                                    + "' does not provide a function for long double Taylor diff");
+    }
+    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_diff_f128(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
+                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    auto &td = f.taylor_diff_f128_f();
     if (!td) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for float128 Taylor diff");
     }
-    return td(s, f, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size, cd_uvars);
+    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
 }
 
 #endif

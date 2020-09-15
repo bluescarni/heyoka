@@ -8,7 +8,9 @@
 
 #include <iostream>
 
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 
@@ -17,4 +19,10 @@ using namespace heyoka;
 TEST_CASE("basic")
 {
     std::cout << llvm_state{kw::mname = "sample state"} << '\n';
+
+    llvm_state s;
+    auto [x, y] = make_vars("x", "y");
+    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 21, 1, true);
+
+    std::cout << s.get_ir() << '\n';
 }

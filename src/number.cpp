@@ -37,6 +37,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/tfp.hpp>
 
 namespace heyoka
 {
@@ -338,6 +339,49 @@ llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value 
     }
 
     return ret;
+}
+
+#endif
+
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: for numbers, the Taylor init phase is
+// just the codegen.
+template <typename T>
+tfp taylor_u_init_number_impl(llvm_state &s, const number &n, const std::vector<tfp> &, std::uint32_t batch_size,
+                              bool high_accuracy)
+{
+    auto ret = create_constant_vector(s.builder(), codegen<T>(s, n), batch_size);
+
+    return tfp_from_vector(s, ret, high_accuracy);
+}
+
+} // namespace
+
+} // namespace detail
+
+tfp taylor_u_init_dbl(llvm_state &s, const number &n, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                      bool high_accuracy)
+{
+    return detail::taylor_u_init_number_impl<double>(s, n, arr, batch_size, high_accuracy);
+}
+
+tfp taylor_u_init_ldbl(llvm_state &s, const number &n, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return detail::taylor_u_init_number_impl<long double>(s, n, arr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+tfp taylor_u_init_f128(llvm_state &s, const number &n, const std::vector<tfp> &arr, std::uint32_t batch_size,
+                       bool high_accuracy)
+{
+    return detail::taylor_u_init_number_impl<mppp::real128>(s, n, arr, batch_size, high_accuracy);
 }
 
 #endif

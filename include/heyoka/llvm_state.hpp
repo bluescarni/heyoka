@@ -80,7 +80,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<llvm::IRBuilder<>> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
-    bool m_verify = true;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_use_fast_math;
@@ -93,7 +92,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_compiled(const char *) const;
     HEYOKA_DLL_LOCAL void check_add_name(const std::string &) const;
-    HEYOKA_DLL_LOCAL void verify_function_impl(llvm::Function *);
 
     // Implementation details for expressions.
     template <typename T>
@@ -218,22 +216,20 @@ public:
     llvm::Module &module();
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
-    bool &verify();
     unsigned &opt_level();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
-    const bool &verify() const;
     const unsigned &opt_level() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
     std::string get_ir() const;
-    std::string get_function_ir(const std::string &) const;
     void dump_object_code(const std::string &) const;
 
     void verify_function(const std::string &);
+    void verify_function(llvm::Function *);
 
     void optimise();
 
@@ -374,6 +370,8 @@ public:
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
     }
+
+    bool is_compiled() const;
 
     void compile();
 

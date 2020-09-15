@@ -148,6 +148,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/tfp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
@@ -197,7 +198,14 @@ endif()
 # Mandatory dependency on LLVM.
 find_package(LLVM REQUIRED)
 
-# Optional dependency on MPC.
+if(${LLVM_VERSION_MAJOR} LESS 10)
+  message(FATAL_ERROR "LLVM >= 10 is required.")
+endif()
+
+# Mandatory dependency on Boost.
+find_package(Boost REQUIRED)
+
+# Optional dependency on mp++.
 if(HEYOKA_WITH_MPPP)
     find_package(mp++ REQUIRED)
     if(${mp++_VERSION} VERSION_LESS "0.21")
@@ -206,13 +214,10 @@ if(HEYOKA_WITH_MPPP)
     target_link_libraries(heyoka PUBLIC mp++::mp++)
 endif()
 
-if(${LLVM_VERSION_MAJOR} LESS 10)
-  message(FATAL_ERROR "LLVM >= 10 is required.")
-endif()
-
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
 target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
+target_link_libraries(heyoka PRIVATE Boost::boost)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
