@@ -106,14 +106,14 @@ int main()
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s -> baseline established" << std::endl;
-
+ 
     // The Taylor integrator in single precision
     std::cout << "\nConstructing the Taylor integrator in single precision ... " << std::flush;
     std::vector<double> ic_d(18);
     std::transform(ic_d.begin(), ic_d.end(), baseline_s[0].begin(), ic_d.begin(),
                    [](double d, mppp::real128 q) { return static_cast<double>(q); });
     start = high_resolution_clock::now();
-    taylor_adaptive<double> taylor_d{sys, ic_d, kw::time = -50. * 365.25 * 24. * 60. * 60.};
+    taylor_adaptive<double> taylor_d{sys, ic_d, kw::time = -50. * 365.25 * 24. * 60. * 60., kw::high_accuracy = true};
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s" << std::endl;

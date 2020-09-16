@@ -30,8 +30,7 @@ ADD_HEYOKA_BENCHMARK(two_body_step)
 ADD_HEYOKA_BENCHMARK(two_body_step_batch)
 ADD_HEYOKA_BENCHMARK(taylor_ANN)
 ADD_HEYOKA_BENCHMARK(apophis)
-
-ADD_HEYOKA_BENCHMARK(taylor_eqq_with_param)
+ADD_HEYOKA_BENCHMARK(stiff_equation)
 
 if(HEYOKA_WITH_XTENSOR)
   function(ADD_HEYOKA_XTENSOR_BENCHMARK arg1)
