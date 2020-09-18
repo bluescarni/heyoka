@@ -1892,54 +1892,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
                 store_vector_to_memory(builder, out_ptr, vec_val, batch_size);
             }
         });
-#if 0
-    for (std::uint32_t cur_order = 1; cur_order < order + 1u; ++cur_order) {
-        for (std::uint32_t sv_idx = 0; sv_idx < n_eq; ++sv_idx) {
-            // Load the vector.
-            auto vec_val = taylor_load_diff(s, diff_arr, boost::numeric_cast<std::uint32_t>(n_uvars),
-                                            builder.getInt32(cur_order), builder.getInt32(sv_idx));
-
-            // Index in the output array.
-            const auto out_idx = n_eq * batch_size * cur_order + sv_idx * batch_size;
-            auto out_ptr = builder.CreateInBoundsGEP(in_out, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
-            store_vector_to_memory(builder, out_ptr, vec_val, batch_size);
-        }
-    }
-#endif
-
-#if 0
-    // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values_as_tfp<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size,
-                                                   high_accuracy);
-
-    // Compute the jet of derivatives.
-    auto diff_arr
-        = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
-                                boost::numeric_cast<std::uint32_t>(n_uvars), order, batch_size, high_accuracy);
-
-    // Write the derivatives to in_out.
-    // NOTE: overflow checking. We need to be able to index into the jet array (size n_eq * (order + 1) * batch_size)
-    // using uint32_t.
-    if (order == std::numeric_limits<std::uint32_t>::max()
-        || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
-        || n_eq > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
-        throw std::overflow_error("An overflow condition was detected while adding a Taylor jet");
-    }
-    for (decltype(diff_arr.size()) cur_order = 1; cur_order <= order; ++cur_order) {
-        for (std::uint32_t j = 0; j < n_eq; ++j) {
-            // Index in the jet of derivatives.
-            const auto arr_idx = cur_order * n_uvars + j;
-            assert(arr_idx < diff_arr.size());
-            const auto fp_vec = tfp_to_vector(s, diff_arr[arr_idx]);
-
-            // Index in the output array.
-            const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;
-            auto out_ptr
-                = s.builder().CreateInBoundsGEP(in_out, {s.builder().getInt32(static_cast<std::uint32_t>(out_idx))});
-            store_vector_to_memory(s.builder(), out_ptr, fp_vec, batch_size);
-        }
-    }
-#endif
 
     // Finish off the function.
     s.builder().CreateRetVoid();
