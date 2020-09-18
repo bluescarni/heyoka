@@ -42,12 +42,13 @@ int main(int argc, char *argv[])
     llvm_state s;
 
     const auto order = 20u;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     taylor_add_jet<double>(s, "jet", std::move(sys), order, batch_size, false);
 
     // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("tjb.o");
-
-    auto start = std::chrono::high_resolution_clock::now();
 
     s.compile();
 
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Compile time: " << elapsed << "μs\n";
+    std::cout << "Construction time: " << elapsed << "μs\n";
 
     auto jet_ptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
 
