@@ -54,6 +54,14 @@ taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<expression>, 
 
 #endif
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                                llvm::Value *);
+
+}
+
 template <typename T>
 std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> sys,
                                        std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)

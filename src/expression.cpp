@@ -662,4 +662,80 @@ tfp taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<tfp>
 
 #endif
 
+llvm::Value *taylor_init_dbl(llvm_state &s, const expression &e, llvm::Value *diff_arr, std::uint32_t batch_size,
+                             bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_dbl(s, arg, diff_arr, batch_size, high_accuracy); },
+                      e.value());
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const expression &e, llvm::Value *diff_arr, std::uint32_t batch_size,
+                              bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_ldbl(s, arg, diff_arr, batch_size, high_accuracy); },
+                      e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const expression &e, llvm::Value *diff_arr, std::uint32_t batch_size,
+                              bool high_accuracy)
+{
+    return std::visit([&](const auto &arg) { return taylor_init_f128(s, arg, diff_arr, batch_size, high_accuracy); },
+                      e.value());
+}
+
+#endif
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_diff2_impl(llvm_state &s, const expression &ex, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_diff2<T>(s, v, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives can be computed only for binary operators or functions");
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *taylor_diff2_dbl(llvm_state &s, const expression &ex, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                              llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+
+{
+    return detail::taylor_diff2_impl<double>(s, ex, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+llvm::Value *taylor_diff2_ldbl(llvm_state &s, const expression &ex, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_diff2_impl<long double>(s, ex, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_diff2_f128(llvm_state &s, const expression &ex, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    return detail::taylor_diff2_impl<mppp::real128>(s, ex, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+}
+
+#endif
+
 } // namespace heyoka

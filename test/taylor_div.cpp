@@ -57,8 +57,10 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
     std::vector<T> jet_batch;
     jet_batch.resize(8 * batch_size);
-    std::uniform_real_distribution<float> dist(-10.f, 10.f);
-    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
+    std::uniform_real_distribution<float> dist(.1f, 10.f);
+    std::uniform_int_distribution<int> sign_dist(0, 1);
+    std::generate(jet_batch.begin(), jet_batch.end(),
+                  [&dist, &sign_dist]() { return T{dist(rng)} * (sign_dist(rng) == 0 ? T(1) : T(-1)); });
 
     std::vector<T> jet_scalar;
     jet_scalar.resize(8);
@@ -74,7 +76,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
         jptr_scalar(jet_scalar.data());
 
         for (auto i = 2u; i < 8u; ++i) {
-            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1E3)));
         }
     }
 }

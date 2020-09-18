@@ -256,6 +256,48 @@ inline tfp taylor_diff(llvm_state &s, const binary_operator &bo, const std::vect
     }
 }
 
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                               bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                                bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_f128(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                                bool);
+
+#endif
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff2_dbl(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                                llvm::Value *, std::uint32_t, std::uint32_t, bool);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff2_ldbl(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                                 llvm::Value *, std::uint32_t, std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff2_f128(llvm_state &, const binary_operator &, llvm::Value *, std::uint32_t,
+                                                 llvm::Value *, std::uint32_t, std::uint32_t, bool);
+
+#endif
+
+template <typename T>
+inline llvm::Value *taylor_diff2(llvm_state &s, const binary_operator &bo, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                 llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_diff2_dbl(s, bo, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_diff2_ldbl(s, bo, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_diff2_f128(s, bo, diff_arr, n_uvars, order, idx, batch_size, high_accuracy);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 } // namespace heyoka
 
 #endif

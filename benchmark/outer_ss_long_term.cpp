@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <initializer_list>
@@ -145,7 +146,7 @@ void run_integration()
     std::cout << "Initial energy: " << init_energy << '\n';
 
     // Base-10 logs of the initial and final saving times.
-    const auto start_time = T(0), final_time = log10(T(1E8 * 365));
+    const auto start_time = T(0), final_time = log10(T(1E6 * 365));
     // Number of snapshots to take.
     const auto n_snaps = 50000u;
     // Build the vector of log10 saving times.
@@ -161,8 +162,10 @@ void run_integration()
     std::ofstream of("outer_ss_long_term.txt");
     of.precision(std::numeric_limits<T>::max_digits10);
     auto it = save_times.begin();
+    ta.step();
+    auto start = std::chrono::high_resolution_clock::now();
     while (ta.get_time() < pow(T(10), final_time)) {
-        if (it != save_times.end() && ta.get_time() >= *it) {
+        if (false && it != save_times.end() && ta.get_time() >= *it) {
             // We are at or past the current saving time, record
             // the time, energy error and orbital elements.
             of << ta.get_time() << " " << abs((init_energy - get_energy()) / init_energy) << " ";
@@ -195,6 +198,10 @@ void run_integration()
             throw std::runtime_error("Error status detected: " + std::to_string(static_cast<int>(res)));
         }
     }
+
+    auto duration
+        = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
+    std::cout << "Microseconds: " << duration.count() << std::endl;
 }
 
 int main(int argc, char *argv[])

@@ -187,6 +187,15 @@ inline tfp taylor_u_init(llvm_state &s, const number &num, const std::vector<tfp
     }
 }
 
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t, bool);
+
+#endif
+
 } // namespace heyoka
 
 #endif

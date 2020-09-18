@@ -33,12 +33,6 @@ int main(int argc, char *argv[])
         batch_size = static_cast<unsigned>(bs);
     }
 
-    if (batch_size == 0u) {
-        std::cout << "The vector size on the current machine is zero, exiting.\n";
-
-        return 0;
-    }
-
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
 

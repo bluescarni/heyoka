@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <string>
@@ -21,6 +22,7 @@
 #include <vector>
 
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
@@ -158,6 +160,9 @@ inline tfp tfp_zero(llvm_state &s, std::uint32_t batch_size, bool high_accuracy)
 {
     return tfp_constant<T>(s, number{0.}, batch_size, high_accuracy);
 }
+
+HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Function *, llvm::Value *, llvm::Value *,
+                                     const std::function<void(llvm::Value *)> &);
 
 } // namespace heyoka::detail
 

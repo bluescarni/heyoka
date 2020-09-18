@@ -20,9 +20,9 @@ TEST_CASE("basic")
 {
     std::cout << llvm_state{kw::mname = "sample state"} << '\n';
 
-    llvm_state s;
+    llvm_state s{kw::opt_level = 3u};
     auto [x, y] = make_vars("x", "y");
-    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 21, 1, true);
+    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 20, 4, false);
 
     std::cout << s.get_ir() << '\n';
 }

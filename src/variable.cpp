@@ -34,6 +34,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
@@ -274,6 +275,39 @@ tfp taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<tfp
                        bool high_accuracy)
 {
     return taylor_u_init_dbl(s, var, arr, batch_size, high_accuracy);
+}
+
+#endif
+
+llvm::Value *taylor_init_dbl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t, bool)
+{
+    // Check that var is a u variable and extract its index.
+    const auto &var_name = var.name();
+    if (var_name.rfind("u_", 0) != 0) {
+        throw std::invalid_argument("Invalid variable name '" + var_name
+                                    + "' encountered in the Taylor initialization phase (the name "
+                                      "must be in the form 'u_n', where n is a non-negative integer)");
+    }
+    const auto idx = detail::uname_to_index(var_name);
+
+    // NOTE: n_uvars will be set to zero here,
+    // it does not matter as the order is also zero.
+    return detail::taylor_load_diff(s, diff_arr, 0, s.builder().getInt32(0), s.builder().getInt32(idx));
+}
+
+llvm::Value *taylor_init_ldbl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t batch_size,
+                              bool high_accuracy)
+{
+    // NOTE: no codegen differences between dbl and ldbl in this case.
+    return taylor_init_dbl(s, var, diff_arr, batch_size, high_accuracy);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_init_f128(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t batch_size,
+                              bool high_accuracy)
+{
+    return taylor_init_dbl(s, var, diff_arr, batch_size, high_accuracy);
 }
 
 #endif
