@@ -47,7 +47,15 @@ int main(int argc, char *argv[])
     // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("tjb.o");
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     s.compile();
+
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Compile time: " << elapsed << "μs\n";
 
     auto jet_ptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
 
@@ -77,7 +85,7 @@ int main(int argc, char *argv[])
     // Warm up.
     jet_ptr(ptr);
 
-    auto start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
 
     // Do 400 evaluations.
     for (auto i = 0; i < 40; ++i) {
@@ -92,7 +100,7 @@ int main(int argc, char *argv[])
         jet_ptr(ptr);
     }
 
-    const auto elapsed = static_cast<double>(
+    elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
