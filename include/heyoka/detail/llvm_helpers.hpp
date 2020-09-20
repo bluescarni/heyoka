@@ -159,6 +159,28 @@ inline tfp tfp_zero(llvm_state &s, std::uint32_t batch_size, bool high_accuracy)
     return tfp_constant<T>(s, number{0.}, batch_size, high_accuracy);
 }
 
+template <typename T>
+inline tfp tfp_compensated_sum(llvm_state &s, const std::vector<tfp> &v, std::uint32_t batch_size)
+{
+    assert(!v.empty());
+
+    if (v.size() == 1u) {
+        return v[0];
+    }
+
+    auto sum = tfp_zero<T>(s, batch_size, false);
+    auto c = tfp_zero<T>(s, batch_size, false);
+
+    for (const auto &x : v) {
+        auto y = tfp_sub(s, x, c);
+        auto t = tfp_add(s, sum, y);
+        c = tfp_sub(s, tfp_sub(s, t, sum), y);
+        sum = t;
+    }
+
+    return sum;
+}
+
 } // namespace heyoka::detail
 
 #endif

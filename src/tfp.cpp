@@ -297,7 +297,7 @@ llvm::Value *tfp_to_vector(llvm_state &s, const tfp &x)
 tfp tfp_from_vector(llvm_state &s, llvm::Value *x, bool high_accuracy)
 {
     if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x->getType())) {
-        if (!high_accuracy) {
+        if (true || !high_accuracy) {
             // In normal mode, just return x converted to a tfp.
             return x;
         }

@@ -548,7 +548,7 @@ void llvm_state::optimise()
         pm_builder.SizeLevel = 0;
         pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
         if (m_opt_level >= 3u) {
-            pm_builder.SLPVectorize = true;
+            // pm_builder.SLPVectorize = true;
             pm_builder.MergeFunctions = true;
         }
 

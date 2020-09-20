@@ -2006,6 +2006,20 @@ tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
     return cf_vec[0];
 }
 
+template <typename T>
+tfp taylor_run_chorner(llvm_state &s, std::vector<tfp> &cf_vec, tfp h, std::uint32_t batch_size)
+{
+    assert(!cf_vec.empty());
+
+    auto cur_h = h;
+    for (decltype(cf_vec.size()) i = 1; i < cf_vec.size(); ++i) {
+        cf_vec[i] = tfp_mul(s, cf_vec[i], cur_h);
+        cur_h = tfp_mul(s, cur_h, h);
+    }
+
+    return tfp_compensated_sum<T>(s, cf_vec, batch_size);
+}
+
 template <typename T, typename U>
 auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
                                    bool high_accuracy)
@@ -2166,7 +2180,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
             cf_vec.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
         }
 
-        auto new_state = taylor_run_estrin(s, cf_vec, tfp_from_vector(s, h, high_accuracy));
+        auto new_state = taylor_run_chorner<T>(s, cf_vec, tfp_from_vector(s, h, high_accuracy), batch_size);
 
         if (var_idx > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: too many variables");

@@ -992,7 +992,7 @@ tfp bo_taylor_diff_mul_impl(llvm_state &s, const number &num, const variable &va
 // Derivative of var * var.
 template <typename T>
 tfp bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const variable &var1, const std::vector<tfp> &arr,
-                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t, bool)
+                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size, bool)
 {
     // Fetch the indices of the u variables.
     const auto u_idx0 = uname_to_index(var0.name());
@@ -1012,7 +1012,7 @@ tfp bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const variable 
         sum.push_back(tfp_mul(s, v0, v1));
     }
 
-    return tfp_pairwise_sum(s, sum);
+    return tfp_compensated_sum<T>(s, sum, batch_size);
 }
 
 // All the other cases.
@@ -1049,7 +1049,8 @@ tfp bo_taylor_diff_div_impl(llvm_state &s, const number &, const number &, const
 template <typename T, typename U,
           std::enable_if_t<std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>>, int> = 0>
 tfp bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1, const std::vector<tfp> &arr,
-                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t, bool)
+                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                            bool)
 {
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
@@ -1069,7 +1070,7 @@ tfp bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1, co
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = tfp_compensated_sum<T>(s, sum, batch_size);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
