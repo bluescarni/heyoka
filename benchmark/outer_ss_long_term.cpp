@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <initializer_list>
@@ -161,6 +162,9 @@ void run_integration()
     std::ofstream of("outer_ss_long_term.txt");
     of.precision(std::numeric_limits<T>::max_digits10);
     auto it = save_times.begin();
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     while (ta.get_time() < pow(T(10), final_time)) {
         if (it != save_times.end() && ta.get_time() >= *it) {
             // We are at or past the current saving time, record
@@ -195,6 +199,12 @@ void run_integration()
             throw std::runtime_error("Error status detected: " + std::to_string(static_cast<int>(res)));
         }
     }
+
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Integration time: " << elapsed << "ms\n";
 }
 
 int main(int argc, char *argv[])
