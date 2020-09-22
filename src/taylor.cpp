@@ -52,7 +52,6 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
-#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -60,6 +59,21 @@ namespace heyoka
 
 namespace detail
 {
+
+// Helper to load the derivative of order 'order' of the u variable at index u_idx from the
+// derivative array 'arr'. The total number of u variables is n_uvars.
+llvm::Value *taylor_load_derivative(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
+                                    std::uint32_t n_uvars)
+{
+    // Sanity check.
+    assert(u_idx < n_uvars);
+
+    // Compute the index.
+    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
+    assert(idx < arr.size());
+
+    return arr[idx];
+}
 
 namespace
 {
@@ -1532,13 +1546,15 @@ struct fm_disabler {
 // the decomposition, arr the array containing the derivatives of all u variables
 // up to order - 1.
 template <typename T>
-tfp taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool)
 {
     assert(order > 0u);
 
+    auto &builder = s.builder();
+
     return std::visit(
-        [&](const auto &v) -> tfp {
+        [&](const auto &v) -> llvm::Value * {
             using type = uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, variable>) {
@@ -1553,7 +1569,8 @@ tfp taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vecto
 
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
-                return tfp_div(s, ret, tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy));
+                return builder.CreateFDiv(
+                    ret, create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
@@ -1561,10 +1578,10 @@ tfp taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vecto
                 // return 0. No need for normalization as the only
                 // nonzero value that can be produced here is the first-order
                 // derivative.
-                return tfp_constant<T>(s, (order == 1u) ? v : number{0.}, batch_size, high_accuracy);
+                return create_constant_vector(builder, codegen<T>(s, (order == 1u) ? v : number{0.}), batch_size);
             } else {
                 assert(false);
-                return tfp{};
+                return nullptr;
             }
         },
         ex.value());
@@ -1580,8 +1597,9 @@ tfp taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vecto
 // The return value is the jet of derivatives of all u variables up to order 'order - 1',
 // plus the derivatives of order 'order' of the state variables.
 template <typename T>
-auto taylor_compute_jet(llvm_state &s, std::vector<tfp> order0, const std::vector<expression> &dc, std::uint32_t n_eq,
-                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const std::vector<expression> &dc,
+                        std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                        bool high_accuracy)
 {
     assert(order0.size() == n_eq);
 
@@ -1621,31 +1639,27 @@ auto taylor_compute_jet(llvm_state &s, std::vector<tfp> order0, const std::vecto
     return retval;
 }
 
-// Given an input pointer 'in', load the first n * batch_size values in it as n tfp values
-// with vector size batch_size.
+// Given an input pointer 'in', load the first n * batch_size values in it as n vectors
+// with size batch_size.
 template <typename T>
-auto taylor_load_values_as_tfp(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size,
-                               bool high_accuracy)
+auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size, bool)
 {
     assert(batch_size > 0u);
 
     // Overflow check.
     if (n > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("Overflow while loading values as tfps");
+        throw std::overflow_error("Overflow while loading Taylor values");
     }
 
     auto &builder = s.builder();
 
-    std::vector<tfp> retval;
+    std::vector<llvm::Value *> retval;
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
         auto ptr = builder.CreateInBoundsGEP(in, {builder.getInt32(i * batch_size)});
 
         // Load the value in vector mode.
-        auto v = load_vector_from_memory(builder, ptr, batch_size);
-
-        // Create the tfp and add it to retval.
-        retval.push_back(tfp_from_vector(s, v, high_accuracy));
+        retval.push_back(load_vector_from_memory(builder, ptr, batch_size));
     }
 
     return retval;
@@ -1708,8 +1722,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.builder().SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values_as_tfp<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size,
-                                                   high_accuracy);
+    auto order0_arr
+        = taylor_load_values<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size, high_accuracy);
 
     // Compute the jet of derivatives.
     auto diff_arr
@@ -1729,7 +1743,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
             // Index in the jet of derivatives.
             const auto arr_idx = cur_order * n_uvars + j;
             assert(arr_idx < diff_arr.size());
-            const auto fp_vec = tfp_to_vector(s, diff_arr[arr_idx]);
+            const auto fp_vec = diff_arr[arr_idx];
 
             // Index in the output array.
             const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;
@@ -1970,7 +1984,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 // whose coefficients are stored in cf_vec, with evaluation
 // value h. This will consume cf_vec.
 // https://en.wikipedia.org/wiki/Estrin%27s_scheme
-tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
+llvm::Value *taylor_run_estrin(llvm_state &s, std::vector<llvm::Value *> &cf_vec, llvm::Value *h)
 {
     assert(!cf_vec.empty());
 
@@ -1978,9 +1992,11 @@ tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
         throw std::overflow_error("Overflow error in taylor_run_estrin()");
     }
 
+    auto &builder = s.builder();
+
     while (cf_vec.size() != 1u) {
         // Fill in the vector of coefficients for the next iteration.
-        std::vector<tfp> new_cf_vec;
+        std::vector<llvm::Value *> new_cf_vec;
 
         for (decltype(cf_vec.size()) i = 0; i < cf_vec.size(); i += 2u) {
             if (i + 1u == cf_vec.size()) {
@@ -1989,7 +2005,7 @@ tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
                 // the existing coefficient.
                 new_cf_vec.push_back(cf_vec[i]);
             } else {
-                new_cf_vec.push_back(tfp_add(s, cf_vec[i], tfp_mul(s, cf_vec[i + 1u], h)));
+                new_cf_vec.push_back(builder.CreateFAdd(cf_vec[i], builder.CreateFMul(cf_vec[i + 1u], h)));
             }
         }
 
@@ -1999,7 +2015,7 @@ tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
 
         // Update h if we are not at the last iteration.
         if (cf_vec.size() != 1u) {
-            h = tfp_mul(s, h, h);
+            h = builder.CreateFMul(h, h);
         }
     }
 
@@ -2007,17 +2023,20 @@ tfp taylor_run_estrin(llvm_state &s, std::vector<tfp> &cf_vec, tfp h)
 }
 
 template <typename T>
-tfp taylor_run_chorner(llvm_state &s, std::vector<tfp> &cf_vec, tfp h, std::uint32_t batch_size)
+llvm::Value *taylor_run_chorner(llvm_state &s, std::vector<llvm::Value *> &cf_vec, llvm::Value *h,
+                                std::uint32_t batch_size)
 {
     assert(!cf_vec.empty());
 
+    auto &builder = s.builder();
+
     auto cur_h = h;
     for (decltype(cf_vec.size()) i = 1; i < cf_vec.size(); ++i) {
-        cf_vec[i] = tfp_mul(s, cf_vec[i], cur_h);
-        cur_h = tfp_mul(s, cur_h, h);
+        cf_vec[i] = builder.CreateFMul(cf_vec[i], cur_h);
+        cur_h = builder.CreateFMul(cur_h, h);
     }
 
-    return tfp_compensated_sum<T>(s, cf_vec, batch_size);
+    return compensated_sum<T>(s, cf_vec, batch_size);
 }
 
 template <typename T, typename U>
@@ -2113,12 +2132,12 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     builder.SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values_as_tfp<T>(s, &*state_ptr, n_eq, batch_size, high_accuracy);
+    auto order0_arr = taylor_load_values<T>(s, &*state_ptr, n_eq, batch_size, high_accuracy);
 
     // Compute the norm infinity of the state vector.
     auto max_abs_state = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
-        max_abs_state = taylor_step_maxabs(s, max_abs_state, tfp_to_vector(s, order0_arr[i]));
+        max_abs_state = taylor_step_maxabs(s, max_abs_state, order0_arr[i]);
     }
 
     // Compute the jet of derivatives at the given order.
@@ -2130,10 +2149,9 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto max_abs_diff_o = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
     auto max_abs_diff_om1 = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
-        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o,
-                                            tfp_to_vector(s, taylor_load_derivative(diff_arr, i, order, n_uvars)));
-        max_abs_diff_om1 = taylor_step_maxabs(
-            s, max_abs_diff_om1, tfp_to_vector(s, taylor_load_derivative(diff_arr, i, order - 1u, n_uvars)));
+        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, taylor_load_derivative(diff_arr, i, order, n_uvars));
+        max_abs_diff_om1
+            = taylor_step_maxabs(s, max_abs_diff_om1, taylor_load_derivative(diff_arr, i, order - 1u, n_uvars));
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -2171,7 +2189,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Run the time stepper for each variable, store the results.
     for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-        std::vector<tfp> cf_vec;
+        std::vector<llvm::Value *> cf_vec;
 
         if (order == std::numeric_limits<std::uint32_t>::max()) {
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: the order is too high");
@@ -2180,13 +2198,13 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
             cf_vec.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
         }
 
-        auto new_state = taylor_run_chorner<T>(s, cf_vec, tfp_from_vector(s, h, high_accuracy), batch_size);
+        auto new_state = taylor_run_chorner<T>(s, cf_vec, h, batch_size);
 
         if (var_idx > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: too many variables");
         }
         store_vector_to_memory(builder, builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
-                               tfp_to_vector(s, new_state), batch_size);
+                               new_state, batch_size);
     }
 
     // Store the timesteps that were used.

@@ -36,7 +36,6 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/tfp.hpp>
 
 namespace heyoka::detail
 {
@@ -143,24 +142,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::str
                                                     const std::vector<llvm::Value *> &,
                                                     const std::vector<llvm::Attribute::AttrKind> & = {});
 
-// Helper to create a constant tfp.
 template <typename T>
-inline tfp tfp_constant(llvm_state &s, const number &num, std::uint32_t batch_size, bool high_accuracy)
-{
-    auto ret = create_constant_vector(s.builder(), codegen<T>(s, num), batch_size);
-
-    return tfp_from_vector(s, ret, high_accuracy);
-}
-
-// Helper to create a zero tfp.
-template <typename T>
-inline tfp tfp_zero(llvm_state &s, std::uint32_t batch_size, bool high_accuracy)
-{
-    return tfp_constant<T>(s, number{0.}, batch_size, high_accuracy);
-}
-
-template <typename T>
-inline tfp tfp_compensated_sum(llvm_state &s, const std::vector<tfp> &v, std::uint32_t batch_size)
+inline llvm::Value *compensated_sum(llvm_state &s, const std::vector<llvm::Value *> &v, std::uint32_t batch_size)
 {
     assert(!v.empty());
 
@@ -168,13 +151,15 @@ inline tfp tfp_compensated_sum(llvm_state &s, const std::vector<tfp> &v, std::ui
         return v[0];
     }
 
-    auto sum = tfp_zero<T>(s, batch_size, false);
-    auto c = tfp_zero<T>(s, batch_size, false);
+    auto &builder = s.builder();
+
+    auto sum = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
+    auto c = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
 
     for (const auto &x : v) {
-        auto y = tfp_sub(s, x, c);
-        auto t = tfp_add(s, sum, y);
-        c = tfp_sub(s, tfp_sub(s, t, sum), y);
+        auto y = builder.CreateFSub(x, c);
+        auto t = builder.CreateFAdd(sum, y);
+        c = builder.CreateFSub(builder.CreateFSub(t, sum), y);
         sum = t;
     }
 

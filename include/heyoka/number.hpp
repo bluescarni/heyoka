@@ -32,7 +32,6 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/tfp.hpp>
 
 namespace heyoka
 {
@@ -161,18 +160,21 @@ inline llvm::Value *taylor_init_batch(llvm_state &s, const number &n, llvm::Valu
     }
 }
 
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_dbl(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_ldbl(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                 std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_ldbl(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_f128(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_f128(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t, bool);
 
 #endif
 
 template <typename T>
-inline tfp taylor_u_init(llvm_state &s, const number &num, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                         bool high_accuracy)
+inline llvm::Value *taylor_u_init(llvm_state &s, const number &num, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t batch_size, bool high_accuracy)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_u_init_dbl(s, num, arr, batch_size, high_accuracy);

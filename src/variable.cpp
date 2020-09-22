@@ -34,7 +34,6 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -243,7 +242,8 @@ llvm::Value *taylor_init_batch_f128(llvm_state &s, const variable &var, llvm::Va
 
 #endif
 
-tfp taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<tfp> &arr, std::uint32_t, bool)
+llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<llvm::Value *> &arr, std::uint32_t,
+                               bool)
 {
     // Check that var is a u variable and extract its index.
     const auto &var_name = var.name();
@@ -261,8 +261,8 @@ tfp taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<tfp> 
     return arr[boost::numeric_cast<decltype(arr.size())>(idx)];
 }
 
-tfp taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                       bool high_accuracy)
+llvm::Value *taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size, bool high_accuracy)
 {
     // NOTE: no codegen differences between dbl and ldbl in this case.
     return taylor_u_init_dbl(s, var, arr, batch_size, high_accuracy);
@@ -270,8 +270,8 @@ tfp taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<tfp
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-tfp taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                       bool high_accuracy)
+llvm::Value *taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size, bool high_accuracy)
 {
     return taylor_u_init_dbl(s, var, arr, batch_size, high_accuracy);
 }

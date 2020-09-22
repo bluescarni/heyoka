@@ -41,7 +41,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/tfp.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -56,8 +56,8 @@ namespace
 // Helper to run the Taylor init phase of a unary
 // function.
 template <typename T>
-tfp taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                             bool high_accuracy)
+llvm::Value *taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                                      std::uint32_t batch_size, bool high_accuracy)
 {
     assert(f.args().size() == 1u);
 
@@ -67,18 +67,7 @@ tfp taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector
     auto arg = taylor_u_init<T>(s, f.args()[0], arr, batch_size, high_accuracy);
 
     // Decompose arg into scalars.
-    auto scalars = vector_to_scalars(
-        builder, std::visit(
-                     [](const auto &a) {
-                         if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
-                             return a;
-                         } else {
-                             // NOTE: in high accuracy mode, return only
-                             // the main component.
-                             return a.first;
-                         }
-                     },
-                     arg));
+    auto scalars = vector_to_scalars(builder, arg);
 
     // Invoke the function on each scalar.
     std::vector<llvm::Value *> init_vals;
@@ -87,15 +76,12 @@ tfp taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector
     }
 
     // Build a vector with the results.
-    auto ret = scalars_to_vector(builder, init_vals);
-
-    // Turn it into a tfp and return it.
-    return tfp_from_vector(s, ret, high_accuracy);
+    return scalars_to_vector(builder, init_vals);
 }
 
 template <typename T>
-tfp taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -108,16 +94,17 @@ tfp taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<tfp> &
 
 // Derivative of sin(number).
 template <typename T>
-tfp taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
-                         std::uint32_t, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
 {
-    return tfp_zero<T>(s, batch_size, high_accuracy);
+    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of sin(variable).
 template <typename T>
-tfp taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                  std::uint32_t batch_size, bool)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -136,7 +123,8 @@ tfp taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<t
     if (order == std::numeric_limits<std::uint32_t>::max()) {
         throw std::overflow_error("Overflow in the Taylor derivative of sin()");
     }
-    std::vector<tfp> sum;
+    std::vector<llvm::Value *> sum;
+    auto &builder = s.builder();
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the +1 is because we are accessing the cosine
         // of the u var, which is conventionally placed
@@ -144,33 +132,34 @@ tfp taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<t
         auto v0 = taylor_load_derivative(arr, idx + 1u, order - j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-        auto fac = tfp_constant<T>(s, number(static_cast<T>(j)), batch_size, high_accuracy);
+        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
         // Add j*v0*v1 to the sum.
-        sum.push_back(tfp_mul(s, fac, tfp_mul(s, v0, v1)));
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: ret_acc / order
-    auto div = tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy);
+    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
-    return tfp_div(s, ret_acc, div);
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-tfp taylor_diff_sin_impl(llvm_state &, const U &, const std::vector<tfp> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                         std::uint32_t, bool)
+llvm::Value *taylor_diff_sin_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a sine");
 }
 
 template <typename T>
-tfp taylor_diff_sin(llvm_state &s, const function &func, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -310,8 +299,8 @@ namespace
 {
 
 template <typename T>
-tfp taylor_u_init_cos(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_cos(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -324,15 +313,16 @@ tfp taylor_u_init_cos(llvm_state &s, const function &f, const std::vector<tfp> &
 
 // Derivative of cos(number).
 template <typename T>
-tfp taylor_diff_cos_impl(llvm_state &s, const number &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
-                         std::uint32_t, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
 {
-    return tfp_zero<T>(s, batch_size, high_accuracy);
+    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 template <typename T>
-tfp taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                  std::uint32_t batch_size, bool)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -351,7 +341,8 @@ tfp taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<t
     if (order == std::numeric_limits<std::uint32_t>::max()) {
         throw std::overflow_error("Overflow in the Taylor derivative of cos()");
     }
-    std::vector<tfp> sum;
+    std::vector<llvm::Value *> sum;
+    auto &builder = s.builder();
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the -1 is because we are accessing the sine
         // of the u var, which is conventionally placed
@@ -359,33 +350,34 @@ tfp taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<t
         auto v0 = taylor_load_derivative(arr, idx - 1u, order - j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-        auto fac = tfp_constant<T>(s, number(static_cast<T>(j)), batch_size, high_accuracy);
+        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
         // Add j*v0*v1 to the sum.
-        sum.push_back(tfp_mul(s, fac, tfp_mul(s, v0, v1)));
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute and return the result: -ret_acc / order
-    auto div = tfp_constant<T>(s, number(-static_cast<T>(order)), batch_size, high_accuracy);
+    auto div = create_constant_vector(builder, codegen<T>(s, number(-static_cast<T>(order))), batch_size);
 
-    return tfp_div(s, ret_acc, div);
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-tfp taylor_diff_cos_impl(llvm_state &, const U &, const std::vector<tfp> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                         std::uint32_t, bool)
+llvm::Value *taylor_diff_cos_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
 }
 
 template <typename T>
-tfp taylor_diff_cos(llvm_state &s, const function &func, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -515,8 +507,8 @@ namespace
 {
 
 template <typename T>
-tfp taylor_u_init_log(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_log(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -529,16 +521,17 @@ tfp taylor_u_init_log(llvm_state &s, const function &f, const std::vector<tfp> &
 
 // Derivative of log(number).
 template <typename T>
-tfp taylor_diff_log_impl(llvm_state &s, const number &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
-                         std::uint32_t, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
 {
-    return tfp_zero<T>(s, batch_size, high_accuracy);
+    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of log(variable).
 template <typename T>
-tfp taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                  std::uint32_t batch_size, bool)
 {
     // NOTE: not much use in allowing zero-order
     // derivatives, which in general might complicate
@@ -551,8 +544,10 @@ tfp taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<t
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
+    auto &builder = s.builder();
+
     // The result of the summation.
-    tfp ret_acc;
+    llvm::Value *ret_acc;
 
     // NOTE: iteration in the [1, order) range
     // (i.e., order excluded). If order is 1,
@@ -560,46 +555,47 @@ tfp taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<t
     // summation function requires a series
     // with at least 1 element.
     if (order > 1u) {
-        std::vector<tfp> sum;
+        std::vector<llvm::Value *> sum;
         for (std::uint32_t j = 1; j < order; ++j) {
             auto v0 = taylor_load_derivative(arr, idx, order - j, n_uvars);
             auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-            auto fac = tfp_constant<T>(s, number(static_cast<T>(order - j)), batch_size, high_accuracy);
+            auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
             // Add (order-j)*v0*v1 to the sum.
-            sum.push_back(tfp_mul(s, fac, tfp_mul(s, v0, v1)));
+            sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
         }
 
         // Compute the result of the summation.
-        ret_acc = tfp_pairwise_sum(s, sum);
+        ret_acc = llvm_pairwise_sum(builder, sum);
     } else {
         // If the order is 1, the summation will be empty.
         // Init the result of the summation with zero.
-        ret_acc = tfp_constant<T>(s, number(0.), batch_size, high_accuracy);
+        ret_acc = create_constant_vector(builder, codegen<T>(s, number(0.)), batch_size);
     }
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
     auto bn = taylor_load_derivative(arr, u_idx, order, n_uvars);
     auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
 
-    auto div = tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy);
+    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
-    return tfp_div(s, tfp_sub(s, bn, tfp_div(s, ret_acc, div)), b0);
+    return builder.CreateFDiv(builder.CreateFSub(bn, builder.CreateFDiv(ret_acc, div)), b0);
 }
 
 // All the other cases.
 template <typename T, typename U>
-tfp taylor_diff_log_impl(llvm_state &, const U &, const std::vector<tfp> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                         std::uint32_t, bool)
+llvm::Value *taylor_diff_log_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
 }
 
 template <typename T>
-tfp taylor_diff_log(llvm_state &s, const function &func, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -711,8 +707,8 @@ namespace
 {
 
 template <typename T>
-tfp taylor_u_init_exp(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_exp(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -725,16 +721,17 @@ tfp taylor_u_init_exp(llvm_state &s, const function &f, const std::vector<tfp> &
 
 // Derivative of exp(number).
 template <typename T>
-tfp taylor_diff_exp_impl(llvm_state &s, const number &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
-                         std::uint32_t, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_exp_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
 {
-    return tfp_zero<T>(s, batch_size, high_accuracy);
+    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of exp(variable).
 template <typename T>
-tfp taylor_diff_exp_impl(llvm_state &s, const variable &var, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_exp_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                  std::uint32_t batch_size, bool)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: not much use in allowing zero-order
@@ -745,43 +742,46 @@ tfp taylor_diff_exp_impl(llvm_state &s, const variable &var, const std::vector<t
             "Cannot compute the Taylor derivative of order 0 of exp() (the order must be at least one)");
     }
 
+    auto &builder = s.builder();
+
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
     // NOTE: iteration in the [0, order) range
     // (i.e., order excluded).
-    std::vector<tfp> sum;
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
         auto v0 = taylor_load_derivative(arr, idx, j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, order - j, n_uvars);
 
-        auto fac = tfp_constant<T>(s, number(static_cast<T>(order - j)), batch_size, high_accuracy);
+        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
         // Add (order-j)*v0*v1 to the sum.
-        sum.push_back(tfp_mul(s, fac, tfp_mul(s, v0, v1)));
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Finalise the return value: ret_acc / n.
-    auto div = tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy);
+    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
-    return tfp_div(s, ret_acc, div);
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-tfp taylor_diff_exp_impl(llvm_state &, const U &, const std::vector<tfp> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                         std::uint32_t, bool)
+llvm::Value *taylor_diff_exp_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of an exponential");
 }
 
 template <typename T>
-tfp taylor_diff_exp(llvm_state &s, const function &func, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -894,8 +894,8 @@ namespace
 {
 
 template <typename T>
-tfp taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     if (f.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -910,30 +910,8 @@ tfp taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<tfp> &
     auto arg1 = taylor_u_init<T>(s, f.args()[1], arr, batch_size, high_accuracy);
 
     // Decompose arg into scalars.
-    auto scalars0 = vector_to_scalars(
-        builder, std::visit(
-                     [](const auto &a) {
-                         if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
-                             return a;
-                         } else {
-                             // NOTE: in high accuracy mode, return only
-                             // the main component.
-                             return a.first;
-                         }
-                     },
-                     arg0));
-    auto scalars1 = vector_to_scalars(
-        builder, std::visit(
-                     [](const auto &a) {
-                         if constexpr (std::is_same_v<detail::uncvref_t<decltype(a)>, llvm::Value *>) {
-                             return a;
-                         } else {
-                             // NOTE: in high accuracy mode, return only
-                             // the main component.
-                             return a.first;
-                         }
-                     },
-                     arg1));
+    auto scalars0 = vector_to_scalars(builder, arg0);
+    auto scalars1 = vector_to_scalars(builder, arg1);
 
     // Invoke the function on each scalar.
     std::vector<llvm::Value *> init_vals;
@@ -942,25 +920,22 @@ tfp taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<tfp> &
     }
 
     // Build a vector with the results.
-    auto ret = scalars_to_vector(builder, init_vals);
-
-    // Turn it into a tfp and return it.
-    return tfp_from_vector(s, ret, high_accuracy);
+    return scalars_to_vector(builder, init_vals);
 }
 
 // Derivative of pow(number, number).
 template <typename T>
-tfp taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<tfp> &, std::uint32_t,
-                         std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
 {
-    return tfp_zero<T>(s, batch_size, high_accuracy);
+    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of pow(variable, number).
 template <typename T>
-tfp taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num, const std::vector<tfp> &arr,
-                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                         bool high_accuracy)
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num,
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                  std::uint32_t idx, std::uint32_t batch_size, bool)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -971,49 +946,54 @@ tfp taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num, 
             "Cannot compute the Taylor derivative of order 0 of pow() (the order must be at least one)");
     }
 
+    auto &builder = s.builder();
+
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
     // NOTE: iteration in the [0, order) range
     // (i.e., order *not* included).
-    std::vector<tfp> sum;
+    std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
         auto v0 = taylor_load_derivative(arr, u_idx, order - j, n_uvars);
         auto v1 = taylor_load_derivative(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
-        auto scal_f = tfp_constant<T>(
-            s, number(static_cast<T>(order)) * num - number(static_cast<T>(j)) * (num + number(static_cast<T>(1))),
-            batch_size, high_accuracy);
+        auto scal_f
+            = create_constant_vector(builder,
+                                     codegen<T>(s, number(static_cast<T>(order)) * num
+                                                       - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                     batch_size);
 
         // Add scal_f*v0*v1 to the sum.
-        sum.push_back(tfp_mul(s, scal_f, tfp_mul(s, v0, v1)));
+        sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = llvm_pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
-    auto ord_f = tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy);
+    auto ord_f = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
     auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
-    auto div = tfp_mul(s, ord_f, b0);
+    auto div = builder.CreateFMul(ord_f, b0);
 
     // Compute and return the result: ret_acc / div.
-    return tfp_div(s, ret_acc, div);
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U1, typename U2>
-tfp taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const std::vector<tfp> &, std::uint32_t, std::uint32_t,
-                         std::uint32_t, std::uint32_t, bool)
+llvm::Value *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
 }
 
 template <typename T>
-tfp taylor_diff_pow(llvm_state &s, const function &func, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_pow(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     if (func.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "

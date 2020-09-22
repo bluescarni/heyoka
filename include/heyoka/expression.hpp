@@ -38,7 +38,6 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -273,21 +272,21 @@ inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
     return std::array{expression{variable{strs}}...};
 }
 
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_dbl(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                        bool);
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_ldbl(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                         bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                                 std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_ldbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_f128(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                         bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_f128(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t, bool);
 
 #endif
 
 template <typename T>
-inline tfp taylor_u_init(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                         bool high_accuracy)
+inline llvm::Value *taylor_u_init(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t batch_size, bool high_accuracy)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_u_init_dbl(s, ex, arr, batch_size, high_accuracy);
@@ -302,22 +301,23 @@ inline tfp taylor_u_init(llvm_state &s, const expression &ex, const std::vector<
     }
 }
 
-HEYOKA_DLL_PUBLIC tfp taylor_diff_dbl(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                      std::uint32_t, std::uint32_t, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                               std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
 
-HEYOKA_DLL_PUBLIC tfp taylor_diff_ldbl(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                       std::uint32_t, std::uint32_t, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                                std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC tfp taylor_diff_f128(llvm_state &, const expression &, const std::vector<tfp> &, std::uint32_t,
-                                       std::uint32_t, std::uint32_t, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
+                                                std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool);
 
 #endif
 
 template <typename T>
-inline tfp taylor_diff(llvm_state &s, const expression &ex, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                       std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+inline llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                                bool high_accuracy)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_diff_dbl(s, ex, arr, n_uvars, order, idx, batch_size, high_accuracy);

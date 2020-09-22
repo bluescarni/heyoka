@@ -39,6 +39,14 @@
 namespace heyoka
 {
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_load_derivative(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                                      std::uint32_t);
+
+}
+
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
 

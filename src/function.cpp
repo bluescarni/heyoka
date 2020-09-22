@@ -43,7 +43,6 @@
 #include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/tfp.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -961,8 +960,8 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &, const function &, std::uint32_
 
 #endif
 
-tfp taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                      bool high_accuracy)
+llvm::Value *taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size, bool high_accuracy)
 {
     auto &ti = f.taylor_u_init_dbl_f();
     if (!ti) {
@@ -972,8 +971,8 @@ tfp taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<tfp> &
     return ti(s, f, arr, batch_size, high_accuracy);
 }
 
-tfp taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                       bool high_accuracy)
+llvm::Value *taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size, bool high_accuracy)
 {
     auto &ti = f.taylor_u_init_ldbl_f();
     if (!ti) {
@@ -985,8 +984,8 @@ tfp taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<tfp> 
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-tfp taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                       bool high_accuracy)
+llvm::Value *taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size, bool high_accuracy)
 {
     auto &ti = f.taylor_u_init_f128_f();
     if (!ti) {
@@ -998,8 +997,9 @@ tfp taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<tfp> 
 
 #endif
 
-tfp taylor_diff_dbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_dbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 {
     auto &td = f.taylor_diff_dbl_f();
     if (!td) {
@@ -1009,8 +1009,9 @@ tfp taylor_diff_dbl(llvm_state &s, const function &f, const std::vector<tfp> &ar
     return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
 }
 
-tfp taylor_diff_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_ldbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                              bool high_accuracy)
 {
     auto &td = f.taylor_diff_ldbl_f();
     if (!td) {
@@ -1022,8 +1023,9 @@ tfp taylor_diff_ldbl(llvm_state &s, const function &f, const std::vector<tfp> &a
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-tfp taylor_diff_f128(llvm_state &s, const function &f, const std::vector<tfp> &arr, std::uint32_t n_uvars,
-                     std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size, bool high_accuracy)
+llvm::Value *taylor_diff_f128(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                              bool high_accuracy)
 {
     auto &td = f.taylor_diff_f128_f();
     if (!td) {
