@@ -95,7 +95,7 @@ llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vect
 // Derivative of sin(number).
 template <typename T>
 llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
     return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
@@ -104,7 +104,7 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vect
 template <typename T>
 llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size, bool)
+                                  std::uint32_t batch_size)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -150,7 +150,7 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std:
 // All the other cases.
 template <typename T, typename U>
 llvm::Value *taylor_diff_sin_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a sine");
@@ -158,8 +158,7 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &, const U &, const std::vector<llv
 
 template <typename T>
 llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -168,9 +167,7 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
     }
 
     return std::visit(
-        [&](const auto &v) {
-            return taylor_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size, high_accuracy);
-        },
+        [&](const auto &v) { return taylor_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -314,7 +311,7 @@ llvm::Value *taylor_u_init_cos(llvm_state &s, const function &f, const std::vect
 // Derivative of cos(number).
 template <typename T>
 llvm::Value *taylor_diff_cos_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
     return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
@@ -322,7 +319,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const number &, const std::vect
 template <typename T>
 llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size, bool)
+                                  std::uint32_t batch_size)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -368,7 +365,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std:
 // All the other cases.
 template <typename T, typename U>
 llvm::Value *taylor_diff_cos_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
@@ -376,8 +373,7 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &, const U &, const std::vector<llv
 
 template <typename T>
 llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -386,9 +382,7 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vec
     }
 
     return std::visit(
-        [&](const auto &v) {
-            return taylor_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size, high_accuracy);
-        },
+        [&](const auto &v) { return taylor_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -522,7 +516,7 @@ llvm::Value *taylor_u_init_log(llvm_state &s, const function &f, const std::vect
 // Derivative of log(number).
 template <typename T>
 llvm::Value *taylor_diff_log_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
     return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
@@ -531,7 +525,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const number &, const std::vect
 template <typename T>
 llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size, bool)
+                                  std::uint32_t batch_size)
 {
     // NOTE: not much use in allowing zero-order
     // derivatives, which in general might complicate
@@ -586,7 +580,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std:
 // All the other cases.
 template <typename T, typename U>
 llvm::Value *taylor_diff_log_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
@@ -594,8 +588,7 @@ llvm::Value *taylor_diff_log_impl(llvm_state &, const U &, const std::vector<llv
 
 template <typename T>
 llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -604,9 +597,7 @@ llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vec
     }
 
     return std::visit(
-        [&](const auto &v) {
-            return taylor_diff_log_impl<T>(s, v, arr, n_uvars, order, idx, batch_size, high_accuracy);
-        },
+        [&](const auto &v) { return taylor_diff_log_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -722,7 +713,7 @@ llvm::Value *taylor_u_init_exp(llvm_state &s, const function &f, const std::vect
 // Derivative of exp(number).
 template <typename T>
 llvm::Value *taylor_diff_exp_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
     return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
@@ -731,7 +722,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const number &, const std::vect
 template <typename T>
 llvm::Value *taylor_diff_exp_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size, bool)
+                                  std::uint32_t batch_size)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: not much use in allowing zero-order
@@ -772,7 +763,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const variable &var, const std:
 // All the other cases.
 template <typename T, typename U>
 llvm::Value *taylor_diff_exp_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of an exponential");
@@ -780,8 +771,7 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &, const U &, const std::vector<llv
 
 template <typename T>
 llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if (func.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -790,9 +780,7 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vec
     }
 
     return std::visit(
-        [&](const auto &v) {
-            return taylor_diff_exp_impl<T>(s, v, arr, n_uvars, order, idx, batch_size, high_accuracy);
-        },
+        [&](const auto &v) { return taylor_diff_exp_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -926,7 +914,7 @@ llvm::Value *taylor_u_init_pow(llvm_state &s, const function &f, const std::vect
 // Derivative of pow(number, number).
 template <typename T>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
     return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
@@ -935,7 +923,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &,
 template <typename T>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num,
                                   const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
-                                  std::uint32_t idx, std::uint32_t batch_size, bool)
+                                  std::uint32_t idx, std::uint32_t batch_size)
 {
     // NOTE: pairwise summation requires order 1 at least.
     // NOTE: also not much use in allowing zero-order
@@ -984,7 +972,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const numb
 // All the other cases.
 template <typename T, typename U1, typename U2>
 llvm::Value *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const std::vector<llvm::Value *> &,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, bool)
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
@@ -992,8 +980,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const st
 
 template <typename T>
 llvm::Value *taylor_diff_pow(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if (func.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
@@ -1003,7 +990,7 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const function &func, const std::vec
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return taylor_diff_pow_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size, high_accuracy);
+            return taylor_diff_pow_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         func.args()[0].value(), func.args()[1].value());
 }

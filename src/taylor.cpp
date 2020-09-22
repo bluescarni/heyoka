@@ -1547,7 +1547,7 @@ struct fm_disabler {
 // up to order - 1.
 template <typename T>
 llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool)
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order > 0u);
 
@@ -1590,16 +1590,14 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 // Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
 // is the number of equations/variables in the ODE sys, dc its Taylor decomposition,
 // n_uvars the total number of u variables in the decomposition.
-// order is the max derivative order desired, batch_size the batch size, high_accuracy
-// specifies whether to use extended precision techniques in the computation.
+// order is the max derivative order desired, batch_size the batch size.
 // order0 contains the zero order derivatives of the state variables.
 //
 // The return value is the jet of derivatives of all u variables up to order 'order - 1',
 // plus the derivatives of order 'order' of the state variables.
 template <typename T>
 auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const std::vector<expression> &dc,
-                        std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                        bool high_accuracy)
+                        std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order0.size() == n_eq);
 
@@ -1619,19 +1617,18 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         // NOTE: the derivatives of the state variables
         // are at the end of the decomposition vector.
         for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-            retval.push_back(
-                taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, cur_order, batch_size, high_accuracy));
+            retval.push_back(taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, cur_order, batch_size));
         }
 
         // Now the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            retval.push_back(taylor_diff<T>(s, dc[i], retval, n_uvars, cur_order, i, batch_size, high_accuracy));
+            retval.push_back(taylor_diff<T>(s, dc[i], retval, n_uvars, cur_order, i, batch_size));
         }
     }
 
     // Compute the last-order derivatives for the state variables.
     for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-        retval.push_back(taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, order, batch_size, high_accuracy));
+        retval.push_back(taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, order, batch_size));
     }
 
     assert(retval.size() == static_cast<decltype(retval.size())>(n_uvars) * order + n_eq);
@@ -1642,7 +1639,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size.
 template <typename T>
-auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size, bool)
+auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1722,13 +1719,11 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.builder().SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr
-        = taylor_load_values<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size, high_accuracy);
+    auto order0_arr = taylor_load_values<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size);
 
     // Compute the jet of derivatives.
-    auto diff_arr
-        = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
-                                boost::numeric_cast<std::uint32_t>(n_uvars), order, batch_size, high_accuracy);
+    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
+                                          boost::numeric_cast<std::uint32_t>(n_uvars), order, batch_size);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array (size n_eq * (order + 1) * batch_size)
@@ -2132,7 +2127,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     builder.SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values<T>(s, &*state_ptr, n_eq, batch_size, high_accuracy);
+    auto order0_arr = taylor_load_values<T>(s, &*state_ptr, n_eq, batch_size);
 
     // Compute the norm infinity of the state vector.
     auto max_abs_state = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
@@ -2141,8 +2136,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Compute the jet of derivatives at the given order.
-    auto diff_arr
-        = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, high_accuracy);
+    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size);
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.

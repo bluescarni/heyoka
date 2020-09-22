@@ -998,41 +998,38 @@ llvm::Value *taylor_u_init_f128(llvm_state &s, const function &f, const std::vec
 #endif
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                             bool high_accuracy)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &td = f.taylor_diff_dbl_f();
     if (!td) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for double Taylor diff");
     }
-    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
+    return td(s, f, arr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                              bool high_accuracy)
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &td = f.taylor_diff_ldbl_f();
     if (!td) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for long double Taylor diff");
     }
-    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
+    return td(s, f, arr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
-                              bool high_accuracy)
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &td = f.taylor_diff_f128_f();
     if (!td) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for float128 Taylor diff");
     }
-    return td(s, f, arr, n_uvars, order, idx, batch_size, high_accuracy);
+    return td(s, f, arr, n_uvars, order, idx, batch_size);
 }
 
 #endif
