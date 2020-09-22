@@ -1012,8 +1012,7 @@ tfp bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const variable 
         sum.push_back(tfp_mul(s, v0, v1));
     }
 
-    //return tfp_compensated_sum<T>(s, sum, batch_size);
-	return tfp_pairwise_sum(s, sum);
+    return tfp_pairwise_sum(s, sum);
 }
 
 // All the other cases.
@@ -1071,8 +1070,7 @@ tfp bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1, co
     }
 
     // Init the return value as the result of the sum.
-    //auto ret_acc = tfp_compensated_sum<T>(s, sum, batch_size);
-	auto ret_acc = tfp_pairwise_sum(s, sum);
+    auto ret_acc = tfp_pairwise_sum(s, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.

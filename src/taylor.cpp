@@ -2046,7 +2046,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // NOTE: minimum order is 2.
     auto order_f = std::max(T(2), ceil(-log(tol) / 2 + 1));
     if (high_accuracy) {
-        // Add 10% more order in high accuracy mode.
+        // Add 20% more order in high accuracy mode.
         order_f += order_f * (T(20) / 100);
     }
 
