@@ -991,7 +991,8 @@ tfp taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num, 
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = tfp_compensated_sum<T>(s, sum, batch_size);
+    //auto ret_acc = tfp_compensated_sum<T>(s, sum, batch_size);
+	auto ret_acc = tfp_pairwise_sum(s, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
     auto ord_f = tfp_constant<T>(s, number(static_cast<T>(order)), batch_size, high_accuracy);
