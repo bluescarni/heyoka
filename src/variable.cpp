@@ -242,8 +242,7 @@ llvm::Value *taylor_init_batch_f128(llvm_state &s, const variable &var, llvm::Va
 
 #endif
 
-llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<llvm::Value *> &arr, std::uint32_t,
-                               bool)
+llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<llvm::Value *> &arr, std::uint32_t)
 {
     // Check that var is a u variable and extract its index.
     const auto &var_name = var.name();
@@ -262,18 +261,18 @@ llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vec
 }
 
 llvm::Value *taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
     // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_u_init_dbl(s, var, arr, batch_size, high_accuracy);
+    return taylor_u_init_dbl(s, var, arr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
-    return taylor_u_init_dbl(s, var, arr, batch_size, high_accuracy);
+    return taylor_u_init_dbl(s, var, arr, batch_size);
 }
 
 #endif

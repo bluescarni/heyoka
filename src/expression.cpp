@@ -586,26 +586,23 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &s, const expression &e, std::uin
 #endif
 
 llvm::Value *taylor_u_init_dbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
-    return std::visit([&](const auto &arg) { return taylor_u_init_dbl(s, arg, arr, batch_size, high_accuracy); },
-                      e.value());
+    return std::visit([&](const auto &arg) { return taylor_u_init_dbl(s, arg, arr, batch_size); }, e.value());
 }
 
 llvm::Value *taylor_u_init_ldbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
-    return std::visit([&](const auto &arg) { return taylor_u_init_ldbl(s, arg, arr, batch_size, high_accuracy); },
-                      e.value());
+    return std::visit([&](const auto &arg) { return taylor_u_init_ldbl(s, arg, arr, batch_size); }, e.value());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_u_init_f128(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
-    return std::visit([&](const auto &arg) { return taylor_u_init_f128(s, arg, arr, batch_size, high_accuracy); },
-                      e.value());
+    return std::visit([&](const auto &arg) { return taylor_u_init_f128(s, arg, arr, batch_size); }, e.value());
 }
 
 #endif

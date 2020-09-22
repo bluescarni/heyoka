@@ -57,14 +57,14 @@ namespace
 // function.
 template <typename T>
 llvm::Value *taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                                      std::uint32_t batch_size, bool high_accuracy)
+                                      std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
     auto &builder = s.builder();
 
     // Do the initialisation for the function argument.
-    auto arg = taylor_u_init<T>(s, f.args()[0], arr, batch_size, high_accuracy);
+    auto arg = taylor_u_init<T>(s, f.args()[0], arr, batch_size);
 
     // Decompose arg into scalars.
     auto scalars = vector_to_scalars(builder, arg);
@@ -81,7 +81,7 @@ llvm::Value *taylor_u_init_unary_func(llvm_state &s, const function &f, const st
 
 template <typename T>
 llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -89,7 +89,7 @@ llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vect
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size, high_accuracy);
+    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of sin(number).
@@ -300,7 +300,7 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_u_init_cos(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -308,7 +308,7 @@ llvm::Value *taylor_u_init_cos(llvm_state &s, const function &f, const std::vect
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size, high_accuracy);
+    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of cos(number).
@@ -508,7 +508,7 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_u_init_log(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -516,7 +516,7 @@ llvm::Value *taylor_u_init_log(llvm_state &s, const function &f, const std::vect
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size, high_accuracy);
+    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of log(number).
@@ -708,7 +708,7 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_u_init_exp(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     if (f.args().size() != 1u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -716,7 +716,7 @@ llvm::Value *taylor_u_init_exp(llvm_state &s, const function &f, const std::vect
                                     + std::to_string(f.args().size()) + " arguments were provided");
     }
 
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size, high_accuracy);
+    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of exp(number).
@@ -895,7 +895,7 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     if (f.args().size() != 2u) {
         throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
@@ -906,8 +906,8 @@ llvm::Value *taylor_u_init_pow(llvm_state &s, const function &f, const std::vect
     auto &builder = s.builder();
 
     // Do the initialisation for the function arguments.
-    auto arg0 = taylor_u_init<T>(s, f.args()[0], arr, batch_size, high_accuracy);
-    auto arg1 = taylor_u_init<T>(s, f.args()[1], arr, batch_size, high_accuracy);
+    auto arg0 = taylor_u_init<T>(s, f.args()[0], arr, batch_size);
+    auto arg1 = taylor_u_init<T>(s, f.args()[1], arr, batch_size);
 
     // Decompose arg into scalars.
     auto scalars0 = vector_to_scalars(builder, arg0);

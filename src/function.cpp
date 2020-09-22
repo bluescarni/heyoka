@@ -961,38 +961,38 @@ llvm::Value *taylor_diff_batch_f128(llvm_state &, const function &, std::uint32_
 #endif
 
 llvm::Value *taylor_u_init_dbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
     auto &ti = f.taylor_u_init_dbl_f();
     if (!ti) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for double Taylor init");
     }
-    return ti(s, f, arr, batch_size, high_accuracy);
+    return ti(s, f, arr, batch_size);
 }
 
 llvm::Value *taylor_u_init_ldbl(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
     auto &ti = f.taylor_u_init_ldbl_f();
     if (!ti) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for long double Taylor init");
     }
-    return ti(s, f, arr, batch_size, high_accuracy);
+    return ti(s, f, arr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_u_init_f128(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
     auto &ti = f.taylor_u_init_f128_f();
     if (!ti) {
         throw std::invalid_argument("The function '" + f.display_name()
                                     + "' does not provide a function for float128 Taylor init");
     }
-    return ti(s, f, arr, batch_size, high_accuracy);
+    return ti(s, f, arr, batch_size);
 }
 
 #endif

@@ -831,11 +831,11 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_u_init_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                   std::uint32_t batch_size, bool high_accuracy)
+                                   std::uint32_t batch_size)
 {
     // Do the Taylor init for lhs and rhs.
-    auto l = taylor_u_init<T>(s, bo.lhs(), arr, batch_size, high_accuracy);
-    auto r = taylor_u_init<T>(s, bo.rhs(), arr, batch_size, high_accuracy);
+    auto l = taylor_u_init<T>(s, bo.lhs(), arr, batch_size);
+    auto r = taylor_u_init<T>(s, bo.rhs(), arr, batch_size);
 
     // Do the codegen for the corresponding operation.
     switch (bo.op()) {
@@ -855,23 +855,23 @@ llvm::Value *taylor_u_init_bo_impl(llvm_state &s, const binary_operator &bo, con
 } // namespace detail
 
 llvm::Value *taylor_u_init_dbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size, bool high_accuracy)
+                               std::uint32_t batch_size)
 {
-    return detail::taylor_u_init_bo_impl<double>(s, bo, arr, batch_size, high_accuracy);
+    return detail::taylor_u_init_bo_impl<double>(s, bo, arr, batch_size);
 }
 
 llvm::Value *taylor_u_init_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
-    return detail::taylor_u_init_bo_impl<long double>(s, bo, arr, batch_size, high_accuracy);
+    return detail::taylor_u_init_bo_impl<long double>(s, bo, arr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_u_init_f128(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t batch_size)
 {
-    return detail::taylor_u_init_bo_impl<mppp::real128>(s, bo, arr, batch_size, high_accuracy);
+    return detail::taylor_u_init_bo_impl<mppp::real128>(s, bo, arr, batch_size);
 }
 
 #endif
