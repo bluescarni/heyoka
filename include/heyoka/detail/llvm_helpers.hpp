@@ -142,30 +142,6 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::str
                                                     const std::vector<llvm::Value *> &,
                                                     const std::vector<llvm::Attribute::AttrKind> & = {});
 
-template <typename T>
-inline llvm::Value *compensated_sum(llvm_state &s, const std::vector<llvm::Value *> &v, std::uint32_t batch_size)
-{
-    assert(!v.empty());
-
-    if (v.size() == 1u) {
-        return v[0];
-    }
-
-    auto &builder = s.builder();
-
-    auto sum = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
-    auto c = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
-
-    for (const auto &x : v) {
-        auto y = builder.CreateFSub(x, c);
-        auto t = builder.CreateFAdd(sum, y);
-        c = builder.CreateFSub(builder.CreateFSub(t, sum), y);
-        sum = t;
-    }
-
-    return sum;
-}
-
 } // namespace heyoka::detail
 
 #endif

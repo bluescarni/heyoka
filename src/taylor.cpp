@@ -1975,63 +1975,89 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
-// Helper to run the Estrin scheme on the polynomial
-// whose coefficients are stored in cf_vec, with evaluation
-// value h. This will consume cf_vec.
-// https://en.wikipedia.org/wiki/Estrin%27s_scheme
-llvm::Value *taylor_run_estrin(llvm_state &s, std::vector<llvm::Value *> &cf_vec, llvm::Value *h)
+// Run the Horner scheme on multiple polynomials at a time, with evaluation point h. Each element of cf_vecs
+// contains the list of coefficients of a polynomial.
+std::vector<llvm::Value *> taylor_run_multihorner(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
+                                                  llvm::Value *h)
 {
-    assert(!cf_vec.empty());
-
-    if (cf_vec.size() == std::numeric_limits<decltype(cf_vec.size())>::max()) {
-        throw std::overflow_error("Overflow error in taylor_run_estrin()");
-    }
+    // Preconditions: cf_vecs is not empty, and it contains polynomials
+    // of degree at least 1, all with the same degree.
+    assert(!cf_vecs.empty());
+    assert(!cf_vecs[0].empty());
+    assert(std::all_of(cf_vecs.begin() + 1, cf_vecs.end(),
+                       [&cf_vecs](const auto &v) { return v.size() == cf_vecs[0].size(); }));
 
     auto &builder = s.builder();
 
-    while (cf_vec.size() != 1u) {
-        // Fill in the vector of coefficients for the next iteration.
-        std::vector<llvm::Value *> new_cf_vec;
+    // Number of terms in each polynomial (i.e., degree + 1).
+    const auto nterms = cf_vecs[0].size();
 
-        for (decltype(cf_vec.size()) i = 0; i < cf_vec.size(); i += 2u) {
-            if (i + 1u == cf_vec.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing coefficient.
-                new_cf_vec.push_back(cf_vec[i]);
-            } else {
-                new_cf_vec.push_back(builder.CreateFAdd(cf_vec[i], builder.CreateFMul(cf_vec[i + 1u], h)));
-            }
-        }
+    // Init the return value, filling it with the values of the
+    // coefficients of the highest-degree monomial in each polynomial.
+    std::vector<llvm::Value *> retval;
+    for (const auto &v : cf_vecs) {
+        retval.push_back(v.back());
+    }
 
-        // Replace the vector of coefficients
-        // with the new one.
-        new_cf_vec.swap(cf_vec);
-
-        // Update h if we are not at the last iteration.
-        if (cf_vec.size() != 1u) {
-            h = builder.CreateFMul(h, h);
+    // Run the Horner scheme simultaneously for all polynomials.
+    for (decltype(cf_vecs[0].size()) i = 1; i < nterms; ++i) {
+        for (decltype(cf_vecs.size()) j = 0; j < cf_vecs.size(); ++j) {
+            retval[j] = builder.CreateFAdd(cf_vecs[j][nterms - i - 1u], builder.CreateFMul(retval[j], h));
         }
     }
 
-    return cf_vec[0];
+    return retval;
 }
 
+// As above, but instead of the Horner scheme use a compensated summation over the naive evaluation
+// of monomials.
 template <typename T>
-llvm::Value *taylor_run_chorner(llvm_state &s, std::vector<llvm::Value *> &cf_vec, llvm::Value *h,
-                                std::uint32_t batch_size)
+std::vector<llvm::Value *> taylor_run_ceval(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
+                                            llvm::Value *h, std::uint32_t batch_size)
 {
-    assert(!cf_vec.empty());
+    // Preconditions: cf_vecs is not empty, and it contains polynomials
+    // of degree at least 1, all with the same degree.
+    assert(!cf_vecs.empty());
+    assert(!cf_vecs[0].empty());
+    assert(std::all_of(cf_vecs.begin() + 1, cf_vecs.end(),
+                       [&cf_vecs](const auto &v) { return v.size() == cf_vecs[0].size(); }));
 
     auto &builder = s.builder();
 
-    auto cur_h = h;
-    for (decltype(cf_vec.size()) i = 1; i < cf_vec.size(); ++i) {
-        cf_vec[i] = builder.CreateFMul(cf_vec[i], cur_h);
-        cur_h = builder.CreateFMul(cur_h, h);
+    // Number of terms in each polynomial (i.e., degree + 1).
+    const auto nterms = cf_vecs[0].size();
+
+    // Init the return values with the order-0 monomials, and the running
+    // compensations with zero.
+    std::vector<llvm::Value *> retval, comp;
+    for (const auto &v : cf_vecs) {
+        retval.push_back(v[0]);
+        comp.push_back(create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size));
     }
 
-    return compensated_sum<T>(s, cf_vec, batch_size);
+    // Evaluate and sum.
+    auto cur_h = h;
+    for (decltype(cf_vecs[0].size()) i = 1; i < nterms; ++i) {
+        for (decltype(cf_vecs.size()) j = 0; j < cf_vecs.size(); ++j) {
+            // Evaluate the current monomial.
+            auto tmp = builder.CreateFMul(cf_vecs[j][i], cur_h);
+
+            // Compute the quantities for the compensation.
+            auto y = builder.CreateFSub(tmp, comp[j]);
+            auto t = builder.CreateFAdd(retval[j], y);
+
+            // Update the compensation and the return value.
+            comp[j] = builder.CreateFSub(builder.CreateFSub(t, retval[j]), y);
+            retval[j] = t;
+        }
+
+        // Update the power of h, if we are not at the last iteration.
+        if (i != nterms - 1u) {
+            cur_h = builder.CreateFMul(cur_h, h);
+        }
+    }
+
+    return retval;
 }
 
 template <typename T, typename U>
@@ -2181,9 +2207,11 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
                                       create_constant_vector(builder, codegen<T>(s, number{1.}), batch_size));
     h = builder.CreateFMul(h_fac, h);
 
-    // Run the time stepper for each variable, store the results.
+    // Build the Taylor polynomials that need to be evaluated for the propagation.
+    std::vector<std::vector<llvm::Value *>> cf_vecs;
     for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-        std::vector<llvm::Value *> cf_vec;
+        cf_vecs.emplace_back();
+        auto &cf_vec = cf_vecs.back();
 
         if (order == std::numeric_limits<std::uint32_t>::max()) {
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: the order is too high");
@@ -2191,14 +2219,19 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
         for (std::uint32_t o = 0; o <= order; ++o) {
             cf_vec.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
         }
+    }
 
-        auto new_state = taylor_run_chorner<T>(s, cf_vec, h, batch_size);
+    // Evaluate the Taylor polynomials, producing the updated state of the system.
+    auto new_states
+        = high_accuracy ? taylor_run_ceval<T>(s, cf_vecs, h, batch_size) : taylor_run_multihorner(s, cf_vecs, h);
 
+    // Store the new state.
+    for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
         if (var_idx > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: too many variables");
         }
         store_vector_to_memory(builder, builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
-                               new_state, batch_size);
+                               new_states[var_idx], batch_size);
     }
 
     // Store the timesteps that were used.
