@@ -544,13 +544,11 @@ void llvm_state::optimise()
         llvm::PassManagerBuilder pm_builder;
         // See here for the defaults:
         // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
+        // NOTE: we used to have the SLP vectorizer on here, but
+        // we don't activate it any more in favour of explicit vectorization.
         pm_builder.OptLevel = m_opt_level;
         pm_builder.SizeLevel = 0;
         pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
-        if (m_opt_level >= 3u) {
-            // pm_builder.SLPVectorize = true;
-            pm_builder.MergeFunctions = true;
-        }
 
         m_jitter->m_tm->adjustPassManager(pm_builder);
 
