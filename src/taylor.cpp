@@ -1569,7 +1569,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
                 return builder.CreateFDiv(
-                    ret, create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
+                    ret, vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size));
             } else if constexpr (std::is_same_v<type, number>) {
                 // The first-order derivative is a constant.
                 // If the first-order derivative is being requested,
@@ -1577,7 +1577,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // return 0. No need for normalization as the only
                 // nonzero value that can be produced here is the first-order
                 // derivative.
-                return create_constant_vector(builder, codegen<T>(s, (order == 1u) ? v : number{0.}), batch_size);
+                return vector_splat(builder, codegen<T>(s, (order == 1u) ? v : number{0.}), batch_size);
             } else {
                 assert(false);
                 return nullptr;
@@ -2031,7 +2031,7 @@ std::vector<llvm::Value *> taylor_run_ceval(llvm_state &s, const std::vector<std
     std::vector<llvm::Value *> retval, comp;
     for (const auto &v : cf_vecs) {
         retval.push_back(v[0]);
-        comp.push_back(create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size));
+        comp.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
     }
 
     // Evaluate and sum.
@@ -2155,7 +2155,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto order0_arr = taylor_load_values<T>(s, state_ptr, n_eq, batch_size);
 
     // Compute the norm infinity of the state vector.
-    auto max_abs_state = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
+    auto max_abs_state = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
         max_abs_state = taylor_step_maxabs(s, max_abs_state, order0_arr[i]);
     }
@@ -2165,8 +2165,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
-    auto max_abs_diff_o = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
-    auto max_abs_diff_om1 = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
+    auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+    auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
         max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, taylor_load_derivative(diff_arr, i, order, n_uvars));
         max_abs_diff_om1
@@ -2174,17 +2174,16 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto tol_v = create_constant_vector(builder, codegen<T>(s, number{tol}), batch_size);
+    auto tol_v = vector_splat(builder, codegen<T>(s, number{tol}), batch_size);
     auto abs_or_rel = builder.CreateFCmpOLE(builder.CreateFMul(tol_v, max_abs_state), tol_v);
 
     // Estimate rho at orders order - 1 and order.
-    auto num_rho = builder.CreateSelect(
-        abs_or_rel, create_constant_vector(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
+    auto num_rho
+        = builder.CreateSelect(abs_or_rel, vector_splat(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
     auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                                 create_constant_vector(builder, codegen<T>(s, number{T(1) / order}), batch_size));
-    auto rho_om1
-        = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                          create_constant_vector(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
+                                 vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
+    auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+                                   vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
     auto rho_m = taylor_step_min(s, rho_o, rho_om1);
@@ -2193,17 +2192,16 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     const auto rhofac = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (order - 1u));
 
     // Determine the step size.
-    auto h = builder.CreateFMul(rho_m, create_constant_vector(builder, codegen<T>(s, number{rhofac}), batch_size));
+    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
 
     // Ensure that the step size does not exceed the limit.
     auto max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto backward
-        = builder.CreateFCmpOLT(max_h_vec, create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size));
-    auto h_fac = builder.CreateSelect(backward, create_constant_vector(builder, codegen<T>(s, number{-1.}), batch_size),
-                                      create_constant_vector(builder, codegen<T>(s, number{1.}), batch_size));
+    auto backward = builder.CreateFCmpOLT(max_h_vec, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+    auto h_fac = builder.CreateSelect(backward, vector_splat(builder, codegen<T>(s, number{-1.}), batch_size),
+                                      vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
     h = builder.CreateFMul(h_fac, h);
 
     // Build the Taylor polynomials that need to be evaluated for the propagation.

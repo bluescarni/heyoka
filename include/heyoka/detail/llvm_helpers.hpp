@@ -78,11 +78,10 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
     }
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *create_constant_vector(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
-
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
-
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &, llvm::Value *);
 
@@ -96,13 +95,13 @@ inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_s
     auto ret = codegen<T>(s, number{0.});
 
     if (vector_size > 0u) {
-        ret = create_constant_vector(s.builder(), ret, vector_size);
+        ret = vector_splat(s.builder(), ret, vector_size);
     }
 
     return ret;
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
 
 // Helper to load the value of the derivative of a u variable
 // from an array in the computation of a Taylor jet:

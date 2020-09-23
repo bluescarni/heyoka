@@ -97,7 +97,7 @@ template <typename T>
 llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of sin(variable).
@@ -132,17 +132,17 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std:
         auto v0 = taylor_load_derivative(arr, idx + 1u, order - j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
         // Add j*v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Compute and return the result: ret_acc / order
-    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
     return builder.CreateFDiv(ret_acc, div);
 }
@@ -313,7 +313,7 @@ template <typename T>
 llvm::Value *taylor_diff_cos_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 template <typename T>
@@ -347,17 +347,17 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std:
         auto v0 = taylor_load_derivative(arr, idx - 1u, order - j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
         // Add j*v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Compute and return the result: -ret_acc / order
-    auto div = create_constant_vector(builder, codegen<T>(s, number(-static_cast<T>(order))), batch_size);
+    auto div = vector_splat(builder, codegen<T>(s, number(-static_cast<T>(order))), batch_size);
 
     return builder.CreateFDiv(ret_acc, div);
 }
@@ -518,7 +518,7 @@ template <typename T>
 llvm::Value *taylor_diff_log_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of log(variable).
@@ -554,25 +554,25 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std:
             auto v0 = taylor_load_derivative(arr, idx, order - j, n_uvars);
             auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
 
-            auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
+            auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
             // Add (order-j)*v0*v1 to the sum.
             sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
         }
 
         // Compute the result of the summation.
-        ret_acc = llvm_pairwise_sum(builder, sum);
+        ret_acc = pairwise_sum(builder, sum);
     } else {
         // If the order is 1, the summation will be empty.
         // Init the result of the summation with zero.
-        ret_acc = create_constant_vector(builder, codegen<T>(s, number(0.)), batch_size);
+        ret_acc = vector_splat(builder, codegen<T>(s, number(0.)), batch_size);
     }
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
     auto bn = taylor_load_derivative(arr, u_idx, order, n_uvars);
     auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
 
-    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
     return builder.CreateFDiv(builder.CreateFSub(bn, builder.CreateFDiv(ret_acc, div)), b0);
 }
@@ -715,7 +715,7 @@ template <typename T>
 llvm::Value *taylor_diff_exp_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of exp(variable).
@@ -745,17 +745,17 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const variable &var, const std:
         auto v0 = taylor_load_derivative(arr, idx, j, n_uvars);
         auto v1 = taylor_load_derivative(arr, u_idx, order - j, n_uvars);
 
-        auto fac = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
         // Add (order-j)*v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Finalise the return value: ret_acc / n.
-    auto div = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
     return builder.CreateFDiv(ret_acc, div);
 }
@@ -916,7 +916,7 @@ template <typename T>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
                                   std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of pow(variable, number).
@@ -947,21 +947,20 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const numb
         auto v1 = taylor_load_derivative(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
-        auto scal_f
-            = create_constant_vector(builder,
-                                     codegen<T>(s, number(static_cast<T>(order)) * num
-                                                       - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
-                                     batch_size);
+        auto scal_f = vector_splat(builder,
+                                   codegen<T>(s, number(static_cast<T>(order)) * num
+                                                     - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                   batch_size);
 
         // Add scal_f*v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
-    auto ord_f = create_constant_vector(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto ord_f = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
     auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
     auto div = builder.CreateFMul(ord_f, b0);
 

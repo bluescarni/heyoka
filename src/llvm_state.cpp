@@ -1149,7 +1149,7 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                 auto divisor = codegen<T>(*this, number(static_cast<T>(order)));
 
                 if (vector_size > 0u) {
-                    divisor = detail::create_constant_vector(*m_builder, divisor, vector_size);
+                    divisor = detail::vector_splat(*m_builder, divisor, vector_size);
                 }
 
                 return m_builder->CreateFDiv(diff_load, divisor, "sv_norm");
@@ -1163,7 +1163,7 @@ llvm::Value *llvm_state::tjb_compute_sv_diff(const expression &ex, std::uint32_t
                 auto ret = (order == 1u) ? codegen<T>(*this, v) : codegen<T>(*this, number{0.});
 
                 if (vector_size > 0u) {
-                    ret = detail::create_constant_vector(*m_builder, ret, vector_size);
+                    ret = detail::vector_splat(*m_builder, ret, vector_size);
                 }
 
                 return ret;

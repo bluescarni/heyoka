@@ -81,8 +81,8 @@ void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::
     }
 }
 
-// Create a SIMD vector of size vector_size filled with the constant c.
-llvm::Value *create_constant_vector(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
+// Create a SIMD vector of size vector_size filled with the value c.
+llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
 
@@ -147,7 +147,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
 
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
-llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
+llvm::Value *pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
 {
     assert(!sum.empty());
 

@@ -308,7 +308,7 @@ llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *
     auto ret = codegen_dbl(s, n);
 
     if (vector_size > 0u) {
-        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+        ret = detail::vector_splat(s.builder(), ret, vector_size);
     }
 
     return ret;
@@ -320,7 +320,7 @@ llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value 
     auto ret = codegen_ldbl(s, n);
 
     if (vector_size > 0u) {
-        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+        ret = detail::vector_splat(s.builder(), ret, vector_size);
     }
 
     return ret;
@@ -334,7 +334,7 @@ llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value 
     auto ret = codegen_f128(s, n);
 
     if (vector_size > 0u) {
-        ret = detail::create_constant_vector(s.builder(), ret, vector_size);
+        ret = detail::vector_splat(s.builder(), ret, vector_size);
     }
 
     return ret;
@@ -354,7 +354,7 @@ template <typename T>
 llvm::Value *taylor_u_init_number_impl(llvm_state &s, const number &n, const std::vector<llvm::Value *> &,
                                        std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, n), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, n), batch_size);
 }
 
 } // namespace

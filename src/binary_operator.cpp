@@ -565,7 +565,7 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var, c
     auto &builder = s.builder();
     auto mul = codegen<T>(s, num);
     if (vector_size > 0u) {
-        mul = detail::create_constant_vector(builder, mul, vector_size);
+        mul = detail::vector_splat(builder, mul, vector_size);
     }
 
     return builder.CreateFMul(mul, ret, "bo_mul_var_num_mul");
@@ -606,7 +606,7 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, 
         sum.push_back(builder.CreateFMul(v0, v1, "bo_mul_var_var_term_prod"));
     }
 
-    return llvm_pairwise_sum(builder, sum);
+    return pairwise_sum(builder, sum);
 }
 
 template <typename, typename V1, typename V2>
@@ -668,7 +668,7 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
@@ -888,7 +888,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const num
                                         const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t, std::uint32_t,
                                         std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of number +- var.
@@ -969,7 +969,7 @@ template <typename T>
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
                                      std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of var * number.
@@ -981,7 +981,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const n
     auto &builder = s.builder();
 
     auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
-    auto mul = create_constant_vector(builder, codegen<T>(s, num), batch_size);
+    auto mul = vector_splat(builder, codegen<T>(s, num), batch_size);
 
     return builder.CreateFMul(mul, ret);
 }
@@ -1020,7 +1020,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
         sum.push_back(builder.CreateFMul(v0, v1));
     }
 
-    return llvm_pairwise_sum(builder, sum);
+    return pairwise_sum(builder, sum);
 }
 
 // All the other cases.
@@ -1049,7 +1049,7 @@ template <typename T>
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
                                      std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return create_constant_vector(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of variable / variable or number / variable. These two cases
@@ -1079,7 +1079,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
@@ -1108,7 +1108,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const n
     auto &builder = s.builder();
 
     auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
-    auto div = create_constant_vector(builder, codegen<T>(s, num), batch_size);
+    auto div = vector_splat(builder, codegen<T>(s, num), batch_size);
 
     return builder.CreateFDiv(ret, div);
 }
