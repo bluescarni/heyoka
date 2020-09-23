@@ -2082,17 +2082,19 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Determine the order from the tolerance.
-    // NOTE: minimum order is 2.
-    auto order_f = std::max(T(2), ceil(-log(tol) / 2 + 1));
+    auto order_f = -log(tol) / 2 + 1;
     if (high_accuracy) {
         // Add 20% more order in high accuracy mode.
         order_f += order_f * (T(20) / 100);
     }
-
+    order_f = ceil(order_f);
     if (!detail::isfinite(order_f)) {
         throw std::invalid_argument(
             "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
     }
+    // NOTE: min order is 2.
+    order_f = std::max(T(2), order_f);
+
     // NOTE: static cast is safe because we know that T is at least
     // a double-precision IEEE type.
     if (order_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
