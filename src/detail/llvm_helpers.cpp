@@ -8,10 +8,11 @@
 
 #include <cassert>
 #include <cstdint>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/Constants.h>
@@ -52,10 +53,7 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     assert(scalar_t != nullptr);
 
     // Create the corresponding vector type.
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in load_vector_from_memory()");
-    }
-    auto vector_t = llvm::VectorType::get(scalar_t, static_cast<unsigned>(vector_size));
+    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create the output vector.
@@ -85,10 +83,8 @@ llvm::Value *create_constant_vector(llvm::IRBuilder<> &builder, llvm::Value *c, 
 {
     assert(vector_size > 0u);
 
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in create_constant_vector()");
-    }
-    llvm::Value *vec = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), static_cast<unsigned>(vector_size)));
+    llvm::Value *vec
+        = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), boost::numeric_cast<unsigned>(vector_size)));
 
     // Fill up the vector with insertelement.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
@@ -110,11 +106,8 @@ std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::V
 
     // Extract the vector elements one by one.
     std::vector<llvm::Value *> ret;
-    if (vector_size > std::numeric_limits<std::uint64_t>::max()) {
-        throw std::overflow_error("Overflow in vector_to_scalars()");
-    }
     for (decltype(vector_size) i = 0; i < vector_size; ++i) {
-        ret.push_back(builder.CreateExtractElement(vec, static_cast<std::uint64_t>(i)));
+        ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
         assert(ret.back() != nullptr);
     }
 
@@ -132,10 +125,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
     const auto vector_size = scalars.size();
 
     // Create the corresponding vector type.
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in scalars_to_vector()");
-    }
-    auto vector_t = llvm::VectorType::get(scalar_t, static_cast<unsigned>(vector_size));
+    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
