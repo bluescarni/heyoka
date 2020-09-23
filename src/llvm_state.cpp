@@ -1321,7 +1321,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                     "o0_diff_ptr_" + detail::li_to_string(i) + "_" + detail::li_to_string(batch_idx));
                 assert(diff_ptr != nullptr);
 
-                detail::store_vector_to_memory(*m_builder, diff_ptr, vec, vector_size);
+                detail::store_vector_to_memory(*m_builder, diff_ptr, vec);
             }
 
             // NOTE: this remainder loop could be interleaved in the same way as the scalar computation
@@ -1394,7 +1394,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                 assert(diff_ptr != nullptr);
 
                 // Store the result of the initialisation.
-                detail::store_vector_to_memory(*m_builder, diff_ptr, init, vector_size);
+                detail::store_vector_to_memory(*m_builder, diff_ptr, init);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1504,7 +1504,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                              m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_uvars * batch_size
                                                                             + sv_idx * batch_size + batch_idx))},
                             "sv_" + detail::li_to_string(sv_idx) + "_diff_ptr"),
-                        diff_val, vector_size);
+                        diff_val);
 
                     detail::store_vector_to_memory(
                         *m_builder,
@@ -1513,7 +1513,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                             {m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_eq * batch_size
                                                                             + sv_idx * batch_size + batch_idx))},
                             "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
-                        diff_val, vector_size);
+                        diff_val);
                 }
 
                 for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1587,7 +1587,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                              m_builder->getInt32(static_cast<std::uint32_t>(cur_order * n_uvars * batch_size
                                                                             + i * batch_size + batch_idx))},
                             "uv_" + detail::li_to_string(i) + "_diff_ptr"),
-                        diff_v, vector_size);
+                        diff_v);
                 }
 
                 for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1654,7 +1654,7 @@ auto llvm_state::add_taylor_jet_batch_impl(const std::string &name, U sys, std::
                                                  {m_builder->getInt32(static_cast<std::uint32_t>(
                                                      order * n_eq * batch_size + sv_idx * batch_size + batch_idx))},
                                                  "sv_" + detail::li_to_string(sv_idx) + "_in_out_ptr"),
-                    diff, vector_size);
+                    diff);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {

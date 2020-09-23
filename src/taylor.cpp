@@ -36,7 +36,6 @@
 #include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -615,7 +614,7 @@ void taylor_add_estrin(llvm_state &s, const std::string &name, std::uint32_t nva
                                                          "res_" + li_to_string(var_idx) + "_" + li_to_string(batch_idx)
                                                              + "_ptr");
 
-                detail::store_vector_to_memory(builder, res_ptr, eval, vector_size);
+                detail::store_vector_to_memory(builder, res_ptr, eval);
             }
 
             for (std::uint32_t batch_idx = n_sub_batch * vector_size; batch_idx < batch_size; ++batch_idx) {
@@ -1719,7 +1718,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.builder().SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values<T>(s, &*in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size);
+    auto order0_arr = taylor_load_values<T>(s, in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size);
 
     // Compute the jet of derivatives.
     auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
@@ -1744,7 +1743,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
             const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;
             auto out_ptr
                 = s.builder().CreateInBoundsGEP(in_out, {s.builder().getInt32(static_cast<std::uint32_t>(out_idx))});
-            store_vector_to_memory(s.builder(), out_ptr, fp_vec, batch_size);
+            store_vector_to_memory(s.builder(), out_ptr, fp_vec);
         }
     }
 
@@ -1822,7 +1821,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+    auto x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -1863,7 +1862,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+    auto x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -1904,7 +1903,7 @@ llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+    auto x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -1942,7 +1941,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = llvm::cast<llvm::VectorType>(x_v->getType())->getElementType();
+    auto x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -2153,7 +2152,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     builder.SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values<T>(s, &*state_ptr, n_eq, batch_size);
+    auto order0_arr = taylor_load_values<T>(s, state_ptr, n_eq, batch_size);
 
     // Compute the norm infinity of the state vector.
     auto max_abs_state = create_constant_vector(builder, codegen<T>(s, number{0.}), batch_size);
@@ -2231,11 +2230,11 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: too many variables");
         }
         store_vector_to_memory(builder, builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
-                               new_states[var_idx], batch_size);
+                               new_states[var_idx]);
     }
 
     // Store the timesteps that were used.
-    store_vector_to_memory(builder, h_ptr, h, batch_size);
+    store_vector_to_memory(builder, h_ptr, h);
 
     // Create the return value.
     builder.CreateRetVoid();

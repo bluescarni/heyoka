@@ -69,9 +69,12 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
 }
 
 // Helper to store the content of vector vec to the pointer ptr.
-// TODO remove the vector_size parameter, fetch the vector size from vec.
-void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec, std::uint32_t vector_size)
+void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec)
 {
+    // Determine the vector size.
+    auto v_ptr_t = llvm::cast<llvm::VectorType>(vec->getType());
+    const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
+
     for (std::uint32_t i = 0; i < vector_size; ++i) {
         builder.CreateStore(builder.CreateExtractElement(vec, i),
                             builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
