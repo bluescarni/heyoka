@@ -2091,7 +2091,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     if (!detail::isfinite(order_f)) {
         throw std::invalid_argument(
-            "The computation of the Taylor order in an adaptive Taylor stepper produced non-finite values");
+            "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
     }
     // NOTE: static cast is safe because we know that T is at least
     // a double-precision IEEE type.
