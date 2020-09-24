@@ -32,10 +32,17 @@
 namespace heyoka::detail
 {
 
-// Helper to load the data from pointer ptr as a vector of size vector_size.
+// Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
+// 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+
+    if (vector_size == 1u) {
+        // Scalar case.
+        return builder.CreateLoad(ptr);
+    }
 
     // Fetch the pointer type (this will result in an assertion
     // failure if ptr is not a pointer).
@@ -61,23 +68,33 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     return ret;
 }
 
-// Helper to store the content of vector vec to the pointer ptr.
+// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
+// a plain store will be performed.
 void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec)
 {
-    // Determine the vector size.
-    auto v_ptr_t = llvm::cast<llvm::VectorType>(vec->getType());
-    const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
+    if (auto v_ptr_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+        // Determine the vector size.
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
 
-    for (std::uint32_t i = 0; i < vector_size; ++i) {
-        builder.CreateStore(builder.CreateExtractElement(vec, i),
-                            builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+        for (std::uint32_t i = 0; i < vector_size; ++i) {
+            builder.CreateStore(builder.CreateExtractElement(vec, i),
+                                builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+        }
+    } else {
+        // Not a vector, store vec directly.
+        builder.CreateStore(vec, ptr);
     }
 }
 
-// Create a SIMD vector of size vector_size filled with the value c.
+// Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
+// c will be returned.
 llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
+
+    if (vector_size == 1u) {
+        return c;
+    }
 
     llvm::Value *vec
         = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), boost::numeric_cast<unsigned>(vector_size)));
@@ -92,33 +109,42 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
     return vec;
 }
 
+// Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
+// return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::Value *vec)
 {
-    // Fetch the vector type.
-    auto vec_t = llvm::cast<llvm::VectorType>(vec->getType());
+    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+        // Fetch the vector width.
+        auto vector_size = vec_t->getNumElements();
 
-    // Fetch the vector width.
-    auto vector_size = vec_t->getNumElements();
+        // Extract the vector elements one by one.
+        std::vector<llvm::Value *> ret;
+        for (decltype(vector_size) i = 0; i < vector_size; ++i) {
+            ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
+            assert(ret.back() != nullptr);
+        }
 
-    // Extract the vector elements one by one.
-    std::vector<llvm::Value *> ret;
-    for (decltype(vector_size) i = 0; i < vector_size; ++i) {
-        ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
-        assert(ret.back() != nullptr);
+        return ret;
+    } else {
+        return {vec};
     }
-
-    return ret;
 }
 
+// Convert a std::vector of values into an LLVM vector of the corresponding size.
+// If scalars contains only 1 value, return that value.
 llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llvm::Value *> &scalars)
 {
     assert(!scalars.empty());
 
-    // Fetch the scalar type.
-    auto scalar_t = scalars[0]->getType();
-
     // Fetch the vector size.
     const auto vector_size = scalars.size();
+
+    if (vector_size == 1u) {
+        return scalars[0];
+    }
+
+    // Fetch the scalar type.
+    auto scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
     auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
