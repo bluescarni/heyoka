@@ -202,7 +202,7 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
 endif()
 
 # Mandatory dependency on Boost.
-find_package(Boost REQUIRED)
+find_package(Boost 1.60 REQUIRED)
 
 # Optional dependency on mp++.
 if(HEYOKA_WITH_MPPP)
