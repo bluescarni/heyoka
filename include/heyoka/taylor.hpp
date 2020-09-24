@@ -179,13 +179,11 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
 // Enum to represnt the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome {
-    success,           // Integration step was successful, no time/step limits were reached.
-    step_limit,        // Maximum number of steps reached.
-    time_limit,        // Time limit reached.
-    interrupted,       // Interrupted by user-provided stopping criterion.
-    err_nf_state,      // Non-finite initial state detected.
-    err_nf_derivative, // Non-finite derivative detected.
-    err_nan_rho        // NaN estimation of the convergence radius.
+    success,     // Integration step was successful, no time/step limits were reached.
+    step_limit,  // Maximum number of steps reached.
+    time_limit,  // Time limit reached.
+    interrupted, // Interrupted by user-provided stopping criterion.
+    err_nf_state // Non-finite initial state detected.
 };
 
 namespace kw
@@ -193,8 +191,6 @@ namespace kw
 
 IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(times);
-IGOR_MAKE_NAMED_ARGUMENT(rtol);
-IGOR_MAKE_NAMED_ARGUMENT(atol);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 
