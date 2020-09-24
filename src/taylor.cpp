@@ -1566,8 +1566,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Determine the order from the tolerance.
     auto order_f = -log(tol) / 2 + 1;
     if (high_accuracy) {
-        // Add 20% more order in high accuracy mode.
-        order_f += order_f * (T(20) / 100);
+        // Add 25% more order in high accuracy mode.
+        order_f += order_f * (T(25) / 100);
     }
     order_f = ceil(order_f);
     if (!detail::isfinite(order_f)) {
