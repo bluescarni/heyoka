@@ -29,13 +29,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
-#if defined(__clang__)
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
-
-#endif
-
 namespace heyoka::detail
 {
 
@@ -203,6 +196,7 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     return r;
 }
 
+// Helper to invoke an external function called 'name' with arguments args and return type ret_type.
 llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
                                   const std::vector<llvm::Value *> &args,
                                   const std::vector<llvm::Attribute::AttrKind> &attrs)
@@ -234,6 +228,8 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
                 "Cannot call the function '" + name
                 + "' as an external function, because it is defined as an internal module function");
         }
+        // NOTE: perhaps in the future we should consider checking
+        // the function prototype here.
     }
 
     // Create the function call.
@@ -247,11 +243,5 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
 
     return r;
 }
-
-#if defined(__clang__)
-
-#pragma clang diagnostic pop
-
-#endif
 
 } // namespace heyoka::detail

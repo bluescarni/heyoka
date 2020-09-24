@@ -40,6 +40,7 @@
 namespace heyoka::detail
 {
 
+// Helper to associate a C++ type to an LLVM type.
 template <typename T>
 inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
 {
