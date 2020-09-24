@@ -81,31 +81,12 @@ int main()
     // Init the batch integrator.
     taylor_adaptive_batch<double> tad{sys, std::move(init_states), batch_size};
 
-    std::vector<std::tuple<taylor_outcome, double, std::uint32_t>> res(batch_size);
+    std::vector<std::tuple<taylor_outcome, double>> res(batch_size);
 
     auto start = std::chrono::high_resolution_clock::now();
 
     // Do 400 steps.
-    for (auto i = 0; i < 20; ++i) {
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
-        tad.step(res);
+    for (auto i = 0; i < 400; ++i) {
         tad.step(res);
     }
 

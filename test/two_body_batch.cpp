@@ -47,7 +47,7 @@ const auto fp_types = std::tuple<double, long double
 
 TEST_CASE("two body batch")
 {
-    auto tester = [](auto fp_x, unsigned opt_level) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool ha) {
         using std::cos;
         using std::abs;
 
@@ -107,18 +107,19 @@ TEST_CASE("two body batch")
         for (std::uint32_t j = 0; j < 12u; ++j) {
             scalar_init.push_back(init_states[j * batch_size]);
         }
-        taylor_adaptive<fp_t> ta{sys, std::move(scalar_init), kw::opt_level = opt_level};
+        taylor_adaptive<fp_t> ta{sys, std::move(scalar_init), kw::opt_level = opt_level, kw::high_accuracy = ha};
         const auto &st = ta.get_state();
         auto scal_st(ta.get_state());
 
         // Init the batch integrator.
-        taylor_adaptive_batch<fp_t> tab{sys, std::move(init_states), batch_size, kw::opt_level = opt_level};
+        taylor_adaptive_batch<fp_t> tab{sys, std::move(init_states), batch_size, kw::opt_level = opt_level,
+                                        kw::high_accuracy = ha};
 
         const auto &bst = tab.get_states();
         auto bst_copy(bst);
         auto times_copy(tab.get_times());
 
-        std::vector<std::tuple<taylor_outcome, fp_t, std::uint32_t>> res;
+        std::vector<std::tuple<taylor_outcome, fp_t>> res;
 
         for (auto _ = 0; _ < 200; ++_) {
             // Copy the batch state/times before propagation.
@@ -148,7 +149,6 @@ TEST_CASE("two body batch")
                 // Check the result of the integration.
                 REQUIRE(std::get<0>(s_res) == std::get<0>(res[i]));
                 REQUIRE(std::get<1>(s_res) == approximately(std::get<1>(res[i]), tol_mul));
-                REQUIRE(std::get<2>(s_res) == std::get<2>(res[i]));
 
                 // Check the state vectors.
                 for (std::uint32_t j = 0; j < 12u; ++j) {
@@ -182,8 +182,10 @@ TEST_CASE("two body batch")
         }
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
+    for (auto ha : {true, false}) {
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 0, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 1, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 2, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 3, ha); });
+    }
 }

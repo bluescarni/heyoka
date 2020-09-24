@@ -450,53 +450,24 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_states;
     // Times.
     std::vector<T> m_times;
-    // Relative and absolute tolerances.
-    T m_rtol, m_atol;
-    // Taylor orders corresponding to the
-    // above tolerances.
-    std::uint32_t m_order_r, m_order_a;
-    // Vector of pre-computed inverse orders
-    // (that is, for i >= 1, m_inv_order[i] = 1 / i).
-    std::vector<T> m_inv_order;
-    // The factor by which rho must
-    // be multiplied in order to determine
-    // the integration timestep.
-    // There are two versions of this
-    // factor, one for the relative Taylor
-    // order and the other for the absolute
-    // Taylor order.
-    T m_rhofac_r, m_rhofac_a;
     // The LLVM machinery.
     llvm_state m_llvm;
-    // The jets of normalised derivatives.
-    std::vector<T> m_jet;
-    // The functions to compute the derivatives.
-    using jet_f_t = void (*)(T *);
-    jet_f_t m_jet_f_r, m_jet_f_a;
-    // The functions to update the state vectors
-    // at the end of an integration timestep.
-    using s_update_f_t = void (*)(T *, const T *, const T *);
-    s_update_f_t m_update_f_r, m_update_f_a;
     // Taylor decomposition.
     std::vector<expression> m_dc;
+    // The stepper.
+    using step_f_t = void (*)(T *, T *);
+    step_f_t m_step_f;
     // Temporary vectors for use
     // in the timestepping functions.
-    std::vector<T> m_max_abs_states;
-    std::vector<char> m_use_abs_tol;
-    std::vector<T> m_max_abs_diff_om1;
-    std::vector<T> m_max_abs_diff_o;
-    std::vector<T> m_rho_om1;
-    std::vector<T> m_rho_o;
-    std::vector<T> m_h;
     std::vector<T> m_pinf;
     std::vector<T> m_minf;
+    std::vector<T> m_delta_ts;
 
-    HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &,
-                                    const std::vector<T> &);
+    HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, T, unsigned);
+    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&... kw_args)
     {
@@ -516,34 +487,25 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
                 }
             }();
 
-            // rtol (defaults to eps).
-            const auto rtol = [&p]() -> T {
-                if constexpr (p.has(kw::rtol)) {
-                    return std::forward<decltype(p(kw::rtol))>(p(kw::rtol));
+            // tol (defaults to eps).
+            const auto tol = [&p]() -> T {
+                if constexpr (p.has(kw::tol)) {
+                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
                 } else {
                     return std::numeric_limits<T>::epsilon();
                 }
             }();
 
-            // atol (defaults to eps).
-            const auto atol = [&p]() -> T {
-                if constexpr (p.has(kw::atol)) {
-                    return std::forward<decltype(p(kw::atol))>(p(kw::atol));
+            // High accuracy mode (defaults to false).
+            const auto high_accuracy = [&p]() -> bool {
+                if constexpr (p.has(kw::high_accuracy)) {
+                    return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
                 } else {
-                    return std::numeric_limits<T>::epsilon();
+                    return false;
                 }
             }();
 
-            // Optimisation level.
-            auto opt_level = [&p]() -> unsigned {
-                if constexpr (p.has(kw::opt_level)) {
-                    return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
-                } else {
-                    return kw::detail::default_opt_level;
-                }
-            }();
-
-            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), rtol, atol, opt_level);
+            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), tol, high_accuracy);
         }
     }
 
@@ -551,19 +513,14 @@ public:
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states, std::uint32_t batch_size,
                                         KwArgs &&... kw_args)
-        : // NOTE: init to optimisation level 0 in order
-          // to delay the optimisation pass.
-          // NOTE: explicitly setting opt_level
-          // *before* forwarding the kwargs overrides
-          // any opt_level setting that might be present in kw_args.
-          m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+        : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> states,
                                         std::uint32_t batch_size, KwArgs &&... kw_args)
-        : m_llvm{kw::opt_level = 0u, std::forward<KwArgs>(kw_args)...}
+        : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
     }
@@ -608,9 +565,9 @@ public:
     void set_states(const std::vector<T> &);
     void set_times(const std::vector<T> &);
 
-    void step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &);
-    void step_backward(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &);
-    void step(std::vector<std::tuple<taylor_outcome, T, std::uint32_t>> &, const std::vector<T> &);
+    void step(std::vector<std::tuple<taylor_outcome, T>> &);
+    void step_backward(std::vector<std::tuple<taylor_outcome, T>> &);
+    void step(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
 };
 
 } // namespace detail
