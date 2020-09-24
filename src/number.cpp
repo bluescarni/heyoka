@@ -300,48 +300,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vec
     return 0;
 }
 
-// NOTE: for numbers, the Taylor init phase is
-// just the codegen.
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
-                                   std::uint32_t vector_size)
-{
-    auto ret = codegen_dbl(s, n);
-
-    if (vector_size > 0u) {
-        ret = detail::vector_splat(s.builder(), ret, vector_size);
-    }
-
-    return ret;
-}
-
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
-                                    std::uint32_t vector_size)
-{
-    auto ret = codegen_ldbl(s, n);
-
-    if (vector_size > 0u) {
-        ret = detail::vector_splat(s.builder(), ret, vector_size);
-    }
-
-    return ret;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const number &n, llvm::Value *, std::uint32_t, std::uint32_t,
-                                    std::uint32_t vector_size)
-{
-    auto ret = codegen_f128(s, n);
-
-    if (vector_size > 0u) {
-        ret = detail::vector_splat(s.builder(), ret, vector_size);
-    }
-
-    return ret;
-}
-
-#endif
-
 namespace detail
 {
 

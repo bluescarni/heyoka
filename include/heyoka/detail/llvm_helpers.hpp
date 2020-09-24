@@ -88,51 +88,7 @@ HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<>
 
 HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilder<> &, const std::vector<llvm::Value *> &);
 
-// Helper to return the (null) Taylor derivative of a constant,
-// as a scalar or as a vector.
-template <typename T>
-inline llvm::Value *taylor_diff_batch_zero(llvm_state &s, std::uint32_t vector_size)
-{
-    auto ret = codegen<T>(s, number{0.});
-
-    if (vector_size > 0u) {
-        ret = vector_splat(s.builder(), ret, vector_size);
-    }
-
-    return ret;
-}
-
 HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
-
-// Helper to load the value of the derivative of a u variable
-// from an array in the computation of a Taylor jet:
-// - u_idx is the index of the u variable,
-// - order is the derivative order,
-// - n_uvars the total number of u variables,
-// - diff_arr is the array of derivatives,
-// - batch_idx and batch_size the batch index/size,
-// - vector_size the SIMD vector size (will be zero in scalar mode).
-// NOTE: see a838c9b0d803b7ab13e83834ac46e3df0963b158 for a commit
-// containing the cd_uvars machinery.
-template <typename T>
-inline llvm::Value *tjb_load_derivative(llvm_state &s, std::uint32_t u_idx, std::uint32_t order, std::uint32_t n_uvars,
-                                        llvm::Value *diff_arr, std::uint32_t batch_idx, std::uint32_t batch_size,
-                                        std::uint32_t vector_size)
-{
-    // Sanity checks.
-    assert(u_idx < n_uvars);
-    assert(batch_idx < batch_size);
-
-    auto &builder = s.builder();
-
-    auto arr_ptr = builder.CreateInBoundsGEP(
-        diff_arr,
-        {builder.getInt32(0), builder.getInt32(order * n_uvars * batch_size + u_idx * batch_size + batch_idx)},
-        "diff_arr_ptr");
-
-    return (vector_size == 0u) ? builder.CreateLoad(arr_ptr, "diff_arr_load")
-                               : load_vector_from_memory(builder, arr_ptr, vector_size);
-}
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::string &,
                                                      const std::vector<llvm::Type *> &,
