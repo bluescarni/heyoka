@@ -53,10 +53,12 @@ TEST_CASE("two body batch")
 
         using fp_t = decltype(fp_x);
 
-        const auto batch_size = llvm_state{}.vector_size<fp_t>();
+        auto batch_size = llvm_state{}.vector_size<fp_t>();
 
         if (batch_size == 0u) {
-            return;
+            // Make sure we use the vector machinery
+            // for testing by setting a non-unitary batch size.
+            batch_size = 2;
         }
 
         auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
