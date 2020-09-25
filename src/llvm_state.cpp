@@ -527,13 +527,21 @@ void llvm_state::optimise()
         module_pm->add(tliwp.release());
         module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
+        // NOTE: not sure what this does, presumably some target-specifc
+        // configuration.
+        module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
+
         // Init the function pass manager.
         auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
         f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
-        // NOTE: not sure what this does, presumably some target-specifc
-        // configuration.
-        module_pm->add(static_cast<llvm::LLVMTargetMachine &>(*m_jitter->m_tm).createPassConfig(*module_pm));
+        // Add a pass to vectorize load/stores. This is needed to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        // NOTE: perhaps down the line we want to make this optional
+        // (same as the fast math flag).
+        f_pm->add(llvm::createLoadStoreVectorizerPass());
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
@@ -542,6 +550,8 @@ void llvm_state::optimise()
         // https://llvm.org/doxygen/PassManagerBuilder_8cpp_source.html
         // NOTE: we used to have the SLP vectorizer on here, but
         // we don't activate it any more in favour of explicit vectorization.
+        // NOTE: perhaps in the future we can make the autovectorizer an
+        // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
         pm_builder.SizeLevel = 0;
         pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
