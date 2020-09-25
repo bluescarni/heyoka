@@ -293,10 +293,9 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_segmented_functions(std::get<3>(tup)),
-      m_save_object_code(std::get<4>(tup))
+      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -323,8 +322,7 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
       m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
-      m_segmented_functions(other.m_segmented_functions), m_save_object_code(other.m_save_object_code),
-      m_object_code(other.m_object_code)
+      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -1188,9 +1186,8 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << std::boolalpha;
 
     oss << "Module name        : " << s.m_module_name << '\n';
-    oss << "Compiled           : " << !static_cast<bool>(s.m_module) << '\n';
+    oss << "Compiled           : " << s.is_compiled() << '\n';
     oss << "Fast math          : " << s.m_use_fast_math << '\n';
-    oss << "Segmented functions: " << s.m_segmented_functions << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
