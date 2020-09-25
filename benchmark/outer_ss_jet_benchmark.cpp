@@ -52,13 +52,13 @@ int main(int argc, char *argv[])
 
     s.compile();
 
+    auto jet_ptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
     std::cout << "Construction time: " << elapsed << "μs\n";
-
-    auto jet_ptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
 
     std::vector<double> jet(36u * (order + 1u) * batch_size);
     auto ic = {// Sun.
