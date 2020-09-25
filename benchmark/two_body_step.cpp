@@ -39,20 +39,28 @@ int main()
     std::vector init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
                            c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     taylor_adaptive<double> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
                                  vx0, vx1, vy0, vy1, vz0, vz1},
                                 std::move(init_state)};
 
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Initialisation time: " << elapsed << "ms\n";
+
     // Warm up.
     tad.step();
 
-    auto start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
 
     for (auto i = 0; i < 4000; ++i) {
         tad.step();
     }
 
-    const auto elapsed = static_cast<double>(
+    elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 

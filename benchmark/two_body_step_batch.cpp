@@ -13,12 +13,14 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#include <boost/program_options.hpp>
+
 #include <heyoka/expression.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -29,14 +31,29 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_benchmark;
 
-int main()
+int main(int argc, char *argv[])
 {
-    const auto batch_size = llvm_state{}.vector_size<double>();
+    namespace po = boost::program_options;
 
-    if (batch_size == 0u) {
-        std::cout << "The vector size on the current machine is zero, exiting.\n";
+    std::uint32_t batch_size;
 
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")(
+        "batch_size", po::value<std::uint32_t>(&batch_size)->default_value(1u), "batch size");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
         return 0;
+    }
+
+    // Validate the command-line arguments.
+    if (batch_size == 0u) {
+        throw std::invalid_argument("The batch size cannot be zero");
     }
 
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
@@ -78,23 +95,31 @@ int main()
         init_states[11u * batch_size + i] = -x[2];
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     // Init the batch integrator.
     taylor_adaptive_batch<double> tad{sys, std::move(init_states), batch_size};
 
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Initialisation time: " << elapsed << "ms\n";
+
     std::vector<std::tuple<taylor_outcome, double>> res(batch_size);
 
-    auto start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
 
-    // Do 400 steps.
-    for (auto i = 0; i < 400; ++i) {
+    // Do 4000 steps.
+    for (auto i = 0; i < 4000; ++i) {
         tad.step(res);
     }
 
-    const auto elapsed = static_cast<double>(
+    elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Elapsed time for a single timestep (double precision): " << elapsed / 400 / batch_size << "ns\n";
+    std::cout << "Elapsed time for a single timestep (double precision): " << elapsed / 4000 / batch_size << "ns\n";
 
     return 0;
 }
