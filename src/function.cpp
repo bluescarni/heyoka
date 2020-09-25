@@ -780,93 +780,17 @@ llvm::Value *function_codegen_from_values(llvm_state &s, const function &f, cons
             + std::to_string(args_v.size()) + " were provided instead");
     }
 
-    llvm::Function *callee_f;
     const auto &f_name = function_name_from_type<T>(f);
 
     switch (function_ty_from_type<T>(f)) {
-        case function::type::internal: {
-            // Look up the name in the global module table.
-            callee_f = s.module().getFunction(f_name);
-
-            if (!callee_f) {
-                throw std::invalid_argument("Unknown internal function: '" + f_name + "'");
-            }
-
-            if (callee_f->isDeclaration()) {
-                throw std::invalid_argument("The internal function '" + f_name + "' cannot be just a declaration");
-            }
-
-            break;
-        }
-        case function::type::external: {
-            // Look up the name in the global module table.
-            callee_f = s.module().getFunction(f_name);
-
-            if (callee_f) {
-                // The function declaration exists already. Check that it is only a
-                // declaration and not a definition.
-                if (!callee_f->isDeclaration()) {
-                    throw std::invalid_argument(
-                        "Cannot call the function '" + f_name
-                        + "' as an external function, because it is defined as an internal module function");
-                }
-            } else {
-                // The function does not exist yet, make the prototype.
-                std::vector<llvm::Type *> arg_types(args_v.size(), to_llvm_type<T>(s.context()));
-                auto *ft = llvm::FunctionType::get(to_llvm_type<T>(s.context()), arg_types, false);
-                assert(ft);
-                callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, f_name, &s.module());
-                assert(callee_f);
-
-                // Add the function attributes.
-                for (const auto &att : function_attributes_from_type<T>(f)) {
-                    callee_f->addFnAttr(att);
-                }
-            }
-
-            break;
-        }
-        default: {
-            // Builtin.
-            const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(f_name);
-            if (intrinsic_ID == 0) {
-                throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + f_name + "'");
-            }
-
-            // NOTE: for generic intrinsics to work, we need to specify
-            // the desired argument type. See:
-            // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
-            // And the docs of the getDeclaration() function.
-            callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, {to_llvm_type<T>(s.context())});
-
-            if (!callee_f) {
-                throw std::invalid_argument("Error getting the declaration of the intrinsic '" + f_name + "'");
-            }
-
-            if (!callee_f->isDeclaration()) {
-                // It does not make sense to have a definition of a builtin.
-                throw std::invalid_argument("The intrinsic '" + f_name + "' must be only declared, not defined");
-            }
-        }
+        case function::type::internal:
+            return llvm_invoke_internal(s, f_name, args_v);
+        case function::type::external:
+            return llvm_invoke_external(s, f_name, to_llvm_type<T>(s.context()), args_v,
+                                        function_attributes_from_type<T>(f));
+        default:
+            return llvm_invoke_intrinsic(s, f_name, {to_llvm_type<T>(s.context())}, args_v);
     }
-
-    // Check the number of arguments.
-    if (callee_f->arg_size() != args_v.size()) {
-        throw std::invalid_argument("Incorrect # of arguments passed while calling the function '" + f.display_name()
-                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
-                                    + std::to_string(args_v.size()) + " were provided instead");
-    }
-
-    // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args_v, "calltmp");
-    assert(r != nullptr);
-    // NOTE: we used to have r->setTailCall(true) here, but:
-    // - when optimising, the tail call attribute is automatically
-    //   added,
-    // - it is not 100% clear to me whether it is always safe to enable it:
-    // https://llvm.org/docs/CodeGenerator.html#tail-calls
-
-    return r;
 }
 
 // Explicit instantiations of function_codegen_from_values().

@@ -98,6 +98,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::str
                                                     const std::vector<llvm::Value *> &,
                                                     const std::vector<llvm::Attribute::AttrKind> & = {});
 
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_internal(llvm_state &, const std::string &,
+                                                    const std::vector<llvm::Value *> &);
+
 } // namespace heyoka::detail
 
 #endif

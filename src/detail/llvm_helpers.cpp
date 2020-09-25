@@ -215,6 +215,13 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
         throw std::invalid_argument("The intrinsic '" + name + "' must be only declared, not defined");
     }
 
+    // Check the number of arguments.
+    if (callee_f->arg_size() != args.size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed while calling the intrinsic '" + name
+                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(args.size()) + " were provided instead");
+    }
+
     // Create the function call.
     auto r = s.builder().CreateCall(callee_f, args);
     assert(r != nullptr);
@@ -254,9 +261,50 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
                 "Cannot call the function '" + name
                 + "' as an external function, because it is defined as an internal module function");
         }
-        // NOTE: perhaps in the future we should consider checking
-        // the function prototype here.
+        // Check the number of arguments.
+        if (callee_f->arg_size() != args.size()) {
+            throw std::invalid_argument("Incorrect # of arguments passed while calling the external function '" + name
+                                        + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                        + std::to_string(args.size()) + " were provided instead");
+        }
+        // NOTE: perhaps in the future we should consider adding more checks here
+        // (e.g., argument types, return type).
     }
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args);
+    assert(r != nullptr);
+    // NOTE: we used to have r->setTailCall(true) here, but:
+    // - when optimising, the tail call attribute is automatically
+    //   added,
+    // - it is not 100% clear to me whether it is always safe to enable it:
+    // https://llvm.org/docs/CodeGenerator.html#tail-calls
+
+    return r;
+}
+
+// Helper to invoke an internal module function called 'name' with arguments 'args'.
+llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const std::vector<llvm::Value *> &args)
+{
+    auto callee_f = s.module().getFunction(name);
+
+    if (callee_f == nullptr) {
+        throw std::invalid_argument("Unknown internal function: '" + name + "'");
+    }
+
+    if (callee_f->isDeclaration()) {
+        throw std::invalid_argument("The internal function '" + name
+                                    + "' cannot be just a declaration, a definition is needed");
+    }
+
+    // Check the number of arguments.
+    if (callee_f->arg_size() != args.size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed while calling the internal function '" + name
+                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(args.size()) + " were provided instead");
+    }
+    // NOTE: perhaps in the future we should consider adding more checks here
+    // (e.g., argument types).
 
     // Create the function call.
     auto r = s.builder().CreateCall(callee_f, args);

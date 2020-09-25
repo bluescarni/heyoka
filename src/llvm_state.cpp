@@ -660,7 +660,9 @@ void llvm_state::add_varargs_expression(const std::string &name, const expressio
 
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    assert(f != nullptr);
+    if (f == nullptr) {
+        throw std::invalid_argument("Could not create a varargs function called '" + name + "'");
+    }
     // Set names for all arguments.
     // NOTE: don't use the same name in vars
     // as it's not clear to me if any name
@@ -775,7 +777,9 @@ void llvm_state::add_vecargs_expression(const std::string &name, const expressio
     auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
     assert(ft != nullptr);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    assert(f != nullptr);
+    if (f == nullptr) {
+        throw std::invalid_argument("Could not create a vecargs function called '" + name + "'");
+    }
 
     // Setup the properties of the pointer argument.
     auto in_ptr = f->args().begin();
@@ -862,7 +866,9 @@ void llvm_state::add_vecargs_expressions(const std::string &name, const std::vec
     auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
     assert(ft != nullptr);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    assert(f != nullptr);
+    if (f == nullptr) {
+        throw std::invalid_argument("Could not create a vecargs muiltifunction called '" + name + "'");
+    }
 
     // Setup the properties of the pointer arguments.
     auto out_ptr = f->args().begin();
@@ -961,7 +967,9 @@ void llvm_state::add_batch_expression_impl(const std::string &name, const expres
     auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
     assert(ft != nullptr);
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    assert(f != nullptr);
+    if (f == nullptr) {
+        throw std::invalid_argument("Could not create a batch function called '" + name + "'");
+    }
 
     // Setup the properties of the pointer arguments.
     auto out_ptr = f->args().begin();
