@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -19,6 +21,12 @@
 #include <vector>
 
 #include <boost/program_options.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
