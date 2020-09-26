@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <functional>
 #include <initializer_list>
 #include <ios>
 #include <iterator>
@@ -121,11 +120,6 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
     llvm::orc::ThreadSafeContext m_ctx;
     llvm::orc::JITDylib &m_main_jd;
-    std::uint32_t m_vector_size_dbl = 0;
-    std::uint32_t m_vector_size_ldbl = 0;
-#if defined(HEYOKA_HAVE_REAL128)
-    std::uint32_t m_vector_size_f128 = 0;
-#endif
     // This is a workaround flag to
     // signal that AVX-512 is available.
     // It is used in the module optimisation
@@ -179,51 +173,6 @@ struct llvm_state::jit {
         }
 
         m_main_jd.addGenerator(std::move(*dlsg));
-
-        // Determine the vector sizes.
-        const auto target_name = std::string{m_tm->getTarget().getName()};
-
-        if (target_name == "x86-64") {
-            // Look for AVX512 first, then AVX.
-            const auto target_features = get_target_features();
-
-            std::string feature = "+avx512f";
-
-            auto it = std::search(target_features.begin(), target_features.end(),
-                                  std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-            if (it != target_features.end()) {
-                m_vector_size_dbl = 8;
-
-                // Set also the flag signalling that
-                // we have AVX-512.
-                m_have_avx512 = true;
-
-                return;
-            }
-
-            feature = "+avx";
-
-            it = std::search(target_features.begin(), target_features.end(),
-                             std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-            if (it != target_features.end()) {
-                m_vector_size_dbl = 4;
-                return;
-            }
-
-            // SSE2 is always available on x86-64.
-#if !defined(NDEBUG)
-            feature = "+sse2";
-
-            it = std::search(target_features.begin(), target_features.end(),
-                             std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-            assert(it != target_features.end());
-#endif
-
-            m_vector_size_dbl = 2;
-        }
     }
 
     jit(const jit &) = delete;
@@ -274,22 +223,6 @@ struct llvm_state::jit {
     llvm::Expected<llvm::JITEvaluatedSymbol> lookup(const std::string &name)
     {
         return m_es.lookup({&m_main_jd}, (*m_mangle)(name));
-    }
-
-    template <typename T>
-    std::uint32_t get_vector_size() const
-    {
-        if constexpr (std::is_same_v<T, double>) {
-            return m_vector_size_dbl;
-        } else if constexpr (std::is_same_v<T, long double>) {
-            return m_vector_size_ldbl;
-#if defined(HEYOKA_HAVE_REAL128)
-        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return m_vector_size_f128;
-#endif
-        } else {
-            static_assert(detail::always_false_v<T>, "Unhandled type.");
-        }
     }
 };
 
@@ -1179,25 +1112,6 @@ llvm_state::sfb_t<mppp::real128> llvm_state::fetch_function_batch_f128(const std
 
 #endif
 
-std::uint32_t llvm_state::vector_size_dbl() const
-{
-    return m_jitter->m_vector_size_dbl;
-}
-
-std::uint32_t llvm_state::vector_size_ldbl() const
-{
-    return m_jitter->m_vector_size_ldbl;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-std::uint32_t llvm_state::vector_size_f128() const
-{
-    return m_jitter->m_vector_size_f128;
-}
-
-#endif
-
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 {
     std::ostringstream oss;
@@ -1210,12 +1124,6 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
-    oss << "Vector sizes       : " << s.m_jitter->get_vector_size<double>() << ", "
-        << s.m_jitter->get_vector_size<long double>()
-#if defined(HEYOKA_HAVE_REAL128)
-        << ", " << s.m_jitter->get_vector_size<mppp::real128>()
-#endif
-        << '\n';
     oss << "IR size            : " << s.get_ir().size() << '\n';
 
     return os << oss.str();

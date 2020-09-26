@@ -25,7 +25,6 @@
 #endif
 
 #include <heyoka/expression.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -53,13 +52,7 @@ TEST_CASE("two body batch")
 
         using fp_t = decltype(fp_x);
 
-        auto batch_size = llvm_state{}.vector_size<fp_t>();
-
-        if (batch_size == 0u) {
-            // Make sure we use the vector machinery
-            // for testing by setting a non-unitary batch size.
-            batch_size = 2;
-        }
+        const std::uint32_t batch_size = 4;
 
         auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
             = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
