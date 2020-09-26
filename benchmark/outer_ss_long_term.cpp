@@ -41,33 +41,37 @@ void run_integration(const std::string &filename, T t_final, double perturb)
     using std::abs;
     using std::log10;
     using std::pow;
+
     using namespace heyoka;
     using namespace heyoka_benchmark;
 
-    auto masses = std::vector<T>{1.00000597682, 1. / 1047.355, 1. / 3501.6, 1. / 22869., 1. / 19314., 7.4074074e-09};
+    auto masses
+        = std::vector{T(1.00000597682), T(1) / 1047.355, T(1) / 3501.6, T(1) / 22869., T(1) / 19314., T(7.4074074e-09)};
 
     const auto G = T(0.01720209895) * T(0.01720209895);
 
     auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
 
-    auto init_state = std::vector<T>{// Sun.
-                                     -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6,
-                                     +6.69048890636161e-6, -6.33922479583593e-6, -3.13202145590767e-9,
-                                     // Jupiter.
-                                     +3.40546614227466e+0, +3.62978190075864e+0, +3.42386261766577e-2,
-                                     -5.59797969310664e-3, +5.51815399480116e-3, -2.66711392865591e-6,
-                                     // Saturn.
-                                     +6.60801554403466e+0, +6.38084674585064e+0, -1.36145963724542e-1,
-                                     -4.17354020307064e-3, +3.99723751748116e-3, +1.67206320571441e-5,
-                                     // Uranus.
-                                     +1.11636331405597e+1, +1.60373479057256e+1, +3.61783279369958e-1,
-                                     -3.25884806151064e-3, +2.06438412905916e-3, -2.17699042180559e-5,
-                                     // Neptune.
-                                     -3.01777243405203e+1, +1.91155314998064e+0, -1.53887595621042e-1,
-                                     -2.17471785045538e-4, -3.11361111025884e-3, +3.58344705491441e-5,
-                                     // Pluto.
-                                     -2.13858977531573e+1, +3.20719104739886e+1, +2.49245689556096e+0,
-                                     -1.76936577252484e-3, -2.06720938381724e-3, +6.58091931493844e-4};
+    auto ic = {// Sun.
+               -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6, +6.69048890636161e-6,
+               -6.33922479583593e-6, -3.13202145590767e-9,
+               // Jupiter.
+               +3.40546614227466e+0, +3.62978190075864e+0, +3.42386261766577e-2, -5.59797969310664e-3,
+               +5.51815399480116e-3, -2.66711392865591e-6,
+               // Saturn.
+               +6.60801554403466e+0, +6.38084674585064e+0, -1.36145963724542e-1, -4.17354020307064e-3,
+               +3.99723751748116e-3, +1.67206320571441e-5,
+               // Uranus.
+               +1.11636331405597e+1, +1.60373479057256e+1, +3.61783279369958e-1, -3.25884806151064e-3,
+               +2.06438412905916e-3, -2.17699042180559e-5,
+               // Neptune.
+               -3.01777243405203e+1, +1.91155314998064e+0, -1.53887595621042e-1, -2.17471785045538e-4,
+               -3.11361111025884e-3, +3.58344705491441e-5,
+               // Pluto.
+               -2.13858977531573e+1, +3.20719104739886e+1, +2.49245689556096e+0, -1.76936577252484e-3,
+               -2.06720938381724e-3, +6.58091931493844e-4};
+
+    auto init_state = std::vector<T>(ic.begin(), ic.end());
 
     // Perturb the initial state.
     std::mt19937 rng;
@@ -107,7 +111,7 @@ void run_integration(const std::string &filename, T t_final, double perturb)
     // Helper to compute the total energy in the system.
     auto get_energy = [&s_array, &m_array, G]() {
         // Kinetic energy.
-        T kin = 0;
+        T kin(0);
         for (auto i = 0u; i < 6u; ++i) {
             const auto v = xt::view(s_array, i, xt::range(3, 6));
 
@@ -115,7 +119,7 @@ void run_integration(const std::string &filename, T t_final, double perturb)
         }
 
         // Potential energy.
-        T pot = 0;
+        T pot(0);
         for (auto i = 0u; i < 6u; ++i) {
             const auto ri = xt::view(s_array, i, xt::range(0, 3));
 
@@ -250,10 +254,6 @@ int main(int argc, char *argv[])
     }
 
     // Validate the command-line arguments.
-    if (fp_type != "double" && fp_type != "long double") {
-        throw std::invalid_argument("Invalid floating-point type '" + fp_type + "'");
-    }
-
     if (!std::isfinite(final_time) || final_time <= 0) {
         throw std::invalid_argument("The final time must be finite and positive, but it is "
                                     + std::to_string(final_time) + " instead");
@@ -266,8 +266,10 @@ int main(int argc, char *argv[])
 
     if (fp_type == "double") {
         run_integration<double>(filename, final_time, perturb);
-    } else {
+    } else if (fp_type == "long double") {
         run_integration<long double>(filename, final_time, perturb);
+    } else {
+        throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
     }
 
     return 0;
