@@ -15,6 +15,7 @@
 #include <limits>
 #include <random>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -52,7 +53,8 @@ TEST_CASE("two body batch")
 
         using fp_t = decltype(fp_x);
 
-        const std::uint32_t batch_size = 4;
+        // NOTE: don't test larger batch sizes for types other than double.
+        const std::uint32_t batch_size = std::is_same_v<fp_t, double> ? 4 : 1;
 
         auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
             = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
