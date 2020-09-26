@@ -32,8 +32,6 @@ option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
-option(HEYOKA_WITH_XTENSOR "Build tests/benchmarks depending on xtensor." OFF)
-mark_as_advanced(HEYOKA_WITH_XTENSOR)
 
 # NOTE: on Unix systems, the correct library installation path
 # could be something other than just "lib", such as "lib64",

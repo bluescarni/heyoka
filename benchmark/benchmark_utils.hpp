@@ -11,19 +11,14 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <initializer_list>
 #include <type_traits>
 #include <utility>
 
-#if defined(HEYOKA_WITH_XTENSOR)
-
-#include <cstddef>
-
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xfixed.hpp>
 #include <xtensor/xshape.hpp>
-
-#endif
 
 namespace heyoka_benchmark
 {
@@ -133,8 +128,6 @@ inline std::pair<std::array<T, 3>, std::array<T, 3>> kep_to_cart(std::array<T, 6
     return std::pair{x, v};
 }
 
-#if defined(HEYOKA_WITH_XTENSOR)
-
 // 1-D array type of fixed size N.
 template <typename T, std::size_t N>
 using vNd = xt::xtensor_fixed<T, xt::xshape<N>>;
@@ -184,8 +177,6 @@ inline vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
 
     return {a, e, i, om, Om, nu};
 }
-
-#endif
 
 } // namespace heyoka_benchmark
 

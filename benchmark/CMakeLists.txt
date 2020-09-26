@@ -13,15 +13,14 @@ if(NOT TARGET Boost::program_options)
     )
 endif()
 
-# Find the xtensor bits, if requested.
-if(HEYOKA_WITH_XTENSOR)
-  find_package(xtensor REQUIRED)
-  find_package(xtensor-blas REQUIRED)
-endif()
+# Find the xtensor bits.
+find_package(xtensor REQUIRED)
+find_package(xtensor-blas REQUIRED)
 
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka Boost::program_options)
+  target_link_libraries(${arg1} PRIVATE heyoka Boost::program_options xtensor xtensor-blas)
+  target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
     "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
@@ -45,13 +44,4 @@ ADD_HEYOKA_BENCHMARK(two_body_step)
 ADD_HEYOKA_BENCHMARK(two_body_step_batch)
 ADD_HEYOKA_BENCHMARK(taylor_eqq_with_param)
 ADD_HEYOKA_BENCHMARK(outer_ss_jet_benchmark)
-
-if(HEYOKA_WITH_XTENSOR)
-  function(ADD_HEYOKA_XTENSOR_BENCHMARK arg1)
-    ADD_HEYOKA_BENCHMARK(${arg1})
-    target_link_libraries(${arg1} PRIVATE xtensor xtensor-blas)
-    target_compile_definitions(${arg1} PRIVATE HEYOKA_WITH_XTENSOR PRIVATE XTENSOR_USE_FLENS_BLAS)
-  endfunction()
-
-  ADD_HEYOKA_XTENSOR_BENCHMARK(outer_ss_long_term)
-endif()
+ADD_HEYOKA_BENCHMARK(outer_ss_long_term)
