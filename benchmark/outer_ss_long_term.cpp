@@ -81,7 +81,15 @@ void run_integration(const std::string &filename, T t_final, double perturb)
         x += abs(x) * (rdist(rng) * perturb);
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = true};
+
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Construction time: " << elapsed << "ms\n";
 
     // Create xtensor views on the the state and mass vectors
     // for ease of indexing.
@@ -183,7 +191,7 @@ void run_integration(const std::string &filename, T t_final, double perturb)
     }
     auto it = save_times.begin();
 
-    auto start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
 
     while (ta.get_time() < pow(T(10), final_time)) {
         if (of && it != save_times.end() && ta.get_time() >= *it) {
@@ -220,7 +228,7 @@ void run_integration(const std::string &filename, T t_final, double perturb)
         }
     }
 
-    auto elapsed = static_cast<double>(
+    elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
