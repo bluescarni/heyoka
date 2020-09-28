@@ -1085,4 +1085,156 @@ expression pow(expression e1, expression e2)
     return expression{std::move(fc)};
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_u_init_sqrt(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the square root (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of sqrt(number).
+template <typename T>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of sqrt(variable).
+template <typename T>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                   std::uint32_t batch_size)
+{
+    return taylor_diff_pow_impl<T>(s, var, number{T(1) / 2}, arr, n_uvars, order, idx, batch_size);
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a square root");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_sqrt(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the square root (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
+} // namespace
+
+} // namespace detail
+
+expression sqrt(expression e)
+{
+    std::vector<expression> args;
+    args.emplace_back(std::move(e));
+
+    function fc{std::move(args)};
+    fc.name_dbl() = "llvm.sqrt";
+    fc.name_ldbl() = "llvm.sqrt";
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.name_f128() = "heyoka_sqrt128";
+#endif
+    fc.display_name() = "sqrt";
+    fc.ty_dbl() = function::type::builtin;
+    fc.ty_ldbl() = function::type::builtin;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.ty_f128() = function::type::external;
+    // NOTE: in theory we may add ReadNone here as well,
+    // but for some reason, at least up to LLVM 10,
+    // this causes strange codegen issues. Revisit
+    // in the future.
+    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+#endif
+    fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when taking the derivative of the square root (1 "
+                "argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return diff(args[0], s) / (expression{number(2.)} * sqrt(args[0]));
+    };
+
+    fc.eval_dbl_f() = [](const std::vector<expression> &args, const std::unordered_map<std::string, double> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the square root from doubles (1 "
+                "argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::sqrt(eval_dbl(args[0], map));
+    };
+    fc.eval_batch_dbl_f() = [](std::vector<double> &out, const std::vector<expression> &args,
+                               const std::unordered_map<std::string, std::vector<double>> &map) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Inconsistent number of arguments when evaluating the square root in batches of "
+                "doubles (1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were provided");
+        }
+        eval_batch_dbl(out, args[0], map);
+        for (auto &el : out) {
+            el = std::sqrt(el);
+        }
+    };
+    fc.eval_num_dbl_f() = [](const std::vector<double> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Inconsistent number of arguments when computing the numerical value of the "
+                                        "square root over doubles (1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were provided");
+        }
+
+        return std::sqrt(args[0]);
+    };
+    fc.deval_num_dbl_f() = [](const std::vector<double> &args, std::vector<double>::size_type i) {
+        if (args.size() != 1u || i != 0u) {
+            throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
+                                        "derivative of std::sqrt over doubles");
+        }
+
+        return std::sqrt(args[0]);
+    };
+
+    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_sqrt<double>;
+    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_sqrt<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_u_init_f128_f() = detail::taylor_u_init_sqrt<mppp::real128>;
+#endif
+    fc.taylor_diff_dbl_f() = detail::taylor_diff_sqrt<double>;
+    fc.taylor_diff_ldbl_f() = detail::taylor_diff_sqrt<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_diff_f128_f() = detail::taylor_diff_sqrt<mppp::real128>;
+#endif
+
+    return expression{std::move(fc)};
+}
+
 } // namespace heyoka

@@ -55,6 +55,7 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_exp128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cos128(__float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sqrt128(__float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_fma128(__float128, __float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128, __float128);
