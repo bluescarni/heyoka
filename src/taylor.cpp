@@ -1564,12 +1564,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Determine the order from the tolerance.
-    auto order_f = -log(tol) / 2 + 1;
-    if (high_accuracy) {
-        // Add 25% more order in high accuracy mode.
-        order_f += order_f * (T(25) / 100);
-    }
-    order_f = ceil(order_f);
+    auto order_f = ceil(-log(tol) / 2 + 1);
     if (!detail::isfinite(order_f)) {
         throw std::invalid_argument(
             "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");

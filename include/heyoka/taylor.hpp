@@ -237,21 +237,27 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
                 }
             }();
 
-            // tol (defaults to eps).
-            const auto tol = [&p]() -> T {
-                if constexpr (p.has(kw::tol)) {
-                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                } else {
-                    return std::numeric_limits<T>::epsilon();
-                }
-            }();
-
             // High accuracy mode (defaults to false).
             const auto high_accuracy = [&p]() -> bool {
                 if constexpr (p.has(kw::high_accuracy)) {
                     return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
                 } else {
                     return false;
+                }
+            }();
+
+            // tol (defaults to eps).
+            const auto tol = [&p, high_accuracy]() -> T {
+                if constexpr (p.has(kw::tol)) {
+                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
+                } else {
+                    auto retval = std::numeric_limits<T>::epsilon();
+                    if (high_accuracy) {
+                        // Add extra precision in high-accuracy mode.
+                        retval *= T(1e-4);
+                    }
+
+                    return retval;
                 }
             }();
 
@@ -482,21 +488,27 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
                 }
             }();
 
-            // tol (defaults to eps).
-            const auto tol = [&p]() -> T {
-                if constexpr (p.has(kw::tol)) {
-                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                } else {
-                    return std::numeric_limits<T>::epsilon();
-                }
-            }();
-
             // High accuracy mode (defaults to false).
             const auto high_accuracy = [&p]() -> bool {
                 if constexpr (p.has(kw::high_accuracy)) {
                     return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
                 } else {
                     return false;
+                }
+            }();
+
+            // tol (defaults to eps).
+            const auto tol = [&p, high_accuracy]() -> T {
+                if constexpr (p.has(kw::tol)) {
+                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
+                } else {
+                    auto retval = std::numeric_limits<T>::epsilon();
+                    if (high_accuracy) {
+                        // Add extra precision in high-accuracy mode.
+                        retval *= T(1e-4);
+                    }
+
+                    return retval;
                 }
             }();
 
