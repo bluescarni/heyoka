@@ -15,8 +15,10 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -41,6 +43,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -389,25 +392,23 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_init_batch_impl(llvm_state &s, const binary_operator &bo, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                   std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     // Do the Taylor init for lhs and rhs.
-    auto l = taylor_init_batch<T>(s, bo.lhs(), arr, batch_idx, batch_size, vector_size);
-    auto r = taylor_init_batch<T>(s, bo.rhs(), arr, batch_idx, batch_size, vector_size);
+    auto l = taylor_u_init<T>(s, bo.lhs(), arr, batch_size);
+    auto r = taylor_u_init<T>(s, bo.rhs(), arr, batch_size);
 
     // Do the codegen for the corresponding operation.
     switch (bo.op()) {
         case binary_operator::type::add:
-            return builder.CreateFAdd(l, r, "taylor_init_batch_add");
+            return s.builder().CreateFAdd(l, r);
         case binary_operator::type::sub:
-            return builder.CreateFSub(l, r, "taylor_init_batch_sub");
+            return s.builder().CreateFSub(l, r);
         case binary_operator::type::mul:
-            return builder.CreateFMul(l, r, "taylor_init_batch_mul");
+            return s.builder().CreateFMul(l, r);
         default:
-            return builder.CreateFDiv(l, r, "taylor_init_batch_div");
+            return s.builder().CreateFDiv(l, r);
     }
 }
 
@@ -415,24 +416,24 @@ llvm::Value *taylor_init_batch_impl(llvm_state &s, const binary_operator &bo, ll
 
 } // namespace detail
 
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const binary_operator &bo, llvm::Value *arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_dbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size)
 {
-    return detail::taylor_init_batch_impl<double>(s, bo, arr, batch_idx, batch_size, vector_size);
+    return detail::taylor_u_init_bo_impl<double>(s, bo, arr, batch_size);
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const binary_operator &bo, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
 {
-    return detail::taylor_init_batch_impl<long double>(s, bo, arr, batch_idx, batch_size, vector_size);
+    return detail::taylor_u_init_bo_impl<long double>(s, bo, arr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const binary_operator &bo, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_f128(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
 {
-    return detail::taylor_init_batch_impl<mppp::real128>(s, bo, arr, batch_idx, batch_size, vector_size);
+    return detail::taylor_u_init_bo_impl<mppp::real128>(s, bo, arr, batch_size);
 }
 
 #endif
@@ -445,23 +446,20 @@ namespace
 
 // Derivative of number +- number.
 template <bool, typename T>
-llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, const number &, std::uint32_t,
-                                              std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
-                                              std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const number &,
+                                        const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                        std::uint32_t batch_size)
 {
-    return taylor_diff_batch_zero<T>(s, vector_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of number +- var.
 template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, const variable &var, std::uint32_t order,
-                                              std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                              std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const variable &var,
+                                        const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                      vector_size);
+    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
 
     if constexpr (AddOrSub) {
         return ret;
@@ -473,27 +471,21 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const number &, con
 
 // Derivative of var +- number.
 template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var, const number &, std::uint32_t order,
-                                              std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                              std::uint32_t batch_size, std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const variable &var, const number &,
+                                        const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    return tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                  vector_size);
+    return taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
 }
 
 // Derivative of var +- var.
 template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var0, const variable &var1,
-                                              std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
-                                              std::uint32_t batch_idx, std::uint32_t batch_size,
-                                              std::uint32_t vector_size,
-                                              const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, const variable &var1,
+                                        const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    auto v0 = tjb_load_derivative<T>(s, uname_to_index(var0.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                     vector_size);
-    auto v1 = tjb_load_derivative<T>(s, uname_to_index(var1.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                     vector_size);
+    auto v0 = taylor_load_derivative(arr, uname_to_index(var0.name()), order, n_uvars);
+    auto v1 = taylor_load_derivative(arr, uname_to_index(var1.name()), order, n_uvars);
 
     if constexpr (AddOrSub) {
         return s.builder().CreateFAdd(v0, v1);
@@ -502,10 +494,10 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &s, const variable &var
     }
 }
 
+// All the other cases.
 template <bool, typename, typename V1, typename V2>
-llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &, const V1 &, const V2 &, std::uint32_t, std::uint32_t,
-                                              llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                              const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
+                                        std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     assert(false);
 
@@ -513,103 +505,90 @@ llvm::Value *bo_taylor_diff_batch_addsub_impl(llvm_state &, const V1 &, const V2
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_add(llvm_state &s, const binary_operator &bo, std::uint32_t, std::uint32_t order,
-                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                      std::uint32_t batch_size, std::uint32_t vector_size,
-                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_batch_addsub_impl<true, T>(s, v1, v2, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                             vector_size, cd_uvars);
+            return bo_taylor_diff_addsub_impl<true, T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_sub(llvm_state &s, const binary_operator &bo, std::uint32_t, std::uint32_t order,
-                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                      std::uint32_t batch_size, std::uint32_t vector_size,
-                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_sub(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_batch_addsub_impl<false, T>(s, v1, v2, order, n_uvars, diff_arr, batch_idx,
-                                                              batch_size, vector_size, cd_uvars);
+            return bo_taylor_diff_addsub_impl<false, T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 // Derivative of number * number.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const number &, const number &, std::uint32_t, std::uint32_t,
-                                           llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
+                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return taylor_diff_batch_zero<T>(s, vector_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of var * number.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var, const number &num, std::uint32_t order,
-                                           std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                           std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const number &num,
+                                     const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t, std::uint32_t batch_size)
 {
-    auto ret = tjb_load_derivative<T>(s, uname_to_index(var.name()), order, n_uvars, diff_arr, batch_idx, batch_size,
-                                      vector_size);
-
     auto &builder = s.builder();
-    auto mul = codegen<T>(s, num);
-    if (vector_size > 0u) {
-        mul = detail::create_constant_vector(builder, mul, vector_size);
-    }
 
-    return builder.CreateFMul(mul, ret, "bo_mul_var_num_mul");
+    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    auto mul = vector_splat(builder, codegen<T>(s, num), batch_size);
+
+    return builder.CreateFMul(mul, ret);
 }
 
 // Derivative of number * var.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const number &num, const variable &var, std::uint32_t order,
-                                           std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                           std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const number &num, const variable &var,
+                                     const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t idx, std::uint32_t batch_size)
 {
-    return bo_taylor_diff_batch_mul_impl<T>(s, var, num, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                            cd_uvars);
+    return bo_taylor_diff_mul_impl<T>(s, var, num, arr, n_uvars, order, idx, batch_size);
 }
 
 // Derivative of var * var.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &s, const variable &var0, const variable &var1,
-                                           std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
-                                           std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const variable &var1,
+                                     const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t, std::uint32_t)
 {
-    auto &builder = s.builder();
-
     // Fetch the indices of the u variables.
     const auto u_idx0 = uname_to_index(var0.name());
     const auto u_idx1 = uname_to_index(var1.name());
 
     // NOTE: iteration in the [0, order] range
     // (i.e., order inclusive).
+    if (order == std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("Overflow in the Taylor derivative of the mul operator");
+    }
     std::vector<llvm::Value *> sum;
+    auto &builder = s.builder();
     for (std::uint32_t j = 0; j <= order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, u_idx0, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
-        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v0 = taylor_load_derivative(arr, u_idx0, order - j, n_uvars);
+        auto v1 = taylor_load_derivative(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(v0, v1, "bo_mul_var_var_term_prod"));
+        sum.push_back(builder.CreateFMul(v0, v1));
     }
 
-    return llvm_pairwise_sum(builder, sum);
+    return pairwise_sum(builder, sum);
 }
 
+// All the other cases.
 template <typename, typename V1, typename V2>
-llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &, const V1 &, const V2 &, std::uint32_t, std::uint32_t,
-                                           llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
+                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     assert(false);
 
@@ -617,59 +596,56 @@ llvm::Value *bo_taylor_diff_batch_mul_impl(llvm_state &, const V1 &, const V2 &,
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_mul(llvm_state &s, const binary_operator &bo, std::uint32_t, std::uint32_t order,
-                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                      std::uint32_t batch_size, std::uint32_t vector_size,
-                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_batch_mul_impl<T>(s, v1, v2, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                    vector_size, cd_uvars);
+            return bo_taylor_diff_mul_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 // Derivative of number / number.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t, const number &, const number &, std::uint32_t,
-                                           std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t,
-                                           std::uint32_t vector_size, const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
+                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
 {
-    return taylor_diff_batch_zero<T>(s, vector_size);
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
 }
 
 // Derivative of variable / variable or number / variable. These two cases
 // are quite similar, so we handle them together.
 template <typename T, typename U,
           std::enable_if_t<std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>>, int> = 0>
-llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, const U &nv, const variable &var1,
-                                           std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
-                                           std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1,
+                                     const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t idx, std::uint32_t)
 {
-    auto &builder = s.builder();
-
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
 
     // NOTE: iteration in the [1, order] range
     // (i.e., order inclusive).
+    if (order == std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("Overflow in the Taylor derivative of the div operator");
+    }
+    auto &builder = s.builder();
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        auto v0 = tjb_load_derivative<T>(s, idx, order - j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
-        auto v1 = tjb_load_derivative<T>(s, u_idx1, j, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+        auto v0 = taylor_load_derivative(arr, idx, order - j, n_uvars);
+        auto v1 = taylor_load_derivative(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(v0, v1, "bo_div_term_prod"));
+        sum.push_back(builder.CreateFMul(v0, v1));
     }
 
     // Init the return value as the result of the sum.
-    auto ret_acc = llvm_pairwise_sum(builder, sum);
+    auto ret_acc = pairwise_sum(builder, sum);
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
-    auto div = tjb_load_derivative<T>(s, u_idx1, 0, n_uvars, diff_arr, batch_idx, batch_size, vector_size);
+    auto div = taylor_load_derivative(arr, u_idx1, 0, n_uvars);
 
     if constexpr (std::is_same_v<U, number>) {
         // nv is a number. Negate the accumulator
@@ -678,8 +654,7 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
     } else {
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
-        auto diff_nv_v = tjb_load_derivative<T>(s, uname_to_index(nv.name()), order, n_uvars, diff_arr, batch_idx,
-                                                batch_size, vector_size);
+        auto diff_nv_v = taylor_load_derivative(arr, uname_to_index(nv.name()), order, n_uvars);
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
         return builder.CreateFDiv(builder.CreateFSub(diff_nv_v, ret_acc), div);
@@ -688,21 +663,22 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t idx, con
 
 // Derivative of variable / number.
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &s, std::uint32_t, const variable &var, const number &num,
-                                           std::uint32_t order, std::uint32_t n_uvars, llvm::Value *diff_arr,
-                                           std::uint32_t batch_idx, std::uint32_t batch_size, std::uint32_t vector_size,
-                                           const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const number &num,
+                                     const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                     std::uint32_t, std::uint32_t batch_size)
 {
-    // NOTE: implement as the derivative of var * (1 / number).
-    return bo_taylor_diff_batch_mul_impl<T>(s, var, number(1.) / num, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                            vector_size, cd_uvars);
+    auto &builder = s.builder();
+
+    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    auto div = vector_splat(builder, codegen<T>(s, num), batch_size);
+
+    return builder.CreateFDiv(ret, div);
 }
 
-// All the other cases. We should never end up here.
+// All the other cases.
 template <typename, typename V1, typename V2>
-llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &, std::uint32_t, const V1 &, const V2 &, std::uint32_t,
-                                           std::uint32_t, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                           const std::unordered_map<std::uint32_t, number> &)
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
+                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     assert(false);
 
@@ -710,24 +686,20 @@ llvm::Value *bo_taylor_diff_batch_div_impl(llvm_state &, std::uint32_t, const V1
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_batch_div(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
-                                      std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                      std::uint32_t batch_size, std::uint32_t vector_size,
-                                      const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_diff_batch_div_impl<T>(s, idx, v1, v2, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                    vector_size, cd_uvars);
+            return bo_taylor_diff_div_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
 
 template <typename T>
-llvm::Value *taylor_diff_batch_bo_impl(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
-                                       std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                       std::uint32_t batch_size, std::uint32_t vector_size,
-                                       const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                                 std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                 std::uint32_t batch_size)
 {
     // NOTE: some of the implementations
     // require order to be at least 1 in order
@@ -771,17 +743,13 @@ llvm::Value *taylor_diff_batch_bo_impl(llvm_state &s, const binary_operator &bo,
 
     switch (bo.op()) {
         case binary_operator::type::add:
-            return bo_taylor_diff_batch_add<T>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                               cd_uvars);
+            return bo_taylor_diff_add<T>(s, bo, arr, n_uvars, order, idx, batch_size);
         case binary_operator::type::sub:
-            return bo_taylor_diff_batch_sub<T>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                               cd_uvars);
+            return bo_taylor_diff_sub<T>(s, bo, arr, n_uvars, order, idx, batch_size);
         case binary_operator::type::mul:
-            return bo_taylor_diff_batch_mul<T>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                               cd_uvars);
+            return bo_taylor_diff_mul<T>(s, bo, arr, n_uvars, order, idx, batch_size);
         default:
-            return bo_taylor_diff_batch_div<T>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size, vector_size,
-                                               cd_uvars);
+            return bo_taylor_diff_div<T>(s, bo, arr, n_uvars, order, idx, batch_size);
     }
 }
 
@@ -789,33 +757,24 @@ llvm::Value *taylor_diff_batch_bo_impl(llvm_state &s, const binary_operator &bo,
 
 } // namespace detail
 
-llvm::Value *taylor_diff_batch_dbl(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
-                                   std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size,
-                                   const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_batch_bo_impl<double>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                     vector_size, cd_uvars);
+    return detail::taylor_diff_bo_impl<double>(s, bo, arr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *taylor_diff_batch_ldbl(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_batch_bo_impl<long double>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                          vector_size, cd_uvars);
+    return detail::taylor_diff_bo_impl<long double>(s, bo, arr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_batch_f128(llvm_state &s, const binary_operator &bo, std::uint32_t idx, std::uint32_t order,
-                                    std::uint32_t n_uvars, llvm::Value *diff_arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size,
-                                    const std::unordered_map<std::uint32_t, number> &cd_uvars)
+llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_batch_bo_impl<mppp::real128>(s, bo, idx, order, n_uvars, diff_arr, batch_idx, batch_size,
-                                                            vector_size, cd_uvars);
+    return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, arr, n_uvars, order, idx, batch_size);
 }
 
 #endif

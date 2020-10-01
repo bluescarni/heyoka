@@ -145,9 +145,11 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             z_acc[i] += Gconst * masses[j] * diff_z * r_m3;
 
             // Acceleration exerted by i on j.
-            x_acc[j] -= Gconst * masses[i] * diff_x * r_m3;
-            y_acc[j] -= Gconst * masses[i] * diff_y * r_m3;
-            z_acc[j] -= Gconst * masses[i] * diff_z * r_m3;
+            // NOTE: do the negation on the masses, which
+            // here are guaranteed to have numerical values.
+            x_acc[j] += Gconst * -masses[i] * diff_x * r_m3;
+            y_acc[j] += Gconst * -masses[i] * diff_y * r_m3;
+            z_acc[j] += Gconst * -masses[i] * diff_z * r_m3;
         }
 
         // Add the expressions of the accelerations to the system.

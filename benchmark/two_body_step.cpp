@@ -6,13 +6,25 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <array>
 #include <chrono>
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/program_options.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
@@ -23,7 +35,8 @@
 using namespace heyoka;
 using namespace heyoka_benchmark;
 
-int main()
+template <typename T>
+void run_bench(T tol, bool high_accuracy)
 {
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
@@ -33,47 +46,80 @@ int main()
     auto z01 = z1 - z0;
     auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
 
-    const auto kep = std::array{1.5, .2, .3, .4, .5, .6};
-    const auto [c_x, c_v] = kep_to_cart(kep, 1. / 4);
+    const auto kep = std::array{T(1.5), T(.2), T(.3), T(.4), T(.5), T(.6)};
+    const auto [c_x, c_v] = kep_to_cart(kep, T(1) / 4);
 
     std::vector init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
                            c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
 
-    taylor_adaptive<double> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
-                                 vx0, vx1, vy0, vy1, vz0, vz1},
-                                std::move(init_state)};
-
     auto start = std::chrono::high_resolution_clock::now();
 
-    // Do 400 steps.
-    for (auto i = 0; i < 20; ++i) {
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
-        tad.step();
+    auto tad = (tol == T(0)) ? taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3,
+                                                   z01 * r01_m3, -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                                  std::move(init_state),
+                                                  kw::high_accuracy = high_accuracy}
+                             : taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3,
+                                                   z01 * r01_m3, -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                                  std::move(init_state),
+                                                  kw::high_accuracy = high_accuracy,
+                                                  kw::tol = tol};
+
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Construction time: " << elapsed << "ms\n";
+
+    start = std::chrono::high_resolution_clock::now();
+
+    for (auto i = 0; i < 4000; ++i) {
         tad.step();
     }
 
-    const auto elapsed = static_cast<double>(
+    elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Elapsed time for a single timestep (double precision): " << elapsed / 400 << "ns\n";
+    std::cout << "Elapsed time for a single timestep: " << elapsed / 4000 << "ns\n";
+}
 
-    return 0;
+int main(int argc, char *argv[])
+{
+    namespace po = boost::program_options;
+
+    std::string fp_type;
+    bool high_accuracy = false;
+    double tol;
+
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")(
+        "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
+        "tol", po::value<double>(&tol)->default_value(0.),
+        "tolerance (if 0, it will be automatically deduced)")("high_accuracy", "high-accuracy mode");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
+        return 0;
+    }
+
+    if (vm.count("high_accuracy")) {
+        high_accuracy = true;
+    }
+
+    if (fp_type == "double") {
+        run_bench<double>(tol, high_accuracy);
+    } else if (fp_type == "long double") {
+        run_bench<long double>(tol, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (fp_type == "real128") {
+        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy);
+#endif
+    } else {
+        throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
+    }
 }

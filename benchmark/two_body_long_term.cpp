@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <initializer_list>
@@ -18,6 +19,8 @@
 
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
+
+#include "benchmark_utils.hpp"
 
 // Two-body problem energy from the state vector.
 template <typename T>
@@ -82,14 +85,30 @@ void run_integration()
     while (ta.get_time() < pow(T(10), final_time)) {
         if (it != save_times.end() && ta.get_time() >= *it) {
             // We are at or past the current saving time, record
-            // the energy error.
-            of << ta.get_time() << " " << abs((en - tbp_energy(st)) / en) << std::endl;
+            // the time, energy error and orbital elements.
+            of << ta.get_time() << " " << abs((en - tbp_energy(st)) / en) << " ";
+
+            const auto kep1 = heyoka_benchmark::cart_to_kep(std::array{st[0], st[1], st[2]},
+                                                            std::array{st[3], st[4], st[5]}, T{1} / 4);
+            const auto kep2 = heyoka_benchmark::cart_to_kep(std::array{st[6], st[7], st[8]},
+                                                            std::array{st[9], st[10], st[11]}, T{1} / 4);
+            for (const auto &v : kep1) {
+                of << v << ' ';
+            }
+            for (const auto &v : kep2) {
+                of << v << ' ';
+            }
+
+            of << std::endl;
 
             // Locate the next saving time (that is, the first saving
             // time which is greater than the current time).
             it = std::upper_bound(it, save_times.end(), ta.get_time());
         }
-        ta.step();
+        auto [res, h] = ta.step();
+        if (res != heyoka::taylor_outcome::success) {
+            throw std::runtime_error("Error status detected: " + std::to_string(static_cast<int>(res)));
+        }
     }
 }
 

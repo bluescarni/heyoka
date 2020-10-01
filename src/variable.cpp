@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -196,11 +198,8 @@ std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::v
     return 0;
 }
 
-llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                   std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<llvm::Value *> &arr, std::uint32_t)
 {
-    auto &builder = s.builder();
-
     // Check that var is a u variable and extract its index.
     const auto &var_name = var.name();
     if (var_name.rfind("u_", 0) != 0) {
@@ -210,32 +209,26 @@ llvm::Value *taylor_init_batch_dbl(llvm_state &s, const variable &var, llvm::Val
     }
     const auto idx = detail::uname_to_index(var_name);
 
-    // Index into the array of derivatives.
-    auto ptr = builder.CreateInBoundsGEP(arr, {builder.getInt32(0), builder.getInt32(idx * batch_size + batch_idx)},
-                                         "diff_ptr");
-    assert(ptr != nullptr);
-
-    // Load from the array of derivatives as a scalar or vector.
-    if (vector_size == 0u) {
-        return builder.CreateLoad(ptr, "diff_load");
-    } else {
-        return detail::load_vector_from_memory(builder, ptr, vector_size, "diff_load");
+    if (idx >= arr.size()) {
+        throw std::invalid_argument("Out of bounds access in the Taylor initialization phase of a variable");
     }
+
+    return arr[boost::numeric_cast<decltype(arr.size())>(idx)];
 }
 
-llvm::Value *taylor_init_batch_ldbl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
 {
     // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size, vector_size);
+    return taylor_u_init_dbl(s, var, arr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_init_batch_f128(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t batch_idx,
-                                    std::uint32_t batch_size, std::uint32_t vector_size)
+llvm::Value *taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
 {
-    return taylor_init_batch_dbl(s, var, arr, batch_idx, batch_size, vector_size);
+    return taylor_u_init_dbl(s, var, arr, batch_size);
 }
 
 #endif

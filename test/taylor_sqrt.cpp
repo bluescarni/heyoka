@@ -80,10 +80,10 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-TEST_CASE("taylor exp")
+TEST_CASE("taylor sqrt")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
-        using std::exp;
+        using std::sqrt;
 
         using fp_t = decltype(fp_x);
 
@@ -95,7 +95,7 @@ TEST_CASE("taylor exp")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy);
 
             s.compile();
 
@@ -108,14 +108,14 @@ TEST_CASE("taylor exp")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sqrt(fp_t{2})));
             REQUIRE(jet[3] == 5);
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy);
 
             s.compile();
 
@@ -132,8 +132,8 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[5] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[4] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[5] == approximately(sqrt(fp_t{2})));
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -142,7 +142,7 @@ TEST_CASE("taylor exp")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy);
 
             s.compile();
 
@@ -155,16 +155,16 @@ TEST_CASE("taylor exp")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sqrt(fp_t{2})));
             REQUIRE(jet[3] == 5);
             REQUIRE(jet[4] == 0);
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + exp(fp_t{2}))));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + sqrt(fp_t{2}))));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy);
 
             s.compile();
 
@@ -181,8 +181,8 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[5] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[4] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[5] == approximately(sqrt(fp_t{2})));
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -190,14 +190,14 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[8] == 0);
             REQUIRE(jet[9] == 0);
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[6] + exp(fp_t{2}))));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[7] + exp(fp_t{2}))));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[6] + sqrt(fp_t{2}))));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[7] + sqrt(fp_t{2}))));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy);
 
             s.compile();
 
@@ -216,9 +216,9 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[4] == -3);
             REQUIRE(jet[5] == 0);
 
-            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[7] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[8] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[6] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[7] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[8] == approximately(sqrt(fp_t{2})));
 
             REQUIRE(jet[9] == 5);
             REQUIRE(jet[10] == -5);
@@ -228,9 +228,9 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[13] == 0);
             REQUIRE(jet[14] == 0);
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + exp(fp_t{2}))));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + exp(fp_t{2}))));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[11] + exp(fp_t{2}))));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + sqrt(fp_t{2}))));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + sqrt(fp_t{2}))));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[11] + sqrt(fp_t{2}))));
 
             REQUIRE(jet[18] == 0);
             REQUIRE(jet[19] == 0);
@@ -242,13 +242,13 @@ TEST_CASE("taylor exp")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({exp(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({sqrt(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy);
 
         // Variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(y), exp(x)}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(y), sqrt(x)}, 1, 1, high_accuracy);
 
             s.compile();
 
@@ -261,14 +261,14 @@ TEST_CASE("taylor exp")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(exp(fp_t{3})));
-            REQUIRE(jet[3] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sqrt(fp_t{3})));
+            REQUIRE(jet[3] == approximately(sqrt(fp_t{2})));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(y), exp(x)}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(y), sqrt(x)}, 1, 2, high_accuracy);
 
             s.compile();
 
@@ -285,17 +285,17 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(exp(fp_t{3})));
-            REQUIRE(jet[5] == approximately(exp(fp_t{5})));
+            REQUIRE(jet[4] == approximately(sqrt(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sqrt(fp_t{5})));
 
-            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[7] == approximately(exp(fp_t{4})));
+            REQUIRE(jet[6] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[7] == approximately(sqrt(fp_t{4})));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(y), exp(x)}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(y), sqrt(x)}, 2, 1, high_accuracy);
 
             s.compile();
 
@@ -308,16 +308,16 @@ TEST_CASE("taylor exp")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(exp(fp_t{3})));
-            REQUIRE(jet[3] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[2] * jet[3]));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] * jet[3]));
+            REQUIRE(jet[2] == approximately(sqrt(fp_t{3})));
+            REQUIRE(jet[3] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] / (2 * jet[2])));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] / (2 * jet[3])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(y), exp(x)}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(y), sqrt(x)}, 2, 2, high_accuracy);
 
             s.compile();
 
@@ -334,23 +334,23 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(exp(fp_t{3})));
-            REQUIRE(jet[5] == approximately(exp(fp_t{5})));
+            REQUIRE(jet[4] == approximately(sqrt(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sqrt(fp_t{5})));
 
-            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[7] == approximately(exp(fp_t{4})));
+            REQUIRE(jet[6] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[7] == approximately(sqrt(fp_t{4})));
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[4] * jet[6]));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[5] * jet[7]));
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[6] / (2 * jet[4])));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[7] / (2 * jet[5])));
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] * jet[6]));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] * jet[7]));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] / (2 * jet[6])));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] / (2 * jet[7])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {exp(y), exp(x)}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {sqrt(y), sqrt(x)}, 3, 3, high_accuracy);
 
             s.compile();
 
@@ -369,33 +369,39 @@ TEST_CASE("taylor exp")
             REQUIRE(jet[4] == 5);
             REQUIRE(jet[5] == 6);
 
-            REQUIRE(jet[6] == approximately(exp(fp_t{3})));
-            REQUIRE(jet[7] == approximately(exp(fp_t{5})));
-            REQUIRE(jet[8] == approximately(exp(fp_t{6})));
+            REQUIRE(jet[6] == approximately(sqrt(fp_t{3})));
+            REQUIRE(jet[7] == approximately(sqrt(fp_t{5})));
+            REQUIRE(jet[8] == approximately(sqrt(fp_t{6})));
 
-            REQUIRE(jet[9] == approximately(exp(fp_t{2})));
-            REQUIRE(jet[10] == approximately(exp(fp_t{4})));
-            REQUIRE(jet[11] == approximately(exp(fp_t{3})));
+            REQUIRE(jet[9] == approximately(sqrt(fp_t{2})));
+            REQUIRE(jet[10] == approximately(sqrt(fp_t{4})));
+            REQUIRE(jet[11] == approximately(sqrt(fp_t{3})));
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[6] * jet[9]));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[7] * jet[10]));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[8] * jet[11]));
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[9] / (2 * jet[6])));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[10] / (2 * jet[7])));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[11] / (2 * jet[8])));
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] * jet[9]));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] * jet[10]));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] * jet[11]));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] / (2 * jet[9])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] / (2 * jet[10])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] / (2 * jet[11])));
 
-            REQUIRE(jet[18] == approximately(fp_t{1} / 6 * (jet[6] * jet[9] * jet[9] + jet[6] * 2 * jet[12])));
-            REQUIRE(jet[19] == approximately(fp_t{1} / 6 * (jet[7] * jet[10] * jet[10] + jet[7] * 2 * jet[13])));
-            REQUIRE(jet[20] == approximately(fp_t{1} / 6 * (jet[8] * jet[11] * jet[11] + jet[8] * 2 * jet[14])));
+            REQUIRE(jet[18]
+                    == approximately(fp_t{1} / 6 * (4 * jet[15] * jet[6] - jet[9] * jet[9] / jet[6]) / (4 * jet[3])));
+            REQUIRE(jet[19]
+                    == approximately(fp_t{1} / 6 * (4 * jet[16] * jet[7] - jet[10] * jet[10] / jet[7]) / (4 * jet[4])));
+            REQUIRE(jet[20]
+                    == approximately(fp_t{1} / 6 * (4 * jet[17] * jet[8] - jet[11] * jet[11] / jet[8]) / (4 * jet[5])));
 
-            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (jet[9] * jet[6] * jet[6] + jet[9] * 2 * jet[15])));
-            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (jet[10] * jet[7] * jet[7] + jet[10] * 2 * jet[16])));
-            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (jet[11] * jet[8] * jet[8] + jet[11] * 2 * jet[17])));
+            REQUIRE(jet[21]
+                    == approximately(fp_t{1} / 6 * (4 * jet[12] * jet[9] - jet[6] * jet[6] / jet[9]) / (4 * jet[0])));
+            REQUIRE(jet[22]
+                    == approximately(fp_t{1} / 6 * (4 * jet[13] * jet[10] - jet[7] * jet[7] / jet[10]) / (4 * jet[1])));
+            REQUIRE(jet[23]
+                    == approximately(fp_t{1} / 6 * (4 * jet[14] * jet[11] - jet[8] * jet[8] / jet[11]) / (4 * jet[2])));
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({exp(y), exp(x)}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({sqrt(y), sqrt(x)}, opt_level, high_accuracy);
     };
 
     for (auto f : {false, true}) {

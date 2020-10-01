@@ -87,7 +87,7 @@ T tbp_energy(const std::vector<T> &st)
 
 TEST_CASE("two body")
 {
-    auto tester = [](auto fp_x, unsigned opt_level) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
         using std::abs;
         using std::cos;
 
@@ -111,7 +111,8 @@ TEST_CASE("two body")
         taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                   std::move(init_state),
-                                  kw::opt_level = opt_level};
+                                  kw::opt_level = opt_level,
+                                  kw::high_accuracy = high_accuracy};
 
         const auto &st = tad.get_state();
 
@@ -119,7 +120,7 @@ TEST_CASE("two body")
         const auto am = compute_am(st);
 
         for (auto i = 0; i < 200; ++i) {
-            const auto [oc, h, ord] = tad.step();
+            const auto [oc, h] = tad.step();
             REQUIRE(oc == taylor_outcome::success);
             REQUIRE(tbp_energy(st) == approximately(en, fp_t{1E2}));
             REQUIRE(compute_am(st) == approximately(am, fp_t{1E2}));
@@ -142,10 +143,12 @@ TEST_CASE("two body")
         }
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
+    for (auto ha : {true, false}) {
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 0, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 1, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 2, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 3, ha); });
+    }
 }
 
 // Energy of two uniform overlapping spheres.
@@ -196,7 +199,7 @@ TEST_CASE("two uniform spheres")
     const auto am = compute_am(st);
 
     for (auto i = 0; i < 200; ++i) {
-        const auto [oc, h, ord] = tad.step();
+        const auto [oc, h] = tad.step();
         REQUIRE(oc == taylor_outcome::success);
         REQUIRE(std::abs((en - tus_energy(rs_val, st)) / en) <= 1E-11);
         REQUIRE(std::abs((am - compute_am(st)) / am) <= 1E-11);
@@ -264,7 +267,7 @@ TEST_CASE("mixed tb/spheres")
         auto max_v = std::max(std::sqrt(v2_0), std::sqrt(v2_1));
 
         // Do a timestep imposing that that max_v * delta_t < 1/2*rs.
-        auto [oc, h, order] = cur_t->step(rs_val / (2 * max_v));
+        auto [oc, h] = cur_t->step(rs_val / (2 * max_v));
         REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
 
         if (get_regime(cur_t->get_state()) != cur_regime) {

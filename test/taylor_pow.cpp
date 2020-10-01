@@ -26,6 +26,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"
@@ -43,19 +44,19 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy)
 {
     const auto batch_size = 23u;
 
     llvm_state s{kw::opt_level = opt_level};
 
-    s.add_taylor_jet_batch<T>("jet_batch", sys, 3, batch_size);
-    s.add_taylor_jet_batch<T>("jet_scalar", sys, 3, 1);
+    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy);
+    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy);
 
     s.compile();
 
-    auto jptr_batch = s.fetch_taylor_jet_batch<T>("jet_batch");
-    auto jptr_scalar = s.fetch_taylor_jet_batch<T>("jet_scalar");
+    auto jptr_batch = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_batch"));
+    auto jptr_scalar = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_scalar"));
 
     std::vector<T> jet_batch;
     jet_batch.resize(8 * batch_size);
@@ -83,7 +84,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level)
 
 TEST_CASE("taylor pow")
 {
-    auto tester = [](auto fp_x, unsigned opt_level) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
         using std::pow;
 
         using fp_t = decltype(fp_x);
@@ -96,12 +97,13 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>(
-                "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 1);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 1,
+                                 high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(4);
@@ -117,12 +119,13 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>(
-                "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 2);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 1, 2,
+                                 high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
             jet.resize(8);
@@ -145,12 +148,13 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>(
-                "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 1);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 1,
+                                 high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(6);
@@ -168,12 +172,13 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>(
-                "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 2);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 2, 2,
+                                 high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{3}, fp_t{5}};
             jet.resize(12);
@@ -202,12 +207,13 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>(
-                "jet", {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 3, 3);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y}, 3, 3,
+                                 high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-1}, fp_t{-4}, fp_t{3}, fp_t{5}, fp_t{6}};
             jet.resize(24);
@@ -242,27 +248,27 @@ TEST_CASE("taylor pow")
             REQUIRE(jet[19] == 0);
             REQUIRE(jet[20] == 0);
 
-            REQUIRE(jet[21] == fp_t{1} / 6 * (2 * jet[12] + 2 * jet[15]));
-            REQUIRE(jet[22] == fp_t{1} / 6 * (2 * jet[13] + 2 * jet[16]));
-            REQUIRE(jet[23] == fp_t{1} / 6 * (2 * jet[14] + 2 * jet[17]));
+            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (2 * jet[12] + 2 * jet[15])));
+            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (2 * jet[13] + 2 * jet[16])));
+            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[14] + 2 * jet[17])));
         }
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({pow(expression{number{fp_t{3}}}, expression{number{fp_t{1} / fp_t{3}}}), x + y},
-                                   opt_level);
+                                   opt_level, high_accuracy);
 
         // Variable-number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet",
-                                         {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
-                                          pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                         1, 1);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
+                                  pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
+                                 1, 1, high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(4);
@@ -278,14 +284,14 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet",
-                                         {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
-                                          pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                         1, 2);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
+                                  pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
+                                 1, 2, high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{5}, fp_t{3}, fp_t{4}};
             jet.resize(8);
@@ -308,14 +314,14 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet",
-                                         {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
-                                          pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                         2, 1);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
+                                  pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
+                                 2, 1, high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(6);
@@ -333,14 +339,14 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet",
-                                         {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
-                                          pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                         2, 2);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
+                                  pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
+                                 2, 2, high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{5}, fp_t{3}, fp_t{4}};
             jet.resize(12);
@@ -369,14 +375,14 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            s.add_taylor_jet_batch<fp_t>("jet",
-                                         {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
-                                          pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                         3, 3);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
+                                  pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
+                                 3, 3, high_accuracy);
 
             s.compile();
 
-            auto jptr = s.fetch_taylor_jet_batch<fp_t>("jet");
+            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{5}, fp_t{1}, fp_t{3}, fp_t{4}, fp_t{6}};
             jet.resize(24);
@@ -437,14 +443,14 @@ TEST_CASE("taylor pow")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({pow(y, expression{number{fp_t{3}}} / expression{number{fp_t{2}}}),
                                     pow(x, expression{number{fp_t{-1}}} / expression{number{fp_t{3}}})},
-                                   opt_level);
+                                   opt_level, high_accuracy);
 
         // Failure modes for non-implemented cases.
         {
             llvm_state s{kw::opt_level = opt_level};
 
             REQUIRE_THROWS_MATCHES(
-                s.add_taylor_jet_batch<fp_t>("jet", {pow(1_dbl, x)}, 3, 3), std::invalid_argument,
+                taylor_add_jet<fp_t>(s, "jet", {pow(1_dbl, x)}, 3, 3, high_accuracy), std::invalid_argument,
                 Message(
                     "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
         }
@@ -453,14 +459,16 @@ TEST_CASE("taylor pow")
             llvm_state s{kw::opt_level = opt_level};
 
             REQUIRE_THROWS_MATCHES(
-                s.add_taylor_jet_batch<fp_t>("jet", {y, pow(y, x)}, 3, 3), std::invalid_argument,
+                taylor_add_jet<fp_t>(s, "jet", {y, pow(y, x)}, 3, 3, high_accuracy), std::invalid_argument,
                 Message(
                     "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
         }
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
+    for (auto f : {false, true}) {
+        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 0, f); });
+        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 1, f); });
+        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 2, f); });
+        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 3, f); });
+    }
 }
