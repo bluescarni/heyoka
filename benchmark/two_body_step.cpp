@@ -54,15 +54,11 @@ void run_bench(T tol, bool high_accuracy)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto tad = (tol == T(0)) ? taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3,
-                                                   z01 * r01_m3, -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
-                                                  std::move(init_state),
-                                                  kw::high_accuracy = high_accuracy}
-                             : taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3,
-                                                   z01 * r01_m3, -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
-                                                  std::move(init_state),
-                                                  kw::high_accuracy = high_accuracy,
-                                                  kw::tol = tol};
+    auto tad = taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
+                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                  std::move(init_state),
+                                  kw::high_accuracy = high_accuracy,
+                                  kw::tol = tol};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)

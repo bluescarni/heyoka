@@ -249,16 +249,22 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
             // tol (defaults to eps).
             const auto tol = [&p, high_accuracy]() -> T {
                 if constexpr (p.has(kw::tol)) {
-                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                } else {
-                    auto retval = std::numeric_limits<T>::epsilon();
-                    if (high_accuracy) {
-                        // Add extra precision in high-accuracy mode.
-                        retval *= T(1e-4);
+                    auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
+                    if (retval != T(0)) {
+                        // NOTE: this covers the NaN case as well.
+                        return retval;
                     }
-
-                    return retval;
+                    // NOTE: zero tolerance will be interpreted
+                    // as automatically-deduced by falling through
+                    // the code below.
                 }
+                auto retval = std::numeric_limits<T>::epsilon();
+                if (high_accuracy) {
+                    // Add extra precision in high-accuracy mode.
+                    retval *= T(1e-4);
+                }
+
+                return retval;
             }();
 
             finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy);
@@ -500,16 +506,22 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
             // tol (defaults to eps).
             const auto tol = [&p, high_accuracy]() -> T {
                 if constexpr (p.has(kw::tol)) {
-                    return std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                } else {
-                    auto retval = std::numeric_limits<T>::epsilon();
-                    if (high_accuracy) {
-                        // Add extra precision in high-accuracy mode.
-                        retval *= T(1e-4);
+                    auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
+                    if (retval != T(0)) {
+                        // NOTE: this covers the NaN case as well.
+                        return retval;
                     }
-
-                    return retval;
+                    // NOTE: zero tolerance will be interpreted
+                    // as automatically-deduced by falling through
+                    // the code below.
                 }
+                auto retval = std::numeric_limits<T>::epsilon();
+                if (high_accuracy) {
+                    // Add extra precision in high-accuracy mode.
+                    retval *= T(1e-4);
+                }
+
+                return retval;
             }();
 
             finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), tol, high_accuracy);

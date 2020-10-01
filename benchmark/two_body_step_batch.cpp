@@ -84,10 +84,8 @@ void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size)
     auto start = std::chrono::high_resolution_clock::now();
 
     // Init the batch integrator.
-    auto tad = (tol == T(0)) ? taylor_adaptive_batch<T>{sys, std::move(init_states), batch_size,
-                                                        kw::high_accuracy = high_accuracy}
-                             : taylor_adaptive_batch<T>{sys, std::move(init_states), batch_size,
-                                                        kw::high_accuracy = high_accuracy, kw::tol = tol};
+    auto tad = taylor_adaptive_batch<T>{sys, std::move(init_states), batch_size, kw::high_accuracy = high_accuracy,
+                                        kw::tol = tol};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
