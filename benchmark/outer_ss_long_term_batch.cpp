@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -20,6 +22,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -30,6 +33,12 @@
 #include <xtensor/xarray.hpp>
 #include <xtensor/xio.hpp>
 #include <xtensor/xview.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
@@ -272,19 +281,28 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
                         *of << val << " ";
                     }
 
-                    // Store the orbital elements wrt the Sun.
-                    for (auto i = 1u; i < 6u; ++i) {
-                        auto rel_x
-                            = xt::view(s_array, i, xt::range(0, 3), i) - xt::view(s_array, 0, xt::range(0, 3), i);
-                        auto rel_v
-                            = xt::view(s_array, i, xt::range(3, 6), i) - xt::view(s_array, 0, xt::range(3, 6), i);
+#if defined(HEYOKA_HAVE_REAL128)
+                    // NOTE: don't try to save the orbital elements
+                    // if real128 is being used, as the xt linalg functions
+                    // don't work on real128.
+                    if constexpr (!std::is_same_v<T, mppp::real128>) {
+#endif
+                        // Store the orbital elements wrt the Sun.
+                        for (auto i = 1u; i < 6u; ++i) {
+                            auto rel_x
+                                = xt::view(s_array, i, xt::range(0, 3), i) - xt::view(s_array, 0, xt::range(0, 3), i);
+                            auto rel_v
+                                = xt::view(s_array, i, xt::range(3, 6), i) - xt::view(s_array, 0, xt::range(3, 6), i);
 
-                        auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+                            auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
 
-                        for (auto oe : kep) {
-                            *of << oe << " ";
+                            for (auto oe : kep) {
+                                *of << oe << " ";
+                            }
                         }
+#if defined(HEYOKA_HAVE_REAL128)
                     }
+#endif
 
                     *of << std::endl;
 
@@ -359,6 +377,10 @@ int main(int argc, char *argv[])
         run_integration<double>(filename, final_time, perturb, batch_size);
     } else if (fp_type == "long double") {
         run_integration<long double>(filename, final_time, perturb, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (fp_type == "real128") {
+        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb, batch_size);
+#endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
     }

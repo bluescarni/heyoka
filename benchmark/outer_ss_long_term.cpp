@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -19,6 +21,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -29,6 +32,12 @@
 #include <xtensor/xfixed.hpp>
 #include <xtensor/xio.hpp>
 #include <xtensor/xview.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
@@ -118,23 +127,32 @@ void run_integration(const std::string &filename, T t_final, double perturb)
 
     // Helper to compute the total energy in the system.
     auto get_energy = [&s_array, &m_array, G]() {
+        using std::sqrt;
+
         // Kinetic energy.
         T kin(0);
         for (auto i = 0u; i < 6u; ++i) {
-            const auto v = xt::view(s_array, i, xt::range(3, 6));
+            auto vx = xt::view(s_array, i, 3)[0];
+            auto vy = xt::view(s_array, i, 4)[0];
+            auto vz = xt::view(s_array, i, 5)[0];
 
-            kin += T{1} / 2 * m_array[i] * xt::linalg::dot(v, v)[0];
+            kin += T{1} / 2 * m_array[i] * (vx * vx + vy * vy + vz * vz);
         }
 
         // Potential energy.
         T pot(0);
         for (auto i = 0u; i < 6u; ++i) {
-            const auto ri = xt::view(s_array, i, xt::range(0, 3));
+            auto xi = xt::view(s_array, i, 0)[0];
+            auto yi = xt::view(s_array, i, 1)[0];
+            auto zi = xt::view(s_array, i, 2)[0];
 
             for (auto j = i + 1u; j < 6u; ++j) {
-                const auto rj = xt::view(s_array, j, xt::range(0, 3));
+                auto xj = xt::view(s_array, j, 0)[0];
+                auto yj = xt::view(s_array, j, 1)[0];
+                auto zj = xt::view(s_array, j, 2)[0];
 
-                pot -= G * m_array[i] * m_array[j] / heyoka_benchmark::norm(ri - rj);
+                pot -= G * m_array[i] * m_array[j]
+                       / sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
             }
         }
 
@@ -204,17 +222,26 @@ void run_integration(const std::string &filename, T t_final, double perturb)
                 *of << val << " ";
             }
 
-            // Store the orbital elements wrt the Sun.
-            for (auto i = 1u; i < 6u; ++i) {
-                auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
-                auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
+#if defined(HEYOKA_HAVE_REAL128)
+            // NOTE: don't try to save the orbital elements
+            // if real128 is being used, as the xt linalg functions
+            // don't work on real128.
+            if constexpr (!std::is_same_v<T, mppp::real128>) {
+#endif
+                // Store the orbital elements wrt the Sun.
+                for (auto i = 1u; i < 6u; ++i) {
+                    auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
+                    auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
 
-                auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+                    auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
 
-                for (auto oe : kep) {
-                    *of << oe << " ";
+                    for (auto oe : kep) {
+                        *of << oe << " ";
+                    }
                 }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
 
             *of << std::endl;
 
@@ -276,6 +303,10 @@ int main(int argc, char *argv[])
         run_integration<double>(filename, final_time, perturb);
     } else if (fp_type == "long double") {
         run_integration<long double>(filename, final_time, perturb);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (fp_type == "real128") {
+        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb);
+#endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
     }
