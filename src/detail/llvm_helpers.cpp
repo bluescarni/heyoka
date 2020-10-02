@@ -8,10 +8,11 @@
 
 #include <cassert>
 #include <cstdint>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/Constants.h>
@@ -28,20 +29,20 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
-#if defined(__clang__)
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
-
-#endif
-
 namespace heyoka::detail
 {
 
-// Helper to load the data from pointer ptr as a vector of size vector_size.
+// Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
+// 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+
+    if (vector_size == 1u) {
+        // Scalar case.
+        return builder.CreateLoad(ptr);
+    }
 
     // Fetch the pointer type (this will result in an assertion
     // failure if ptr is not a pointer).
@@ -52,10 +53,7 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     assert(scalar_t != nullptr);
 
     // Create the corresponding vector type.
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in load_vector_from_memory()");
-    }
-    auto vector_t = llvm::VectorType::get(scalar_t, static_cast<unsigned>(vector_size));
+    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create the output vector.
@@ -70,25 +68,36 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     return ret;
 }
 
-// Helper to store the content of vector vec to the pointer ptr.
-// TODO remove the vector_size parameter, fetch the vector size from vec.
-void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec, std::uint32_t vector_size)
+// Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
+// a plain store will be performed.
+void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec)
 {
-    for (std::uint32_t i = 0; i < vector_size; ++i) {
-        builder.CreateStore(builder.CreateExtractElement(vec, i),
-                            builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+    if (auto v_ptr_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+        // Determine the vector size.
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
+
+        for (std::uint32_t i = 0; i < vector_size; ++i) {
+            builder.CreateStore(builder.CreateExtractElement(vec, i),
+                                builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+        }
+    } else {
+        // Not a vector, store vec directly.
+        builder.CreateStore(vec, ptr);
     }
 }
 
-// Create a SIMD vector of size vector_size filled with the constant c.
-llvm::Value *create_constant_vector(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
+// Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
+// c will be returned.
+llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
 
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in create_constant_vector()");
+    if (vector_size == 1u) {
+        return c;
     }
-    llvm::Value *vec = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), static_cast<unsigned>(vector_size)));
+
+    llvm::Value *vec
+        = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), boost::numeric_cast<unsigned>(vector_size)));
 
     // Fill up the vector with insertelement.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
@@ -100,42 +109,45 @@ llvm::Value *create_constant_vector(llvm::IRBuilder<> &builder, llvm::Value *c, 
     return vec;
 }
 
+// Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
+// return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::Value *vec)
 {
-    // Fetch the vector type.
-    auto vec_t = llvm::cast<llvm::VectorType>(vec->getType());
+    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+        // Fetch the vector width.
+        auto vector_size = vec_t->getNumElements();
 
-    // Fetch the vector width.
-    auto vector_size = vec_t->getNumElements();
+        // Extract the vector elements one by one.
+        std::vector<llvm::Value *> ret;
+        for (decltype(vector_size) i = 0; i < vector_size; ++i) {
+            ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
+            assert(ret.back() != nullptr);
+        }
 
-    // Extract the vector elements one by one.
-    std::vector<llvm::Value *> ret;
-    if (vector_size > std::numeric_limits<std::uint64_t>::max()) {
-        throw std::overflow_error("Overflow in vector_to_scalars()");
+        return ret;
+    } else {
+        return {vec};
     }
-    for (decltype(vector_size) i = 0; i < vector_size; ++i) {
-        ret.push_back(builder.CreateExtractElement(vec, static_cast<std::uint64_t>(i)));
-        assert(ret.back() != nullptr);
-    }
-
-    return ret;
 }
 
+// Convert a std::vector of values into an LLVM vector of the corresponding size.
+// If scalars contains only 1 value, return that value.
 llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llvm::Value *> &scalars)
 {
     assert(!scalars.empty());
 
-    // Fetch the scalar type.
-    auto scalar_t = scalars[0]->getType();
-
     // Fetch the vector size.
     const auto vector_size = scalars.size();
 
-    // Create the corresponding vector type.
-    if (vector_size > std::numeric_limits<unsigned>::max()) {
-        throw std::overflow_error("Overflow in scalars_to_vector()");
+    if (vector_size == 1u) {
+        return scalars[0];
     }
-    auto vector_t = llvm::VectorType::get(scalar_t, static_cast<unsigned>(vector_size));
+
+    // Fetch the scalar type.
+    auto scalar_t = scalars[0]->getType();
+
+    // Create the corresponding vector type.
+    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
@@ -154,7 +166,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
 
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
-llvm::Value *llvm_pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
+llvm::Value *pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
 {
     assert(!sum.empty());
 
@@ -203,6 +215,13 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
         throw std::invalid_argument("The intrinsic '" + name + "' must be only declared, not defined");
     }
 
+    // Check the number of arguments.
+    if (callee_f->arg_size() != args.size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed while calling the intrinsic '" + name
+                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(args.size()) + " were provided instead");
+    }
+
     // Create the function call.
     auto r = s.builder().CreateCall(callee_f, args);
     assert(r != nullptr);
@@ -210,6 +229,7 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     return r;
 }
 
+// Helper to invoke an external function called 'name' with arguments args and return type ret_type.
 llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
                                   const std::vector<llvm::Value *> &args,
                                   const std::vector<llvm::Attribute::AttrKind> &attrs)
@@ -241,6 +261,14 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
                 "Cannot call the function '" + name
                 + "' as an external function, because it is defined as an internal module function");
         }
+        // Check the number of arguments.
+        if (callee_f->arg_size() != args.size()) {
+            throw std::invalid_argument("Incorrect # of arguments passed while calling the external function '" + name
+                                        + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                        + std::to_string(args.size()) + " were provided instead");
+        }
+        // NOTE: perhaps in the future we should consider adding more checks here
+        // (e.g., argument types, return type).
     }
 
     // Create the function call.
@@ -255,10 +283,39 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
     return r;
 }
 
-#if defined(__clang__)
+// Helper to invoke an internal module function called 'name' with arguments 'args'.
+llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const std::vector<llvm::Value *> &args)
+{
+    auto callee_f = s.module().getFunction(name);
 
-#pragma clang diagnostic pop
+    if (callee_f == nullptr) {
+        throw std::invalid_argument("Unknown internal function: '" + name + "'");
+    }
 
-#endif
+    if (callee_f->isDeclaration()) {
+        throw std::invalid_argument("The internal function '" + name
+                                    + "' cannot be just a declaration, a definition is needed");
+    }
+
+    // Check the number of arguments.
+    if (callee_f->arg_size() != args.size()) {
+        throw std::invalid_argument("Incorrect # of arguments passed while calling the internal function '" + name
+                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
+                                    + std::to_string(args.size()) + " were provided instead");
+    }
+    // NOTE: perhaps in the future we should consider adding more checks here
+    // (e.g., argument types).
+
+    // Create the function call.
+    auto r = s.builder().CreateCall(callee_f, args);
+    assert(r != nullptr);
+    // NOTE: we used to have r->setTailCall(true) here, but:
+    // - when optimising, the tail call attribute is automatically
+    //   added,
+    // - it is not 100% clear to me whether it is always safe to enable it:
+    // https://llvm.org/docs/CodeGenerator.html#tail-calls
+
+    return r;
+}
 
 } // namespace heyoka::detail

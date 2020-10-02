@@ -87,7 +87,7 @@ T tbp_energy(const std::vector<T> &st)
 
 TEST_CASE("two body")
 {
-    auto tester = [](auto fp_x, unsigned opt_level) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
         using std::abs;
         using std::cos;
 
@@ -111,7 +111,8 @@ TEST_CASE("two body")
         taylor_adaptive<fp_t> tad{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                   std::move(init_state),
-                                  kw::opt_level = opt_level};
+                                  kw::opt_level = opt_level,
+                                  kw::high_accuracy = high_accuracy};
 
         const auto &st = tad.get_state();
 
@@ -142,10 +143,12 @@ TEST_CASE("two body")
         }
     };
 
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 0); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 1); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 2); });
-    tuple_for_each(fp_types, [&tester](auto x) { tester(x, 3); });
+    for (auto ha : {true, false}) {
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 0, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 1, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 2, ha); });
+        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 3, ha); });
+    }
 }
 
 // Energy of two uniform overlapping spheres.

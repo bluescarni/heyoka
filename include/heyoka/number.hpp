@@ -32,7 +32,6 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/tfp.hpp>
 
 namespace heyoka
 {
@@ -132,55 +131,29 @@ inline llvm::Value *codegen(llvm_state &s, const number &n)
 
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t,
-                                                     std::uint32_t, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t,
-                                                      std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                 std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_ldbl(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_init_batch_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t,
-                                                      std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_f128(llvm_state &, const number &, const std::vector<llvm::Value *> &,
+                                                  std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Value *taylor_init_batch(llvm_state &s, const number &n, llvm::Value *arr, std::uint32_t batch_idx,
-                                      std::uint32_t batch_size, std::uint32_t vector_size)
+inline llvm::Value *taylor_u_init(llvm_state &s, const number &num, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_init_batch_dbl(s, n, arr, batch_idx, batch_size, vector_size);
+        return taylor_u_init_dbl(s, num, arr, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_init_batch_ldbl(s, n, arr, batch_idx, batch_size, vector_size);
+        return taylor_u_init_ldbl(s, num, arr, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_init_batch_f128(s, n, arr, batch_idx, batch_size, vector_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_dbl(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_ldbl(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC tfp taylor_u_init_f128(llvm_state &, const number &, const std::vector<tfp> &, std::uint32_t, bool);
-
-#endif
-
-template <typename T>
-inline tfp taylor_u_init(llvm_state &s, const number &num, const std::vector<tfp> &arr, std::uint32_t batch_size,
-                         bool high_accuracy)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_u_init_dbl(s, num, arr, batch_size, high_accuracy);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_u_init_ldbl(s, num, arr, batch_size, high_accuracy);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_u_init_f128(s, num, arr, batch_size, high_accuracy);
+        return taylor_u_init_f128(s, num, arr, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");

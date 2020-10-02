@@ -86,7 +86,8 @@ TEST_CASE("three body")
                                   // Jupiter.
                                   fp_t{j_x[0]}, fp_t{j_x[1]}, fp_t{j_x[2]}, fp_t{j_v[0]}, fp_t{j_v[1]}, fp_t{j_v[2]},
                                   // Saturn.
-                                  fp_t{s_x[0]}, fp_t{s_x[1]}, fp_t{s_x[2]}, fp_t{s_v[0]}, fp_t{s_v[1]}, fp_t{s_v[2]}}};
+                                  fp_t{s_x[0]}, fp_t{s_x[1]}, fp_t{s_x[2]}, fp_t{s_v[0]}, fp_t{s_v[1]}, fp_t{s_v[2]}},
+                                 kw::high_accuracy = true};
 
         ta.propagate_for(fp_t{100} * 365 * 86400);
         ta.propagate_for(-fp_t{100} * 365 * 86400);

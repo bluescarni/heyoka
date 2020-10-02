@@ -6,17 +6,26 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <initializer_list>
+#include <ios>
+#include <iostream>
 #include <limits>
-#include <ostream>
+#include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <boost/program_options.hpp>
 
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xadapt.hpp>
@@ -24,46 +33,72 @@
 #include <xtensor/xio.hpp>
 #include <xtensor/xview.hpp>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "benchmark_utils.hpp"
 
 template <typename T>
-void run_integration()
+void run_integration(const std::string &filename, T t_final, double perturb)
 {
     using std::abs;
     using std::log10;
     using std::pow;
+
     using namespace heyoka;
     using namespace heyoka_benchmark;
 
-    auto masses = std::vector<T>{1.00000597682, 1. / 1047.355, 1. / 3501.6, 1. / 22869., 1. / 19314., 7.4074074e-09};
+    auto masses
+        = std::vector{T(1.00000597682), T(1) / 1047.355, T(1) / 3501.6, T(1) / 22869., T(1) / 19314., T(7.4074074e-09)};
 
     const auto G = T(0.01720209895) * T(0.01720209895);
 
     auto sys = make_nbody_sys(6, kw::masses = masses, kw::Gconst = G);
 
-    taylor_adaptive<T> ta{std::move(sys),
-                          std::vector<T>{// Sun.
-                                         -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6,
-                                         +6.69048890636161e-6, -6.33922479583593e-6, -3.13202145590767e-9,
-                                         // Jupiter.
-                                         +3.40546614227466e+0, +3.62978190075864e+0, +3.42386261766577e-2,
-                                         -5.59797969310664e-3, +5.51815399480116e-3, -2.66711392865591e-6,
-                                         // Saturn.
-                                         +6.60801554403466e+0, +6.38084674585064e+0, -1.36145963724542e-1,
-                                         -4.17354020307064e-3, +3.99723751748116e-3, +1.67206320571441e-5,
-                                         // Uranus.
-                                         +1.11636331405597e+1, +1.60373479057256e+1, +3.61783279369958e-1,
-                                         -3.25884806151064e-3, +2.06438412905916e-3, -2.17699042180559e-5,
-                                         // Neptune.
-                                         -3.01777243405203e+1, +1.91155314998064e+0, -1.53887595621042e-1,
-                                         -2.17471785045538e-4, -3.11361111025884e-3, +3.58344705491441e-5,
-                                         // Pluto.
-                                         -2.13858977531573e+1, +3.20719104739886e+1, +2.49245689556096e+0,
-                                         -1.76936577252484e-3, -2.06720938381724e-3, +6.58091931493844e-4},
-                          kw::high_accuracy = true};
+    auto ic = {// Sun.
+               -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6, +6.69048890636161e-6,
+               -6.33922479583593e-6, -3.13202145590767e-9,
+               // Jupiter.
+               +3.40546614227466e+0, +3.62978190075864e+0, +3.42386261766577e-2, -5.59797969310664e-3,
+               +5.51815399480116e-3, -2.66711392865591e-6,
+               // Saturn.
+               +6.60801554403466e+0, +6.38084674585064e+0, -1.36145963724542e-1, -4.17354020307064e-3,
+               +3.99723751748116e-3, +1.67206320571441e-5,
+               // Uranus.
+               +1.11636331405597e+1, +1.60373479057256e+1, +3.61783279369958e-1, -3.25884806151064e-3,
+               +2.06438412905916e-3, -2.17699042180559e-5,
+               // Neptune.
+               -3.01777243405203e+1, +1.91155314998064e+0, -1.53887595621042e-1, -2.17471785045538e-4,
+               -3.11361111025884e-3, +3.58344705491441e-5,
+               // Pluto.
+               -2.13858977531573e+1, +3.20719104739886e+1, +2.49245689556096e+0, -1.76936577252484e-3,
+               -2.06720938381724e-3, +6.58091931493844e-4};
+
+    auto init_state = std::vector<T>(ic.begin(), ic.end());
+
+    // Perturb the initial state.
+    std::mt19937 rng;
+    rng.seed(static_cast<std::mt19937::result_type>(std::random_device()()));
+    std::uniform_real_distribution<double> rdist(-1., 1.);
+    for (auto &x : init_state) {
+        x += abs(x) * (rdist(rng) * perturb);
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = true};
+
+    auto elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Construction time: " << elapsed << "ms\n";
 
     // Create xtensor views on the the state and mass vectors
     // for ease of indexing.
@@ -92,23 +127,32 @@ void run_integration()
 
     // Helper to compute the total energy in the system.
     auto get_energy = [&s_array, &m_array, G]() {
-        // Kinetic energy.
-        T kin = 0;
-        for (auto i = 0u; i < 6u; ++i) {
-            const auto v = xt::view(s_array, i, xt::range(3, 6));
+        using std::sqrt;
 
-            kin += T{1} / 2 * m_array[i] * xt::linalg::dot(v, v)[0];
+        // Kinetic energy.
+        T kin(0);
+        for (auto i = 0u; i < 6u; ++i) {
+            auto vx = xt::view(s_array, i, 3)[0];
+            auto vy = xt::view(s_array, i, 4)[0];
+            auto vz = xt::view(s_array, i, 5)[0];
+
+            kin += T{1} / 2 * m_array[i] * (vx * vx + vy * vy + vz * vz);
         }
 
         // Potential energy.
-        T pot = 0;
+        T pot(0);
         for (auto i = 0u; i < 6u; ++i) {
-            const auto ri = xt::view(s_array, i, xt::range(0, 3));
+            auto xi = xt::view(s_array, i, 0)[0];
+            auto yi = xt::view(s_array, i, 1)[0];
+            auto zi = xt::view(s_array, i, 2)[0];
 
             for (auto j = i + 1u; j < 6u; ++j) {
-                const auto rj = xt::view(s_array, j, xt::range(0, 3));
+                auto xj = xt::view(s_array, j, 0)[0];
+                auto yj = xt::view(s_array, j, 1)[0];
+                auto zj = xt::view(s_array, j, 2)[0];
 
-                pot -= G * m_array[i] * m_array[j] / xt::linalg::norm(ri - rj);
+                pot -= G * m_array[i] * m_array[j]
+                       / sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
             }
         }
 
@@ -145,7 +189,7 @@ void run_integration()
     std::cout << "Initial energy: " << init_energy << '\n';
 
     // Base-10 logs of the initial and final saving times.
-    const auto start_time = T(0), final_time = log10(T(1E8 * 365));
+    const auto start_time = T(0), final_time = log10(T(t_final * 365));
     // Number of snapshots to take.
     const auto n_snaps = 50000u;
     // Build the vector of log10 saving times.
@@ -158,33 +202,48 @@ void run_integration()
         t = pow(T(10), t);
     }
 
-    std::ofstream of("outer_ss_long_term.txt");
-    of.precision(std::numeric_limits<T>::max_digits10);
+    std::optional<std::ofstream> of;
+    if (!filename.empty()) {
+        of.emplace(filename, std::ios_base::out | std::ios_base::trunc);
+        of->precision(std::numeric_limits<T>::max_digits10);
+    }
     auto it = save_times.begin();
+
+    start = std::chrono::high_resolution_clock::now();
+
     while (ta.get_time() < pow(T(10), final_time)) {
-        if (it != save_times.end() && ta.get_time() >= *it) {
+        if (of && it != save_times.end() && ta.get_time() >= *it) {
             // We are at or past the current saving time, record
             // the time, energy error and orbital elements.
-            of << ta.get_time() << " " << abs((init_energy - get_energy()) / init_energy) << " ";
+            *of << ta.get_time() << " " << abs((init_energy - get_energy()) / init_energy) << " ";
 
             // Store the state.
             for (auto val : s_array) {
-                of << val << " ";
+                *of << val << " ";
             }
 
-            // Store the orbital elements wrt the Sun.
-            for (auto i = 1u; i < 6u; ++i) {
-                auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
-                auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
+#if defined(HEYOKA_HAVE_REAL128)
+            // NOTE: don't try to save the orbital elements
+            // if real128 is being used, as the xt linalg functions
+            // don't work on real128.
+            if constexpr (!std::is_same_v<T, mppp::real128>) {
+#endif
+                // Store the orbital elements wrt the Sun.
+                for (auto i = 1u; i < 6u; ++i) {
+                    auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
+                    auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
 
-                auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+                    auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
 
-                for (auto oe : kep) {
-                    of << oe << " ";
+                    for (auto oe : kep) {
+                        *of << oe << " ";
+                    }
                 }
+#if defined(HEYOKA_HAVE_REAL128)
             }
+#endif
 
-            of << std::endl;
+            *of << std::endl;
 
             // Locate the next saving time (that is, the first saving
             // time which is greater than the current time).
@@ -195,9 +254,62 @@ void run_integration()
             throw std::runtime_error("Error status detected: " + std::to_string(static_cast<int>(res)));
         }
     }
+
+    elapsed = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+            .count());
+
+    std::cout << "Integration time: " << elapsed << "ms\n";
 }
 
 int main(int argc, char *argv[])
 {
-    run_integration<double>();
+    namespace po = boost::program_options;
+
+    std::string fp_type, filename;
+    double final_time, perturb;
+
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")(
+        "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
+        "filename", po::value<std::string>(&filename)->default_value(""),
+        "name of the file into which the simulation data will be saved (if empty, no data will be saved)")(
+        "final_time", po::value<double>(&final_time)->default_value(1E6),
+        "simulation end time (in years)")("perturb", po::value<double>(&perturb)->default_value(0.),
+                                          "magnitude of the perturbation on the initial state");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
+        return 0;
+    }
+
+    // Validate the command-line arguments.
+    if (!std::isfinite(final_time) || final_time <= 0) {
+        throw std::invalid_argument("The final time must be finite and positive, but it is "
+                                    + std::to_string(final_time) + " instead");
+    }
+
+    if (!std::isfinite(perturb) || perturb < 0) {
+        throw std::invalid_argument("The perturbation parameter must be finite and non-negative, but it is "
+                                    + std::to_string(perturb) + " instead");
+    }
+
+    if (fp_type == "double") {
+        run_integration<double>(filename, final_time, perturb);
+    } else if (fp_type == "long double") {
+        run_integration<long double>(filename, final_time, perturb);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if (fp_type == "real128") {
+        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb);
+#endif
+    } else {
+        throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
+    }
+
+    return 0;
 }

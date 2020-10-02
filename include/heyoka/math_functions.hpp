@@ -20,6 +20,7 @@ HEYOKA_DLL_PUBLIC expression cos(expression);
 HEYOKA_DLL_PUBLIC expression log(expression);
 HEYOKA_DLL_PUBLIC expression exp(expression);
 HEYOKA_DLL_PUBLIC expression pow(expression, expression);
+HEYOKA_DLL_PUBLIC expression sqrt(expression);
 
 } // namespace heyoka
 

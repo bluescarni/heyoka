@@ -32,8 +32,6 @@ option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
-option(HEYOKA_WITH_XTENSOR "Build tests/benchmarks depending on xtensor." OFF)
-mark_as_advanced(HEYOKA_WITH_XTENSOR)
 
 # NOTE: on Unix systems, the correct library installation path
 # could be something other than just "lib", such as "lib64",
@@ -148,7 +146,6 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/tfp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
@@ -203,7 +200,7 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
 endif()
 
 # Mandatory dependency on Boost.
-find_package(Boost REQUIRED)
+find_package(Boost 1.60 REQUIRED)
 
 # Optional dependency on mp++.
 if(HEYOKA_WITH_MPPP)
