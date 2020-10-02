@@ -40,14 +40,14 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
     const auto batch_size = 23u;
 
     llvm_state s{kw::opt_level = opt_level};
 
-    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy);
-    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy);
+    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
+    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
 
     s.compile();
 
@@ -80,7 +80,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
 TEST_CASE("taylor const sys")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
         auto [x, y, z] = make_vars("x", "y", "z");
@@ -91,7 +91,7 @@ TEST_CASE("taylor const sys")
             taylor_add_jet<fp_t>(s, "jet",
                                  {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                   prime(z) = expression{number{fp_t{0}}}},
-                                 1, 1, high_accuracy);
+                                 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -116,7 +116,7 @@ TEST_CASE("taylor const sys")
             taylor_add_jet<fp_t>(s, "jet",
                                  {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                   prime(z) = expression{number{fp_t{0}}}},
-                                 1, 2, high_accuracy);
+                                 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -152,7 +152,7 @@ TEST_CASE("taylor const sys")
             taylor_add_jet<fp_t>(s, "jet",
                                  {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                   prime(z) = expression{number{fp_t{0}}}},
-                                 2, 1, high_accuracy);
+                                 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -180,7 +180,7 @@ TEST_CASE("taylor const sys")
             taylor_add_jet<fp_t>(s, "jet",
                                  {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                   prime(z) = expression{number{fp_t{0}}}},
-                                 2, 2, high_accuracy);
+                                 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -225,7 +225,7 @@ TEST_CASE("taylor const sys")
             taylor_add_jet<fp_t>(s, "jet",
                                  {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                   prime(z) = expression{number{fp_t{0}}}},
-                                 3, 3, high_accuracy);
+                                 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -268,13 +268,15 @@ TEST_CASE("taylor const sys")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
                                     prime(z) = expression{number{fp_t{0}}}},
-                                   opt_level, high_accuracy);
+                                   opt_level, high_accuracy, compact_mode);
     };
 
-    for (auto ha : {true, false}) {
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 0, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 1, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 2, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 3, ha); });
+    for (auto cm : {true, false}) {
+        for (auto ha : {true, false}) {
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 0, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 1, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 2, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 3, ha, cm); });
+        }
     }
 }

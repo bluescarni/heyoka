@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     auto dc = taylor_add_jet<double>(s, "jet",
                                      {x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
                                       -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
-                                     order, batch_size, false);
+                                     order, batch_size, false, false);
 
     // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("tjb.o");

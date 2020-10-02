@@ -1145,7 +1145,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
-                         bool high_accuracy)
+                         bool high_accuracy, bool)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -1246,48 +1246,55 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 } // namespace detail
 
 std::vector<expression> taylor_add_jet_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+                                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                           bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 }
 
 std::vector<expression> taylor_add_jet_ldbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+                                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                            bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                    compact_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<expression> taylor_add_jet_f128(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+                                            std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                            bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                      compact_mode);
 }
 
 #endif
 
 std::vector<expression> taylor_add_jet_dbl(llvm_state &s, const std::string &name,
                                            std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
-                                           std::uint32_t batch_size, bool high_accuracy)
+                                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 }
 
 std::vector<expression> taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
                                             std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
-                                            std::uint32_t batch_size, bool high_accuracy)
+                                            std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                    compact_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<expression> taylor_add_jet_f128(llvm_state &s, const std::string &name,
                                             std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
-                                            std::uint32_t batch_size, bool high_accuracy)
+                                            std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy);
+    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                      compact_mode);
 }
 
 #endif

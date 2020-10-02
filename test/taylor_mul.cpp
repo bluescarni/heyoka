@@ -41,14 +41,14 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
     const auto batch_size = 23u;
 
     llvm_state s{kw::opt_level = opt_level};
 
-    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy);
-    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy);
+    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
+    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
 
     s.compile();
 
@@ -81,7 +81,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
 TEST_CASE("taylor mul")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
         using Catch::Matchers::Message;
@@ -94,7 +94,7 @@ TEST_CASE("taylor mul")
 
             taylor_add_jet<fp_t>(s, "jet",
                                  {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy);
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -116,7 +116,7 @@ TEST_CASE("taylor mul")
 
             taylor_add_jet<fp_t>(s, "jet",
                                  {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 1, 2,
-                                 high_accuracy);
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -142,7 +142,7 @@ TEST_CASE("taylor mul")
 
             taylor_add_jet<fp_t>(s, "jet",
                                  {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 1,
-                                 high_accuracy);
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -166,7 +166,7 @@ TEST_CASE("taylor mul")
 
             taylor_add_jet<fp_t>(s, "jet",
                                  {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 2, 2,
-                                 high_accuracy);
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -196,7 +196,7 @@ TEST_CASE("taylor mul")
 
             taylor_add_jet<fp_t>(s, "jet",
                                  {expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y}, 3, 3,
-                                 high_accuracy);
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -235,13 +235,13 @@ TEST_CASE("taylor mul")
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}}, x + y},
-                                   opt_level, high_accuracy);
+                                   opt_level, high_accuracy, compact_mode);
 
         // Variable-number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -261,7 +261,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -288,7 +288,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -310,7 +310,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -338,7 +338,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {y * 2_dbl, x * -4_dbl}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -382,13 +382,13 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
         }
 
-        compare_batch_scalar<fp_t>({y * 2_dbl, x * -4_dbl}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({y * 2_dbl, x * -4_dbl}, opt_level, high_accuracy, compact_mode);
 
         // Number/variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -408,7 +408,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -435,7 +435,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -457,7 +457,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -485,7 +485,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {2_dbl * y, -4_dbl * x}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -529,13 +529,13 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(-1 / fp_t{6} * 8 * jet[14]));
         }
 
-        compare_batch_scalar<fp_t>({2_dbl * y, -4_dbl * x}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({2_dbl * y, -4_dbl * x}, opt_level, high_accuracy, compact_mode);
 
         // Variable/variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -555,7 +555,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -582,7 +582,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -604,7 +604,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -637,7 +637,7 @@ TEST_CASE("taylor mul")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {x * y, y * x}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -683,13 +683,15 @@ TEST_CASE("taylor mul")
             REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[14] * 6 + 2 * jet[8] * jet[11] + 2 * 3 * jet[17])));
         }
 
-        compare_batch_scalar<fp_t>({x * y, y * x}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({x * y, y * x}, opt_level, high_accuracy, compact_mode);
     };
 
-    for (auto f : {false, true}) {
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 0, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 1, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 2, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 3, f); });
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
     }
 }
