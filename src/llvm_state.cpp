@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <ios>
@@ -31,6 +30,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/Triple.h>
@@ -517,7 +518,7 @@ void llvm_state::compile()
     // Store also the object code, if requested.
     if (m_save_object_code) {
         // Create a name model for the llvm temporary file machinery.
-        const auto model = (std::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
+        const auto model = (boost::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
 
         // Create a unique file.
         // NOTE: this will also open the file. fd is the file
@@ -538,7 +539,7 @@ void llvm_state::compile()
 
             ~file_remover()
             {
-                std::filesystem::remove(std::filesystem::path{path.c_str()});
+                boost::filesystem::remove(boost::filesystem::path{path.c_str()});
             }
         } fr{res_path};
 
@@ -1044,7 +1045,7 @@ void llvm_state::dump_object_code(const std::string &filename) const
         if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
             // Close and remove the file before throwing.
             dest.close();
-            std::filesystem::remove(std::filesystem::path{filename});
+            boost::filesystem::remove(boost::filesystem::path{filename});
 
             throw std::invalid_argument("The target machine can't emit a file of this type");
         }

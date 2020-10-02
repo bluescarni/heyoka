@@ -200,7 +200,7 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
 endif()
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED)
+find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
 
 # Optional dependency on mp++.
 if(HEYOKA_WITH_MPPP)
@@ -214,7 +214,7 @@ endif()
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
 target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
-target_link_libraries(heyoka PRIVATE Boost::boost)
+target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
