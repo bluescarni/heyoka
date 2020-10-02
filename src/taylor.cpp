@@ -1168,14 +1168,14 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     }
 
     // Record the number of equations/variables.
-    const auto n_eq = sys.size();
+    const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
     auto dc = taylor_decompose(std::move(sys));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
-    const auto n_uvars = dc.size() - n_eq;
+    const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
     // Prepare the function prototype. The only argument is a float pointer to in/out array.
     std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(to_llvm_type<T>(s.context()))};
@@ -1200,11 +1200,10 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.builder().SetInsertPoint(bb);
 
     // Load the order zero derivatives from the input pointer.
-    auto order0_arr = taylor_load_values<T>(s, in_out, boost::numeric_cast<std::uint32_t>(n_eq), batch_size);
+    auto order0_arr = taylor_load_values<T>(s, in_out, n_eq, batch_size);
 
     // Compute the jet of derivatives.
-    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, boost::numeric_cast<std::uint32_t>(n_eq),
-                                          boost::numeric_cast<std::uint32_t>(n_uvars), order, batch_size);
+    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array (size n_eq * (order + 1) * batch_size)
