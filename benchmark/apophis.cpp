@@ -146,7 +146,7 @@ int main()
     return 0;
 #else
 
-    std::cout << "The mppp::real128 is not available, the benchmark will not be run.\n";
+    std::cout << "The mppp::real128 type is not available, the benchmark will not be run.\n";
 
     return 0;
 #endif
