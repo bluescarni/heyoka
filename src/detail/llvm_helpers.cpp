@@ -391,4 +391,15 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     cur->addIncoming(next, loop_end_bb);
 }
 
+// Given an input pointer value, return the
+// pointed-to type.
+llvm::Type *pointee_type(llvm::Value *ptr)
+{
+    if (auto ptr_t = llvm::dyn_cast<llvm::PointerType>(ptr->getType())) {
+        return ptr_t->getElementType();
+    } else {
+        throw std::invalid_argument("Cannot get the pointee type of a non-pointer value");
+    }
+}
+
 } // namespace heyoka::detail

@@ -105,6 +105,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_internal(llvm_state &, const std::str
 HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
                                      const std::function<void(llvm::Value *)> &);
 
+HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
+
 } // namespace heyoka::detail
 
 #endif

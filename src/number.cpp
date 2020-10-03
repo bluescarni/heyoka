@@ -341,4 +341,41 @@ llvm::Value *taylor_u_init_f128(llvm_state &s, const number &n, const std::vecto
 
 #endif
 
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: for numbers, the Taylor compact init phase is
+// just the codegen.
+template <typename T>
+llvm::Value *taylor_c_u_init_number_impl(llvm_state &s, const number &n, llvm::Value *, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, n), batch_size);
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *taylor_c_u_init_dbl(llvm_state &s, const number &n, llvm::Value *diff_arr, std::uint32_t batch_size)
+{
+    return detail::taylor_c_u_init_number_impl<double>(s, n, diff_arr, batch_size);
+}
+
+llvm::Value *taylor_c_u_init_ldbl(llvm_state &s, const number &n, llvm::Value *diff_arr, std::uint32_t batch_size)
+{
+    return detail::taylor_c_u_init_number_impl<long double>(s, n, diff_arr, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_c_u_init_f128(llvm_state &s, const number &n, llvm::Value *diff_arr, std::uint32_t batch_size)
+{
+    return detail::taylor_c_u_init_number_impl<mppp::real128>(s, n, diff_arr, batch_size);
+}
+
+#endif
+
 } // namespace heyoka

@@ -566,4 +566,74 @@ llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::ve
 
 #endif
 
+llvm::Value *taylor_c_u_init_dbl(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_c_u_init_dbl(s, arg, arr, batch_size); }, e.value());
+}
+
+llvm::Value *taylor_c_u_init_ldbl(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_c_u_init_ldbl(s, arg, arr, batch_size); }, e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_c_u_init_f128(llvm_state &s, const expression &e, llvm::Value *arr, std::uint32_t batch_size)
+{
+    return std::visit([&](const auto &arg) { return taylor_c_u_init_f128(s, arg, arr, batch_size); }, e.value());
+}
+
+#endif
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_c_diff_impl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
+                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return std::visit(
+        [&](const auto &v) -> llvm::Value * {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+                return taylor_c_diff<T>(s, v, arr, n_uvars, order, idx, batch_size);
+            } else {
+                throw std::invalid_argument(
+                    "Taylor derivatives in compact mode can be computed only for binary operators or functions");
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *taylor_c_diff_dbl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+
+{
+    return detail::taylor_c_diff_impl<double>(s, ex, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *taylor_c_diff_ldbl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
+                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return detail::taylor_c_diff_impl<long double>(s, ex, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_c_diff_f128(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
+                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return detail::taylor_c_diff_impl<mppp::real128>(s, ex, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
+
 } // namespace heyoka

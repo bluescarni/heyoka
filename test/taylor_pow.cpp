@@ -449,21 +449,25 @@ TEST_CASE("taylor pow")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            REQUIRE_THROWS_MATCHES(
-                taylor_add_jet<fp_t>(s, "jet", {pow(1_dbl, x)}, 3, 3, high_accuracy, compact_mode),
-                std::invalid_argument,
-                Message(
-                    "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+            REQUIRE_THROWS_MATCHES(taylor_add_jet<fp_t>(s, "jet", {pow(1_dbl, x)}, 3, 3, high_accuracy, compact_mode),
+                                   std::invalid_argument,
+                                   Message(compact_mode
+                                               ? "An invalid argument type was encountered while trying to build the "
+                                                 "Taylor derivative of a pow() in compact mode"
+                                               : "An invalid argument type was encountered while trying to build the "
+                                                 "Taylor derivative of a pow()"));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            REQUIRE_THROWS_MATCHES(
-                taylor_add_jet<fp_t>(s, "jet", {y, pow(y, x)}, 3, 3, high_accuracy, compact_mode),
-                std::invalid_argument,
-                Message(
-                    "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()"));
+            REQUIRE_THROWS_MATCHES(taylor_add_jet<fp_t>(s, "jet", {y, pow(y, x)}, 3, 3, high_accuracy, compact_mode),
+                                   std::invalid_argument,
+                                   Message(compact_mode
+                                               ? "An invalid argument type was encountered while trying to build the "
+                                                 "Taylor derivative of a pow() in compact mode"
+                                               : "An invalid argument type was encountered while trying to build the "
+                                                 "Taylor derivative of a pow()"));
         }
     };
 
