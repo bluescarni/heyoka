@@ -87,7 +87,7 @@ T tbp_energy(const std::vector<T> &st)
 
 TEST_CASE("two body")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using std::abs;
         using std::cos;
 
@@ -112,7 +112,8 @@ TEST_CASE("two body")
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                   std::move(init_state),
                                   kw::opt_level = opt_level,
-                                  kw::high_accuracy = high_accuracy};
+                                  kw::high_accuracy = high_accuracy,
+                                  kw::compact_mode = compact_mode};
 
         const auto &st = tad.get_state();
 
@@ -143,11 +144,13 @@ TEST_CASE("two body")
         }
     };
 
-    for (auto ha : {true, false}) {
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 0, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 1, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 2, ha); });
-        tuple_for_each(fp_types, [&tester, ha](auto x) { tester(x, 3, ha); });
+    for (auto cm : {true, false}) {
+        for (auto ha : {true, false}) {
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 0, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 1, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 2, ha, cm); });
+            tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 3, ha, cm); });
+        }
     }
 }
 

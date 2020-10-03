@@ -465,7 +465,8 @@ namespace detail
 
 template <typename T>
 template <typename U>
-void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy)
+void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
+                                                 bool compact_mode)
 {
     // Assign the data members.
     m_state = std::move(state);
@@ -496,7 +497,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
 
     // Add the stepper function.
-    m_dc = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy);
+    m_dc = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
 
     // Run the jit.
     m_llvm.compile();
@@ -721,25 +722,25 @@ const std::vector<expression> &taylor_adaptive_impl<T>::get_decomposition() cons
 // Explicit instantiation of the implementation classes/functions.
 template class taylor_adaptive_impl<double>;
 template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, double,
-                                                               double, bool);
+                                                               double, bool, bool);
 template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                               std::vector<double>, double, double, bool);
+                                                               std::vector<double>, double, double, bool, bool);
 template class taylor_adaptive_impl<long double>;
 template void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
-                                                                    long double, long double, bool);
+                                                                    long double, long double, bool, bool);
 template void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                                     std::vector<long double>, long double, long double,
-                                                                    bool);
+                                                                    bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
 template void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
                                                                       std::vector<mppp::real128>, mppp::real128,
-                                                                      mppp::real128, bool);
+                                                                      mppp::real128, bool, bool);
 template void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                                       std::vector<mppp::real128>, mppp::real128,
-                                                                      mppp::real128, bool);
+                                                                      mppp::real128, bool, bool);
 
 #endif
 
@@ -751,7 +752,8 @@ namespace detail
 template <typename T>
 template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> states, std::uint32_t batch_size,
-                                                       std::vector<T> times, T tol, bool high_accuracy)
+                                                       std::vector<T> times, T tol, bool high_accuracy,
+                                                       bool compact_mode)
 {
     // Init the data members.
     m_batch_size = batch_size;
@@ -801,7 +803,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     }
 
     // Add the stepper function.
-    m_dc = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy);
+    m_dc = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
 
     // Run the jit.
     m_llvm.compile();
@@ -964,19 +966,21 @@ const std::vector<expression> &taylor_adaptive_batch_impl<T>::get_decomposition(
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch_impl<double>;
 template void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>,
-                                                                     std::uint32_t, std::vector<double>, double, bool);
+                                                                     std::uint32_t, std::vector<double>, double, bool,
+                                                                     bool);
 template void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                                      std::vector<double>, std::uint32_t,
-                                                                     std::vector<double>, double, bool);
+                                                                     std::vector<double>, double, bool, bool);
 
 template class taylor_adaptive_batch_impl<long double>;
 template void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>,
                                                                           std::vector<long double>, std::uint32_t,
-                                                                          std::vector<long double>, long double, bool);
+                                                                          std::vector<long double>, long double, bool,
+                                                                          bool);
 template void
 taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                             std::vector<long double>, std::uint32_t,
-                                                            std::vector<long double>, long double, bool);
+                                                            std::vector<long double>, long double, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -984,11 +988,11 @@ template class taylor_adaptive_batch_impl<mppp::real128>;
 template void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
                                                                             std::vector<mppp::real128>, std::uint32_t,
                                                                             std::vector<mppp::real128>, mppp::real128,
-                                                                            bool);
+                                                                            bool, bool);
 template void
 taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                               std::vector<mppp::real128>, std::uint32_t,
-                                                              std::vector<mppp::real128>, mppp::real128, bool);
+                                                              std::vector<mppp::real128>, mppp::real128, bool, bool);
 
 #endif
 
@@ -1692,7 +1696,7 @@ std::vector<llvm::Value *> taylor_run_ceval(llvm_state &s, const std::vector<std
 
 template <typename T, typename U>
 auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
-                                   bool high_accuracy)
+                                   bool high_accuracy, bool compact_mode)
 {
     using std::ceil;
     using std::exp;
@@ -1789,8 +1793,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Compute the jet of derivatives at the given order.
-    // TODO fix false.
-    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, false);
+    auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, compact_mode);
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
@@ -1881,52 +1884,58 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
 std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &s, const std::string &name,
                                                      std::vector<expression> sys, double tol, std::uint32_t batch_size,
-                                                     bool high_accuracy)
+                                                     bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                         compact_mode);
 }
 
 std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &s, const std::string &name,
                                                       std::vector<expression> sys, long double tol,
-                                                      std::uint32_t batch_size, bool high_accuracy)
+                                                      std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                              compact_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &s, const std::string &name,
                                                       std::vector<expression> sys, mppp::real128 tol,
-                                                      std::uint32_t batch_size, bool high_accuracy)
+                                                      std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size,
-                                                                high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                                compact_mode);
 }
 
 #endif
 
 std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &s, const std::string &name,
                                                      std::vector<std::pair<expression, expression>> sys, double tol,
-                                                     std::uint32_t batch_size, bool high_accuracy)
+                                                     std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                         compact_mode);
 }
 
 std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &s, const std::string &name,
                                                       std::vector<std::pair<expression, expression>> sys,
-                                                      long double tol, std::uint32_t batch_size, bool high_accuracy)
+                                                      long double tol, std::uint32_t batch_size, bool high_accuracy,
+                                                      bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                              compact_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &s, const std::string &name,
                                                       std::vector<std::pair<expression, expression>> sys,
-                                                      mppp::real128 tol, std::uint32_t batch_size, bool high_accuracy)
+                                                      mppp::real128 tol, std::uint32_t batch_size, bool high_accuracy,
+                                                      bool compact_mode)
 {
-    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size,
-                                                                high_accuracy);
+    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size, high_accuracy,
+                                                                compact_mode);
 }
 
 #endif
