@@ -21,12 +21,6 @@
 using namespace std::chrono;
 using namespace heyoka;
 
-template <typename Enumeration>
-auto as_integer(Enumeration const value) -> typename std::underlying_type<Enumeration>::type
-{
-    return static_cast<typename std::underlying_type<Enumeration>::type>(value);
-}
-
 expression sigmoid(const expression &in)
 {
     return 1._dbl / (1._dbl + exp(-in));
@@ -145,7 +139,7 @@ int main()
     //    V = eval_dbl(-out[0] - 1_dbl / pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl), eval_map);
     //    auto E = V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
     //    std::cout << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0 << ", "
-    //              << as_integer(std::get<0>(res)) << ", " << V << ", " << std::endl;
+    //              << static_cast<int>(std::get<0>(res)) << ", " << V << ", " << std::endl;
     //}
 
     neural_network_ode.propagate_until(100.);

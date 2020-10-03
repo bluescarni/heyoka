@@ -6,24 +6,24 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <mp++/real128.hpp>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 using namespace heyoka;
 using namespace std::chrono;
-using namespace mppp::literals;
-
-template <typename Enumeration>
-auto as_integer(Enumeration const value) -> typename std::underlying_type<Enumeration>::type
-{
-    return static_cast<typename std::underlying_type<Enumeration>::type>(value);
-}
 
 template <typename Fp_type>
 void to_screen(const taylor_adaptive<Fp_type> &taylor)
@@ -51,19 +51,18 @@ void to_screen(const taylor_adaptive<Fp_type> &taylor)
 
 int main()
 {
+#if defined(HEYOKA_HAVE_REAL128)
+    using namespace mppp::literals;
+
     // Bodies are Sun, Earth and Apophis.
     const auto masses = std::vector{1.989e30, 5.9722e24, 6.1e10};
     // Position at 2029-Apr-13 21:42:00.0000 in the J2000 frame (solar system barycenter)
     // Earth
-    const auto r_e
-        = std::vector<mppp::real128>{-1.370648479191993E+11_rq, -6.075143207036727E+10_rq, 9.502339686807245E+06_rq};
-    const auto v_e
-        = std::vector<mppp::real128>{1.155023262401610E+04_rq, -2.735128886751287E+04_rq, 1.777171492232554_rq};
+    const auto r_e = std::vector{-1.370648479191993E+11_rq, -6.075143207036727E+10_rq, 9.502339686807245E+06_rq};
+    const auto v_e = std::vector{1.155023262401610E+04_rq, -2.735128886751287E+04_rq, 1.777171492232554_rq};
     // Apophis
-    const auto r_a
-        = std::vector<mppp::real128>{-1.370898394232368E+11_rq, -6.072219715068178E+10_rq, 1.467144922637567E+07_rq};
-    const auto v_a
-        = std::vector<mppp::real128>{1.786753408315841E+04_rq, -2.390511764955029E+04_rq, 1.855718806173850E+03_rq};
+    const auto r_a = std::vector{-1.370898394232368E+11_rq, -6.072219715068178E+10_rq, 1.467144922637567E+07_rq};
+    const auto v_a = std::vector{1.786753408315841E+04_rq, -2.390511764955029E+04_rq, 1.855718806173850E+03_rq};
     // Cavendish constant
     const auto G = 6.6743e-11;
     // The 3-body system we will study
@@ -88,7 +87,7 @@ int main()
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s"
-              << " -> return code -> " << as_integer(std::get<0>(res)) << std::endl;
+              << " -> return code -> " << static_cast<int>(std::get<0>(res)) << std::endl;
     std::cout << "Initial conditions computed:" << std::endl;
     to_screen<mppp::real128>(taylor_q);
     // Forward integration of 100 years
@@ -106,7 +105,7 @@ int main()
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s -> baseline established" << std::endl;
- 
+
     // The Taylor integrator in single precision
     std::cout << "\nConstructing the Taylor integrator in single precision ... " << std::flush;
     std::vector<double> ic_d(18);
@@ -145,4 +144,10 @@ int main()
         std::cout << times_d[i] << ", " << abs(r_d - r_q) << ", " << abs(v_q - v_d) << "," << std::endl;
     }
     return 0;
+#else
+
+    std::cout << "The mppp::real128 is not available, the benchmark will not be run.\n";
+
+    return 0;
+#endif
 }

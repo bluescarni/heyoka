@@ -46,17 +46,6 @@ ADD_HEYOKA_BENCHMARK(taylor_ANN)
 ADD_HEYOKA_BENCHMARK(apophis)
 ADD_HEYOKA_BENCHMARK(stiff_equation)
 ADD_HEYOKA_BENCHMARK(mascon_model)
-
-
-if(HEYOKA_WITH_XTENSOR)
-  function(ADD_HEYOKA_XTENSOR_BENCHMARK arg1)
-    ADD_HEYOKA_BENCHMARK(${arg1})
-    target_link_libraries(${arg1} PRIVATE xtensor xtensor-blas)
-    target_compile_definitions(${arg1} PRIVATE HEYOKA_WITH_XTENSOR PRIVATE XTENSOR_USE_FLENS_BLAS)
-  endfunction()
-
-  ADD_HEYOKA_XTENSOR_BENCHMARK(outer_ss_long_term)
-endif()
 ADD_HEYOKA_BENCHMARK(outer_ss_jet_benchmark)
 ADD_HEYOKA_BENCHMARK(outer_ss_long_term)
 ADD_HEYOKA_BENCHMARK(outer_ss_long_term_batch)
