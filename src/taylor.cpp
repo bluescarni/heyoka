@@ -1154,8 +1154,7 @@ llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm:
 // order is the max derivative order desired, batch_size the batch size.
 // order0 contains the zero order derivatives of the state variables.
 //
-// The return value is the jet of derivatives of all u variables up to order 'order - 1',
-// plus the derivatives of order 'order' of the state variables.
+// The return value is the jet of derivatives of the state variables up to order 'order'.
 template <typename T>
 auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const std::vector<expression> &dc,
                         std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
@@ -1165,6 +1164,17 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
     assert(n_eq > 0u);
     assert(order > 0u);
 
+    // Make sure we can represent a size of n_uvars * order + n_eq as a 32-bit
+    // unsigned integer. This is the total number of derivatives we will have to compute
+    // and store.
+    if (n_uvars > std::numeric_limits<std::uint32_t>::max() / order
+        || n_uvars * order > std::numeric_limits<std::uint32_t>::max() - n_eq) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the computation of a jet of Taylor derivatives");
+    }
+
+    std::vector<llvm::Value *> retval;
+
     if (compact_mode) {
         auto &builder = s.builder();
 
@@ -1173,13 +1183,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         // up to order 'order - 1', plus the derivatives of order
         // 'order' of the state variables only.
         // NOTE: the array size is specified as a 64-bit integer in the
-        // LLVM API, but we are interested in not overflowing 32-bit
-        // integers.
-        if (n_uvars > std::numeric_limits<std::uint32_t>::max() / order
-            || n_uvars * order > std::numeric_limits<std::uint32_t>::max() - n_eq) {
-            throw std::overflow_error(
-                "An overflow condition was detected in the computation of a jet of Taylor derivatives");
-        }
+        // LLVM API.
         auto array_type = llvm::ArrayType::get(order0[0]->getType(), n_uvars * order + n_eq);
         // NOTE: fetch a pointer to the first element of the array.
         auto diff_arr = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type, 0, "diff_arr"),
@@ -1221,19 +1225,21 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         }
 
         // Build the return value.
-        std::vector<llvm::Value *> retval;
-        for (std::uint32_t i = 0; i < n_uvars * order + n_eq; ++i) {
-            retval.push_back(builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {builder.getInt32(i)})));
+        for (std::uint32_t o = 0; o < order + 1u; ++o) {
+            for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
+                retval.push_back(
+                    taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(o), builder.getInt32(var_idx)));
+            }
         }
 
         return retval;
     } else {
-        // Init the return value with the order 0 of the state variables.
-        auto retval(std::move(order0));
+        // Init the derivatives array with the order 0 of the state variables.
+        auto diff_arr(std::move(order0));
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            retval.push_back(taylor_u_init<T>(s, dc[i], retval, batch_size));
+            diff_arr.push_back(taylor_u_init<T>(s, dc[i], diff_arr, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -1244,21 +1250,28 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
             // NOTE: the derivatives of the state variables
             // are at the end of the decomposition vector.
             for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-                retval.push_back(taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, cur_order, batch_size));
+                diff_arr.push_back(taylor_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
             }
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                retval.push_back(taylor_diff<T>(s, dc[i], retval, n_uvars, cur_order, i, batch_size));
+                diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, i, batch_size));
             }
         }
 
         // Compute the last-order derivatives for the state variables.
         for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-            retval.push_back(taylor_compute_sv_diff<T>(s, dc[i], retval, n_uvars, order, batch_size));
+            diff_arr.push_back(taylor_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, order, batch_size));
         }
 
-        assert(retval.size() == static_cast<decltype(retval.size())>(n_uvars) * order + n_eq);
+        assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
+
+        // Extract the derivatives of the state variables from diff_arr.
+        for (std::uint32_t o = 0; o < order + 1u; ++o) {
+            for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
+                retval.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
+            }
+        }
 
         return retval;
     }
@@ -1363,15 +1376,15 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     for (decltype(diff_arr.size()) cur_order = 1; cur_order <= order; ++cur_order) {
         for (std::uint32_t j = 0; j < n_eq; ++j) {
             // Index in the jet of derivatives.
-            const auto arr_idx = cur_order * n_uvars + j;
+            const auto arr_idx = cur_order * n_eq + j;
             assert(arr_idx < diff_arr.size());
-            const auto fp_vec = diff_arr[arr_idx];
+            const auto val = diff_arr[arr_idx];
 
             // Index in the output array.
             const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;
             auto out_ptr
                 = s.builder().CreateInBoundsGEP(in_out, {s.builder().getInt32(static_cast<std::uint32_t>(out_idx))});
-            store_vector_to_memory(s.builder(), out_ptr, fp_vec);
+            store_vector_to_memory(s.builder(), out_ptr, val);
         }
     }
 
@@ -1794,15 +1807,16 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Compute the jet of derivatives at the given order.
     auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, compact_mode);
+    using da_size_t = decltype(diff_arr.size());
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
     auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
-        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, taylor_load_derivative(diff_arr, i, order, n_uvars));
+        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[static_cast<da_size_t>(order) * n_eq + i]);
         max_abs_diff_om1
-            = taylor_step_maxabs(s, max_abs_diff_om1, taylor_load_derivative(diff_arr, i, order - 1u, n_uvars));
+            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[static_cast<da_size_t>(order - 1u) * n_eq + i]);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -1846,7 +1860,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
             throw std::overflow_error("Overflow error in an adaptive Taylor stepper: the order is too high");
         }
         for (std::uint32_t o = 0; o <= order; ++o) {
-            cf_vec.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
+            cf_vec.push_back(diff_arr[static_cast<da_size_t>(o) * n_eq + var_idx]);
         }
     }
 
