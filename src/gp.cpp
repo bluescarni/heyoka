@@ -336,7 +336,7 @@ void mutate(expression &e, const expression_generator &generator, const double m
     }
 }
 // Version targeting a node
-void mutate(expression &e, size_t node_id, const expression_generator &generator, const unsigned min_depth,
+void mutate(expression &e, std::size_t node_id, const expression_generator &generator, const unsigned min_depth,
             const unsigned max_depth)
 {
     auto e_sub_ptr = fetch_from_node_id(e, node_id);
@@ -347,9 +347,9 @@ void mutate(expression &e, size_t node_id, const expression_generator &generator
     *e_sub_ptr = generator(min_depth, max_depth);
 }
 
-size_t count_nodes(const expression &e)
+std::size_t count_nodes(const expression &e)
 {
-    size_t node_counter = 0u;
+    std::size_t node_counter = 0u;
     detail::count_nodes_impl(e, node_counter);
     return node_counter;
 }
@@ -379,7 +379,7 @@ void crossover(expression &e1, expression &e2, splitmix64 &engine)
 }
 
 // Crossover targeting specific node_ids
-void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2, splitmix64 &)
+void crossover(expression &e1, expression &e2, std::size_t node_id1, std::size_t node_id2)
 {
     auto e2_sub_ptr = fetch_from_node_id(e1, node_id1);
     auto e1_sub_ptr = fetch_from_node_id(e2, node_id2);

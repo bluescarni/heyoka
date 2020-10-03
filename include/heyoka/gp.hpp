@@ -66,9 +66,9 @@ HEYOKA_DLL_PUBLIC std::size_t count_nodes(const expression &);
 HEYOKA_DLL_PUBLIC expression *fetch_from_node_id(expression &, std::size_t);
 HEYOKA_DLL_PUBLIC void mutate(expression &, const expression_generator &, const double, splitmix64 &, const unsigned,
                               const unsigned, const unsigned = 0u);
-HEYOKA_DLL_PUBLIC void mutate(expression &, size_t, const expression_generator &, const unsigned, const unsigned);
+HEYOKA_DLL_PUBLIC void mutate(expression &, std::size_t, const expression_generator &, const unsigned, const unsigned);
 HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, splitmix64 &);
-HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, size_t, size_t, splitmix64 &);
+HEYOKA_DLL_PUBLIC void crossover(expression &, expression &, std::size_t, std::size_t);
 
 } // namespace heyoka
 
