@@ -21,25 +21,34 @@
 using namespace std::chrono;
 using namespace heyoka;
 
+expression sigmoid(const expression &in)
+{
+    return 1._dbl / (1._dbl + exp(-in));
+}
+
+// In this benchmark we integrate the two dimensional motion of a spacecraft perturbed by a conservative field
+// defined by a neural network. The propagation is made forward and then backward to 0. The error is thus computed.
+
 int main()
 {
     // System Dimension
-    auto n_neurons = 100u;
+    auto n_neurons = 10u;
     auto n_in = 2u;
     auto n_out = 1u;
+    unsigned offset_w_names = 1000u;
 
     // System state (letter a is used to make sure the state comes before the weights w)
     std::vector<expression> x;
-    for (auto i = 0u; i < 4; ++i) {
+    for (auto i = 0u; i < 4u; ++i) {
         x.emplace_back(variable{"a" + std::to_string(i)});
     }
 
-    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to 10000
-    // parameters)
+    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to
+    // offset_w_names - 1) parameters)
     auto n_w = (n_in + 1) * n_neurons + (n_neurons + 1) * n_out;
     std::vector<expression> w;
     for (auto i = 0u; i < n_w; ++i) {
-        w.emplace_back(variable{"w" + std::to_string(i + 1000)});
+        w.emplace_back(variable{"w" + std::to_string(i + offset_w_names)});
     }
 
     // We compute the outputs of the first (and only) layer of neurons
@@ -55,7 +64,7 @@ int main()
             hidden[i] += w[ji] * x[j];
         }
         // the non linearity
-        hidden[i] = sin(hidden[i]);
+        hidden[i] = sigmoid(hidden[i]);
     }
 
     // We compute the outputs of the output layer
@@ -74,7 +83,7 @@ int main()
             out[i] += w[ji] * hidden[j];
         }
         // the non linearity
-        out[i] = sin(out[i]);
+        out[i] = sigmoid(out[i]);
     }
 
     // Assembling the dynamics (weights and biases derivatives are zero)
@@ -83,20 +92,20 @@ int main()
     dynamics.push_back(x[2]);
     dynamics.push_back(x[3]);
     // dynamics
-    auto f0 = diff(out[0], "a0");
-    auto f1 = diff(out[0], "a1");
+    auto f0 = diff(out[0] + 1_dbl / (pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl)), "a0");
+    auto f1 = diff(out[0] + 1_dbl / (pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl)), "a1");
     dynamics.push_back(f0);
     dynamics.push_back(f1);
-    // parameters
+    // parameters are constants -> derivative to zero
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
         dynamics.push_back(0_dbl);
     }
 
     // Setting the initial conditions (random weights and biases initialization)
     splitmix64 engine(123u);
-    std::vector<double> ic = {0, 0, 0, 0};
+    std::vector<double> ic = {1., 0., 0., 1.};
     for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-        ic.push_back(std::uniform_real_distribution<>(-1, 1)(engine));
+        ic.push_back(std::normal_distribution<>(0., 1.)(engine));
     }
 
     // Defining the integrator
@@ -110,38 +119,30 @@ int main()
     // Calling the integrator
     std::cout << "\nCalling the Taylor Integrator." << std::endl;
     start = high_resolution_clock::now();
-    // Longer times result in reaching liit cycles and thus loss of precision
-    // auto dt = 10;
-    // auto state = neural_network_ode.get_state();
+    // Longer times result in reaching limit cycles and thus loss of precision
+    auto state = neural_network_ode.get_state();
+
+    // Uncomment these lines to print the state on screen during the first steps
     // std::unordered_map<std::string, double> eval_map;
     // eval_map["a0"] = state[0];
     // eval_map["a1"] = state[1];
     // for (decltype(w.size()) i = 0u; i < w.size(); ++i) {
-    //    eval_map["w" + std::to_string(i + 10000)] = ic[4 + i];
+    //    eval_map["w" + std::to_string(i + offset_w_names)] = ic[4 + i];
     //}
-    // auto V = eval_dbl(out[0], eval_map);
-    // auto E0 = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    // for (auto i = 0u; i < 1000; ++i) {
-    //    neural_network_ode.step();
+    // auto V = eval_dbl(-out[0] - 1_dbl / pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl), eval_map);
+    // auto E0 = V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    // for (auto i = 0u; i < 100; ++i) {
+    //    auto res = neural_network_ode.step();
     //    state = neural_network_ode.get_state();
     //    eval_map["a0"] = state[0];
     //    eval_map["a1"] = state[1];
-    //    V = eval_dbl(out[0], eval_map);
-    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
-    //              << std::endl;
+    //    V = eval_dbl(-out[0] - 1_dbl / pow(x[0] * x[0] + x[1] * x[1], 0.5_dbl), eval_map);
+    //    auto E = V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
+    //    std::cout << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0 << ", "
+    //              << static_cast<int>(std::get<0>(res)) << ", " << V << ", " << std::endl;
     //}
-    // for (auto i = 0u; i < 1000; ++i) {
-    //    neural_network_ode.step_backward();
-    //    state = neural_network_ode.get_state();
-    //    eval_map["a0"] = state[0];
-    //    eval_map["a1"] = state[1];
-    //    V = eval_dbl(out[0], eval_map);
-    //    auto E = -V + 0.5 * (state[2] * state[2] + state[3] * state[3]);
-    //    std::cout << "," << neural_network_ode.get_time() << "," << state[0] << "," << state[1] << "," << E - E0
-    //              << std::endl;
-    //}
-    neural_network_ode.propagate_until(10.);
+
+    neural_network_ode.propagate_until(100.);
     neural_network_ode.propagate_until(0.);
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
