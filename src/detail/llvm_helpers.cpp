@@ -366,7 +366,16 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
     cur->addIncoming(begin, preheader_bb);
 
     // Execute the loop body.
-    body(cur);
+    try {
+        body(cur);
+    } catch (...) {
+        // NOTE: at this point after_bb has not been
+        // inserted into any parent, and thus it will not
+        // be cleaned up automatically. Do it manually.
+        after_bb->deleteValue();
+
+        throw;
+    }
 
     // Compute the next value of the iteration.
     // NOTE: addition works regardless of integral signedness.
