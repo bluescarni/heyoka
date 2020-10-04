@@ -53,14 +53,7 @@ IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 IGOR_MAKE_NAMED_ARGUMENT(save_object_code);
-
-namespace detail
-{
-
-// Default value for the opt_level argument.
-inline constexpr unsigned default_opt_level = 3;
-
-} // namespace detail
+IGOR_MAKE_NAMED_ARGUMENT(ls_vectorize);
 
 } // namespace kw
 
@@ -85,6 +78,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_module_name;
     bool m_save_object_code;
     std::string m_object_code;
+    bool m_ls_vectorize;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -122,12 +116,12 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            // Optimisation level.
+            // Optimisation level (defaults to 3).
             auto opt_level = [&p]() -> unsigned {
                 if constexpr (p.has(kw::opt_level)) {
                     return std::forward<decltype(p(kw::opt_level))>(p(kw::opt_level));
                 } else {
-                    return kw::detail::default_opt_level;
+                    return 3;
                 }
             }();
 
@@ -149,10 +143,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath, socode};
+            // Load-store vectorization (defaults to false).
+            auto ls_vectorize = [&p]() -> bool {
+                if constexpr (p.has(kw::ls_vectorize)) {
+                    return std::forward<decltype(p(kw::ls_vectorize))>(p(kw::ls_vectorize));
+                } else {
+                    return false;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, socode, ls_vectorize};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
 
 public:
     llvm_state();
@@ -178,12 +181,14 @@ public:
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
+    bool &ls_vectorize();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
+    const bool &ls_vectorize() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
     std::string get_ir() const;

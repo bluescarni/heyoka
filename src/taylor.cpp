@@ -1886,6 +1886,29 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Verify the function.
     s.verify_function(name);
 
+    // Tool to forcibly enable the LS vectorize flag in the LLVM state.
+    struct ls_forcer {
+        const bool m_orig_flag;
+        llvm_state &m_s;
+
+        explicit ls_forcer(llvm_state &s) : m_orig_flag(s.ls_vectorize()), m_s(s)
+        {
+            m_s.ls_vectorize() = true;
+        }
+        ~ls_forcer()
+        {
+            m_s.ls_vectorize() = m_orig_flag;
+        }
+    };
+
+    std::optional<ls_forcer> lsf;
+    if (batch_size > 1u) {
+        // In vector mode, enable the ls_vectorize flag forcibly so
+        // that load/store_vector_from/to_memory() immediately produces vector
+        // load/stores.
+        lsf.emplace(s);
+    }
+
     // Run the optimisation pass.
     s.optimise();
 
