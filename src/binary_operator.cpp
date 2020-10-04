@@ -964,11 +964,11 @@ llvm::Value *bo_taylor_c_diff_mul_impl(llvm_state &s, const variable &var0, cons
     auto &module = s.module();
     auto &builder = s.builder();
 
-    // Create the diff function name, appending the batch size in order to
-    // avoid potential name clashes when multiple Taylor functions
-    // with different vector sizes are added to the same module.
-    // TODO further mangling wrt type.
-    const auto fname = "heyoka_taylor_diff_mul_" + li_to_string(batch_size);
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_mul_" + taylor_mangle_suffix(val_t);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -979,9 +979,6 @@ llvm::Value *bo_taylor_c_diff_mul_impl(llvm_state &s, const variable &var0, cons
 
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
-
-        // Fetch the pointee type of diff_arr.
-        auto val_t = pointee_type(diff_arr);
 
         // Prepare the function prototype. The arguments:
         // - indices of the variables,
@@ -1069,11 +1066,11 @@ llvm::Value *bo_taylor_c_diff_div_impl(llvm_state &s, const U &nv, const variabl
     auto &module = s.module();
     auto &builder = s.builder();
 
-    // Create the diff function name, appending the batch size in order to
-    // avoid potential name clashes when multiple Taylor functions
-    // with different vector sizes are added to the same module.
-    // TODO further mangling wrt type.
-    const auto fname = "heyoka_taylor_diff_div_" + li_to_string(batch_size);
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_div_" + taylor_mangle_suffix(val_t);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1084,9 +1081,6 @@ llvm::Value *bo_taylor_c_diff_div_impl(llvm_state &s, const U &nv, const variabl
 
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
-
-        // Fetch the pointee type of diff_arr.
-        auto val_t = pointee_type(diff_arr);
 
         // Prepare the function prototype. The arguments:
         // - indices of the variables,

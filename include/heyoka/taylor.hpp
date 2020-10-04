@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -46,6 +47,8 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
                                                   llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
 
 } // namespace detail
 

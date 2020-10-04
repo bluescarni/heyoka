@@ -36,6 +36,8 @@
 #include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -58,6 +60,29 @@ namespace heyoka
 
 namespace detail
 {
+
+// Helper to produce a unique string for the type t.
+// This is used in certain AD implementations
+// to avoid potential clashing in function names.
+std::string taylor_mangle_suffix(llvm::Type *t)
+{
+    assert(t != nullptr);
+
+    if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
+        // If the type is a vector, get the name of the element type
+        // and append the vector size.
+        return taylor_mangle_suffix(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
+    } else {
+        // Otherwise, fetch the type name from the print()
+        // member function of llvm::Type.
+        std::string retval;
+        llvm::raw_string_ostream ostr(retval);
+
+        t->print(ostr, false, true);
+
+        return ostr.str();
+    }
+}
 
 namespace
 {
