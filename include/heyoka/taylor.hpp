@@ -41,8 +41,8 @@ namespace heyoka
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_load_derivative(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                                      std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                                 std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
                                                   llvm::Value *);

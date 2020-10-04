@@ -459,7 +459,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const var
                                         const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
                                         std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
     if constexpr (AddOrSub) {
         return ret;
@@ -475,7 +475,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const variable &var, const
                                         const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
                                         std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    return taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    return taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 }
 
 // Derivative of var +- var.
@@ -484,8 +484,8 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, con
                                         const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
                                         std::uint32_t order, std::uint32_t, std::uint32_t)
 {
-    auto v0 = taylor_load_derivative(arr, uname_to_index(var0.name()), order, n_uvars);
-    auto v1 = taylor_load_derivative(arr, uname_to_index(var1.name()), order, n_uvars);
+    auto v0 = taylor_fetch_diff(arr, uname_to_index(var0.name()), order, n_uvars);
+    auto v1 = taylor_fetch_diff(arr, uname_to_index(var1.name()), order, n_uvars);
 
     if constexpr (AddOrSub) {
         return s.builder().CreateFAdd(v0, v1);
@@ -542,7 +542,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const n
 {
     auto &builder = s.builder();
 
-    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
     auto mul = vector_splat(builder, codegen<T>(s, num), batch_size);
 
     return builder.CreateFMul(mul, ret);
@@ -575,8 +575,8 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
     std::vector<llvm::Value *> sum;
     auto &builder = s.builder();
     for (std::uint32_t j = 0; j <= order; ++j) {
-        auto v0 = taylor_load_derivative(arr, u_idx0, order - j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, u_idx1, j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, u_idx0, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1));
@@ -633,8 +633,8 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
     auto &builder = s.builder();
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        auto v0 = taylor_load_derivative(arr, idx, order - j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, u_idx1, j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx1, j, n_uvars);
 
         // Add v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(v0, v1));
@@ -645,7 +645,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
 
     // Load the divisor for the quotient formula.
     // This is the zero-th order derivative of var1.
-    auto div = taylor_load_derivative(arr, u_idx1, 0, n_uvars);
+    auto div = taylor_fetch_diff(arr, u_idx1, 0, n_uvars);
 
     if constexpr (std::is_same_v<U, number>) {
         // nv is a number. Negate the accumulator
@@ -654,7 +654,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
     } else {
         // nv is a variable. We need to fetch its
         // derivative of order 'order' from the array of derivatives.
-        auto diff_nv_v = taylor_load_derivative(arr, uname_to_index(nv.name()), order, n_uvars);
+        auto diff_nv_v = taylor_fetch_diff(arr, uname_to_index(nv.name()), order, n_uvars);
 
         // Produce the result: (diff_nv_v - ret_acc) / div.
         return builder.CreateFDiv(builder.CreateFSub(diff_nv_v, ret_acc), div);
@@ -669,7 +669,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const n
 {
     auto &builder = s.builder();
 
-    auto ret = taylor_load_derivative(arr, uname_to_index(var.name()), order, n_uvars);
+    auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
     auto div = vector_splat(builder, codegen<T>(s, num), batch_size);
 
     return builder.CreateFDiv(ret, div);

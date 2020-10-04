@@ -129,8 +129,8 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std:
         // NOTE: the +1 is because we are accessing the cosine
         // of the u var, which is conventionally placed
         // right after the sine in the decomposition.
-        auto v0 = taylor_load_derivative(arr, idx + 1u, order - j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, idx + 1u, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
@@ -344,8 +344,8 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std:
         // NOTE: the -1 is because we are accessing the sine
         // of the u var, which is conventionally placed
         // right before the cosine in the decomposition.
-        auto v0 = taylor_load_derivative(arr, idx - 1u, order - j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, idx - 1u, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
@@ -551,8 +551,8 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std:
     if (order > 1u) {
         std::vector<llvm::Value *> sum;
         for (std::uint32_t j = 1; j < order; ++j) {
-            auto v0 = taylor_load_derivative(arr, idx, order - j, n_uvars);
-            auto v1 = taylor_load_derivative(arr, u_idx, j, n_uvars);
+            auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+            auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
             auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
@@ -569,8 +569,8 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std:
     }
 
     // Finalise the return value: (b^[n] - ret_acc / n) / b^[0]
-    auto bn = taylor_load_derivative(arr, u_idx, order, n_uvars);
-    auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
+    auto bn = taylor_fetch_diff(arr, u_idx, order, n_uvars);
+    auto b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
 
     auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
 
@@ -742,8 +742,8 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const variable &var, const std:
     // (i.e., order excluded).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = taylor_load_derivative(arr, idx, j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, u_idx, order - j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, idx, j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
 
@@ -943,8 +943,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const numb
     // (i.e., order *not* included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = taylor_load_derivative(arr, u_idx, order - j, n_uvars);
-        auto v1 = taylor_load_derivative(arr, idx, j, n_uvars);
+        auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
         auto scal_f = vector_splat(builder,
@@ -961,7 +961,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const numb
 
     // Compute the final divisor: order * (zero-th derivative of u_idx).
     auto ord_f = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
-    auto b0 = taylor_load_derivative(arr, u_idx, 0, n_uvars);
+    auto b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
     auto div = builder.CreateFMul(ord_f, b0);
 
     // Compute and return the result: ret_acc / div.

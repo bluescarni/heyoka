@@ -59,21 +59,6 @@ namespace heyoka
 namespace detail
 {
 
-// Helper to load the derivative of order 'order' of the u variable at index u_idx from the
-// derivative array 'arr'. The total number of u variables is n_uvars.
-llvm::Value *taylor_load_derivative(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
-                                    std::uint32_t n_uvars)
-{
-    // Sanity check.
-    assert(u_idx < n_uvars);
-
-    // Compute the index.
-    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
-    assert(idx < arr.size());
-
-    return arr[idx];
-}
-
 namespace
 {
 
@@ -1001,6 +986,21 @@ taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::p
 namespace detail
 {
 
+// Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
+// derivative array 'arr'. The total number of u variables is n_uvars.
+llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
+                               std::uint32_t n_uvars)
+{
+    // Sanity check.
+    assert(u_idx < n_uvars);
+
+    // Compute the index.
+    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
+    assert(idx < arr.size());
+
+    return arr[idx];
+}
+
 // Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
 // n_uvars is the total number of u variables.
 llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
@@ -1080,7 +1080,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // Fetch from arr the derivative
                 // of order 'order - 1' of the u variable at u_idx. The index is:
                 // (order - 1) * n_uvars + u_idx.
-                auto ret = taylor_load_derivative(arr, u_idx, order - 1u, n_uvars);
+                auto ret = taylor_fetch_diff(arr, u_idx, order - 1u, n_uvars);
 
                 // We have to divide the derivative by order
                 // to get the normalised derivative of the state variable.
@@ -1269,7 +1269,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         // Extract the derivatives of the state variables from diff_arr.
         for (std::uint32_t o = 0; o <= order; ++o) {
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-                retval.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
+                retval.push_back(taylor_fetch_diff(diff_arr, var_idx, o, n_uvars));
             }
         }
 
