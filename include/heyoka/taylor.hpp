@@ -196,7 +196,6 @@ namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(time);
-IGOR_MAKE_NAMED_ARGUMENT(times);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
@@ -504,8 +503,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
         } else {
             // Initial times (defaults to a vector of zeroes).
             auto times = [&p, batch_size]() -> std::vector<T> {
-                if constexpr (p.has(kw::times)) {
-                    return std::forward<decltype(p(kw::times))>(p(kw::times));
+                if constexpr (p.has(kw::time)) {
+                    return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
                 }
