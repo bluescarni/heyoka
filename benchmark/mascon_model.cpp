@@ -25,7 +25,7 @@ using namespace std::chrono;
 int main()
 {
     // assembling the r.h.s.
-    for (double N = 3u; N < 1000; N+=10) {
+    for (double N = 3u; N < 1000; N += 10) {
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
         expression dx(0_dbl), dy(0_dbl), dz(0_dbl);
         for (double i = -N; i < N; ++i) {
@@ -38,7 +38,8 @@ int main()
         auto start = high_resolution_clock::now();
         taylor_adaptive<double> taylor{
             {prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = dx, prime(vy) = dy, prime(vz) = dz},
-            {0.123, 0.123, 0.123, 0., 0., 0.}};
+            {0.123, 0.123, 0.123, 0., 0., 0.},
+            kw::compact_mode = true};
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << N << ": " << duration.count() / 1e6 << "s" << std::endl;
