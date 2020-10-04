@@ -1001,21 +1001,6 @@ taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::p
 namespace detail
 {
 
-// Store the value val as the derivative of order 'order' of the u variable u_idx
-// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         std::uint32_t u_idx, llvm::Value *val)
-{
-    auto &builder = s.builder();
-
-    // NOTE: overflow check has already been done to ensure that the
-    // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx))});
-
-    builder.CreateStore(val, ptr);
-}
-
 // Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
 // n_uvars is the total number of u variables.
 llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
@@ -1033,6 +1018,21 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint3
 
 namespace
 {
+
+// Store the value val as the derivative of order 'order' of the u variable u_idx
+// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
+void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                         std::uint32_t u_idx, llvm::Value *val)
+{
+    auto &builder = s.builder();
+
+    // NOTE: overflow check has already been done to ensure that the
+    // total size of diff_arr fits in a 32-bit unsigned integer.
+    auto ptr = builder.CreateInBoundsGEP(
+        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx))});
+
+    builder.CreateStore(val, ptr);
+}
 
 // RAII helper to temporarily disable most fast math flags that might
 // be set in an LLVM builder. On destruction, the original fast math
