@@ -1225,7 +1225,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         }
 
         // Build the return value.
-        for (std::uint32_t o = 0; o < order + 1u; ++o) {
+        for (std::uint32_t o = 0; o <= order; ++o) {
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
                 retval.push_back(
                     taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(o), builder.getInt32(var_idx)));
@@ -1267,7 +1267,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
 
         // Extract the derivatives of the state variables from diff_arr.
-        for (std::uint32_t o = 0; o < order + 1u; ++o) {
+        for (std::uint32_t o = 0; o <= order; ++o) {
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
                 retval.push_back(taylor_load_derivative(diff_arr, var_idx, o, n_uvars));
             }
