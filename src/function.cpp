@@ -110,8 +110,9 @@ function::function(const function &f)
 #if defined(HEYOKA_HAVE_REAL128)
       m_taylor_c_u_init_f128_f(f.m_taylor_c_u_init_f128_f),
 #endif
-      m_taylor_c_diff_dbl_f(f.m_taylor_c_diff_dbl_f), m_taylor_c_diff_ldbl_f(f.m_taylor_c_diff_ldbl_f),
+      m_taylor_c_diff_dbl_f(f.m_taylor_c_diff_dbl_f), m_taylor_c_diff_ldbl_f(f.m_taylor_c_diff_ldbl_f)
 #if defined(HEYOKA_HAVE_REAL128)
+      ,
       m_taylor_c_diff_f128_f(f.m_taylor_c_diff_f128_f)
 #endif
 {
