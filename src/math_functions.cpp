@@ -145,9 +145,6 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std:
 
     // NOTE: iteration in the [1, order] range
     // (i.e., order included).
-    if (order == std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("Overflow in the Taylor derivative of sin()");
-    }
     std::vector<llvm::Value *> sum;
     auto &builder = s.builder();
     for (std::uint32_t j = 1; j <= order; ++j) {
@@ -495,9 +492,6 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std:
 
     // NOTE: iteration in the [1, order] range
     // (i.e., order included).
-    if (order == std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("Overflow in the Taylor derivative of cos()");
-    }
     std::vector<llvm::Value *> sum;
     auto &builder = s.builder();
     for (std::uint32_t j = 1; j <= order; ++j) {

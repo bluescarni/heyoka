@@ -15,7 +15,6 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
-#include <limits>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
@@ -569,9 +568,6 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
 
     // NOTE: iteration in the [0, order] range
     // (i.e., order inclusive).
-    if (order == std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("Overflow in the Taylor derivative of the mul operator");
-    }
     std::vector<llvm::Value *> sum;
     auto &builder = s.builder();
     for (std::uint32_t j = 0; j <= order; ++j) {
@@ -627,9 +623,6 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable 
 
     // NOTE: iteration in the [1, order] range
     // (i.e., order inclusive).
-    if (order == std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("Overflow in the Taylor derivative of the div operator");
-    }
     auto &builder = s.builder();
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
