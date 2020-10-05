@@ -57,8 +57,7 @@ TEST_CASE("pendulum")
         REQUIRE(st[1] == approximately(fp_t{0.025}, fp_t{1E4}));
     };
 
-    // TODO fix with true.
-    for (auto cm : {false, false}) {
+    for (auto cm : {true, false}) {
         for (auto ha : {true, false}) {
             tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, ha, cm); });
         }
@@ -117,8 +116,7 @@ TEST_CASE("three body")
         REQUIRE(st[17] == approximately(s_v[2], fp_t{1E4}));
     };
 
-    // TODO fix with true.
-    for (auto cm : {false, false}) {
+    for (auto cm : {true, false}) {
         for (auto ha : {true, false}) {
             tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, ha, cm); });
         }

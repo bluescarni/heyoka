@@ -79,6 +79,31 @@ llvm::Value *taylor_u_init_unary_func(llvm_state &s, const function &f, const st
     return scalars_to_vector(builder, init_vals);
 }
 
+// Helper to run the Taylor init phase of a unary
+// function in compact mode.
+template <typename T>
+llvm::Value *taylor_c_u_init_unary_func(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    assert(f.args().size() == 1u);
+
+    auto &builder = s.builder();
+
+    // Do the initialisation for the function argument.
+    auto arg = taylor_c_u_init<T>(s, f.args()[0], arr, batch_size);
+
+    // Decompose arg into scalars.
+    auto scalars = vector_to_scalars(builder, arg);
+
+    // Invoke the function on each scalar.
+    std::vector<llvm::Value *> init_vals;
+    for (auto scal : scalars) {
+        init_vals.push_back(function_codegen_from_values<T>(s, f, {scal}));
+    }
+
+    // Build a vector with the results.
+    return scalars_to_vector(builder, init_vals);
+}
+
 template <typename T>
 llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
                                std::uint32_t batch_size)
@@ -168,6 +193,131 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
 
     return std::visit(
         [&](const auto &v) { return taylor_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
+template <typename T>
+llvm::Value *taylor_c_u_init_sin(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the sine in compact mode (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of sin(number).
+template <typename T>
+llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const number &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                    std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of sin(variable).
+template <typename T>
+llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                    llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t);
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // Prepare the function prototype. The arguments:
+        // - indices of the variable,
+        // - derivative order,
+        // - diff array.
+        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
+        // The return type is the pointee type of diff_arr.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the function arguments.
+        auto idx0 = f->args().begin();
+        auto idx1 = f->args().begin() + 1;
+        auto ord = f->args().begin() + 2;
+        auto diff_ptr = f->args().begin() + 3;
+
+        // Create a new basic block to start insertion into.
+        auto bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        // Create an FP vector version of the order.
+        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+
+        // Run the loop.
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+            // NOTE: the +1 is because we are accessing the cosine
+            // of the u var, which is conventionally placed
+            // right after the sine in the decomposition.
+            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
+                                           builder.CreateAdd(idx0, builder.getInt32(1)));
+            auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, idx1);
+
+            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+
+            builder.CreateStore(
+                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(j_v, builder.CreateFMul(a_nj, cj))),
+                acc);
+        });
+
+        // Divide by the order to produce the return value.
+        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    // Invoke the function.
+    return builder.CreateCall(f,
+                              {builder.getInt32(idx), builder.getInt32(uname_to_index(var.name())), order, diff_arr});
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_c_diff_sin_impl(llvm_state &, const U &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t,
+                                    std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of a sine in compact mode");
+}
+
+template <typename T>
+llvm::Value *taylor_c_diff_sin(llvm_state &s, const function &func, llvm::Value *arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the sine in compact mode (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -285,6 +435,16 @@ expression sin(expression e)
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_sin<mppp::real128>;
 #endif
+    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_sin<double>;
+    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_sin<mppp::real128>;
+#endif
+    fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_sin<double>;
+    fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_sin<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_diff_f128_f() = detail::taylor_c_diff_sin<mppp::real128>;
+#endif
 
     return expression{std::move(fc)};
 }
@@ -383,6 +543,131 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vec
 
     return std::visit(
         [&](const auto &v) { return taylor_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
+template <typename T>
+llvm::Value *taylor_c_u_init_cos(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the cosine in compact mode (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of cos(number).
+template <typename T>
+llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const number &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                    std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of cos(variable).
+template <typename T>
+llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                    llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t);
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // Prepare the function prototype. The arguments:
+        // - indices of the variable,
+        // - derivative order,
+        // - diff array.
+        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
+        // The return type is the pointee type of diff_arr.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the function arguments.
+        auto idx0 = f->args().begin();
+        auto idx1 = f->args().begin() + 1;
+        auto ord = f->args().begin() + 2;
+        auto diff_ptr = f->args().begin() + 3;
+
+        // Create a new basic block to start insertion into.
+        auto bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        // Create an FP vector version of the order.
+        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+
+        // Run the loop.
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+            // NOTE: the -1 is because we are accessing the sine
+            // of the u var, which is conventionally placed
+            // right before the cosine in the decomposition.
+            auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
+                                           builder.CreateSub(idx0, builder.getInt32(1)));
+            auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, idx1);
+
+            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+
+            builder.CreateStore(
+                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(j_v, builder.CreateFMul(b_nj, cj))),
+                acc);
+        });
+
+        // Divide by the order and negate to produce the return value.
+        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), builder.CreateFNeg(ord_v)));
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    // Invoke the function.
+    return builder.CreateCall(f,
+                              {builder.getInt32(idx), builder.getInt32(uname_to_index(var.name())), order, diff_arr});
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_c_diff_cos_impl(llvm_state &, const U &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t,
+                                    std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of a cosine in compact mode");
+}
+
+template <typename T>
+llvm::Value *taylor_c_diff_cos(llvm_state &s, const function &func, llvm::Value *arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the cosine in compact mode (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
 }
 
@@ -489,6 +774,16 @@ expression cos(expression e)
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_cos<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_cos<mppp::real128>;
+#endif
+    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_cos<double>;
+    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_cos<mppp::real128>;
+#endif
+    fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_cos<double>;
+    fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_cos<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_diff_f128_f() = detail::taylor_c_diff_cos<mppp::real128>;
 #endif
 
     return expression{std::move(fc)};
