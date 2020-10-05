@@ -241,7 +241,7 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
         auto orig_bb = builder.GetInsertBlock();
 
         // Prepare the function prototype. The arguments:
-        // - indices of the variable,
+        // - indices of the variables,
         // - derivative order,
         // - diff array.
         std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
@@ -591,7 +591,7 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
         auto orig_bb = builder.GetInsertBlock();
 
         // Prepare the function prototype. The arguments:
-        // - indices of the variable,
+        // - indices of the variables,
         // - derivative order,
         // - diff array.
         std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
@@ -896,6 +896,133 @@ llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vec
         func.args()[0].value());
 }
 
+template <typename T>
+llvm::Value *taylor_c_u_init_log(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the logarithm in compact mode (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of log(number).
+template <typename T>
+llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const number &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                    std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of log(variable).
+template <typename T>
+llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                    llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t);
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // Prepare the function prototype. The arguments:
+        // - indices of the variables,
+        // - derivative order,
+        // - diff array.
+        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
+        // The return type is the pointee type of diff_arr.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the function arguments.
+        auto idx0 = f->args().begin();
+        auto idx1 = f->args().begin() + 1;
+        auto ord = f->args().begin() + 2;
+        auto diff_ptr = f->args().begin() + 3;
+
+        // Create a new basic block to start insertion into.
+        auto bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        // Create an FP vector version of the order.
+        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+
+        // Run the loop.
+        llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
+            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
+            auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, idx1);
+
+            // Compute the factor n - j.
+            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+            auto fac = builder.CreateFSub(ord_v, j_v);
+
+            builder.CreateStore(
+                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(fac, builder.CreateFMul(a_nj, bj))),
+                acc);
+        });
+
+        // ret = bn - acc / n.
+        auto ret = builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, idx1),
+                                      builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+        // Return ret / b0.
+        builder.CreateRet(builder.CreateFDiv(ret, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), idx1)));
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    // Invoke the function.
+    return builder.CreateCall(f,
+                              {builder.getInt32(idx), builder.getInt32(uname_to_index(var.name())), order, diff_arr});
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_c_diff_log_impl(llvm_state &, const U &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t,
+                                    std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of a logarithm in compact mode");
+}
+
+template <typename T>
+llvm::Value *taylor_c_diff_log(llvm_state &s, const function &func, llvm::Value *arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the logarithm in compact mode (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_log_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
 } // namespace
 
 } // namespace detail
@@ -981,6 +1108,16 @@ expression log(expression e)
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_log<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_log<mppp::real128>;
+#endif
+    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_log<double>;
+    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_log<mppp::real128>;
+#endif
+    fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_log<double>;
+    fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_log<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_diff_f128_f() = detail::taylor_c_diff_log<mppp::real128>;
 #endif
 
     return expression{std::move(fc)};
@@ -1079,6 +1216,129 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vec
         func.args()[0].value());
 }
 
+template <typename T>
+llvm::Value *taylor_c_u_init_exp(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the exponential in compact mode (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of exp(number).
+template <typename T>
+llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const number &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                    std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of exp(variable).
+template <typename T>
+llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t n_uvars,
+                                    llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the pointee type of diff_arr.
+    auto val_t = pointee_type(diff_arr);
+
+    // Get the function name for the current fp type and batch size.
+    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t);
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // Prepare the function prototype. The arguments:
+        // - indices of the variables,
+        // - derivative order,
+        // - diff array.
+        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
+        // The return type is the pointee type of diff_arr.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the function arguments.
+        auto idx0 = f->args().begin();
+        auto idx1 = f->args().begin() + 1;
+        auto ord = f->args().begin() + 2;
+        auto diff_ptr = f->args().begin() + 3;
+
+        // Create a new basic block to start insertion into.
+        auto bb = llvm::BasicBlock::Create(context, "entry", f);
+        builder.SetInsertPoint(bb);
+
+        // Create an FP vector version of the order.
+        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+
+        // Run the loop.
+        llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
+            auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, idx0);
+            auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx1);
+
+            // Compute the factor n - j.
+            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+            auto fac = builder.CreateFSub(ord_v, j_v);
+
+            builder.CreateStore(
+                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(fac, builder.CreateFMul(aj, b_nj))),
+                acc);
+        });
+
+        // Return acc / n.
+        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    }
+
+    // Invoke the function.
+    return builder.CreateCall(f,
+                              {builder.getInt32(idx), builder.getInt32(uname_to_index(var.name())), order, diff_arr});
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_c_diff_exp_impl(llvm_state &, const U &, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t,
+                                    std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of an exponential in compact mode");
+}
+
+template <typename T>
+llvm::Value *taylor_c_diff_exp(llvm_state &s, const function &func, llvm::Value *arr, std::uint32_t n_uvars,
+                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the exponential in compact mode (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_exp_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
 } // namespace
 
 } // namespace detail
@@ -1165,6 +1425,16 @@ expression exp(expression e)
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_exp<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_exp<mppp::real128>;
+#endif
+    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_exp<double>;
+    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_exp<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_exp<mppp::real128>;
+#endif
+    fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_exp<double>;
+    fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_exp<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_diff_f128_f() = detail::taylor_c_diff_exp<mppp::real128>;
 #endif
 
     return expression{std::move(fc)};
