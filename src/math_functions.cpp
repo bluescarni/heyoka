@@ -1670,22 +1670,18 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
                 acc);
         });
 
-        // Create the return value.
-        builder.CreateRet(builder.CreateLoad(acc));
+        // Finalize the result: acc / (n*b0).
+        builder.CreateRet(builder.CreateFDiv(
+            builder.CreateLoad(acc),
+            builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), idx0))));
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
 
     // Invoke the function.
-    llvm::Value *ret = builder.CreateCall(
+    return builder.CreateCall(
         f, {builder.getInt32(uname_to_index(var.name())), builder.getInt32(idx), codegen<T>(s, num), order, diff_arr});
-
-    // Finalize the result.
-    auto order_v = vector_splat(builder, builder.CreateUIToFP(order, to_llvm_type<T>(context)), batch_size);
-    return builder.CreateFDiv(
-        ret, builder.CreateFMul(order_v, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0),
-                                                            builder.getInt32(uname_to_index(var.name())))));
 }
 
 // All the other cases.
