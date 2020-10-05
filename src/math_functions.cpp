@@ -1875,6 +1875,58 @@ llvm::Value *taylor_diff_sqrt(llvm_state &s, const function &func, const std::ve
         func.args()[0].value());
 }
 
+template <typename T>
+llvm::Value *taylor_c_u_init_sqrt(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
+{
+    if (f.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
+                                    "the square root in compact mode (1 argument was expected, but "
+                                    + std::to_string(f.args().size()) + " arguments were provided");
+    }
+
+    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
+}
+
+// Derivative of sqrt(number).
+template <typename T>
+llvm::Value *taylor_c_diff_sqrt_impl(llvm_state &s, const number &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                     std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of sqrt(variable).
+template <typename T>
+llvm::Value *taylor_c_diff_sqrt_impl(llvm_state &s, const variable &var, llvm::Value *arr, std::uint32_t n_uvars,
+                                     llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return taylor_c_diff_pow_impl<T>(s, var, number{T(1) / 2}, arr, n_uvars, order, idx, batch_size);
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_c_diff_sqrt_impl(llvm_state &, const U &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                     std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of a square root in compact mode");
+}
+
+template <typename T>
+llvm::Value *taylor_c_diff_sqrt(llvm_state &s, const function &func, llvm::Value *arr, std::uint32_t n_uvars,
+                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    if (func.args().size() != 1u) {
+        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
+                                    "the square root in compact mode (1 argument was expected, but "
+                                    + std::to_string(func.args().size()) + " arguments were provided");
+    }
+
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_sqrt_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        func.args()[0].value());
+}
+
 } // namespace
 
 } // namespace detail
@@ -1962,6 +2014,16 @@ expression sqrt(expression e)
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_sqrt<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_sqrt<mppp::real128>;
+#endif
+    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_sqrt<double>;
+    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_sqrt<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_sqrt<mppp::real128>;
+#endif
+    fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_sqrt<double>;
+    fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_sqrt<long double>;
+#if defined(HEYOKA_HAVE_REAL128)
+    fc.taylor_c_diff_f128_f() = detail::taylor_c_diff_sqrt<mppp::real128>;
 #endif
 
     return expression{std::move(fc)};
