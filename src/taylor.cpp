@@ -1881,9 +1881,6 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
         cf_vecs.emplace_back();
         auto &cf_vec = cf_vecs.back();
 
-        if (order == std::numeric_limits<std::uint32_t>::max()) {
-            throw std::overflow_error("Overflow error in an adaptive Taylor stepper: the order is too high");
-        }
         for (std::uint32_t o = 0; o <= order; ++o) {
             cf_vec.push_back(diff_arr[static_cast<da_size_t>(o) * n_eq + var_idx]);
         }
