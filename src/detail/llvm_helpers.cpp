@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -15,11 +16,13 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -316,6 +319,96 @@ llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const 
     // https://llvm.org/docs/CodeGenerator.html#tail-calls
 
     return r;
+}
+
+// Create an LLVM for loop in the form:
+//
+// for (auto i = begin; i < end; ++i) {
+//   body(i);
+// }
+//
+// begin/end must be 32-bit unsigned integer values.
+void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const std::function<void(llvm::Value *)> &body)
+{
+    assert(begin->getType() == end->getType());
+    assert(begin->getType() == s.builder().getInt32Ty());
+
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    // Fetch the current function.
+    assert(builder.GetInsertBlock() != nullptr);
+    auto f = builder.GetInsertBlock()->getParent();
+    assert(f != nullptr);
+
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context);
+    auto *after_bb = llvm::BasicBlock::Create(context);
+
+    // NOTE: we need a special case if the body of the loop is
+    // never to be executed (that is, begin >= end).
+    // In such a case, we will jump directly to after_bb.
+    // NOTE: unsigned integral comparison.
+    auto skip_cond = builder.CreateICmp(llvm::CmpInst::ICMP_UGE, begin, end);
+    builder.CreateCondBr(skip_cond, after_bb, loop_bb);
+
+    // Get a reference to the current block for
+    // later usage in the phi node.
+    auto preheader_bb = builder.GetInsertBlock();
+
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
+    builder.SetInsertPoint(loop_bb);
+
+    // Create the phi node and add the first pair of arguments.
+    auto cur = builder.CreatePHI(builder.getInt32Ty(), 2);
+    cur->addIncoming(begin, preheader_bb);
+
+    // Execute the loop body.
+    try {
+        body(cur);
+    } catch (...) {
+        // NOTE: at this point after_bb has not been
+        // inserted into any parent, and thus it will not
+        // be cleaned up automatically. Do it manually.
+        after_bb->deleteValue();
+
+        throw;
+    }
+
+    // Compute the next value of the iteration.
+    // NOTE: addition works regardless of integral signedness.
+    auto next = builder.CreateAdd(cur, builder.getInt32(1));
+
+    // Compute the end condition.
+    // NOTE: we use the unsigned less-than predicate.
+    auto end_cond = builder.CreateICmp(llvm::CmpInst::ICMP_ULT, next, end);
+
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
+    auto loop_end_bb = builder.GetInsertBlock();
+    f->getBasicBlockList().push_back(after_bb);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    builder.CreateCondBr(end_cond, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    builder.SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    cur->addIncoming(next, loop_end_bb);
+}
+
+// Given an input pointer value, return the
+// pointed-to type.
+llvm::Type *pointee_type(llvm::Value *ptr)
+{
+    if (auto ptr_t = llvm::dyn_cast<llvm::PointerType>(ptr->getType())) {
+        return ptr_t->getElementType();
+    } else {
+        throw std::invalid_argument("Cannot get the pointee type of a non-pointer value");
+    }
 }
 
 } // namespace heyoka::detail

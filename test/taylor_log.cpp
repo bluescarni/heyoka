@@ -42,14 +42,14 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 template <typename T, typename U>
-void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy)
+void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
     const auto batch_size = 23u;
 
     llvm_state s{kw::opt_level = opt_level};
 
-    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy);
-    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy);
+    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
+    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
 
     s.compile();
 
@@ -82,7 +82,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
 TEST_CASE("taylor log")
 {
-    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy) {
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using std::log;
 
         using fp_t = decltype(fp_x);
@@ -95,7 +95,8 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -115,7 +116,8 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -142,7 +144,8 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 1, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -164,7 +167,8 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 2, 2, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -197,7 +201,8 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(expression{number{fp_t(2)}}), x + y}, 3, 3, high_accuracy,
+                                 compact_mode);
 
             s.compile();
 
@@ -242,13 +247,13 @@ TEST_CASE("taylor log")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({log(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({log(expression{number{fp_t(2)}}), x + y}, opt_level, high_accuracy, compact_mode);
 
         // Variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 1, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -268,7 +273,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 1, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -295,7 +300,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 2, 1, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -317,7 +322,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 2, 2, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -350,7 +355,7 @@ TEST_CASE("taylor log")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 3, 3, high_accuracy);
+            taylor_add_jet<fp_t>(s, "jet", {log(y), log(x)}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -401,13 +406,15 @@ TEST_CASE("taylor log")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({log(y), log(x)}, opt_level, high_accuracy);
+        compare_batch_scalar<fp_t>({log(y), log(x)}, opt_level, high_accuracy, compact_mode);
     };
 
-    for (auto f : {false, true}) {
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 0, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 1, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 2, f); });
-        tuple_for_each(fp_types, [&tester, f](auto x) { tester(x, 3, f); });
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
     }
 }

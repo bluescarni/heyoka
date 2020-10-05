@@ -36,7 +36,7 @@ using namespace heyoka;
 using namespace heyoka_benchmark;
 
 template <typename T>
-void run_bench(T tol, bool high_accuracy)
+void run_bench(T tol, bool high_accuracy, bool compact_mode)
 {
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
@@ -58,7 +58,8 @@ void run_bench(T tol, bool high_accuracy)
                                    -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
                                   std::move(init_state),
                                   kw::high_accuracy = high_accuracy,
-                                  kw::tol = tol};
+                                  kw::tol = tol,
+                                  kw::compact_mode = compact_mode};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -86,13 +87,14 @@ int main(int argc, char *argv[])
     std::string fp_type;
     bool high_accuracy = false;
     double tol;
+    bool compact_mode = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")(
         "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
-        "tol", po::value<double>(&tol)->default_value(0.),
-        "tolerance (if 0, it will be automatically deduced)")("high_accuracy", "high-accuracy mode");
+        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be automatically deduced)")(
+        "high_accuracy", "high-accuracy mode")("compact_mode", "compact mode");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -107,13 +109,17 @@ int main(int argc, char *argv[])
         high_accuracy = true;
     }
 
+    if (vm.count("compact_mode")) {
+        compact_mode = true;
+    }
+
     if (fp_type == "double") {
-        run_bench<double>(tol, high_accuracy);
+        run_bench<double>(tol, high_accuracy, compact_mode);
     } else if (fp_type == "long double") {
-        run_bench<long double>(tol, high_accuracy);
+        run_bench<long double>(tol, high_accuracy, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy);
+        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, compact_mode);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");

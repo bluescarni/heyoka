@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_add_jet<double>(s, "jet", std::move(sys), order, batch_size, false);
+    taylor_add_jet<double>(s, "jet", std::move(sys), order, batch_size, false, false);
 
     // std::cout << s.get_ir() << '\n';
     // s.dump_object_code("tjb.o");

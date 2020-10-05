@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <ios>
@@ -31,6 +30,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/Triple.h>
@@ -226,9 +227,9 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup))
+      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup)), m_ls_vectorize(std::get<4>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -255,7 +256,8 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
       m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
-      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code)
+      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code),
+      m_ls_vectorize(other.m_ls_vectorize)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -330,6 +332,11 @@ unsigned &llvm_state::opt_level()
     return m_opt_level;
 }
 
+bool &llvm_state::ls_vectorize()
+{
+    return m_ls_vectorize;
+}
+
 std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
 {
     return m_named_values;
@@ -355,6 +362,11 @@ const llvm::LLVMContext &llvm_state::context() const
 const unsigned &llvm_state::opt_level() const
 {
     return m_opt_level;
+}
+
+const bool &llvm_state::ls_vectorize() const
+{
+    return m_ls_vectorize;
 }
 
 const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
@@ -468,13 +480,14 @@ void llvm_state::optimise()
         auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
         f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
-        // Add a pass to vectorize load/stores. This is needed to ensure that the
+        // Add a pass to vectorize load/stores, if requested.
+        // This is useful to ensure that the
         // pattern adopted in load_vector_from_memory() and
         // store_vector_to_memory() is translated to
         // vectorized store/load instructions.
-        // NOTE: perhaps down the line we want to make this optional
-        // (same as the fast math flag).
-        f_pm->add(llvm::createLoadStoreVectorizerPass());
+        if (m_ls_vectorize) {
+            f_pm->add(llvm::createLoadStoreVectorizerPass());
+        }
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
@@ -486,7 +499,6 @@ void llvm_state::optimise()
         // NOTE: perhaps in the future we can make the autovectorizer an
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
-        pm_builder.SizeLevel = 0;
         pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
 
         m_jitter->m_tm->adjustPassManager(pm_builder);
@@ -517,7 +529,7 @@ void llvm_state::compile()
     // Store also the object code, if requested.
     if (m_save_object_code) {
         // Create a name model for the llvm temporary file machinery.
-        const auto model = (std::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
+        const auto model = (boost::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
 
         // Create a unique file.
         // NOTE: this will also open the file. fd is the file
@@ -538,7 +550,7 @@ void llvm_state::compile()
 
             ~file_remover()
             {
-                std::filesystem::remove(std::filesystem::path{path.c_str()});
+                boost::filesystem::remove(boost::filesystem::path{path.c_str()});
             }
         } fr{res_path};
 
@@ -1044,7 +1056,7 @@ void llvm_state::dump_object_code(const std::string &filename) const
         if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
             // Close and remove the file before throwing.
             dest.close();
-            std::filesystem::remove(std::filesystem::path{filename});
+            boost::filesystem::remove(boost::filesystem::path{filename});
 
             throw std::invalid_argument("The target machine can't emit a file of this type");
         }
@@ -1121,6 +1133,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Compiled           : " << s.is_compiled() << '\n';
     oss << "Fast math          : " << s.m_use_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
+    oss << "LS vectorize       : " << s.m_ls_vectorize << '\n';
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';

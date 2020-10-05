@@ -45,7 +45,7 @@
 #include "benchmark_utils.hpp"
 
 template <typename T>
-void run_integration(const std::string &filename, T t_final, double perturb)
+void run_integration(const std::string &filename, T t_final, double perturb, bool compact_mode)
 {
     using std::abs;
     using std::log10;
@@ -92,7 +92,8 @@ void run_integration(const std::string &filename, T t_final, double perturb)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = true};
+    taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = true,
+                          kw::compact_mode = compact_mode};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -268,6 +269,7 @@ int main(int argc, char *argv[])
 
     std::string fp_type, filename;
     double final_time, perturb;
+    bool compact_mode = false;
 
     po::options_description desc("Options");
 
@@ -275,9 +277,9 @@ int main(int argc, char *argv[])
         "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
         "filename", po::value<std::string>(&filename)->default_value(""),
         "name of the file into which the simulation data will be saved (if empty, no data will be saved)")(
-        "final_time", po::value<double>(&final_time)->default_value(1E6),
-        "simulation end time (in years)")("perturb", po::value<double>(&perturb)->default_value(0.),
-                                          "magnitude of the perturbation on the initial state");
+        "final_time", po::value<double>(&final_time)->default_value(1E6), "simulation end time (in years)")(
+        "perturb", po::value<double>(&perturb)->default_value(0.),
+        "magnitude of the perturbation on the initial state")("compact_mode", "compact mode");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -286,6 +288,10 @@ int main(int argc, char *argv[])
     if (vm.count("help")) {
         std::cout << desc << "\n";
         return 0;
+    }
+
+    if (vm.count("compact_mode")) {
+        compact_mode = true;
     }
 
     // Validate the command-line arguments.
@@ -300,12 +306,12 @@ int main(int argc, char *argv[])
     }
 
     if (fp_type == "double") {
-        run_integration<double>(filename, final_time, perturb);
+        run_integration<double>(filename, final_time, perturb, compact_mode);
     } else if (fp_type == "long double") {
-        run_integration<long double>(filename, final_time, perturb);
+        run_integration<long double>(filename, final_time, perturb, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb);
+        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb, compact_mode);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");

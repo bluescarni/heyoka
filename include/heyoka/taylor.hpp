@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -41,37 +42,45 @@ namespace heyoka
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_load_derivative(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                                      std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                                 std::uint32_t);
 
-}
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                                  llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
+
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<expression>);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expression>>);
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<expression>,
-                                                             std::uint32_t, std::uint32_t, bool);
-HEYOKA_DLL_PUBLIC std::vector<expression>
-taylor_add_jet_ldbl(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t, bool);
+                                                             std::uint32_t, std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_ldbl(llvm_state &, const std::string &,
+                                                              std::vector<expression>, std::uint32_t, std::uint32_t,
+                                                              bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<expression>
-taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_f128(llvm_state &, const std::string &,
+                                                              std::vector<expression>, std::uint32_t, std::uint32_t,
+                                                              bool, bool);
 
 #endif
 
 template <typename T>
 std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                       std::uint32_t order, std::uint32_t batch_size, bool high_accuracy)
+                                       std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                       bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -80,62 +89,63 @@ std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name, s
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_dbl(llvm_state &, const std::string &,
                                                              std::vector<std::pair<expression, expression>>,
-                                                             std::uint32_t, std::uint32_t, bool);
+                                                             std::uint32_t, std::uint32_t, bool, bool);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_ldbl(llvm_state &, const std::string &,
                                                               std::vector<std::pair<expression, expression>>,
-                                                              std::uint32_t, std::uint32_t, bool);
+                                                              std::uint32_t, std::uint32_t, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_jet_f128(llvm_state &, const std::string &,
                                                               std::vector<std::pair<expression, expression>>,
-                                                              std::uint32_t, std::uint32_t, bool);
+                                                              std::uint32_t, std::uint32_t, bool, bool);
 
 #endif
 
 template <typename T>
 std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name,
                                        std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
-                                       std::uint32_t batch_size, bool high_accuracy)
+                                       std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy);
+        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<expression>
-taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<expression>, double, std::uint32_t, bool);
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
+                                                                       std::vector<expression>, double, std::uint32_t,
+                                                                       bool, bool);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
                                                                         std::vector<expression>, long double,
-                                                                        std::uint32_t, bool);
+                                                                        std::uint32_t, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
                                                                         std::vector<expression>, mppp::real128,
-                                                                        std::uint32_t, bool);
+                                                                        std::uint32_t, bool, bool);
 
 #endif
 
 template <typename T>
 std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                                 T tol, std::uint32_t batch_size, bool high_accuracy)
+                                                 T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -144,31 +154,31 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
                                                                        std::vector<std::pair<expression, expression>>,
-                                                                       double, std::uint32_t, bool);
+                                                                       double, std::uint32_t, bool, bool);
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
                                                                         std::vector<std::pair<expression, expression>>,
-                                                                        long double, std::uint32_t, bool);
+                                                                        long double, std::uint32_t, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
                                                                         std::vector<std::pair<expression, expression>>,
-                                                                        mppp::real128, std::uint32_t, bool);
+                                                                        mppp::real128, std::uint32_t, bool, bool);
 
 #endif
 
 template <typename T>
 std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name,
                                                  std::vector<std::pair<expression, expression>> sys, T tol,
-                                                 std::uint32_t batch_size, bool high_accuracy)
+                                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy);
+        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -189,14 +199,62 @@ namespace kw
 {
 
 IGOR_MAKE_NAMED_ARGUMENT(time);
-IGOR_MAKE_NAMED_ARGUMENT(times);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
+IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 
 } // namespace kw
 
 namespace detail
 {
+
+// Helper for parsing common options for the Taylor integrators.
+template <typename T, typename... KwArgs>
+inline auto taylor_adaptive_common_ops(KwArgs &&... kw_args)
+{
+    igor::parser p{kw_args...};
+
+    // High accuracy mode (defaults to false).
+    auto high_accuracy = [&p]() -> bool {
+        if constexpr (p.has(kw::high_accuracy)) {
+            return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
+        } else {
+            return false;
+        }
+    }();
+
+    // tol (defaults to eps).
+    auto tol = [&p, high_accuracy]() -> T {
+        if constexpr (p.has(kw::tol)) {
+            auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
+            if (retval != T(0)) {
+                // NOTE: this covers the NaN case as well.
+                return retval;
+            }
+            // NOTE: zero tolerance will be interpreted
+            // as automatically-deduced by falling through
+            // the code below.
+        }
+        auto retval = std::numeric_limits<T>::epsilon();
+        if (high_accuracy) {
+            // Add extra precision in high-accuracy mode.
+            retval *= T(1e-4);
+        }
+
+        return retval;
+    }();
+
+    // Compact mode (defaults to false).
+    auto compact_mode = [&p]() -> bool {
+        if constexpr (p.has(kw::compact_mode)) {
+            return std::forward<decltype(p(kw::compact_mode))>(p(kw::compact_mode));
+        } else {
+            return false;
+        }
+    }();
+
+    return std::tuple{high_accuracy, tol, compact_mode};
+}
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
@@ -217,7 +275,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, T, T, bool);
+    void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&... kw_args)
     {
@@ -237,37 +295,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
                 }
             }();
 
-            // High accuracy mode (defaults to false).
-            const auto high_accuracy = [&p]() -> bool {
-                if constexpr (p.has(kw::high_accuracy)) {
-                    return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
-                } else {
-                    return false;
-                }
-            }();
+            const auto [high_accuracy, tol, compact_mode]
+                = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
-            // tol (defaults to eps).
-            const auto tol = [&p, high_accuracy]() -> T {
-                if constexpr (p.has(kw::tol)) {
-                    auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                    if (retval != T(0)) {
-                        // NOTE: this covers the NaN case as well.
-                        return retval;
-                    }
-                    // NOTE: zero tolerance will be interpreted
-                    // as automatically-deduced by falling through
-                    // the code below.
-                }
-                auto retval = std::numeric_limits<T>::epsilon();
-                if (high_accuracy) {
-                    // Add extra precision in high-accuracy mode.
-                    retval *= T(1e-4);
-                }
-
-                return retval;
-            }();
-
-            finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy);
+            finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy, compact_mode);
         }
     }
 
@@ -474,7 +505,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool);
+    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&... kw_args)
     {
@@ -487,44 +518,18 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
         } else {
             // Initial times (defaults to a vector of zeroes).
             auto times = [&p, batch_size]() -> std::vector<T> {
-                if constexpr (p.has(kw::times)) {
-                    return std::forward<decltype(p(kw::times))>(p(kw::times));
+                if constexpr (p.has(kw::time)) {
+                    return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
                     return std::vector<T>(static_cast<typename std::vector<T>::size_type>(batch_size), T(0));
                 }
             }();
 
-            // High accuracy mode (defaults to false).
-            const auto high_accuracy = [&p]() -> bool {
-                if constexpr (p.has(kw::high_accuracy)) {
-                    return std::forward<decltype(p(kw::high_accuracy))>(p(kw::high_accuracy));
-                } else {
-                    return false;
-                }
-            }();
+            const auto [high_accuracy, tol, compact_mode]
+                = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
-            // tol (defaults to eps).
-            const auto tol = [&p, high_accuracy]() -> T {
-                if constexpr (p.has(kw::tol)) {
-                    auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
-                    if (retval != T(0)) {
-                        // NOTE: this covers the NaN case as well.
-                        return retval;
-                    }
-                    // NOTE: zero tolerance will be interpreted
-                    // as automatically-deduced by falling through
-                    // the code below.
-                }
-                auto retval = std::numeric_limits<T>::epsilon();
-                if (high_accuracy) {
-                    // Add extra precision in high-accuracy mode.
-                    retval *= T(1e-4);
-                }
-
-                return retval;
-            }();
-
-            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), tol, high_accuracy);
+            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), tol, high_accuracy,
+                               compact_mode);
         }
     }
 
