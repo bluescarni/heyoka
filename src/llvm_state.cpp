@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <ios>
 #include <iterator>
@@ -101,6 +102,76 @@ namespace detail
 namespace
 {
 
+// Helper function to detect specific features
+// on the host machine via LLVM's machinery.
+target_features get_target_features_impl()
+{
+    auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+    if (!jtmb) {
+        throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
+    }
+
+    auto tm = jtmb->createTargetMachine();
+    if (!tm) {
+        throw std::invalid_argument("Error creating the target machine");
+    }
+
+    target_features retval;
+
+    const auto target_name = std::string{(*tm)->getTarget().getName()};
+
+    if (target_name == "x86-64") {
+        // Look for AVX512 first, then AVX.
+        const auto t_features = (*tm)->getTargetFeatureString();
+
+        std::string feature = "+avx512f";
+
+        auto it = std::search(t_features.begin(), t_features.end(),
+                              std::boyer_moore_searcher(feature.begin(), feature.end()));
+
+        if (it != t_features.end()) {
+            retval.avx512 = true;
+        }
+
+        feature = "+avx";
+
+        it = std::search(t_features.begin(), t_features.end(),
+                         std::boyer_moore_searcher(feature.begin(), feature.end()));
+
+        if (it != t_features.end()) {
+            retval.avx = true;
+        }
+
+        // SSE2 is always available on x86-64.
+#if !defined(NDEBUG)
+        feature = "+sse2";
+
+        it = std::search(t_features.begin(), t_features.end(),
+                         std::boyer_moore_searcher(feature.begin(), feature.end()));
+
+        assert(it != t_features.end());
+#endif
+
+        retval.sse = true;
+    }
+
+    return retval;
+}
+
+} // namespace
+
+// Helper function to fetch a const ref to a global object
+// containing info about the host machine.
+const target_features &get_target_features()
+{
+    static const target_features retval{get_target_features_impl()};
+
+    return retval;
+}
+
+namespace
+{
+
 std::once_flag nt_inited;
 
 } // namespace
@@ -121,11 +192,6 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
     llvm::orc::ThreadSafeContext m_ctx;
     llvm::orc::JITDylib &m_main_jd;
-    // This is a workaround flag to
-    // signal that AVX-512 is available.
-    // It is used in the module optimisation
-    // function to set specific function attributes.
-    bool m_have_avx512 = false;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
@@ -450,7 +516,7 @@ void llvm_state::optimise()
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
 
-        if (m_jitter->m_have_avx512) {
+        if (detail::get_target_features().avx512) {
             // NOTE: currently LLVM forces 256-bit vector
             // width when AVX-512 is available, due to clock
             // frequency scaling concerns. It seems like for

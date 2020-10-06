@@ -46,6 +46,21 @@
 namespace heyoka
 {
 
+namespace detail
+{
+
+// Helper struct to signal the availability
+// of certain features on the host machine.
+struct target_features {
+    bool sse = false;
+    bool avx = false;
+    bool avx512 = false;
+};
+
+HEYOKA_DLL_PUBLIC const target_features &get_target_features();
+
+} // namespace detail
+
 namespace kw
 {
 
