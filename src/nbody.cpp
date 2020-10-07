@@ -13,6 +13,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
@@ -120,9 +122,12 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     std::vector<std::pair<expression, expression>> retval;
 
     // Accumulators for the accelerations on the bodies.
-    // NOTE: no need to check n, we already successfully created
-    // vectors of size n above.
-    std::vector<expression> x_acc(n, expression{number{0.}}), y_acc(x_acc), z_acc(x_acc);
+    // The i-th element of x/y/z_acc contains the list of
+    // accelerations on body i due to all the other bodies.
+    std::vector<std::vector<expression>> x_acc;
+    x_acc.resize(boost::numeric_cast<decltype(x_acc.size())>(n));
+    auto y_acc = x_acc;
+    auto z_acc = x_acc;
 
     for (std::uint32_t i = 0; i < n; ++i) {
         // r' = v.
@@ -140,22 +145,24 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             auto r_m3 = pow(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z, expression{number{-3. / 2}});
 
             // Acceleration exerted by j on i.
-            x_acc[i] += Gconst * masses[j] * diff_x * r_m3;
-            y_acc[i] += Gconst * masses[j] * diff_y * r_m3;
-            z_acc[i] += Gconst * masses[j] * diff_z * r_m3;
+            // NOTE: Gconst * masses[j] will be contracted
+            // into a single number by expression's operator*().
+            x_acc[i].push_back(Gconst * masses[j] * (diff_x * r_m3));
+            y_acc[i].push_back(Gconst * masses[j] * (diff_y * r_m3));
+            z_acc[i].push_back(Gconst * masses[j] * (diff_z * r_m3));
 
             // Acceleration exerted by i on j.
             // NOTE: do the negation on the masses, which
             // here are guaranteed to have numerical values.
-            x_acc[j] += Gconst * -masses[i] * diff_x * r_m3;
-            y_acc[j] += Gconst * -masses[i] * diff_y * r_m3;
-            z_acc[j] += Gconst * -masses[i] * diff_z * r_m3;
+            x_acc[j].push_back(Gconst * -masses[i] * (diff_x * r_m3));
+            y_acc[j].push_back(Gconst * -masses[i] * (diff_y * r_m3));
+            z_acc[j].push_back(Gconst * -masses[i] * (diff_z * r_m3));
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) = x_acc[i]);
-        retval.push_back(prime(vy_vars[i]) = y_acc[i]);
-        retval.push_back(prime(vz_vars[i]) = z_acc[i]);
+        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
     }
 
     return retval;
