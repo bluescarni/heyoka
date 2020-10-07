@@ -393,6 +393,38 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
     return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
 }
 
+// Pairwise summation of a vector of expressions.
+// https://en.wikipedia.org/wiki/Pairwise_summation
+expression pairwise_sum(std::vector<expression> sum)
+{
+    if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
+        throw std::overflow_error("Overflow detected in pairwise_sum()");
+    }
+
+    if (sum.empty()) {
+        return expression{number{0.}};
+    }
+
+    while (sum.size() != 1u) {
+        std::vector<expression> new_sum;
+
+        for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
+            if (i + 1u == sum.size()) {
+                // We are at the last element of the vector
+                // and the size of the vector is odd. Just append
+                // the existing value.
+                new_sum.push_back(std::move(sum[i]));
+            } else {
+                new_sum.push_back(std::move(sum[i]) + std::move(sum[i + 1u]));
+            }
+        }
+
+        new_sum.swap(sum);
+    }
+
+    return sum[0];
+}
+
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
 {
     return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
