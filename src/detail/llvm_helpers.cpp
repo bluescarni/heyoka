@@ -9,6 +9,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -172,6 +173,10 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
 llvm::Value *pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
 {
     assert(!sum.empty());
+
+    if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
+        throw std::overflow_error("Overflow detected in pairwise_sum()");
+    }
 
     while (sum.size() != 1u) {
         std::vector<llvm::Value *> new_sum;
