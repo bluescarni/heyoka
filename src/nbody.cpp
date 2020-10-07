@@ -25,6 +25,10 @@
 namespace heyoka::detail
 {
 
+// NOTE: decide if this is to be kept or not. Possible performance improvements:
+// - use pairwise sum,
+// - collect the multiplication by Gconst
+//   outside the sum, instead of doing it term-by-term.
 std::vector<std::pair<expression, expression>> make_nbody_sys_parametric_masses(std::uint32_t n, expression Gconst)
 {
     assert(n >= 2u);
@@ -70,14 +74,14 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_parametric_masses(
             auto r_m3 = pow(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z, expression{number{-3. / 2}});
 
             // Acceleration exerted by j on i.
-            x_acc[i] += Gconst * m_vars[j] * diff_x * r_m3;
-            y_acc[i] += Gconst * m_vars[j] * diff_y * r_m3;
-            z_acc[i] += Gconst * m_vars[j] * diff_z * r_m3;
+            x_acc[i] += Gconst * m_vars[j] * (diff_x * r_m3);
+            y_acc[i] += Gconst * m_vars[j] * (diff_y * r_m3);
+            z_acc[i] += Gconst * m_vars[j] * (diff_z * r_m3);
 
             // Acceleration exerted by i on j.
-            x_acc[j] -= Gconst * m_vars[i] * diff_x * r_m3;
-            y_acc[j] -= Gconst * m_vars[i] * diff_y * r_m3;
-            z_acc[j] -= Gconst * m_vars[i] * diff_z * r_m3;
+            x_acc[j] -= Gconst * m_vars[i] * (diff_x * r_m3);
+            y_acc[j] -= Gconst * m_vars[i] * (diff_y * r_m3);
+            z_acc[j] -= Gconst * m_vars[i] * (diff_z * r_m3);
         }
 
         // Add the expressions of the accelerations to the system.
