@@ -434,10 +434,6 @@ TEST_CASE("taylor sincos cse")
     auto dc = taylor_add_jet<double>(s, "jet", {sin(y) + cos(x) + sin(x) + cos(y), sin(y) + cos(x) + sin(x) + cos(y)},
                                      2, 1, false, false);
 
-    for (const auto &ex : dc) {
-        std::cout << ex << '\n';
-    }
-
     s.compile();
 
     auto jptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
