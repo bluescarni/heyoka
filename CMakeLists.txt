@@ -215,6 +215,8 @@ add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
 target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
 target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
+# NOTE: quench warnings from Boost when building the library.
+target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
