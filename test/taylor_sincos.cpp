@@ -420,3 +420,41 @@ TEST_CASE("taylor sincos")
         }
     }
 }
+
+// Test expression simplification with sine/cosine.
+TEST_CASE("taylor sincos cse")
+{
+    using std::cos;
+    using std::sin;
+
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s;
+
+    auto dc = taylor_add_jet<double>(s, "jet", {sin(y) + cos(x) + sin(x) + cos(y), sin(y) + cos(x) + sin(x) + cos(y)},
+                                     2, 1, false, false);
+
+    for (const auto &ex : dc) {
+        std::cout << ex << '\n';
+    }
+
+    s.compile();
+
+    auto jptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+
+    std::vector<double> jet{2., 3.};
+    jet.resize(6);
+
+    jptr(jet.data());
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
+    REQUIRE(jet[3] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1])));
+    REQUIRE(jet[4]
+            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
+                             / 2));
+    REQUIRE(jet[5]
+            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
+                             / 2));
+}
