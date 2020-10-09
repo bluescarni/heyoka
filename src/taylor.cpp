@@ -1850,34 +1850,28 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
-// Run the Horner scheme on multiple polynomials at a time, with evaluation point h. Each element of cf_vecs
-// contains the list of coefficients of a polynomial.
-std::vector<llvm::Value *> taylor_run_multihorner(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
-                                                  llvm::Value *h)
+// Given a jet of derivatives diff_arr from order 0 to order 'order' of the state variables, produce
+// an updated state via the evaluation of the Taylor polynomials with timestep h. The evaluation
+// is done via Horner's scheme. n_eq is the number of state variables, n_uvars the total number
+// of u variables.
+std::vector<llvm::Value *>
+taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_arr,
+                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order)
 {
-    // Preconditions: cf_vecs is not empty, and it contains polynomials
-    // of degree at least 1, all with the same degree.
-    assert(!cf_vecs.empty());
-    assert(!cf_vecs[0].empty());
-    assert(std::all_of(cf_vecs.begin() + 1, cf_vecs.end(),
-                       [&cf_vecs](const auto &v) { return v.size() == cf_vecs[0].size(); }));
-
     auto &builder = s.builder();
 
-    // Number of terms in each polynomial (i.e., degree + 1).
-    const auto nterms = cf_vecs[0].size();
-
     // Init the return value, filling it with the values of the
-    // coefficients of the highest-degree monomial in each polynomial.
+    // derivatives of order 'order'.
     std::vector<llvm::Value *> retval;
-    for (const auto &v : cf_vecs) {
-        retval.push_back(v.back());
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        retval.push_back(taylor_sv_diff_from_jet(s, diff_arr, n_eq, n_uvars, order, i));
     }
 
     // Run the Horner scheme simultaneously for all polynomials.
-    for (decltype(cf_vecs[0].size()) i = 1; i < nterms; ++i) {
-        for (decltype(cf_vecs.size()) j = 0; j < cf_vecs.size(); ++j) {
-            retval[j] = builder.CreateFAdd(cf_vecs[j][nterms - i - 1u], builder.CreateFMul(retval[j], h));
+    for (std::uint32_t o = 1; o <= order; ++o) {
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            retval[i] = builder.CreateFAdd(taylor_sv_diff_from_jet(s, diff_arr, n_eq, n_uvars, order - o, i),
+                                           builder.CreateFMul(retval[i], h));
         }
     }
 
@@ -1887,47 +1881,38 @@ std::vector<llvm::Value *> taylor_run_multihorner(llvm_state &s, const std::vect
 // As above, but instead of the Horner scheme use a compensated summation over the naive evaluation
 // of monomials.
 template <typename T>
-std::vector<llvm::Value *> taylor_run_ceval(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
-                                            llvm::Value *h, std::uint32_t batch_size)
+std::vector<llvm::Value *>
+taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_arr, llvm::Value *h,
+                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
-    // Preconditions: cf_vecs is not empty, and it contains polynomials
-    // of degree at least 1, all with the same degree.
-    assert(!cf_vecs.empty());
-    assert(!cf_vecs[0].empty());
-    assert(std::all_of(cf_vecs.begin() + 1, cf_vecs.end(),
-                       [&cf_vecs](const auto &v) { return v.size() == cf_vecs[0].size(); }));
-
     auto &builder = s.builder();
-
-    // Number of terms in each polynomial (i.e., degree + 1).
-    const auto nterms = cf_vecs[0].size();
 
     // Init the return values with the order-0 monomials, and the running
     // compensations with zero.
     std::vector<llvm::Value *> retval, comp;
-    for (const auto &v : cf_vecs) {
-        retval.push_back(v[0]);
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        retval.push_back(taylor_sv_diff_from_jet(s, diff_arr, n_eq, n_uvars, 0, i));
         comp.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
     }
 
     // Evaluate and sum.
     auto cur_h = h;
-    for (decltype(cf_vecs[0].size()) i = 1; i < nterms; ++i) {
-        for (decltype(cf_vecs.size()) j = 0; j < cf_vecs.size(); ++j) {
+    for (std::uint32_t o = 1; o <= order; ++o) {
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
             // Evaluate the current monomial.
-            auto tmp = builder.CreateFMul(cf_vecs[j][i], cur_h);
+            auto tmp = builder.CreateFMul(taylor_sv_diff_from_jet(s, diff_arr, n_eq, n_uvars, o, i), cur_h);
 
             // Compute the quantities for the compensation.
-            auto y = builder.CreateFSub(tmp, comp[j]);
-            auto t = builder.CreateFAdd(retval[j], y);
+            auto y = builder.CreateFSub(tmp, comp[i]);
+            auto t = builder.CreateFAdd(retval[i], y);
 
             // Update the compensation and the return value.
-            comp[j] = builder.CreateFSub(builder.CreateFSub(t, retval[j]), y);
-            retval[j] = t;
+            comp[i] = builder.CreateFSub(builder.CreateFSub(t, retval[i]), y);
+            retval[i] = t;
         }
 
         // Update the power of h, if we are not at the last iteration.
-        if (i != nterms - 1u) {
+        if (o != order) {
             cur_h = builder.CreateFMul(cur_h, h);
         }
     }
@@ -2078,20 +2063,9 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
                                       vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
     h = builder.CreateFMul(h_fac, h);
 
-    // Build the Taylor polynomials that need to be evaluated for the propagation.
-    std::vector<std::vector<llvm::Value *>> cf_vecs;
-    for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-        cf_vecs.emplace_back();
-        auto &cf_vec = cf_vecs.back();
-
-        for (std::uint32_t o = 0; o <= order; ++o) {
-            cf_vec.push_back(taylor_sv_diff_from_jet(s, diff_arr, n_eq, n_uvars, o, var_idx));
-        }
-    }
-
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_states
-        = high_accuracy ? taylor_run_ceval<T>(s, cf_vecs, h, batch_size) : taylor_run_multihorner(s, cf_vecs, h);
+    auto new_states = high_accuracy ? taylor_run_ceval<T>(s, diff_arr, h, n_eq, n_uvars, order, batch_size)
+                                    : taylor_run_multihorner(s, diff_arr, h, n_eq, n_uvars, order);
 
     // Store the new state.
     for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
