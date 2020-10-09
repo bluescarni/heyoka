@@ -13,8 +13,10 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <iterator>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -27,6 +29,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/IR/Attributes.h>
@@ -162,6 +165,175 @@ std::vector<expression> taylor_decompose_cse(std::vector<expression> &v_ex, std:
         rename_variables(ex, uvars_rename);
 
         retval.emplace_back(std::move(ex));
+    }
+
+    return retval;
+}
+
+// Perform a topological sort on a graph representation
+// of the Taylor decomposition. This can improve performance
+// by grouping together operations that can be performed in parallel.
+// NOTE: the original decomposition dc is already topologically sorted,
+// in the sense that the definitions of the u variables are already
+// ordered according to dependency. However, because the original decomposition
+// comes from a depth-first search, it has the tendency to group together
+// expressions which are dependent on each other. By doing another topological
+// sort, this time based on breadth-first search, we determine another valid
+// sorting in which independent operations tend to be clustered together. This
+// results in a measurable performance improvement in non-compact mode (~15%
+// on the outer_ss benchmarks),
+// however it does not seem to have an effect in compact mode. Perhaps
+// in the future we can consider some options:
+//
+// - make this extra sorting deactivatable with a kw arg,
+// - do the decomposition in breadth-first fashion directly,
+//   thus avoiding this extra sorting.
+auto taylor_sort_dc(std::vector<expression> &dc, std::vector<expression>::size_type n_eq)
+{
+    // A Taylor decomposition is supposed
+    // to have n_eq variables at the beginning,
+    // n_eq variables at the end and possibly
+    // extra variables in the middle
+    assert(dc.size() >= n_eq * 2u);
+
+    // The graph type that we will use for the topological sorting.
+    using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
+                                          boost::vecS,           // std::vector for the list of vertices
+                                          boost::bidirectionalS, // directed graph with efficient access
+                                                                 // to in-edges
+                                          boost::no_property,    // no vertex properties
+                                          boost::no_property,    // no edge properties
+                                          boost::no_property,    // no graph properties
+                                          boost::listS           // std::list for of the graph's edge list
+                                          >;
+
+    graph_t g;
+
+    // Add the root node.
+    const auto root_v = boost::add_vertex(g);
+
+    // Add the nodes corresponding to the state variables.
+    for (decltype(n_eq) i = 0; i < n_eq; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Add a dependency on the root node.
+        boost::add_edge(root_v, v, g);
+    }
+
+    // Add the rest of the u variables.
+    for (decltype(n_eq) i = n_eq; i < dc.size() - n_eq; ++i) {
+        auto v = boost::add_vertex(g);
+
+        // Fetch the list of variables in the current expression.
+        const auto vars = get_variables(dc[i]);
+
+        if (vars.empty()) {
+            // The current expression does not contain
+            // any variable: make it depend on the root
+            // node. This means that in the topological
+            // sort below, the current u var will appear
+            // immediately after the state variables.
+            boost::add_edge(root_v, v, g);
+        } else {
+            // Mark the current u variable as depending on all the
+            // variables in the current expression.
+            for (const auto &var : vars) {
+                // Extract the index.
+                const auto idx = uname_to_index(var);
+
+                // Add the dependency.
+                // NOTE: add +1 because the i-th vertex
+                // corresponds to the (i-1)-th u variable
+                // due to the presence of the root node.
+                boost::add_edge(boost::vertex(idx + 1u, g), v, g);
+            }
+        }
+    }
+
+    assert(boost::num_vertices(g) - 1u == dc.size() - n_eq);
+
+    // Run the BF topological sort on the graph. This is Kahn's algorithm:
+    // https://en.wikipedia.org/wiki/Topological_sorting
+
+    // The result of the sort.
+    std::vector<decltype(dc.size())> v_idx;
+
+    // Temp variable used to sort a list of edges in the loop below.
+    std::vector<boost::graph_traits<graph_t>::edge_descriptor> tmp_edges;
+
+    // The set of all nodes with no incoming edge.
+    std::deque<decltype(dc.size())> tmp;
+    // The root node has no incoming edge.
+    tmp.push_back(0);
+
+    // Main loop.
+    while (!tmp.empty()) {
+        // Pop the first element from tmp
+        // and append it to the result.
+        const auto v = tmp.front();
+        tmp.pop_front();
+        v_idx.push_back(v);
+
+        // Fetch all the out edges of v and sort them according
+        // to the target vertex.
+        // NOTE: the sorting is important to ensure that all the state
+        // variables are insered into v_idx in the correct order.
+        const auto e_range = boost::out_edges(v, g);
+        tmp_edges.assign(e_range.first, e_range.second);
+        std::sort(tmp_edges.begin(), tmp_edges.end(),
+                  [&g](const auto &e1, const auto &e2) { return boost::target(e1, g) < boost::target(e2, g); });
+
+        // For each out edge of v:
+        // - eliminate it;
+        // - check if the target vertex of the edge
+        //   has other incoming edges;
+        // - if it does not, insert it into tmp.
+        for (auto &e : tmp_edges) {
+            // Fetch the target of the edge.
+            const auto t = boost::target(e, g);
+
+            // Remove the edge.
+            boost::remove_edge(e, g);
+
+            // Get the range of vertices connecting to t.
+            const auto iav = boost::inv_adjacent_vertices(t, g);
+
+            if (iav.first == iav.second) {
+                // t does not have any incoming edges, add it to tmp.
+                tmp.push_back(t);
+            }
+        }
+    }
+
+    assert(v_idx.size() == boost::num_vertices(g));
+    assert(boost::num_edges(g) == 0u);
+
+    // Adjust v_idx: remove the index of the root node,
+    // decrease by one all other indices, insert the final
+    // n_eq indices.
+    for (decltype(v_idx.size()) i = 0; i < v_idx.size() - 1u; ++i) {
+        v_idx[i] = v_idx[i + 1u] - 1u;
+    }
+    v_idx.resize(boost::numeric_cast<decltype(v_idx.size())>(dc.size()));
+    std::iota(v_idx.data() + dc.size() - n_eq, v_idx.data() + dc.size(), dc.size() - n_eq);
+
+    // Create the remapping dictionary.
+    std::unordered_map<std::string, std::string> remap;
+    for (decltype(v_idx.size()) i = n_eq; i < v_idx.size() - n_eq; ++i) {
+        if (v_idx[i] != i) {
+            remap.emplace("u_" + li_to_string(v_idx[i]), "u_" + li_to_string(i));
+        }
+    }
+
+    // Do the remap.
+    for (auto it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
+        rename_variables(*it, remap);
+    }
+
+    // Reorder the decomposition.
+    std::vector<expression> retval;
+    for (auto idx : v_idx) {
+        retval.push_back(std::move(dc[idx]));
     }
 
     return retval;
@@ -324,6 +496,13 @@ std::vector<expression> taylor_decompose(std::vector<expression> v_ex)
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
 #endif
 
+    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
+
+#if !defined(NDEBUG)
+    // Verify the reordered decomposition.
+    detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+#endif
+
     return u_vars_defs;
 }
 
@@ -464,6 +643,13 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
+    detail::verify_taylor_dec(orig_rhs, u_vars_defs);
+#endif
+
+    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
+
+#if !defined(NDEBUG)
+    // Verify the reordered decomposition.
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
 #endif
 

@@ -147,6 +147,8 @@ HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<s
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
+HEYOKA_DLL_PUBLIC expression pairwise_sum(std::vector<expression>);
+
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const expression &,

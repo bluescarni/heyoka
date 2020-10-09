@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <initializer_list>
 #include <random>
 #include <tuple>
@@ -19,8 +20,10 @@
 
 #endif
 
+#include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math_functions.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -279,4 +282,41 @@ TEST_CASE("taylor const sys")
             tuple_for_each(fp_types, [&tester, ha, cm](auto x) { tester(x, 3, ha, cm); });
         }
     }
+}
+
+// A test in which equations have an expression without variables
+// at the end.
+TEST_CASE("taylor end novars")
+{
+    using std::cos;
+    using std::sin;
+
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s;
+
+    auto no_vars = expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}};
+    auto dc = taylor_add_jet<double>(
+        s, "jet", {sin(y) + cos(x) + sin(x) + cos(y) + no_vars, sin(y) + cos(x) + sin(x) + cos(y) + no_vars}, 2, 1,
+        false, false);
+
+    s.compile();
+
+    auto jptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+
+    std::vector<double> jet{2., 3.};
+    jet.resize(6);
+
+    jptr(jet.data());
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1]) + 6));
+    REQUIRE(jet[3] == approximately(sin(jet[1]) + cos(jet[0]) + sin(jet[0]) + cos(jet[1]) + 6));
+    REQUIRE(jet[4]
+            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
+                             / 2));
+    REQUIRE(jet[5]
+            == approximately((cos(jet[1]) * jet[3] - sin(jet[0]) * jet[2] + cos(jet[0]) * jet[2] - sin(jet[1]) * jet[3])
+                             / 2));
 }
