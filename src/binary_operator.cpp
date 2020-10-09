@@ -1011,6 +1011,9 @@ llvm::Value *bo_taylor_c_diff_mul_impl(llvm_state &s, const variable &var0, cons
         // Create the return value.
         builder.CreateRet(builder.CreateLoad(acc));
 
+        // Verify.
+        s.verify_function(f);
+
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     }
@@ -1113,6 +1116,9 @@ llvm::Value *bo_taylor_c_diff_div_impl(llvm_state &s, const U &nv, const variabl
 
         // Create the return value.
         builder.CreateRet(builder.CreateLoad(acc));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
