@@ -54,6 +54,7 @@ namespace detail
 struct target_features {
     bool sse = false;
     bool avx = false;
+    bool avx2 = false;
     bool avx512 = false;
 };
 

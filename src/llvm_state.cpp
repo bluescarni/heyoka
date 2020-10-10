@@ -120,8 +120,7 @@ target_features get_target_features_impl()
 
     const auto target_name = std::string{(*tm)->getTarget().getName()};
 
-    if (target_name == "x86-64") {
-        // Look for AVX512 first, then AVX.
+    if (target_name == "x86-64" || target_name == "x86") {
         const auto t_features = (*tm)->getTargetFeatureString();
 
         std::string feature = "+avx512f";
@@ -131,6 +130,15 @@ target_features get_target_features_impl()
 
         if (it != t_features.end()) {
             retval.avx512 = true;
+        }
+
+        feature = "+avx2";
+
+        it = std::search(t_features.begin(), t_features.end(),
+                         std::boyer_moore_searcher(feature.begin(), feature.end()));
+
+        if (it != t_features.end()) {
+            retval.avx2 = true;
         }
 
         feature = "+avx";
