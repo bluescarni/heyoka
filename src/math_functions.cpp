@@ -225,8 +225,8 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -248,6 +248,7 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -284,6 +285,9 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Divide by the order to produce the return value.
         builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
@@ -572,8 +576,8 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -595,6 +599,7 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -631,6 +636,9 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Divide by the order and negate to produce the return value.
         builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), builder.CreateFNeg(ord_v)));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
@@ -922,8 +930,8 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -945,6 +953,7 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -983,6 +992,9 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Return ret / b0.
         builder.CreateRet(builder.CreateFDiv(ret, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), idx1)));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
@@ -1242,8 +1254,8 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1265,6 +1277,7 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -1299,6 +1312,9 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Return acc / n.
         builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
@@ -1603,8 +1619,8 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1627,6 +1643,7 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
+        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -1668,6 +1685,9 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
         builder.CreateRet(builder.CreateFDiv(
             builder.CreateLoad(acc),
             builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), idx0))));
+
+        // Verify.
+        s.verify_function(f);
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
