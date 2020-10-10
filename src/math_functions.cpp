@@ -225,8 +225,8 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -576,8 +576,8 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -930,8 +930,8 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1254,8 +1254,8 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1619,8 +1619,8 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
     // Fetch the pointee type of diff_arr.
     auto val_t = pointee_type(diff_arr);
 
-    // Get the function name for the current fp type and batch size.
-    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t);
+    // Get the function name for the current fp type, batch size and n_uvars.
+    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);

@@ -1366,6 +1366,13 @@ llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm:
 // order0 contains the zero order derivatives of the state variables.
 //
 // The return value is the jet of derivatives of the state variables up to order 'order'.
+//
+// NOTE: at one point we had another version of this function which would return a variant
+// containing either the diff array for all uvars (compact mode) or a std::vector containing the jet
+// of derivatives for the state variables like now. This allowed us to interleave load instructions
+// with computations later (e.g., in the determination of rho and in the Taylor polynomial
+// evaluation functions). This did not seem to make a difference, performance-wise, but it might
+// be useful to remember about this. See tree state @ 7476630eb5a1d6ac6204035093faecdd1f6d7da5.
 template <typename T>
 auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const std::vector<expression> &dc,
                         std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
