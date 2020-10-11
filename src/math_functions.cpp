@@ -23,9 +23,10 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -253,7 +254,7 @@ llvm::Value *taylor_c_diff_sin(llvm_state &s, const function &func, llvm::Value 
 expression sin(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
     fc.display_name() = "sin";
@@ -380,7 +381,7 @@ expression sin(expression e)
         const auto retval = u_vars_defs.size() - 1u;
 
         // Append the cosine decomposition.
-        u_vars_defs.emplace_back(cos(std::move(f_arg)));
+        u_vars_defs.push_back(cos(std::move(f_arg)));
 
         return retval;
     };
@@ -603,7 +604,7 @@ llvm::Value *taylor_c_diff_cos(llvm_state &s, const function &func, llvm::Value 
 expression cos(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
     fc.display_name() = "cos";
@@ -717,7 +718,7 @@ expression cos(expression e)
         }
 
         // Append the sine decomposition.
-        u_vars_defs.emplace_back(sin(arg));
+        u_vars_defs.push_back(sin(arg));
 
         // Append the cosine decomposition.
         u_vars_defs.emplace_back(std::move(f));
@@ -958,7 +959,7 @@ llvm::Value *taylor_c_diff_log(llvm_state &s, const function &func, llvm::Value 
 expression log(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
     fc.display_name() = "log";
@@ -1278,7 +1279,7 @@ llvm::Value *taylor_c_diff_exp(llvm_state &s, const function &func, llvm::Value 
 expression exp(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
     fc.display_name() = "exp";
@@ -1618,30 +1619,48 @@ llvm::Value *taylor_c_diff_pow(llvm_state &s, const function &func, llvm::Value 
 
 expression pow(expression e1, expression e2)
 {
+    // NOTE: we want to allow approximate implementations of pow()
+    // in the following cases:
+    // - e2 is an integral number n (in which case we want to allow
+    //   transformation in a sequence of multiplications),
+    // - e2 is a value of type n / 2, with n an odd integral value (in which case
+    //   we want to give the option of implementing pow() on top of sqrt()).
+    const auto allow_approx = detail::is_integral(e2) || detail::is_odd_integral_half(e2);
+
     std::vector<expression> args;
-    args.emplace_back(std::move(e1));
-    args.emplace_back(std::move(e2));
+    args.push_back(std::move(e1));
+    args.push_back(std::move(e2));
 
     function fc{std::move(args)};
     fc.display_name() = "pow";
 
-    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+    fc.codegen_dbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) -> llvm::Value * {
         if (args.size() != 2u) {
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the pow "
                                         "function: 2 arguments were expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
         }
 
-        return detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+        auto ret = llvm::cast<llvm::CallInst>(detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args));
+        if (allow_approx) {
+            ret->setHasApproxFunc(true);
+        }
+
+        return ret;
     };
-    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+    fc.codegen_ldbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) -> llvm::Value * {
         if (args.size() != 2u) {
             throw std::invalid_argument("Invalid number of arguments passed to the long double codegen of the pow "
                                         "function: 2 arguments were expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
         }
 
-        return detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+        auto ret = llvm::cast<llvm::CallInst>(detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args));
+        if (allow_approx) {
+            ret->setHasApproxFunc(true);
+        }
+
+        return ret;
     };
 #if defined(HEYOKA_HAVE_REAL128)
     fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
@@ -1831,7 +1850,7 @@ llvm::Value *taylor_c_diff_sqrt(llvm_state &s, const function &func, llvm::Value
 expression sqrt(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
     fc.display_name() = "sqrt";
