@@ -21,7 +21,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -42,7 +41,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC function
 {
 public:
-    enum class type { internal, external, builtin };
+    using codegen_t = std::function<llvm::Value *(llvm_state &, const std::vector<llvm::Value *> &)>;
 
     using diff_t = std::function<expression(const std::vector<expression> &, const std::string &)>;
 
@@ -68,23 +67,16 @@ public:
                                                         llvm::Value *, std::uint32_t, std::uint32_t)>;
 
 private:
-    std::string m_name_dbl, m_name_ldbl,
-#if defined(HEYOKA_HAVE_REAL128)
-        m_name_f128,
-#endif
-        m_display_name;
-    std::unique_ptr<std::vector<expression>> m_args;
-    std::vector<llvm::Attribute::AttrKind> m_attributes_dbl, m_attributes_ldbl
+    codegen_t m_codegen_dbl_f, m_codegen_ldbl_f
 #if defined(HEYOKA_HAVE_REAL128)
         ,
-        m_attributes_f128
+        m_codegen_f128_f
 #endif
         ;
-    type m_ty_dbl = type::internal;
-    type m_ty_ldbl = type::internal;
-#if defined(HEYOKA_HAVE_REAL128)
-    type m_ty_f128 = type::internal;
-#endif
+
+    std::string m_display_name;
+
+    std::unique_ptr<std::vector<expression>> m_args;
 
     diff_t m_diff_f;
 
@@ -128,23 +120,13 @@ public:
     function &operator=(const function &);
     function &operator=(function &&) noexcept;
 
-    std::string &name_dbl();
-    std::string &name_ldbl();
+    codegen_t &codegen_dbl_f();
+    codegen_t &codegen_ldbl_f();
 #if defined(HEYOKA_HAVE_REAL128)
-    std::string &name_f128();
+    codegen_t &codegen_f128_f();
 #endif
     std::string &display_name();
     std::vector<expression> &args();
-    std::vector<llvm::Attribute::AttrKind> &attributes_dbl();
-    std::vector<llvm::Attribute::AttrKind> &attributes_ldbl();
-#if defined(HEYOKA_HAVE_REAL128)
-    std::vector<llvm::Attribute::AttrKind> &attributes_f128();
-#endif
-    type &ty_dbl();
-    type &ty_ldbl();
-#if defined(HEYOKA_HAVE_REAL128)
-    type &ty_f128();
-#endif
     diff_t &diff_f();
     eval_dbl_t &eval_dbl_f();
     eval_batch_dbl_t &eval_batch_dbl_f();
@@ -172,23 +154,13 @@ public:
     taylor_c_diff_t &taylor_c_diff_f128_f();
 #endif
 
-    const std::string &name_dbl() const;
-    const std::string &name_ldbl() const;
+    const codegen_t &codegen_dbl_f() const;
+    const codegen_t &codegen_ldbl_f() const;
 #if defined(HEYOKA_HAVE_REAL128)
-    const std::string &name_f128() const;
+    const codegen_t &codegen_f128_f() const;
 #endif
     const std::string &display_name() const;
     const std::vector<expression> &args() const;
-    const std::vector<llvm::Attribute::AttrKind> &attributes_dbl() const;
-    const std::vector<llvm::Attribute::AttrKind> &attributes_ldbl() const;
-#if defined(HEYOKA_HAVE_REAL128)
-    const std::vector<llvm::Attribute::AttrKind> &attributes_f128() const;
-#endif
-    const type &ty_dbl() const;
-    const type &ty_ldbl() const;
-#if defined(HEYOKA_HAVE_REAL128)
-    const type &ty_f128() const;
-#endif
     const diff_t &diff_f() const;
     const eval_dbl_t &eval_dbl_f() const;
     const eval_batch_dbl_t &eval_batch_dbl_f() const;
@@ -275,15 +247,6 @@ inline llvm::Value *codegen(llvm_state &s, const function &f)
 }
 
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(function &&, std::vector<expression> &);
-
-namespace detail
-{
-
-template <typename T>
-HEYOKA_DLL_PUBLIC llvm::Value *function_codegen_from_values(llvm_state &, const function &,
-                                                            const std::vector<llvm::Value *> &);
-
-}
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const function &, const std::vector<llvm::Value *> &,
                                                  std::uint32_t);

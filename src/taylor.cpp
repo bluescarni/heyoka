@@ -1702,7 +1702,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
         std::vector<llvm::Value *> res_scalars;
         for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
             res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_maxabs128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                s, "heyoka_maxabs128", x_t, {x_scalars[i], y_scalars[i]},
                 // NOTE: in theory we may add ReadNone here as well,
                 // but for some reason, at least up to LLVM 10,
                 // this causes strange codegen issues. Revisit
@@ -1743,7 +1743,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
         std::vector<llvm::Value *> res_scalars;
         for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
             res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minabs128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                s, "heyoka_minabs128", x_t, {x_scalars[i], y_scalars[i]},
                 // NOTE: in theory we may add ReadNone here as well,
                 // but for some reason, at least up to LLVM 10,
                 // this causes strange codegen issues. Revisit
@@ -1784,7 +1784,7 @@ llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
         std::vector<llvm::Value *> res_scalars;
         for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
             res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minnum128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
                 // NOTE: in theory we may add ReadNone here as well,
                 // but for some reason, at least up to LLVM 10,
                 // this causes strange codegen issues. Revisit
