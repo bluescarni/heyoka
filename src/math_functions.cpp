@@ -1634,30 +1634,30 @@ expression pow(expression e1, expression e2)
     function fc{std::move(args)};
     fc.display_name() = "pow";
 
-    fc.codegen_dbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) -> llvm::Value * {
+    fc.codegen_dbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) {
         if (args.size() != 2u) {
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the pow "
                                         "function: 2 arguments were expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
         }
 
-        auto ret = llvm::cast<llvm::CallInst>(detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args));
+        auto ret = detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
         if (allow_approx) {
-            ret->setHasApproxFunc(true);
+            llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
         }
 
         return ret;
     };
-    fc.codegen_ldbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) -> llvm::Value * {
+    fc.codegen_ldbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) {
         if (args.size() != 2u) {
             throw std::invalid_argument("Invalid number of arguments passed to the long double codegen of the pow "
                                         "function: 2 arguments were expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
         }
 
-        auto ret = llvm::cast<llvm::CallInst>(detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args));
+        auto ret = detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
         if (allow_approx) {
-            ret->setHasApproxFunc(true);
+            llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
         }
 
         return ret;
