@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cstddef>
+#include <limits>
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
@@ -326,4 +327,45 @@ TEST_CASE("diff")
         expression ex = sin("x"_var);
         REQUIRE(diff(ex, "x") == cos("x"_var));
     }
+}
+
+TEST_CASE("is_integral")
+{
+    REQUIRE(!detail::is_integral("x"_var));
+    REQUIRE(detail::is_integral(0_dbl));
+    REQUIRE(detail::is_integral(1_dbl));
+    REQUIRE(detail::is_integral(-1_dbl));
+    REQUIRE(detail::is_integral(42_dbl));
+    REQUIRE(detail::is_integral(-42_dbl));
+    REQUIRE(!detail::is_integral(expression{number{std::numeric_limits<double>::infinity()}}));
+    REQUIRE(!detail::is_integral(expression{number{-std::numeric_limits<double>::infinity()}}));
+    REQUIRE(!detail::is_integral(expression{number{std::numeric_limits<double>::quiet_NaN()}}));
+    REQUIRE(!detail::is_integral(expression{number{-std::numeric_limits<double>::quiet_NaN()}}));
+    REQUIRE(!detail::is_integral(-42.1_dbl));
+    REQUIRE(!detail::is_integral(.1e-6_dbl));
+
+    REQUIRE(!detail::is_odd_integral_half("x"_var));
+    REQUIRE(!detail::is_odd_integral_half(0_dbl));
+    REQUIRE(!detail::is_odd_integral_half(-1_dbl));
+    REQUIRE(!detail::is_odd_integral_half(1_dbl));
+    REQUIRE(!detail::is_odd_integral_half(-2_dbl));
+    REQUIRE(!detail::is_odd_integral_half(2_dbl));
+    REQUIRE(!detail::is_odd_integral_half(-42_dbl));
+    REQUIRE(!detail::is_odd_integral_half(42_dbl));
+    REQUIRE(!detail::is_odd_integral_half(-42.123_dbl));
+    REQUIRE(!detail::is_odd_integral_half(.1e-7_dbl));
+    REQUIRE(!detail::is_odd_integral_half(expression{number{std::numeric_limits<double>::infinity()}}));
+    REQUIRE(!detail::is_odd_integral_half(expression{number{-std::numeric_limits<double>::infinity()}}));
+    REQUIRE(!detail::is_odd_integral_half(expression{number{std::numeric_limits<double>::quiet_NaN()}}));
+    REQUIRE(!detail::is_odd_integral_half(expression{number{-std::numeric_limits<double>::quiet_NaN()}}));
+    REQUIRE(detail::is_odd_integral_half(-1_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(1_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(-3_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(3_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(-5_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(5_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(-53231_dbl / 2_dbl));
+    REQUIRE(detail::is_odd_integral_half(449281_dbl / 2_dbl));
+    REQUIRE(!detail::is_odd_integral_half(-53222_dbl / 2_dbl));
+    REQUIRE(!detail::is_odd_integral_half(449282_dbl / 2_dbl));
 }
