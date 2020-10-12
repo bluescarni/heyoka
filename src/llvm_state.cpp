@@ -160,7 +160,7 @@ target_features get_target_features_impl()
         assert(it != t_features.end());
 #endif
 
-        retval.sse = true;
+        retval.sse2 = true;
     }
 
     return retval;
