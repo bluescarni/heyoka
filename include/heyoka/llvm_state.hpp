@@ -55,7 +55,7 @@ struct target_features {
     bool sse2 = false;
     bool avx = false;
     bool avx2 = false;
-    bool avx512 = false;
+    bool avx512f = false;
 };
 
 HEYOKA_DLL_PUBLIC const target_features &get_target_features();
