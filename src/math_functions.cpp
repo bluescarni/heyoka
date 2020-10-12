@@ -23,9 +23,10 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -52,70 +53,6 @@ namespace detail
 
 namespace
 {
-
-// Helper to run the Taylor init phase of a unary
-// function.
-template <typename T>
-llvm::Value *taylor_u_init_unary_func(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                                      std::uint32_t batch_size)
-{
-    assert(f.args().size() == 1u);
-
-    auto &builder = s.builder();
-
-    // Do the initialisation for the function argument.
-    auto arg = taylor_u_init<T>(s, f.args()[0], arr, batch_size);
-
-    // Decompose arg into scalars.
-    auto scalars = vector_to_scalars(builder, arg);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> init_vals;
-    for (auto scal : scalars) {
-        init_vals.push_back(function_codegen_from_values<T>(s, f, {scal}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, init_vals);
-}
-
-// Helper to run the Taylor init phase of a unary
-// function in compact mode.
-template <typename T>
-llvm::Value *taylor_c_u_init_unary_func(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    assert(f.args().size() == 1u);
-
-    auto &builder = s.builder();
-
-    // Do the initialisation for the function argument.
-    auto arg = taylor_c_u_init<T>(s, f.args()[0], arr, batch_size);
-
-    // Decompose arg into scalars.
-    auto scalars = vector_to_scalars(builder, arg);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> init_vals;
-    for (auto scal : scalars) {
-        init_vals.push_back(function_codegen_from_values<T>(s, f, {scal}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, init_vals);
-}
-
-template <typename T>
-llvm::Value *taylor_u_init_sin(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the sine (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
-}
 
 // Derivative of sin(number).
 template <typename T>
@@ -191,18 +128,6 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
     return std::visit(
         [&](const auto &v) { return taylor_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_sin(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the sine in compact mode (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of sin(number).
@@ -329,25 +254,59 @@ llvm::Value *taylor_c_diff_sin(llvm_state &s, const function &func, llvm::Value 
 expression sin(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.sin";
-    fc.name_ldbl() = "llvm.sin";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_sin128";
-#endif
     fc.display_name() = "sin";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the sine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.sin", {args[0]->getType()}, args);
+    };
+    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the long double codegen of the sine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.sin", {args[0]->getType()}, args);
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the sine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the argument into scalars.
+        auto scalars = detail::vector_to_scalars(builder, args[0]);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> retvals;
+        for (auto scal : scalars) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_sin128", scal->getType(), {scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -422,24 +381,14 @@ expression sin(expression e)
         const auto retval = u_vars_defs.size() - 1u;
 
         // Append the cosine decomposition.
-        u_vars_defs.emplace_back(cos(std::move(f_arg)));
+        u_vars_defs.push_back(cos(std::move(f_arg)));
 
         return retval;
     };
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_sin<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_sin<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_sin<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_sin<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_sin<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_sin<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_sin<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_sin<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_sin<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_sin<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_sin<long double>;
@@ -455,19 +404,6 @@ namespace detail
 
 namespace
 {
-
-template <typename T>
-llvm::Value *taylor_u_init_cos(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the cosine (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
-}
 
 // Derivative of cos(number).
 template <typename T>
@@ -542,18 +478,6 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vec
     return std::visit(
         [&](const auto &v) { return taylor_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_cos(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the cosine in compact mode (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of cos(number).
@@ -680,25 +604,59 @@ llvm::Value *taylor_c_diff_cos(llvm_state &s, const function &func, llvm::Value 
 expression cos(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.cos";
-    fc.name_ldbl() = "llvm.cos";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_cos128";
-#endif
     fc.display_name() = "cos";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the cosine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.cos", {args[0]->getType()}, args);
+    };
+    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the long double codegen of the cosine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.cos", {args[0]->getType()}, args);
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the cosine "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the argument into scalars.
+        auto scalars = detail::vector_to_scalars(builder, args[0]);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> retvals;
+        for (auto scal : scalars) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_cos128", scal->getType(), {scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument("Inconsistent number of arguments when taking the derivative of the cosine (1 "
@@ -760,27 +718,17 @@ expression cos(expression e)
         }
 
         // Append the sine decomposition.
-        u_vars_defs.emplace_back(sin(arg));
+        u_vars_defs.push_back(sin(arg));
 
         // Append the cosine decomposition.
         u_vars_defs.emplace_back(std::move(f));
 
         return u_vars_defs.size() - 1u;
     };
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_cos<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_cos<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_cos<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_cos<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_cos<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_cos<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_cos<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_cos<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_cos<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_cos<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_cos<long double>;
@@ -796,19 +744,6 @@ namespace detail
 
 namespace
 {
-
-template <typename T>
-llvm::Value *taylor_u_init_log(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the logarithm (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
-}
 
 // Derivative of log(number).
 template <typename T>
@@ -896,18 +831,6 @@ llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vec
     return std::visit(
         [&](const auto &v) { return taylor_diff_log_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_log(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the logarithm in compact mode (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of log(number).
@@ -1036,25 +959,60 @@ llvm::Value *taylor_c_diff_log(llvm_state &s, const function &func, llvm::Value 
 expression log(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.log";
-    fc.name_ldbl() = "llvm.log";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_log128";
-#endif
     fc.display_name() = "log";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the logarithm "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.log", {args[0]->getType()}, args);
+    };
+    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Invalid number of arguments passed to the long double codegen of the logarithm "
+                "function: 1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.log", {args[0]->getType()}, args);
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the logarithm "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the argument into scalars.
+        auto scalars = detail::vector_to_scalars(builder, args[0]);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> retvals;
+        for (auto scal : scalars) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_log128", scal->getType(), {scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -1105,20 +1063,10 @@ expression log(expression e)
 
         return 1. / args[0];
     };
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_log<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_log<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_log<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_log<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_log<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_log<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_log<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_log<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_log<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_log<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_log<long double>;
@@ -1134,19 +1082,6 @@ namespace detail
 
 namespace
 {
-
-template <typename T>
-llvm::Value *taylor_u_init_exp(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the exponential (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
-}
 
 // Derivative of exp(number).
 template <typename T>
@@ -1220,18 +1155,6 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vec
     return std::visit(
         [&](const auto &v) { return taylor_diff_exp_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_exp(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the exponential in compact mode (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of exp(number).
@@ -1356,25 +1279,60 @@ llvm::Value *taylor_c_diff_exp(llvm_state &s, const function &func, llvm::Value 
 expression exp(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.exp";
-    fc.name_ldbl() = "llvm.exp";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_exp128";
-#endif
     fc.display_name() = "exp";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the exponential "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.exp", {args[0]->getType()}, args);
+    };
+    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Invalid number of arguments passed to the long double codegen of the exponential "
+                "function: 1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.exp", {args[0]->getType()}, args);
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the exponential "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the argument into scalars.
+        auto scalars = detail::vector_to_scalars(builder, args[0]);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> retvals;
+        for (auto scal : scalars) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_exp128", scal->getType(), {scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -1426,20 +1384,10 @@ expression exp(expression e)
 
         return std::exp(args[0]);
     };
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_exp<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_exp<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_exp<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_exp<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_exp<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_exp<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_exp<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_exp<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_exp<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_exp<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_exp<long double>;
@@ -1455,36 +1403,6 @@ namespace detail
 
 namespace
 {
-
-template <typename T>
-llvm::Value *taylor_u_init_pow(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    if (f.args().size() != 2u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the pow() function (2 arguments were expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    auto &builder = s.builder();
-
-    // Do the initialisation for the function arguments.
-    auto arg0 = taylor_u_init<T>(s, f.args()[0], arr, batch_size);
-    auto arg1 = taylor_u_init<T>(s, f.args()[1], arr, batch_size);
-
-    // Decompose arg into scalars.
-    auto scalars0 = vector_to_scalars(builder, arg0);
-    auto scalars1 = vector_to_scalars(builder, arg1);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> init_vals;
-    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
-        init_vals.push_back(function_codegen_from_values<T>(s, f, {scalars0[i], scalars1[i]}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, init_vals);
-}
 
 // Derivative of pow(number, number).
 template <typename T>
@@ -1567,35 +1485,6 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const function &func, const std::vec
             return taylor_diff_pow_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         func.args()[0].value(), func.args()[1].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_pow(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 2u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the pow() function in compact mode (2 arguments were expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    auto &builder = s.builder();
-
-    // Do the initialisation for the function arguments.
-    auto arg0 = taylor_c_u_init<T>(s, f.args()[0], arr, batch_size);
-    auto arg1 = taylor_c_u_init<T>(s, f.args()[1], arr, batch_size);
-
-    // Decompose arg into scalars.
-    auto scalars0 = vector_to_scalars(builder, arg0);
-    auto scalars1 = vector_to_scalars(builder, arg1);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> init_vals;
-    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
-        init_vals.push_back(function_codegen_from_values<T>(s, f, {scalars0[i], scalars1[i]}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, init_vals);
 }
 
 // Derivative of pow(number, number).
@@ -1730,26 +1619,78 @@ llvm::Value *taylor_c_diff_pow(llvm_state &s, const function &func, llvm::Value 
 
 expression pow(expression e1, expression e2)
 {
+    // NOTE: we want to allow approximate implementations of pow()
+    // in the following cases:
+    // - e2 is an integral number n (in which case we want to allow
+    //   transformation in a sequence of multiplications),
+    // - e2 is a value of type n / 2, with n an odd integral value (in which case
+    //   we want to give the option of implementing pow() on top of sqrt()).
+    const auto allow_approx = detail::is_integral(e2) || detail::is_odd_integral_half(e2);
+
     std::vector<expression> args;
-    args.emplace_back(std::move(e1));
-    args.emplace_back(std::move(e2));
+    args.push_back(std::move(e1));
+    args.push_back(std::move(e2));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.pow";
-    fc.name_ldbl() = "llvm.pow";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_pow128";
-#endif
     fc.display_name() = "pow";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 2u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the pow "
+                                        "function: 2 arguments were expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto ret = detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+        if (allow_approx) {
+            llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
+        }
+
+        return ret;
+    };
+    fc.codegen_ldbl_f() = [allow_approx](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 2u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the long double codegen of the pow "
+                                        "function: 2 arguments were expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto ret = detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+        if (allow_approx) {
+            llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
+        }
+
+        return ret;
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 2u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the pow "
+                                        "function: 2 arguments were expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the arguments into scalars.
+        auto scalars0 = detail::vector_to_scalars(builder, args[0]);
+        auto scalars1 = detail::vector_to_scalars(builder, args[1]);
+
+        // Invoke the function on the scalars.
+        std::vector<llvm::Value *> retvals;
+        for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_pow128", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
 
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
@@ -1801,20 +1742,10 @@ expression pow(expression e1, expression e2)
         }
         return args[1] * std::pow(args[0], args[1] - 1.) + std::log(args[0]) * std::pow(args[0], args[1]);
     };
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_pow<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_pow<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_pow<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_pow<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_pow<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_pow<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_pow<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_pow<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_pow<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_pow<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_pow<long double>;
@@ -1830,19 +1761,6 @@ namespace detail
 
 namespace
 {
-
-template <typename T>
-llvm::Value *taylor_u_init_sqrt(llvm_state &s, const function &f, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the square root (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_u_init_unary_func<T>(s, f, arr, batch_size);
-}
 
 // Derivative of sqrt(number).
 template <typename T>
@@ -1883,18 +1801,6 @@ llvm::Value *taylor_diff_sqrt(llvm_state &s, const function &func, const std::ve
     return std::visit(
         [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
         func.args()[0].value());
-}
-
-template <typename T>
-llvm::Value *taylor_c_u_init_sqrt(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if (f.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor initialization phase for "
-                                    "the square root in compact mode (1 argument was expected, but "
-                                    + std::to_string(f.args().size()) + " arguments were provided");
-    }
-
-    return taylor_c_u_init_unary_func<T>(s, f, arr, batch_size);
 }
 
 // Derivative of sqrt(number).
@@ -1944,25 +1850,60 @@ llvm::Value *taylor_c_diff_sqrt(llvm_state &s, const function &func, llvm::Value
 expression sqrt(expression e)
 {
     std::vector<expression> args;
-    args.emplace_back(std::move(e));
+    args.push_back(std::move(e));
 
     function fc{std::move(args)};
-    fc.name_dbl() = "llvm.sqrt";
-    fc.name_ldbl() = "llvm.sqrt";
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.name_f128() = "heyoka_sqrt128";
-#endif
     fc.display_name() = "sqrt";
-    fc.ty_dbl() = function::type::builtin;
-    fc.ty_ldbl() = function::type::builtin;
+
+    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the square root "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.sqrt", {args[0]->getType()}, args);
+    };
+    fc.codegen_ldbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument(
+                "Invalid number of arguments passed to the long double codegen of the square root "
+                "function: 1 argument was expected, but "
+                + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        return detail::llvm_invoke_intrinsic(s, "llvm.sqrt", {args[0]->getType()}, args);
+    };
 #if defined(HEYOKA_HAVE_REAL128)
-    fc.ty_f128() = function::type::external;
-    // NOTE: in theory we may add ReadNone here as well,
-    // but for some reason, at least up to LLVM 10,
-    // this causes strange codegen issues. Revisit
-    // in the future.
-    fc.attributes_f128() = {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn};
+    fc.codegen_f128_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
+        if (args.size() != 1u) {
+            throw std::invalid_argument("Invalid number of arguments passed to the float128 codegen of the square root "
+                                        "function: 1 argument was expected, but "
+                                        + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        auto &builder = s.builder();
+
+        // Decompose the argument into scalars.
+        auto scalars = detail::vector_to_scalars(builder, args[0]);
+
+        // Invoke the function on each scalar.
+        std::vector<llvm::Value *> retvals;
+        for (auto scal : scalars) {
+            retvals.push_back(detail::llvm_invoke_external(
+                s, "heyoka_sqrt128", scal->getType(), {scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Build a vector with the results.
+        return detail::scalars_to_vector(builder, retvals);
+    };
 #endif
+
     fc.diff_f() = [](const std::vector<expression> &args, const std::string &s) {
         if (args.size() != 1u) {
             throw std::invalid_argument(
@@ -2015,20 +1956,10 @@ expression sqrt(expression e)
         return std::sqrt(args[0]);
     };
 
-    fc.taylor_u_init_dbl_f() = detail::taylor_u_init_sqrt<double>;
-    fc.taylor_u_init_ldbl_f() = detail::taylor_u_init_sqrt<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_u_init_f128_f() = detail::taylor_u_init_sqrt<mppp::real128>;
-#endif
     fc.taylor_diff_dbl_f() = detail::taylor_diff_sqrt<double>;
     fc.taylor_diff_ldbl_f() = detail::taylor_diff_sqrt<long double>;
 #if defined(HEYOKA_HAVE_REAL128)
     fc.taylor_diff_f128_f() = detail::taylor_diff_sqrt<mppp::real128>;
-#endif
-    fc.taylor_c_u_init_dbl_f() = detail::taylor_c_u_init_sqrt<double>;
-    fc.taylor_c_u_init_ldbl_f() = detail::taylor_c_u_init_sqrt<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_u_init_f128_f() = detail::taylor_c_u_init_sqrt<mppp::real128>;
 #endif
     fc.taylor_c_diff_dbl_f() = detail::taylor_c_diff_sqrt<double>;
     fc.taylor_c_diff_ldbl_f() = detail::taylor_c_diff_sqrt<long double>;

@@ -129,7 +129,7 @@ target_features get_target_features_impl()
                               std::boyer_moore_searcher(feature.begin(), feature.end()));
 
         if (it != t_features.end()) {
-            retval.avx512 = true;
+            retval.avx512f = true;
         }
 
         feature = "+avx2";
@@ -160,7 +160,7 @@ target_features get_target_features_impl()
         assert(it != t_features.end());
 #endif
 
-        retval.sse = true;
+        retval.sse2 = true;
     }
 
     return retval;
@@ -524,7 +524,7 @@ void llvm_state::optimise()
         // the host CPU.
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
 
-        if (detail::get_target_features().avx512) {
+        if (detail::get_target_features().avx512f) {
             // NOTE: currently LLVM forces 256-bit vector
             // width when AVX-512 is available, due to clock
             // frequency scaling concerns. It seems like for

@@ -52,10 +52,10 @@ namespace detail
 // Helper struct to signal the availability
 // of certain features on the host machine.
 struct target_features {
-    bool sse = false;
+    bool sse2 = false;
     bool avx = false;
     bool avx2 = false;
-    bool avx512 = false;
+    bool avx512f = false;
 };
 
 HEYOKA_DLL_PUBLIC const target_features &get_target_features();

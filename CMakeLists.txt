@@ -30,6 +30,7 @@ include(YACMACompilerLinkerSettings)
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
+option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
 
@@ -151,6 +152,13 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
 )
 
+if(HEYOKA_WITH_SLEEF)
+    set(HEYOKA_SRC_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
+        "${HEYOKA_SRC_FILES}"
+    )
+endif()
+
 # Setup of the heyoka shared library.
 add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
 set_property(TARGET heyoka PROPERTY VERSION "1.0")
@@ -209,6 +217,12 @@ if(HEYOKA_WITH_MPPP)
         message(FATAL_ERROR "mp++ >= 0.21 is required.")
     endif()
     target_link_libraries(heyoka PUBLIC mp++::mp++)
+endif()
+
+# Optional dependency on SLEEF.
+if(HEYOKA_WITH_SLEEF)
+    find_package(heyoka_SLEEF REQUIRED)
+    target_link_libraries(heyoka PRIVATE heyoka::SLEEF)
 endif()
 
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)

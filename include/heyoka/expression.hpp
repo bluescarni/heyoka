@@ -322,6 +322,14 @@ inline llvm::Value *taylor_c_diff(llvm_state &s, const expression &ex, llvm::Val
     }
 }
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC bool is_integral(const expression &);
+HEYOKA_DLL_PUBLIC bool is_odd_integral_half(const expression &);
+
+} // namespace detail
+
 } // namespace heyoka
 
 namespace std

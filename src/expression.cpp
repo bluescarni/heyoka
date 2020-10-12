@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
@@ -29,6 +30,7 @@
 #endif
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/function.hpp>
@@ -667,5 +669,65 @@ llvm::Value *taylor_c_diff_f128(llvm_state &s, const expression &ex, llvm::Value
 }
 
 #endif
+
+namespace detail
+{
+
+// Helper to detect if ex is an integral number.
+bool is_integral(const expression &ex)
+{
+    return std::visit(
+        [](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit(
+                    [](const auto &x) {
+                        using std::trunc;
+
+                        return isfinite(x) && x == trunc(x);
+                    },
+                    v.value());
+            } else {
+                // Not a number.
+                return false;
+            }
+        },
+        ex.value());
+}
+
+// Helper to detect if ex is a number in the form n / 2,
+// where n is an odd integral value.
+bool is_odd_integral_half(const expression &ex)
+{
+    return std::visit(
+        [](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit(
+                    [](const auto &x) {
+                        using std::trunc;
+
+                        if (!isfinite(x) || x == trunc(x)) {
+                            // x is not finite, or it is already
+                            // an integral value.
+                            return false;
+                        }
+
+                        const auto y = 2 * x;
+
+                        return isfinite(y) && y == trunc(y);
+                    },
+                    v.value());
+            } else {
+                // Not a number.
+                return false;
+            }
+        },
+        ex.value());
+}
+
+} // namespace detail
 
 } // namespace heyoka
