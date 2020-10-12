@@ -10,6 +10,7 @@
 #define HEYOKA_CONFIG_HPP
 
 #cmakedefine HEYOKA_WITH_MPPP
+#cmakedefine HEYOKA_WITH_SLEEF
 
 #if defined(HEYOKA_WITH_MPPP)
 

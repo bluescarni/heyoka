@@ -50,6 +50,7 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/math_wrappers.hpp>
+#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -1834,6 +1835,24 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
         return scalars_to_vector(builder, res_scalars);
     } else {
 #endif
+        // If we are operating on SIMD vectors, try to see if we have a sleef
+        // function available for pow().
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
+            // NOTE: if sfn ends up empty, we will be falling through
+            // below and use the LLVM intrinsic instead.
+            if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x_v, y_v},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+
         return llvm_invoke_intrinsic(s, "llvm.pow", {x_v->getType()}, {x_v, y_v});
 #if defined(HEYOKA_HAVE_REAL128)
     }
