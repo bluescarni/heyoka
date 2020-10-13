@@ -44,38 +44,38 @@ const auto fp_types = std::tuple<double, long double
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
-    const auto batch_size = 23u;
+    for (auto batch_size : {2u, 4u, 8u, 23u}) {
+        llvm_state s{kw::opt_level = opt_level};
 
-    llvm_state s{kw::opt_level = opt_level};
+        taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
+        taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
 
-    taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
-    taylor_add_jet<T>(s, "jet_scalar", sys, 3, 1, high_accuracy, compact_mode);
+        s.compile();
 
-    s.compile();
+        auto jptr_batch = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_batch"));
+        auto jptr_scalar = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_scalar"));
 
-    auto jptr_batch = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_batch"));
-    auto jptr_scalar = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_scalar"));
+        std::vector<T> jet_batch;
+        jet_batch.resize(8 * batch_size);
+        std::uniform_real_distribution<float> dist(-10.f, 10.f);
+        std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
 
-    std::vector<T> jet_batch;
-    jet_batch.resize(8 * batch_size);
-    std::uniform_real_distribution<float> dist(-10.f, 10.f);
-    std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
+        std::vector<T> jet_scalar;
+        jet_scalar.resize(8);
 
-    std::vector<T> jet_scalar;
-    jet_scalar.resize(8);
+        jptr_batch(jet_batch.data());
 
-    jptr_batch(jet_batch.data());
+        for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+            // Assign the initial values of x and y.
+            for (auto i = 0u; i < 2u; ++i) {
+                jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
+            }
 
-    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
-        // Assign the initial values of x and y.
-        for (auto i = 0u; i < 2u; ++i) {
-            jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
-        }
+            jptr_scalar(jet_scalar.data());
 
-        jptr_scalar(jet_scalar.data());
-
-        for (auto i = 2u; i < 8u; ++i) {
-            REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+            for (auto i = 2u; i < 8u; ++i) {
+                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+            }
         }
     }
 }
