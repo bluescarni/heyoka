@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
@@ -106,6 +107,10 @@ HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
                                      const std::function<void(llvm::Value *)> &);
 
 HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
+
+HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
 
 } // namespace heyoka::detail
 

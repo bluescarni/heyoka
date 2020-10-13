@@ -29,6 +29,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -414,6 +415,52 @@ llvm::Type *pointee_type(llvm::Value *ptr)
     } else {
         throw std::invalid_argument("Cannot get the pointee type of a non-pointer value");
     }
+}
+
+// Small helper to fetch a string representation
+// of an LLVM type.
+std::string llvm_type_name(llvm::Type *t)
+{
+    assert(t != nullptr);
+
+    std::string retval;
+    llvm::raw_string_ostream ostr(retval);
+
+    t->print(ostr, false, true);
+
+    return ostr.str();
+}
+
+// This function will return true if:
+//
+// - the return type of f is ret, and
+// - the argument types of f are the same as in 'args'.
+//
+// Otherwise, the function will return false.
+bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::vector<llvm::Type *> &args)
+{
+    assert(f != nullptr);
+    assert(ret != nullptr);
+
+    if (ret != f->getReturnType()) {
+        // Mismatched return types.
+        return false;
+    }
+
+    auto it = f->arg_begin();
+    for (auto arg_type : args) {
+        if (it == f->arg_end() || it->getType() != arg_type) {
+            // f has fewer arguments than args, or the current
+            // arguments' types do not match.
+            return false;
+        }
+        ++it;
+    }
+
+    // In order for the signatures to match,
+    // we must be at the end of f's arguments list
+    // (otherwise f has more arguments than args).
+    return it == f->arg_end();
 }
 
 } // namespace heyoka::detail
