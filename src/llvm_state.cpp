@@ -38,8 +38,8 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/CodeGen/CommandFlags.inc>
 #include <llvm/CodeGen/TargetPassConfig.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -79,6 +79,16 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Utils.h>
 #include <llvm/Transforms/Vectorize.h>
+
+#if LLVM_VERSION_MAJOR == 10
+
+#include <llvm/CodeGen/CommandFlags.inc>
+
+#else
+
+#include <llvm/ExecutionEngine/Orc/Mangling.h>
+
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -194,16 +204,18 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::DataLayout> m_dl;
     std::unique_ptr<llvm::Triple> m_triple;
     std::unique_ptr<llvm::TargetMachine> m_tm;
-    // NOTE: it seems like in LLVM 11 this class was moved
-    // from llvm/ExecutionEngine/Orc/Core.h to
-    // llvm/ExecutionEngine/Orc/Mangling.h.
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
     llvm::orc::ThreadSafeContext m_ctx;
     llvm::orc::JITDylib &m_main_jd;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
-          m_ctx(std::make_unique<llvm::LLVMContext>()), m_main_jd(m_es.createJITDylib("<main>"))
+          m_ctx(std::make_unique<llvm::LLVMContext>()),
+#if LLVM_VERSION_MAJOR == 10
+          m_main_jd(m_es.createJITDylib("<main>"))
+#else
+          m_main_jd(*m_es.createJITDylib("<main>"))
+#endif
     {
         // NOTE: the native target initialization needs to be done only once
         std::call_once(detail::nt_inited, []() {
@@ -268,11 +280,11 @@ struct llvm_state::jit {
     }
     std::string get_target_cpu() const
     {
-        return m_tm->getTargetCPU();
+        return std::string{m_tm->getTargetCPU()};
     }
     std::string get_target_features() const
     {
-        return m_tm->getTargetFeatureString();
+        return std::string{m_tm->getTargetFeatureString()};
     }
     llvm::TargetIRAnalysis get_target_ir_analysis() const
     {
@@ -522,7 +534,41 @@ void llvm_state::optimise()
         // For every function in the module, setup its attributes
         // so that the codegen uses all the features available on
         // the host CPU.
+#if LLVM_VERSION_MAJOR == 10
         ::setFunctionAttributes(m_jitter->get_target_cpu(), m_jitter->get_target_features(), *m_module);
+#else
+        // NOTE: in LLVM > 10, the setFunctionAttributes() function is gone in favour of another
+        // function in another namespace, which however does not seem to work out of the box
+        // because (I think) it might be reading some non-existent command-line options. See:
+        // https://llvm.org/doxygen/CommandFlags_8cpp_source.html#l00552
+        // Here we are reproducing a trimmed-down version of the same function.
+        const auto cpu = m_jitter->get_target_cpu();
+        const auto features = m_jitter->get_target_features();
+
+        for (auto &f : module()) {
+            auto attrs = f.getAttributes();
+            llvm::AttrBuilder new_attrs;
+
+            if (!cpu.empty() && !f.hasFnAttribute("target-cpu")) {
+                new_attrs.addAttribute("target-cpu", cpu);
+            }
+
+            if (!features.empty()) {
+                auto old_features = f.getFnAttribute("target-features").getValueAsString();
+
+                if (old_features.empty()) {
+                    new_attrs.addAttribute("target-features", features);
+                } else {
+                    llvm::SmallString<256> appended(old_features);
+                    appended.push_back(',');
+                    appended.append(features);
+                    new_attrs.addAttribute("target-features", appended);
+                }
+            }
+
+            f.setAttributes(attrs.addAttributes(context(), llvm::AttributeList::FunctionIndex, new_attrs));
+        }
+#endif
 
         if (detail::get_target_features().avx512f) {
             // NOTE: currently LLVM forces 256-bit vector
