@@ -40,7 +40,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
-#include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -75,16 +74,10 @@ std::string taylor_mangle_suffix(llvm::Type *t)
     if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        return taylor_mangle_suffix(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
+        return llvm_type_name(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
     } else {
-        // Otherwise, fetch the type name from the print()
-        // member function of llvm::Type.
-        std::string retval;
-        llvm::raw_string_ostream ostr(retval);
-
-        t->print(ostr, false, true);
-
-        return ostr.str();
+        // Otherwise just return the type name.
+        return llvm_type_name(t);
     }
 }
 
@@ -1522,6 +1515,14 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
     return retval;
 }
 
+// NOTE: in compact mode, care must be taken when adding multiple jet functions to the same llvm state
+// with the same floating-point type, batch size and number of u variables. The potential issue there
+// is that when the first jet is added, the compact mode AD functions are created and then optimised.
+// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
+// uses in the second jet (e.g., an argument might be removed from the signature because it is a
+// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
+// in the state, add the 2 jets and then run a single optimisation pass.
+// NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
                          bool high_accuracy, bool compact_mode)
@@ -1944,6 +1945,16 @@ std::vector<llvm::Value *> taylor_run_ceval(llvm_state &s, const std::vector<std
     return retval;
 }
 
+// NOTE: in compact mode, care must be taken when adding multiple stepper functions to the same llvm state
+// with the same floating-point type, batch size and number of u variables. The potential issue there
+// is that when the first stepper is added, the compact mode AD functions are created and then optimised.
+// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
+// uses in the second stepper (e.g., an argument might be removed from the signature because it is a
+// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
+// in the state, add the 2 steppers and then run a single optimisation pass.
+// NOTE: document this eventually.
+// NOTE: this is not an issue in the Taylor integrators, where we are certain that only 1 stepper
+// is ever added to the LLVM state.
 template <typename T, typename U>
 auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
                                    bool high_accuracy, bool compact_mode)

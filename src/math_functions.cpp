@@ -20,8 +20,11 @@
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
@@ -35,6 +38,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -151,7 +155,14 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
     auto val_t = pointee_type(diff_arr);
 
     // Get the function name for the current fp type, batch size and n_uvars.
-    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_sin_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+
+    // The function arguments:
+    // - indices of the variables,
+    // - derivative order,
+    // - diff array.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context), diff_arr->getType()};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -162,12 +173,6 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
 
-        // Prepare the function prototype. The arguments:
-        // - indices of the variables,
-        // - derivative order,
-        // - diff array.
-        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
         // The return type is the pointee type of diff_arr.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
@@ -216,6 +221,15 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signature for the Taylor derivative of the sine in compact mode detected");
+        }
     }
 
     // Invoke the function.
@@ -264,6 +278,21 @@ expression sin(expression e)
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the sine "
                                         "function: 1 argument was expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+            if (const auto sfn
+                = detail::sleef_function_name(s.context(), "sin", vec_t->getElementType(),
+                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return detail::llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
         }
 
         return detail::llvm_invoke_intrinsic(s, "llvm.sin", {args[0]->getType()}, args);
@@ -501,7 +530,14 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
     auto val_t = pointee_type(diff_arr);
 
     // Get the function name for the current fp type, batch size and n_uvars.
-    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_cos_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+
+    // The function arguments:
+    // - indices of the variables,
+    // - derivative order,
+    // - diff array.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context), diff_arr->getType()};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -512,12 +548,6 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
 
-        // Prepare the function prototype. The arguments:
-        // - indices of the variables,
-        // - derivative order,
-        // - diff array.
-        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
         // The return type is the pointee type of diff_arr.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
@@ -566,6 +596,15 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signature for the Taylor derivative of the cosine in compact mode detected");
+        }
     }
 
     // Invoke the function.
@@ -614,6 +653,21 @@ expression cos(expression e)
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the cosine "
                                         "function: 1 argument was expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+            if (const auto sfn
+                = detail::sleef_function_name(s.context(), "cos", vec_t->getElementType(),
+                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return detail::llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
         }
 
         return detail::llvm_invoke_intrinsic(s, "llvm.cos", {args[0]->getType()}, args);
@@ -854,7 +908,14 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
     auto val_t = pointee_type(diff_arr);
 
     // Get the function name for the current fp type, batch size and n_uvars.
-    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_log_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+
+    // The function arguments:
+    // - indices of the variables,
+    // - derivative order,
+    // - diff array.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context), diff_arr->getType()};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -865,12 +926,6 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
 
-        // Prepare the function prototype. The arguments:
-        // - indices of the variables,
-        // - derivative order,
-        // - diff array.
-        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
         // The return type is the pointee type of diff_arr.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
@@ -921,6 +976,15 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signature for the Taylor derivative of the logarithm in compact mode detected");
+        }
     }
 
     // Invoke the function.
@@ -969,6 +1033,21 @@ expression log(expression e)
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the logarithm "
                                         "function: 1 argument was expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+            if (const auto sfn
+                = detail::sleef_function_name(s.context(), "log", vec_t->getElementType(),
+                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return detail::llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
         }
 
         return detail::llvm_invoke_intrinsic(s, "llvm.log", {args[0]->getType()}, args);
@@ -1178,7 +1257,14 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
     auto val_t = pointee_type(diff_arr);
 
     // Get the function name for the current fp type, batch size and n_uvars.
-    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_exp_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+
+    // The function arguments:
+    // - indices of the variables,
+    // - derivative order,
+    // - diff array.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context), diff_arr->getType()};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1189,12 +1275,6 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
 
-        // Prepare the function prototype. The arguments:
-        // - indices of the variables,
-        // - derivative order,
-        // - diff array.
-        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                        llvm::Type::getInt32Ty(context), diff_arr->getType()};
         // The return type is the pointee type of diff_arr.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
@@ -1241,6 +1321,15 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the exponential "
+                                        "in compact mode detected");
+        }
     }
 
     // Invoke the function.
@@ -1289,6 +1378,21 @@ expression exp(expression e)
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the exponential "
                                         "function: 1 argument was expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+            if (const auto sfn
+                = detail::sleef_function_name(s.context(), "exp", vec_t->getElementType(),
+                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return detail::llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
         }
 
         return detail::llvm_invoke_intrinsic(s, "llvm.exp", {args[0]->getType()}, args);
@@ -1509,7 +1613,15 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
     auto val_t = pointee_type(diff_arr);
 
     // Get the function name for the current fp type, batch size and n_uvars.
-    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t) + "_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_pow_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+
+    // The function arguments:
+    // - indices of the variables,
+    // - exponent,
+    // - derivative order,
+    // - diff array.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    to_llvm_type<T>(context), llvm::Type::getInt32Ty(context), diff_arr->getType()};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1520,13 +1632,6 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
         // Fetch the current insertion block.
         auto orig_bb = builder.GetInsertBlock();
 
-        // Prepare the function prototype. The arguments:
-        // - indices of the variables,
-        // - exponent,
-        // - derivative order,
-        // - diff array.
-        std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                        to_llvm_type<T>(context), llvm::Type::getInt32Ty(context), diff_arr->getType()};
         // The return type is the pointee type of diff_arr.
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
@@ -1580,6 +1685,15 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signatures for the Taylor derivative of pow() in compact mode detected");
+        }
     }
 
     // Invoke the function.
@@ -1639,6 +1753,24 @@ expression pow(expression e1, expression e2)
             throw std::invalid_argument("Invalid number of arguments passed to the double codegen of the pow "
                                         "function: 2 arguments were expected, but "
                                         + std::to_string(args.size()) + " arguments were passed instead");
+        }
+
+        // NOTE: we want to try the SLEEF route only if we are *not* approximating
+        // pow() with sqrt() or iterated multiplications (in which case we are fine
+        // with the LLVM builtin).
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
+            if (const auto sfn
+                = detail::sleef_function_name(s.context(), "pow", vec_t->getElementType(),
+                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return detail::llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
         }
 
         auto ret = detail::llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
