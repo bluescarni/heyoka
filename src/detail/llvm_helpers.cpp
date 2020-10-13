@@ -16,6 +16,7 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -58,7 +59,13 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     assert(scalar_t != nullptr);
 
     // Create the corresponding vector type.
-    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    auto vector_t =
+#if LLVM_VERSION_MAJOR == 10
+        llvm::VectorType::get
+#else
+        llvm::FixedVectorType::get
+#endif
+        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create the output vector.
@@ -101,8 +108,13 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
         return c;
     }
 
-    llvm::Value *vec
-        = llvm::UndefValue::get(llvm::VectorType::get(c->getType(), boost::numeric_cast<unsigned>(vector_size)));
+    llvm::Value *vec = llvm::UndefValue::get(
+#if LLVM_VERSION_MAJOR == 10
+        llvm::VectorType::get
+#else
+        llvm::FixedVectorType::get
+#endif
+        (c->getType(), boost::numeric_cast<unsigned>(vector_size)));
 
     // Fill up the vector with insertelement.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
@@ -152,7 +164,13 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
     auto scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
-    auto vector_t = llvm::VectorType::get(scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    auto vector_t =
+#if LLVM_VERSION_MAJOR == 10
+        llvm::VectorType::get
+#else
+        llvm::FixedVectorType::get
+#endif
+        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
