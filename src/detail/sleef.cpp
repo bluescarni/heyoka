@@ -56,6 +56,66 @@ auto make_sleef_map_dbl()
 
     sleef_map_t retval;
 
+    // sin().
+    if (features.avx512f) {
+        retval[{"sin", 8}] = "Sleef_sind8_u10avx512f";
+        retval[{"sin", 4}] = "Sleef_sind4_u10avx2";
+        retval[{"sin", 2}] = "Sleef_sind2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"sin", 4}] = "Sleef_sind4_u10avx2";
+        retval[{"sin", 2}] = "Sleef_sind2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"sin", 4}] = "Sleef_sind4_u10avx";
+        retval[{"sin", 2}] = "Sleef_sind2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
+    }
+
+    // cos().
+    if (features.avx512f) {
+        retval[{"cos", 8}] = "Sleef_cosd8_u10avx512f";
+        retval[{"cos", 4}] = "Sleef_cosd4_u10avx2";
+        retval[{"cos", 2}] = "Sleef_cosd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"cos", 4}] = "Sleef_cosd4_u10avx2";
+        retval[{"cos", 2}] = "Sleef_cosd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"cos", 4}] = "Sleef_cosd4_u10avx";
+        retval[{"cos", 2}] = "Sleef_cosd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
+    }
+
+    // log().
+    if (features.avx512f) {
+        retval[{"log", 8}] = "Sleef_logd8_u10avx512f";
+        retval[{"log", 4}] = "Sleef_logd4_u10avx2";
+        retval[{"log", 2}] = "Sleef_logd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"log", 4}] = "Sleef_logd4_u10avx2";
+        retval[{"log", 2}] = "Sleef_logd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"log", 4}] = "Sleef_logd4_u10avx";
+        retval[{"log", 2}] = "Sleef_logd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"log", 2}] = "Sleef_logd2_u10sse2";
+    }
+
+    // exp().
+    if (features.avx512f) {
+        retval[{"exp", 8}] = "Sleef_expd8_u10avx512f";
+        retval[{"exp", 4}] = "Sleef_expd4_u10avx2";
+        retval[{"exp", 2}] = "Sleef_expd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"exp", 4}] = "Sleef_expd4_u10avx2";
+        retval[{"exp", 2}] = "Sleef_expd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"exp", 4}] = "Sleef_expd4_u10avx";
+        retval[{"exp", 2}] = "Sleef_expd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"exp", 2}] = "Sleef_expd2_u10sse2";
+    }
+
     // pow().
     if (features.avx512f) {
         retval[{"pow", 8}] = "Sleef_powd8_u10avx512f";
