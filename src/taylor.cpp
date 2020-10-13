@@ -40,7 +40,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
-#include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -75,16 +74,10 @@ std::string taylor_mangle_suffix(llvm::Type *t)
     if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        return taylor_mangle_suffix(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
+        return llvm_type_name(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
     } else {
-        // Otherwise, fetch the type name from the print()
-        // member function of llvm::Type.
-        std::string retval;
-        llvm::raw_string_ostream ostr(retval);
-
-        t->print(ostr, false, true);
-
-        return ostr.str();
+        // Otherwise just return the type name.
+        return llvm_type_name(t);
     }
 }
 
