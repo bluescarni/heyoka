@@ -210,7 +210,7 @@ namespace detail
 
 // Helper for parsing common options for the Taylor integrators.
 template <typename T, typename... KwArgs>
-inline auto taylor_adaptive_common_ops(KwArgs &&... kw_args)
+inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -277,7 +277,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     template <typename U>
     void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
     template <typename U, typename... KwArgs>
-    void finalise_ctor(U sys, std::vector<T> state, KwArgs &&... kw_args)
+    void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -304,14 +304,14 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 
 public:
     template <typename... KwArgs>
-    explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&... kw_args)
+    explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
     explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
-                                  KwArgs &&... kw_args)
+                                  KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
@@ -507,7 +507,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     template <typename U>
     void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
     template <typename U, typename... KwArgs>
-    void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&... kw_args)
+    void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -536,14 +536,14 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 public:
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states, std::uint32_t batch_size,
-                                        KwArgs &&... kw_args)
+                                        KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> states,
-                                        std::uint32_t batch_size, KwArgs &&... kw_args)
+                                        std::uint32_t batch_size, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
         finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);

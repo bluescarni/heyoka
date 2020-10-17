@@ -140,7 +140,7 @@ struct is_tagged_container_any<tagged_container<Tag, T>> : ::std::true_type {
 // (as const ref) and will filter out the named arguments
 // (which are returned as a tuple of const references).
 template <typename... Args>
-constexpr inline auto build_parser_tuple(const Args &... args)
+constexpr inline auto build_parser_tuple(const Args &...args)
 {
     [[maybe_unused]] auto filter_na = [](const auto &x) {
         if constexpr (is_tagged_container_any<uncvref_t<decltype(x)>>::value) {
@@ -166,13 +166,13 @@ constexpr bool has([[maybe_unused]] const named_argument<Tag, ExplicitType> &nar
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &... nargs)
+constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
     return (... && ::igor::has<Args...>(nargs));
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &... nargs)
+constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
     return (... || ::igor::has<Args...>(nargs));
 }
@@ -184,7 +184,7 @@ constexpr bool has_unnamed_arguments()
 }
 
 template <typename... Args, typename... Tags, typename... ExplicitTypes>
-constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &... nargs)
+constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
 {
     // NOTE: the first fold expression will return how many of the nargs
     // are in the pack. The second fold expression will return the total number
@@ -224,7 +224,7 @@ class parser
     using tuple_t = decltype(detail::build_parser_tuple(::std::declval<const ParseArgs &>()...));
 
 public:
-    constexpr explicit parser(const ParseArgs &... parse_args) : m_nargs(detail::build_parser_tuple(parse_args...)) {}
+    constexpr explicit parser(const ParseArgs &...parse_args) : m_nargs(detail::build_parser_tuple(parse_args...)) {}
 
 private:
     // Fetch the value associated to the input named
@@ -250,7 +250,7 @@ private:
 public:
     // Get references to the values associated to the input named arguments.
     template <typename... Tags, typename... ExplicitTypes>
-    constexpr decltype(auto) operator()([[maybe_unused]] const named_argument<Tags, ExplicitTypes> &... nargs) const
+    constexpr decltype(auto) operator()([[maybe_unused]] const named_argument<Tags, ExplicitTypes> &...nargs) const
     {
         if constexpr (sizeof...(Tags) == 0u) {
             return;
@@ -268,13 +268,13 @@ public:
     }
     // Check if all the input named arguments nargs are present in the parser.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &... nargs)
+    static constexpr bool has_all(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
         return ::igor::has_all<ParseArgs...>(nargs...);
     }
     // Check if at least one of the input named arguments nargs is present in the parser.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &... nargs)
+    static constexpr bool has_any(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
         return ::igor::has_any<ParseArgs...>(nargs...);
     }
@@ -285,7 +285,7 @@ public:
     }
     // Check if the parser contains named arguments other than nargs.
     template <typename... Tags, typename... ExplicitTypes>
-    static constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &... nargs)
+    static constexpr bool has_other_than(const named_argument<Tags, ExplicitTypes> &...nargs)
     {
         return ::igor::has_other_than<ParseArgs...>(nargs...);
     }
