@@ -65,7 +65,7 @@ template <typename Tuple, typename F>
 inline void tuple_for_each(Tuple &&tup, F &&f)
 {
     std::apply(
-        [&f](auto &&... items) {
+        [&f](auto &&...items) {
             // NOTE: here we are converting to void the results of the invocations
             // of f. This ensures that we are folding using the builtin comma
             // operator, which implies sequencing:

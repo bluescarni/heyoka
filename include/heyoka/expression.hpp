@@ -203,7 +203,7 @@ HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(e
                                                                                std::vector<expression> &);
 
 template <typename... Args>
-inline std::array<expression, sizeof...(Args)> make_vars(const Args &... strs)
+inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
 {
     return std::array{expression{variable{strs}}...};
 }

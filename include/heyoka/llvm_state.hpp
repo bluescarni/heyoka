@@ -114,7 +114,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     // Implementation details for the variadic constructor.
     template <typename... KwArgs>
-    static auto kw_args_ctor_impl(KwArgs &&... kw_args)
+    static auto kw_args_ctor_impl(KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -184,7 +184,7 @@ public:
                                    && (sizeof...(KwArgs) > 1u
                                        || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
                                int> = 0>
-    explicit llvm_state(KwArgs &&... kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
+    explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
     llvm_state(const llvm_state &);

@@ -79,7 +79,7 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 // y_1' = ...
 // etc.
 template <typename... KwArgs>
-inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&... kw_args)
+inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&...kw_args)
 {
     if (n < 2u) {
         throw std::invalid_argument("At least 2 bodies are needed to construct an N-body system");
