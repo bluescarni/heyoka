@@ -132,7 +132,7 @@ void poly_reverse(Ret &ret, const T &a, std::uint32_t n)
 // Substitute the polynomial variable x with x + 1,
 // and write the resulting polynomial in ret. bcs
 // is a vector containing the binomial coefficients
-// up to to (n coose n) as produced by make_binomial_coefficients().
+// up to to (n choose n) as produced by make_binomial_coefficients().
 // NOTE: aliasing NOT allowed.
 template <typename Ret, typename T, typename U>
 void poly_translate_1(Ret &ret, const T &a, std::uint32_t n, const U &bcs)
