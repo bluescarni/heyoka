@@ -1766,6 +1766,44 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 #endif
 }
 
+// Helper to compute abs(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector argument.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the heyoka_abs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_abs128", x_t, {x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
 llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
@@ -2047,16 +2085,51 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Load the order zero derivatives from the input pointer.
     auto order0_arr = taylor_load_values<T>(s, state_ptr, n_eq, batch_size);
 
+#if 0
     // Compute the norm infinity of the state vector.
     auto max_abs_state = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
         max_abs_state = taylor_step_maxabs(s, max_abs_state, order0_arr[i]);
     }
+#endif
 
     // Compute the jet of derivatives at the given order.
     auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, compact_mode);
     using da_size_t = decltype(diff_arr.size());
 
+    std::vector<llvm::Value *> rho_m_vec;
+    auto tol_v = vector_splat(builder, codegen<T>(s, number{tol}), batch_size);
+    auto num_1 = vector_splat(builder, codegen<T>(s, number{T(1)}), batch_size);
+    auto inv_order = vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size);
+    auto inv_orderm1 = vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size);
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        // Compute the absolute value of the current component of the state vector
+        // at the beginning of the timestep.
+        auto abs_state = taylor_step_abs(s, diff_arr[i]);
+
+        // Determine if we are in absolute or relative tolerance mode.
+        auto abs_or_rel = builder.CreateFCmpOLE(builder.CreateFMul(tol_v, abs_state), tol_v);
+
+        // Compute the absolute values of the derivatives at orders 'order' and 'order - 1'.
+        auto abs_diff_o = taylor_step_abs(s, diff_arr[static_cast<da_size_t>(order) * n_eq + i]);
+        auto abs_diff_om1 = taylor_step_abs(s, diff_arr[static_cast<da_size_t>(order - 1u) * n_eq + i]);
+
+        // Estimate rho at orders 'order - 1' and 'order'.
+        auto num_rho = builder.CreateSelect(abs_or_rel, num_1, abs_state);
+        auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, abs_diff_o), inv_order);
+        auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, abs_diff_om1), inv_orderm1);
+
+        // Take the minimum.
+        rho_m_vec.push_back(taylor_step_min(s, rho_o, rho_om1));
+    }
+
+    // Compute the minimum value in rho_m_vec.
+    auto rho_m = rho_m_vec[0];
+    for (std::uint32_t i = 1; i < n_eq; ++i) {
+        rho_m = taylor_step_min(s, rho_m, rho_m_vec[i]);
+    }
+
+#if 0
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
     auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
@@ -2081,8 +2154,9 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Take the minimum.
     auto rho_m = taylor_step_min(s, rho_o, rho_om1);
+#endif
 
-    // Copmute the safety factor.
+    // Copmute the scaling/safety factor.
     const auto rhofac = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (order - 1u));
 
     // Determine the step size.
