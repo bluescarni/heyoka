@@ -2054,17 +2054,19 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Compute the jet of derivatives at the given order.
+    // NOTE: in taylor_compute_jet() we ensure that n_uvars * order + n_eq
+    // is representable as a 32-bit unsigned integer. Thus, we can always
+    // index into diff_arr using std::uint32_t.
     auto diff_arr = taylor_compute_jet<T>(s, std::move(order0_arr), dc, n_eq, n_uvars, order, batch_size, compact_mode);
-    using da_size_t = decltype(diff_arr.size());
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
     auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
-        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[static_cast<da_size_t>(order) * n_eq + i]);
+        max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
         max_abs_diff_om1
-            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[static_cast<da_size_t>(order - 1u) * n_eq + i]);
+            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -2105,7 +2107,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
         auto &cf_vec = cf_vecs.back();
 
         for (std::uint32_t o = 0; o <= order; ++o) {
-            cf_vec.push_back(diff_arr[static_cast<da_size_t>(o) * n_eq + var_idx]);
+            cf_vec.push_back(diff_arr[o * n_eq + var_idx]);
         }
     }
 
