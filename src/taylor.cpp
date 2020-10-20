@@ -2065,8 +2065,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
         max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
-        max_abs_diff_om1
-            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
+        max_abs_diff_om1 = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
