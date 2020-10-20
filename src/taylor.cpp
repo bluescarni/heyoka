@@ -16,6 +16,7 @@
 #include <deque>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -36,10 +37,11 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Pass.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Transforms/Vectorize.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1239,27 +1241,6 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
     builder.CreateStore(val, ptr);
 }
 
-// RAII helper to temporarily disable most fast math flags that might
-// be set in an LLVM builder. On destruction, the original fast math
-// flags will be restored.
-struct fm_disabler {
-    llvm_state &m_s;
-    llvm::FastMathFlags m_orig_fmf;
-
-    explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
-    {
-        // Set the new flags (allow only fp contract).
-        llvm::FastMathFlags fmf;
-        fmf.setAllowContract();
-        m_s.builder().setFastMathFlags(fmf);
-    }
-    ~fm_disabler()
-    {
-        // Restore the original flags.
-        m_s.builder().setFastMathFlags(m_orig_fmf);
-    }
-};
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number), n_uvars the number of variables in
@@ -1525,7 +1506,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
-                         bool high_accuracy, bool compact_mode)
+                         bool, bool compact_mode)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -1538,13 +1519,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
-    }
-
-    // NOTE: in high accuracy mode we need
-    // to disable fast math flags in the builder.
-    std::optional<fm_disabler> fmd;
-    if (high_accuracy) {
-        fmd.emplace(s);
     }
 
     // Record the number of equations/variables.
@@ -1994,13 +1968,6 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
     const auto order = static_cast<std::uint32_t>(order_f);
 
-    // NOTE: in high accuracy mode we need
-    // to disable fast math flags in the builder.
-    std::optional<fm_disabler> fmd;
-    if (high_accuracy) {
-        fmd.emplace(s);
-    }
-
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -2065,8 +2032,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     for (std::uint32_t i = 0; i < n_eq; ++i) {
         max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
-        max_abs_diff_om1
-            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
+        max_abs_diff_om1 = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -2133,31 +2099,20 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Verify the function.
     s.verify_function(name);
 
-    // Tool to forcibly enable the LS vectorize flag in the LLVM state.
-    struct ls_forcer {
-        const bool m_orig_flag;
-        llvm_state &m_s;
-
-        explicit ls_forcer(llvm_state &s) : m_orig_flag(s.ls_vectorize()), m_s(s)
-        {
-            m_s.ls_vectorize() = true;
-        }
-        ~ls_forcer()
-        {
-            m_s.ls_vectorize() = m_orig_flag;
-        }
-    };
-
-    std::optional<ls_forcer> lsf;
-    if (batch_size > 1u) {
-        // In vector mode, enable the ls_vectorize flag forcibly so
-        // that load/store_vector_from/to_memory() immediately produces vector
-        // load/stores.
-        lsf.emplace(s);
-    }
-
     // Run the optimisation pass.
-    s.optimise();
+    if (batch_size > 1u) {
+        // In vector mode, add a pass to vectorize load/stores.
+        // This is useful to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        std::vector<std::unique_ptr<llvm::Pass>> passes;
+        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
+
+        s.optimise(std::move(passes));
+    } else {
+        s.optimise();
+    }
 
     return dc;
 }

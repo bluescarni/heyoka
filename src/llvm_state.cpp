@@ -64,6 +64,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Pass.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -74,11 +75,6 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/InstCombine/InstCombine.h>
-#include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Scalar/GVN.h>
-#include <llvm/Transforms/Utils.h>
-#include <llvm/Transforms/Vectorize.h>
 
 #if LLVM_VERSION_MAJOR == 10
 
@@ -313,9 +309,9 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup)), m_ls_vectorize(std::get<4>(tup))
+      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -332,6 +328,15 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
         llvm::FastMathFlags fmf;
         fmf.setFast();
         m_builder->setFastMathFlags(fmf);
+    } else {
+        // By default, allow only fp contraction.
+        // NOTE: if we ever implement double-double
+        // arithmetic, we must either revisit this
+        // or make sure that fp contraction is off
+        // for the double-double primitives.
+        llvm::FastMathFlags fmf;
+        fmf.setAllowContract();
+        m_builder->setFastMathFlags(fmf);
     }
 }
 
@@ -342,8 +347,7 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
       m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
-      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code),
-      m_ls_vectorize(other.m_ls_vectorize)
+      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -372,6 +376,15 @@ llvm_state::llvm_state(const llvm_state &other)
         // price of potential change of semantics.
         llvm::FastMathFlags fmf;
         fmf.setFast();
+        m_builder->setFastMathFlags(fmf);
+    } else {
+        // By default, allow only fp contraction.
+        // NOTE: if we ever implement double-double
+        // arithmetic, we must either revisit this
+        // or make sure that fp contraction is off
+        // for the double-double primitives.
+        llvm::FastMathFlags fmf;
+        fmf.setAllowContract();
         m_builder->setFastMathFlags(fmf);
     }
 
@@ -418,11 +431,6 @@ unsigned &llvm_state::opt_level()
     return m_opt_level;
 }
 
-bool &llvm_state::ls_vectorize()
-{
-    return m_ls_vectorize;
-}
-
 std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
 {
     return m_named_values;
@@ -448,11 +456,6 @@ const llvm::LLVMContext &llvm_state::context() const
 const unsigned &llvm_state::opt_level() const
 {
     return m_opt_level;
-}
-
-const bool &llvm_state::ls_vectorize() const
-{
-    return m_ls_vectorize;
 }
 
 const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
@@ -522,7 +525,7 @@ void llvm_state::verify_function(const std::string &name)
     verify_function(f);
 }
 
-void llvm_state::optimise()
+void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
 {
     check_uncompiled(__func__);
 
@@ -600,13 +603,9 @@ void llvm_state::optimise()
         auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
         f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
-        // Add a pass to vectorize load/stores, if requested.
-        // This is useful to ensure that the
-        // pattern adopted in load_vector_from_memory() and
-        // store_vector_to_memory() is translated to
-        // vectorized store/load instructions.
-        if (m_ls_vectorize) {
-            f_pm->add(llvm::createLoadStoreVectorizerPass());
+        // Add the optimisation pre-passes for functions.
+        for (auto &p_ptr : f_pass_pre) {
+            f_pm->add(p_ptr.release());
         }
 
         // We use the helper class PassManagerBuilder to populate the module
@@ -1253,7 +1252,6 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Compiled           : " << s.is_compiled() << '\n';
     oss << "Fast math          : " << s.m_use_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
-    oss << "LS vectorize       : " << s.m_ls_vectorize << '\n';
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
