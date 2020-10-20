@@ -60,6 +60,7 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_fma128(__float128, __float128, __
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128, __float128);
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minnum128(__float128, __float128);
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_abs128(__float128);
 
 #endif
 

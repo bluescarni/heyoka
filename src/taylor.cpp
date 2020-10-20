@@ -1834,6 +1834,44 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
+// Helper to compute abs(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector argument.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the heyoka_abs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_abs128", x_t, {x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Run the Horner scheme on multiple polynomials at a time, with evaluation point h. Each element of cf_vecs
 // contains the list of coefficients of a polynomial.
 std::vector<llvm::Value *> taylor_run_multihorner(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
@@ -2015,8 +2053,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto order0_arr = taylor_load_values<T>(s, state_ptr, n_eq, batch_size);
 
     // Compute the norm infinity of the state vector.
-    auto max_abs_state = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    for (std::uint32_t i = 0; i < n_eq; ++i) {
+    auto max_abs_state = taylor_step_abs(s, order0_arr[0]);
+    for (std::uint32_t i = 1; i < n_eq; ++i) {
         max_abs_state = taylor_step_maxabs(s, max_abs_state, order0_arr[i]);
     }
 
@@ -2028,9 +2066,9 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
-    auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    for (std::uint32_t i = 0; i < n_eq; ++i) {
+    auto max_abs_diff_o = taylor_step_abs(s, diff_arr[order * n_eq]);
+    auto max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * n_eq]);
+    for (std::uint32_t i = 1; i < n_eq; ++i) {
         max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
         max_abs_diff_om1 = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
     }

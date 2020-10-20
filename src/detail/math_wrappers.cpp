@@ -75,4 +75,9 @@ __float128 heyoka_minnum128(__float128 x, __float128 y)
     return mppp::fmin(mppp::real128{x}, mppp::real128{y}).m_value;
 }
 
+__float128 heyoka_abs128(__float128 x)
+{
+    return mppp::abs(mppp::real128{x}).m_value;
+}
+
 #endif
