@@ -71,6 +71,7 @@ IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
 IGOR_MAKE_NAMED_ARGUMENT(save_object_code);
+IGOR_MAKE_NAMED_ARGUMENT(inline_functions);
 
 } // namespace kw
 
@@ -91,10 +92,11 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
-    bool m_use_fast_math;
+    bool m_fast_math;
     std::string m_module_name;
     bool m_save_object_code;
     std::string m_object_code;
+    bool m_inline_functions;
 
     // Check functions and verification.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;
@@ -159,10 +161,19 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath, socode};
+            // Inline functions (defaults to true).
+            auto i_func = [&p]() -> bool {
+                if constexpr (p.has(kw::inline_functions)) {
+                    return std::forward<decltype(p(kw::inline_functions))>(p(kw::inline_functions));
+                } else {
+                    return true;
+                }
+            }();
+
+            return std::tuple{std::move(mod_name), opt_level, fmath, socode, i_func};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
 
 public:
     llvm_state();
@@ -188,12 +199,16 @@ public:
     llvm::IRBuilder<> &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
+    bool &fast_math();
+    bool &inline_functions();
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
     const llvm::IRBuilder<> &builder() const;
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
+    const bool &fast_math() const;
+    const bool &inline_functions() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
 
     std::string get_ir() const;

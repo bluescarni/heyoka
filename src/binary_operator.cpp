@@ -25,7 +25,6 @@
 #include <variant>
 #include <vector>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Value.h>
@@ -988,7 +987,6 @@ llvm::Value *bo_taylor_c_diff_mul_impl(llvm_state &s, const variable &var0, cons
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -1104,7 +1102,6 @@ llvm::Value *bo_taylor_c_diff_div_impl(llvm_state &s, const U &nv, const variabl
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();

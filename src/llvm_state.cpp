@@ -309,9 +309,10 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
-    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_use_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup))
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
+    : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
+      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup)),
+      m_inline_functions(std::get<4>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -322,7 +323,7 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
 
-    if (m_use_fast_math) {
+    if (m_fast_math) {
         // Set flags for faster math at the
         // price of potential change of semantics.
         llvm::FastMathFlags fmf;
@@ -346,8 +347,8 @@ llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
-      m_use_fast_math(other.m_use_fast_math), m_module_name(other.m_module_name),
-      m_save_object_code(other.m_save_object_code), m_object_code(other.m_object_code)
+      m_fast_math(other.m_fast_math), m_module_name(other.m_module_name), m_save_object_code(other.m_save_object_code),
+      m_object_code(other.m_object_code), m_inline_functions(other.m_inline_functions)
 {
     // Get the IR of other.
     auto other_ir = other.get_ir();
@@ -371,7 +372,7 @@ llvm_state::llvm_state(const llvm_state &other)
     // Create a new builder for the module.
     m_builder = std::make_unique<llvm::IRBuilder<>>(context());
 
-    if (m_use_fast_math) {
+    if (m_fast_math) {
         // Set flags for faster math at the
         // price of potential change of semantics.
         llvm::FastMathFlags fmf;
@@ -431,6 +432,16 @@ unsigned &llvm_state::opt_level()
     return m_opt_level;
 }
 
+bool &llvm_state::fast_math()
+{
+    return m_fast_math;
+}
+
+bool &llvm_state::inline_functions()
+{
+    return m_inline_functions;
+}
+
 std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
 {
     return m_named_values;
@@ -456,6 +467,16 @@ const llvm::LLVMContext &llvm_state::context() const
 const unsigned &llvm_state::opt_level() const
 {
     return m_opt_level;
+}
+
+const bool &llvm_state::fast_math() const
+{
+    return m_fast_math;
+}
+
+const bool &llvm_state::inline_functions() const
+{
+    return m_inline_functions;
 }
 
 const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
@@ -618,7 +639,9 @@ void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
         // NOTE: perhaps in the future we can make the autovectorizer an
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
-        pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
+        if (m_opt_level >= 2u && m_inline_functions) {
+            pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
+        }
 
         m_jitter->m_tm->adjustPassManager(pm_builder);
 
@@ -1250,8 +1273,9 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 
     oss << "Module name        : " << s.m_module_name << '\n';
     oss << "Compiled           : " << s.is_compiled() << '\n';
-    oss << "Fast math          : " << s.m_use_fast_math << '\n';
+    oss << "Fast math          : " << s.m_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
+    oss << "Inline functions   : " << s.m_inline_functions << '\n';
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
