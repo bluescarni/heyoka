@@ -1589,7 +1589,19 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.verify_function(f);
 
     // Run the optimisation pass.
-    s.optimise();
+    if (batch_size > 1u) {
+        // In vector mode, add a pass to vectorize load/stores.
+        // This is useful to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        std::vector<std::unique_ptr<llvm::Pass>> passes;
+        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
+
+        s.optimise(std::move(passes));
+    } else {
+        s.optimise();
+    }
 
     return dc;
 }
