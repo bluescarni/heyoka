@@ -2147,7 +2147,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     builder.CreateRetVoid();
 
     // Verify the function.
-    s.verify_function(name);
+    s.verify_function(f);
 
     // Run the optimisation pass.
     if (batch_size > 1u) {
