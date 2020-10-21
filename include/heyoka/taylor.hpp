@@ -224,7 +224,7 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
     }();
 
     // tol (defaults to eps).
-    auto tol = [&p, high_accuracy]() -> T {
+    auto tol = [&p]() -> T {
         if constexpr (p.has(kw::tol)) {
             auto retval = std::forward<decltype(p(kw::tol))>(p(kw::tol));
             if (retval != T(0)) {
@@ -235,13 +235,8 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
             // as automatically-deduced by falling through
             // the code below.
         }
-        auto retval = std::numeric_limits<T>::epsilon();
-        if (high_accuracy) {
-            // Add extra precision in high-accuracy mode.
-            retval *= T(1e-4);
-        }
 
-        return retval;
+        return std::numeric_limits<T>::epsilon();
     }();
 
     // Compact mode (defaults to false).

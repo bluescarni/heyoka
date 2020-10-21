@@ -40,7 +40,7 @@ using namespace heyoka;
 using namespace heyoka_benchmark;
 
 template <typename T>
-void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size, bool compact_mode)
+void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size, bool compact_mode, bool fast_math)
 {
     auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
         = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
@@ -84,9 +84,13 @@ void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size, bool compact
     auto start = std::chrono::high_resolution_clock::now();
 
     // Init the batch integrator.
-    auto tad = taylor_adaptive_batch<T>{sys,           std::move(init_states),
-                                        batch_size,    kw::high_accuracy = high_accuracy,
-                                        kw::tol = tol, kw::compact_mode = compact_mode};
+    auto tad = taylor_adaptive_batch<T>{sys,
+                                        std::move(init_states),
+                                        batch_size,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::tol = tol,
+                                        kw::compact_mode = compact_mode,
+                                        kw::fast_math = fast_math};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -119,14 +123,16 @@ int main(int argc, char *argv[])
     double tol;
     std::uint32_t batch_size;
     bool compact_mode = false;
+    bool fast_math = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")(
         "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
-        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be automatically deduced)")(
-        "high_accuracy", "high-accuracy mode")("batch_size", po::value<std::uint32_t>(&batch_size)->default_value(1u),
-                                               "batch size")("compact_mode", "compact mode");
+        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be the type's epsilon)")(
+        "batch_size", po::value<std::uint32_t>(&batch_size)->default_value(1u), "batch size")(
+        "high_accuracy", "enable high-accuracy mode")("compact_mode", "enable compact mode")("fast_math",
+                                                                                             "enable fast math flags");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -150,13 +156,17 @@ int main(int argc, char *argv[])
         compact_mode = true;
     }
 
+    if (vm.count("fast_math")) {
+        fast_math = true;
+    }
+
     if (fp_type == "double") {
-        run_bench<double>(tol, high_accuracy, batch_size, compact_mode);
+        run_bench<double>(tol, high_accuracy, batch_size, compact_mode, fast_math);
     } else if (fp_type == "long double") {
-        run_bench<long double>(tol, high_accuracy, batch_size, compact_mode);
+        run_bench<long double>(tol, high_accuracy, batch_size, compact_mode, fast_math);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, batch_size, compact_mode);
+        run_bench<mppp::real128>(mppp::real128(tol), high_accuracy, batch_size, compact_mode, fast_math);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");

@@ -11,6 +11,8 @@
 #include <iostream>
 #include <vector>
 
+#include <boost/program_options.hpp>
+
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -22,8 +24,29 @@
 using namespace heyoka;
 using namespace std::chrono;
 
-int main()
+int main(int argc, char *argv[])
 {
+    namespace po = boost::program_options;
+
+    bool inline_functions = false;
+
+    po::options_description desc("Options");
+
+    desc.add_options()("help", "produce help message")("inline_functions", "enable function inlining");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << "\n";
+        return 0;
+    }
+
+    if (vm.count("inline_functions")) {
+        inline_functions = true;
+    }
+
     // assembling the r.h.s.
     for (double N = 3u; N < 1000; N += 10) {
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
@@ -39,7 +62,8 @@ int main()
         taylor_adaptive<double> taylor{
             {prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = dx, prime(vy) = dy, prime(vz) = dz},
             {0.123, 0.123, 0.123, 0., 0., 0.},
-            kw::compact_mode = true};
+            kw::compact_mode = true,
+            kw::inline_functions = inline_functions};
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << N << ": " << duration.count() / 1e6 << "s" << std::endl;
