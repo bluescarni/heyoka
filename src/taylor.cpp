@@ -1852,9 +1852,9 @@ llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
         // Execute the heyoka_abs128() function on the scalar values and store
         // the results in res_scalars.
         std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+        for (auto x_scal : x_scalars) {
             res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_abs128", x_t, {x_scalars[i]},
+                s, "heyoka_abs128", x_t, {x_scal},
                 // NOTE: in theory we may add ReadNone here as well,
                 // but for some reason, at least up to LLVM 10,
                 // this causes strange codegen issues. Revisit
