@@ -178,7 +178,6 @@ llvm::Value *taylor_c_diff_sin_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -553,7 +552,6 @@ llvm::Value *taylor_c_diff_cos_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -931,7 +929,6 @@ llvm::Value *taylor_c_diff_log_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -1280,7 +1277,6 @@ llvm::Value *taylor_c_diff_exp_impl(llvm_state &s, const variable &var, llvm::Va
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();
@@ -1637,7 +1633,6 @@ llvm::Value *taylor_c_diff_pow_impl(llvm_state &s, const variable &var, const nu
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
-        f->addFnAttr(llvm::Attribute::NoInline);
 
         // Fetch the function arguments.
         auto idx0 = f->args().begin();

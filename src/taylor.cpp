@@ -16,6 +16,7 @@
 #include <deque>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -36,10 +37,11 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Pass.h>
 #include <llvm/Support/Casting.h>
+#include <llvm/Transforms/Vectorize.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1239,27 +1241,6 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
     builder.CreateStore(val, ptr);
 }
 
-// RAII helper to temporarily disable most fast math flags that might
-// be set in an LLVM builder. On destruction, the original fast math
-// flags will be restored.
-struct fm_disabler {
-    llvm_state &m_s;
-    llvm::FastMathFlags m_orig_fmf;
-
-    explicit fm_disabler(llvm_state &s) : m_s(s), m_orig_fmf(m_s.builder().getFastMathFlags())
-    {
-        // Set the new flags (allow only fp contract).
-        llvm::FastMathFlags fmf;
-        fmf.setAllowContract();
-        m_s.builder().setFastMathFlags(fmf);
-    }
-    ~fm_disabler()
-    {
-        // Restore the original flags.
-        m_s.builder().setFastMathFlags(m_orig_fmf);
-    }
-};
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number), n_uvars the number of variables in
@@ -1525,7 +1506,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
-                         bool high_accuracy, bool compact_mode)
+                         bool, bool compact_mode)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -1538,13 +1519,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
-    }
-
-    // NOTE: in high accuracy mode we need
-    // to disable fast math flags in the builder.
-    std::optional<fm_disabler> fmd;
-    if (high_accuracy) {
-        fmd.emplace(s);
     }
 
     // Record the number of equations/variables.
@@ -1860,6 +1834,44 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
+// Helper to compute abs(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector argument.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the heyoka_abs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (auto x_scal : x_scalars) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_abs128", x_t, {x_scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Run the Horner scheme on multiple polynomials at a time, with evaluation point h. Each element of cf_vecs
 // contains the list of coefficients of a polynomial.
 std::vector<llvm::Value *> taylor_run_multihorner(llvm_state &s, const std::vector<std::vector<llvm::Value *>> &cf_vecs,
@@ -1994,13 +2006,6 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
     const auto order = static_cast<std::uint32_t>(order_f);
 
-    // NOTE: in high accuracy mode we need
-    // to disable fast math flags in the builder.
-    std::optional<fm_disabler> fmd;
-    if (high_accuracy) {
-        fmd.emplace(s);
-    }
-
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -2048,8 +2053,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto order0_arr = taylor_load_values<T>(s, state_ptr, n_eq, batch_size);
 
     // Compute the norm infinity of the state vector.
-    auto max_abs_state = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    for (std::uint32_t i = 0; i < n_eq; ++i) {
+    auto max_abs_state = taylor_step_abs(s, order0_arr[0]);
+    for (std::uint32_t i = 1; i < n_eq; ++i) {
         max_abs_state = taylor_step_maxabs(s, max_abs_state, order0_arr[i]);
     }
 
@@ -2061,12 +2066,11 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Determine the norm infinity of the derivatives
     // at orders order and order - 1.
-    auto max_abs_diff_o = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    auto max_abs_diff_om1 = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-    for (std::uint32_t i = 0; i < n_eq; ++i) {
+    auto max_abs_diff_o = taylor_step_abs(s, diff_arr[order * n_eq]);
+    auto max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * n_eq]);
+    for (std::uint32_t i = 1; i < n_eq; ++i) {
         max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
-        max_abs_diff_om1
-            = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
+        max_abs_diff_om1 = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -2133,31 +2137,20 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Verify the function.
     s.verify_function(name);
 
-    // Tool to forcibly enable the LS vectorize flag in the LLVM state.
-    struct ls_forcer {
-        const bool m_orig_flag;
-        llvm_state &m_s;
-
-        explicit ls_forcer(llvm_state &s) : m_orig_flag(s.ls_vectorize()), m_s(s)
-        {
-            m_s.ls_vectorize() = true;
-        }
-        ~ls_forcer()
-        {
-            m_s.ls_vectorize() = m_orig_flag;
-        }
-    };
-
-    std::optional<ls_forcer> lsf;
-    if (batch_size > 1u) {
-        // In vector mode, enable the ls_vectorize flag forcibly so
-        // that load/store_vector_from/to_memory() immediately produces vector
-        // load/stores.
-        lsf.emplace(s);
-    }
-
     // Run the optimisation pass.
-    s.optimise();
+    if (batch_size > 1u) {
+        // In vector mode, add a pass to vectorize load/stores.
+        // This is useful to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        std::vector<std::unique_ptr<llvm::Pass>> passes;
+        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
+
+        s.optimise(std::move(passes));
+    } else {
+        s.optimise();
+    }
 
     return dc;
 }
