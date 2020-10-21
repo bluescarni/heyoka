@@ -640,6 +640,8 @@ void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
         if (m_opt_level >= 2u && m_inline_functions) {
+            // Enable function inlining at O2 and if the inlining
+            // flag is enabled.
             pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
         }
 
