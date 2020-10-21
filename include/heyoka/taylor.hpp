@@ -185,6 +185,74 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
     }
 }
 
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_dbl(llvm_state &, const std::string &,
+                                                                     std::vector<expression>, std::uint32_t,
+                                                                     std::uint32_t, bool, bool);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &, const std::string &,
+                                                                      std::vector<expression>, std::uint32_t,
+                                                                      std::uint32_t, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_f128(llvm_state &, const std::string &,
+                                                                      std::vector<expression>, std::uint32_t,
+                                                                      std::uint32_t, bool, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_custom_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                               std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                               bool compact_mode)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_custom_step_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_custom_step_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_custom_step_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_dbl(llvm_state &, const std::string &,
+                                                                     std::vector<std::pair<expression, expression>>,
+                                                                     std::uint32_t, std::uint32_t, bool, bool);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &, const std::string &,
+                                                                      std::vector<std::pair<expression, expression>>,
+                                                                      std::uint32_t, std::uint32_t, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_f128(llvm_state &, const std::string &,
+                                                                      std::vector<std::pair<expression, expression>>,
+                                                                      std::uint32_t, std::uint32_t, bool, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_custom_step(llvm_state &s, const std::string &name,
+                                               std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                                               std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_custom_step_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_custom_step_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_custom_step_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 // Enum to represnt the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome {

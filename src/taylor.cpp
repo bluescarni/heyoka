@@ -2229,4 +2229,220 @@ std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &s, const std::
 
 #endif
 
+namespace detail
+{
+
+namespace
+{
+
+// Add a function for updating the state of an ODE system, given its jet of derivatives up to order 'order'.
+// n_vars is the total number of state variables. The function will take as input a read/write pointer
+// to the current jet of derivatives, and a const pointer to the timestep (or timesteps in batch mode).
+// It will then update the order 0 of the jet of derivatives (i.e., the state vector) via the evaluation
+// of the Taylor polynomials for each state variable.
+template <typename T>
+auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::uint32_t n_vars, std::uint32_t order,
+                                   std::uint32_t batch_size, bool high_accuracy)
+{
+    // NOTE: these are ensured by the fact that this function is always
+    // called after the successful addition of a jet function, which
+    // checks for these.
+    // NOTE: the Taylor jet function also verifies that we can index
+    // into the jet of derivatives without overflow.
+    assert(n_vars > 0u);
+    assert(order > 0u);
+    assert(batch_size > 0u);
+
+    auto &builder = s.builder();
+
+    // Prepare the function prototype. The arguments are:
+    // - pointer to the jet of derivatives (read and write),
+    // - pointer to the array of timesteps (read only).
+    // These pointers cannot overlap.
+    std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create a function for a Taylor state updater with name '" + name + "'");
+    }
+
+    // Set the name/attributes of the function argument.
+    auto jet_ptr = f->args().begin();
+    jet_ptr->setName("jet_ptr");
+    jet_ptr->addAttr(llvm::Attribute::NoCapture);
+    jet_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto h_ptr = jet_ptr + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Load the coefficients of the Taylor polynomials from jet_ptr.
+    std::vector<std::vector<llvm::Value *>> cf_vecs;
+    for (std::uint32_t i = 0; i < n_vars; ++i) {
+        cf_vecs.emplace_back();
+        auto &cf_vec = cf_vecs.back();
+
+        for (std::uint32_t o = 0; o <= order; ++o) {
+            // NOTE: overflow check done already in the jet function.
+            auto ptr = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(o * n_vars * batch_size + i * batch_size)});
+            cf_vec.push_back(load_vector_from_memory(builder, ptr, batch_size));
+        }
+    }
+
+    // Load the integration timestep(s).
+    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+
+    // Evaluate the Taylor polynomials, producing the updated state of the system.
+    // NOTE: the asserts at the top ensure that the preconditions of these functions
+    // are satisfied.
+    auto new_states
+        = high_accuracy ? taylor_run_ceval<T>(s, cf_vecs, h, batch_size) : taylor_run_multihorner(s, cf_vecs, h);
+
+    // Store the new state.
+    for (std::uint32_t i = 0; i < n_vars; ++i) {
+        // NOTE: overflow check done already in the jet function.
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(jet_ptr, builder.getInt32(i * batch_size)),
+                               new_states[i]);
+    }
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // NOTE: don't run the optimisation pass here, it will be
+    // run from the main function below.
+}
+
+// RAII helper to temporarily set the opt level to 0 in an llvm_state.
+struct opt_disabler {
+    llvm_state &m_s;
+    unsigned m_orig_opt_level;
+
+    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
+    {
+        // Disable optimisations.
+        m_s.opt_level() = 0;
+    }
+    ~opt_disabler()
+    {
+        // Restore the original optimisation level.
+        m_s.opt_level() = m_orig_opt_level;
+    }
+};
+
+template <typename T, typename U>
+auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order,
+                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+{
+    // Record the number of equations/variables.
+    // NOTE: the Taylor decomposition will make sure to throw
+    // if n_vars ends up being zero.
+    const auto n_vars = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Temporarily disable optimisations in s.
+    std::optional<opt_disabler> od;
+    od.emplace(s);
+
+    // Add the function for the computation of the jet of derivatives.
+    auto dc = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode);
+
+    // Add the function for the state update.
+    taylor_add_state_updater_impl<T>(s, name + "_updater", n_vars, order, batch_size, high_accuracy);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass.
+    if (batch_size > 1u) {
+        // In vector mode, add a pass to vectorize load/stores.
+        // This is useful to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        std::vector<std::unique_ptr<llvm::Pass>> passes;
+        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
+
+        s.optimise(std::move(passes));
+    } else {
+        s.optimise();
+    }
+
+    return dc;
+}
+
+} // namespace
+
+} // namespace detail
+
+std::vector<expression> taylor_add_custom_step_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                                   std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                   bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                       compact_mode);
+}
+
+std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                    bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                            compact_mode);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> taylor_add_custom_step_f128(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                    bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                              compact_mode);
+}
+
+#endif
+
+std::vector<expression> taylor_add_custom_step_dbl(llvm_state &s, const std::string &name,
+                                                   std::vector<std::pair<expression, expression>> sys,
+                                                   std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                   bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                       compact_mode);
+}
+
+std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &s, const std::string &name,
+                                                    std::vector<std::pair<expression, expression>> sys,
+                                                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                    bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                            compact_mode);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+std::vector<expression> taylor_add_custom_step_f128(llvm_state &s, const std::string &name,
+                                                    std::vector<std::pair<expression, expression>> sys,
+                                                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                                    bool compact_mode)
+{
+    return detail::taylor_add_custom_step_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
+                                                              compact_mode);
+}
+
+#endif
+
 } // namespace heyoka
