@@ -2086,8 +2086,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto tol_v = vector_splat(builder, codegen<T>(s, number{tol}), batch_size);
-    auto abs_or_rel = builder.CreateFCmpOLE(builder.CreateFMul(tol_v, max_abs_state), tol_v);
+    auto abs_or_rel
+        = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
 
     // Estimate rho at orders order - 1 and order.
     auto num_rho
