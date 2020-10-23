@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <initializer_list>
@@ -305,7 +306,7 @@ TEST_CASE("mixed tb/spheres")
 
             // Copy the current state to the other integrator.
             other_t->set_time(cur_t->get_time());
-            other_t->set_state(cur_t->get_state());
+            std::copy(cur_t->get_state().begin(), cur_t->get_state().end(), other_t->get_state_data());
 
             // Swap around, update regime.
             std::swap(other_t, cur_t);

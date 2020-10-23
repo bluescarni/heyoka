@@ -400,6 +400,11 @@ public:
     {
         return m_time;
     }
+    void set_time(T t)
+    {
+        m_time = t;
+    }
+
     const std::vector<T> &get_state() const
     {
         return m_state;
@@ -412,9 +417,6 @@ public:
     {
         return m_state.data();
     }
-
-    void set_state(const std::vector<T> &);
-    void set_time(T);
 
     std::tuple<taylor_outcome, T> step();
     std::tuple<taylor_outcome, T> step_backward();
@@ -603,9 +605,6 @@ public:
     {
         return m_states.data();
     }
-
-    void set_states(const std::vector<T> &);
-    void set_times(const std::vector<T> &);
 
     void step(std::vector<std::tuple<taylor_outcome, T>> &);
     void step_backward(std::vector<std::tuple<taylor_outcome, T>> &);

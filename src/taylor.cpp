@@ -865,42 +865,6 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::set_time(T t)
-{
-    if (!detail::isfinite(t)) {
-        throw std::invalid_argument("Non-finite time " + detail::li_to_string(t)
-                                    + " passed to the set_time() function of an adaptive Taylor integrator");
-    }
-
-    m_time = t;
-}
-
-template <typename T>
-void taylor_adaptive_impl<T>::set_state(const std::vector<T> &state)
-{
-    if (&state == &m_state) {
-        // Check that state and m_state are not the same object,
-        // otherwise std::copy() cannot be used.
-        return;
-    }
-
-    if (state.size() != m_state.size()) {
-        throw std::invalid_argument(
-            "The state vector passed to the set_state() function of an adaptive Taylor integrator has a size of "
-            + std::to_string(state.size()) + ", which is inconsistent with the size of the current state vector ("
-            + std::to_string(m_state.size()) + ")");
-    }
-
-    if (std::any_of(state.begin(), state.end(), [](const T &x) { return !detail::isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite state vector was passed to the set_state() function of an adaptive Taylor integrator");
-    }
-
-    // Do the copy.
-    std::copy(state.begin(), state.end(), m_state.begin());
-}
-
-template <typename T>
 const llvm_state &taylor_adaptive_impl<T>::get_llvm_state() const
 {
     return m_llvm;
@@ -924,6 +888,7 @@ template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expre
                                                                double, bool, bool);
 template void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                                std::vector<double>, double, double, bool, bool);
+
 template class taylor_adaptive_impl<long double>;
 template void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
                                                                     long double, long double, bool, bool);
@@ -1098,57 +1063,6 @@ template <typename T>
 void taylor_adaptive_batch_impl<T>::step_backward(std::vector<std::tuple<taylor_outcome, T>> &res)
 {
     return step_impl(res, m_minf);
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::set_times(const std::vector<T> &t)
-{
-    if (&t == &m_times) {
-        // Check that t and m_times are not the same object,
-        // otherwise std::copy() cannot be used.
-        return;
-    }
-
-    if (t.size() != m_times.size()) {
-        throw std::invalid_argument("Inconsistent sizes when setting the times in a batch Taylor integrator: the new "
-                                    "times vector has a size of "
-                                    + std::to_string(t.size()) + ", while the existing times vector has a size of "
-                                    + std::to_string(m_times.size()));
-    }
-
-    if (std::any_of(t.begin(), t.end(), [](const auto &x) { return !detail::isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite time value was detected while setting the times in a batch Taylor integrator");
-    }
-
-    // Do the copy.
-    std::copy(t.begin(), t.end(), m_times.begin());
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::set_states(const std::vector<T> &states)
-{
-    if (&states == &m_states) {
-        // Check that states and m_states are not the same object,
-        // otherwise std::copy() cannot be used.
-        return;
-    }
-
-    if (states.size() != m_states.size()) {
-        throw std::invalid_argument("The states vector passed to the set_states() function of an adaptive batch Taylor "
-                                    "integrator has a size of "
-                                    + std::to_string(states.size())
-                                    + ", which is inconsistent with the size of the current states vector ("
-                                    + std::to_string(m_states.size()) + ")");
-    }
-
-    if (std::any_of(states.begin(), states.end(), [](const T &x) { return !detail::isfinite(x); })) {
-        throw std::invalid_argument("A non-finite states vector was passed to the set_states() function of an adaptive "
-                                    "batch Taylor integrator");
-    }
-
-    // Do the copy.
-    std::copy(states.begin(), states.end(), m_states.begin());
 }
 
 template <typename T>
