@@ -593,6 +593,7 @@ public:
     {
         return m_times.data();
     }
+
     const std::vector<T> &get_states() const
     {
         return m_states;
