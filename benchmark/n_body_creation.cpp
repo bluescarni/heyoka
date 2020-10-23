@@ -25,11 +25,13 @@ int main(int argc, char *argv[])
 
     std::uint32_t n_bodies;
     bool compact_mode = false;
+    bool function_inlining = true;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("n", po::value<std::uint32_t>(&n_bodies)->default_value(2),
-                                                       "number of bodies")("compact_mode", "compact mode");
+                                                       "number of bodies")("compact_mode", "compact mode")(
+        "disable_inlining", "disable function inlining");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -44,13 +46,17 @@ int main(int argc, char *argv[])
         compact_mode = true;
     }
 
+    if (vm.count("disable_inlining")) {
+        function_inlining = false;
+    }
+
     std::vector<double> init_state(6u * n_bodies);
     std::iota(init_state.begin(), init_state.end(), 1.);
 
     auto start = std::chrono::high_resolution_clock::now();
 
     taylor_adaptive<double> ta{make_nbody_sys(n_bodies), std::move(init_state), kw::high_accuracy = true,
-                               kw::compact_mode = compact_mode};
+                               kw::compact_mode = compact_mode, kw::inline_functions = function_inlining};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
