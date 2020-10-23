@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -430,59 +429,6 @@ public:
     // only if at least 1-2 steps were taken successfully.
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
-
-private:
-    template <bool Direction, typename F>
-    auto propagate_pred_impl(const F &f, std::size_t max_steps)
-    {
-        // Initial values for the counter,
-        // the min/max abs of the integration
-        // timesteps, and min/max Taylor orders.
-        std::size_t step_counter = 0;
-        T min_h = std::numeric_limits<T>::infinity(), max_h = 0;
-
-        while (true) {
-            const auto sres = Direction ? step() : step_backward();
-            const auto &[res, h] = sres;
-
-            if (res != taylor_outcome::success) {
-                return std::tuple{res, min_h, max_h, step_counter};
-            }
-
-            // Update the number of steps
-            // completed successfully.
-            ++step_counter;
-
-            // Update min_h/max_h.
-            assert(!Direction || h >= 0);
-            min_h = std::min(min_h, Direction ? h : -h);
-            max_h = std::max(max_h, Direction ? h : -h);
-
-            // Check the max number of steps stopping criterion.
-            if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
-            }
-
-            // Check the stopping criterion.
-            if (f(sres, *this)) {
-                break;
-            }
-        }
-
-        return std::tuple{taylor_outcome::interrupted, min_h, max_h, step_counter};
-    }
-
-public:
-    template <typename F>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_pred(const F &f, std::size_t max_steps = 0)
-    {
-        return propagate_pred_impl<true>(f, max_steps);
-    }
-    template <typename F>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_pred_backward(const F &f, std::size_t max_steps = 0)
-    {
-        return propagate_pred_impl<false>(f, max_steps);
-    }
 };
 
 } // namespace detail
