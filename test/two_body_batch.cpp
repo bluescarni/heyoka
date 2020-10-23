@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -137,7 +138,7 @@ TEST_CASE("two body batch")
                 for (std::uint32_t j = 0; j < 12u; ++j) {
                     scal_st[j] = bst_copy[j * batch_size + i];
                 }
-                ta.set_state(scal_st);
+                std::copy(scal_st.begin(), scal_st.end(), ta.get_state_data());
                 ta.set_time(times_copy[i]);
 
                 auto s_res = ta.step();

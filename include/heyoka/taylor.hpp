@@ -11,7 +11,6 @@
 
 #include <heyoka/config.hpp>
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -120,24 +119,25 @@ std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name,
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
-                                                                       std::vector<expression>, double, std::uint32_t,
-                                                                       bool, bool);
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
-                                                                        std::vector<expression>, long double,
-                                                                        std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<expression>, double, std::uint32_t, bool,
+                             bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<expression>, long double, std::uint32_t,
+                              bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
-                                                                        std::vector<expression>, mppp::real128,
-                                                                        std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<expression>, mppp::real128, std::uint32_t,
+                              bool, bool);
 
 #endif
 
 template <typename T>
-std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                                 T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys, T tol,
+                         std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
@@ -152,25 +152,25 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
-                                                                       std::vector<std::pair<expression, expression>>,
-                                                                       double, std::uint32_t, bool, bool);
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
-                                                                        std::vector<std::pair<expression, expression>>,
-                                                                        long double, std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, double,
+                             std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
+                              long double, std::uint32_t, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
-                                                                        std::vector<std::pair<expression, expression>>,
-                                                                        mppp::real128, std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
+                              mppp::real128, std::uint32_t, bool, bool);
 
 #endif
 
 template <typename T>
-std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name,
-                                                 std::vector<std::pair<expression, expression>> sys, T tol,
-                                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
+                         T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
@@ -179,6 +179,74 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_dbl(llvm_state &, const std::string &,
+                                                                     std::vector<expression>, std::uint32_t,
+                                                                     std::uint32_t, bool, bool);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &, const std::string &,
+                                                                      std::vector<expression>, std::uint32_t,
+                                                                      std::uint32_t, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_f128(llvm_state &, const std::string &,
+                                                                      std::vector<expression>, std::uint32_t,
+                                                                      std::uint32_t, bool, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_custom_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
+                                               std::uint32_t order, std::uint32_t batch_size, bool high_accuracy,
+                                               bool compact_mode)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_custom_step_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_custom_step_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_custom_step_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_dbl(llvm_state &, const std::string &,
+                                                                     std::vector<std::pair<expression, expression>>,
+                                                                     std::uint32_t, std::uint32_t, bool, bool);
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_ldbl(llvm_state &, const std::string &,
+                                                                      std::vector<std::pair<expression, expression>>,
+                                                                      std::uint32_t, std::uint32_t, bool, bool);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_custom_step_f128(llvm_state &, const std::string &,
+                                                                      std::vector<std::pair<expression, expression>>,
+                                                                      std::uint32_t, std::uint32_t, bool, bool);
+
+#endif
+
+template <typename T>
+std::vector<expression> taylor_add_custom_step(llvm_state &s, const std::string &name,
+                                               std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                                               std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_add_custom_step_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_add_custom_step_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_add_custom_step_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -262,6 +330,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     llvm_state m_llvm;
     // Taylor decomposition.
     std::vector<expression> m_dc;
+    // Taylor order.
+    std::uint32_t m_order;
     // The stepper.
     using step_f_t = void (*)(T *, T *);
     step_f_t m_step_f;
@@ -324,10 +394,17 @@ public:
 
     const std::vector<expression> &get_decomposition() const;
 
+    std::uint32_t get_order() const;
+
     T get_time() const
     {
         return m_time;
     }
+    void set_time(T t)
+    {
+        m_time = t;
+    }
+
     const std::vector<T> &get_state() const
     {
         return m_state;
@@ -340,9 +417,6 @@ public:
     {
         return m_state.data();
     }
-
-    void set_state(const std::vector<T> &);
-    void set_time(T);
 
     std::tuple<taylor_outcome, T> step();
     std::tuple<taylor_outcome, T> step_backward();
@@ -357,59 +431,6 @@ public:
     // only if at least 1-2 steps were taken successfully.
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
-
-private:
-    template <bool Direction, typename F>
-    auto propagate_pred_impl(const F &f, std::size_t max_steps)
-    {
-        // Initial values for the counter,
-        // the min/max abs of the integration
-        // timesteps, and min/max Taylor orders.
-        std::size_t step_counter = 0;
-        T min_h = std::numeric_limits<T>::infinity(), max_h = 0;
-
-        while (true) {
-            const auto sres = Direction ? step() : step_backward();
-            const auto &[res, h] = sres;
-
-            if (res != taylor_outcome::success) {
-                return std::tuple{res, min_h, max_h, step_counter};
-            }
-
-            // Update the number of steps
-            // completed successfully.
-            ++step_counter;
-
-            // Update min_h/max_h.
-            assert(!Direction || h >= 0);
-            min_h = std::min(min_h, Direction ? h : -h);
-            max_h = std::max(max_h, Direction ? h : -h);
-
-            // Check the max number of steps stopping criterion.
-            if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
-            }
-
-            // Check the stopping criterion.
-            if (f(sres, *this)) {
-                break;
-            }
-        }
-
-        return std::tuple{taylor_outcome::interrupted, min_h, max_h, step_counter};
-    }
-
-public:
-    template <typename F>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_pred(const F &f, std::size_t max_steps = 0)
-    {
-        return propagate_pred_impl<true>(f, max_steps);
-    }
-    template <typename F>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_pred_backward(const F &f, std::size_t max_steps = 0)
-    {
-        return propagate_pred_impl<false>(f, max_steps);
-    }
 };
 
 } // namespace detail
@@ -487,6 +508,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     llvm_state m_llvm;
     // Taylor decomposition.
     std::vector<expression> m_dc;
+    // Taylor order.
+    std::uint32_t m_order;
     // The stepper.
     using step_f_t = void (*)(T *, T *);
     step_f_t m_step_f;
@@ -556,6 +579,8 @@ public:
 
     const std::vector<expression> &get_decomposition() const;
 
+    std::uint32_t get_order() const;
+
     const std::vector<T> &get_times() const
     {
         return m_times;
@@ -568,6 +593,7 @@ public:
     {
         return m_times.data();
     }
+
     const std::vector<T> &get_states() const
     {
         return m_states;
@@ -580,9 +606,6 @@ public:
     {
         return m_states.data();
     }
-
-    void set_states(const std::vector<T> &);
-    void set_times(const std::vector<T> &);
 
     void step(std::vector<std::tuple<taylor_outcome, T>> &);
     void step_backward(std::vector<std::tuple<taylor_outcome, T>> &);
