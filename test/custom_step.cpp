@@ -62,7 +62,8 @@ TEST_CASE("outer solar system custom step")
 
             // Add the custom timestep machinery.
             llvm_state s;
-            const std::uint32_t order = 20;
+            const std::uint32_t order = ta.get_order();
+            REQUIRE(order == 20u);
             taylor_add_custom_step<fp_t>(s, "cstep", sys, order, 1, ha, cm);
             s.compile();
 

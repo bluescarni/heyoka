@@ -120,24 +120,25 @@ std::vector<expression> taylor_add_jet(llvm_state &s, const std::string &name,
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
-                                                                       std::vector<expression>, double, std::uint32_t,
-                                                                       bool, bool);
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
-                                                                        std::vector<expression>, long double,
-                                                                        std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<expression>, double, std::uint32_t, bool,
+                             bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<expression>, long double, std::uint32_t,
+                              bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
-                                                                        std::vector<expression>, mppp::real128,
-                                                                        std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<expression>, mppp::real128, std::uint32_t,
+                              bool, bool);
 
 #endif
 
 template <typename T>
-std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys,
-                                                 T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys, T tol,
+                         std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
@@ -152,25 +153,25 @@ std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::strin
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_dbl(llvm_state &, const std::string &,
-                                                                       std::vector<std::pair<expression, expression>>,
-                                                                       double, std::uint32_t, bool, bool);
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &,
-                                                                        std::vector<std::pair<expression, expression>>,
-                                                                        long double, std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, double,
+                             std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
+                              long double, std::uint32_t, bool, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<expression> taylor_add_adaptive_step_f128(llvm_state &, const std::string &,
-                                                                        std::vector<std::pair<expression, expression>>,
-                                                                        mppp::real128, std::uint32_t, bool, bool);
+HEYOKA_DLL_PUBLIC std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
+                              mppp::real128, std::uint32_t, bool, bool);
 
 #endif
 
 template <typename T>
-std::vector<expression> taylor_add_adaptive_step(llvm_state &s, const std::string &name,
-                                                 std::vector<std::pair<expression, expression>> sys, T tol,
-                                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+std::tuple<std::vector<expression>, std::uint32_t>
+taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
+                         T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
@@ -330,6 +331,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     llvm_state m_llvm;
     // Taylor decomposition.
     std::vector<expression> m_dc;
+    // Taylor order.
+    std::uint32_t m_order;
     // The stepper.
     using step_f_t = void (*)(T *, T *);
     step_f_t m_step_f;
@@ -391,6 +394,8 @@ public:
     const llvm_state &get_llvm_state() const;
 
     const std::vector<expression> &get_decomposition() const;
+
+    std::uint32_t get_order() const;
 
     T get_time() const
     {
@@ -555,6 +560,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     llvm_state m_llvm;
     // Taylor decomposition.
     std::vector<expression> m_dc;
+    // Taylor order.
+    std::uint32_t m_order;
     // The stepper.
     using step_f_t = void (*)(T *, T *);
     step_f_t m_step_f;
@@ -623,6 +630,8 @@ public:
     const llvm_state &get_llvm_state() const;
 
     const std::vector<expression> &get_decomposition() const;
+
+    std::uint32_t get_order() const;
 
     const std::vector<T> &get_times() const
     {
