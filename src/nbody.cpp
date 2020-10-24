@@ -20,6 +20,7 @@
 #include <heyoka/math_functions.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/sum.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka::detail
@@ -146,7 +147,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             auto diff_y = y_vars[j] - y_vars[i];
             auto diff_z = z_vars[j] - z_vars[i];
 
-            auto r_m3 = pow(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z, expression{number{-3. / 2}});
+            auto r_m3 = pow(sum(diff_x * diff_x, diff_y * diff_y, diff_z * diff_z), expression{number{-3. / 2}});
 
             // Acceleration exerted by j on i.
             // NOTE: Gconst * masses[j] will be contracted
@@ -164,9 +165,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
     }
 
     return retval;
