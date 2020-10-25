@@ -688,6 +688,9 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
             + " instead");
     }
 
+    // Store the dimension of the system.
+    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
@@ -702,7 +705,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointer.
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dc(other.m_dc), m_order(other.m_order)
+    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
+      m_order(other.m_order)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -738,10 +742,11 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 {
-    // Check the current state before invoking the stepper.
-    if (std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !detail::isfinite(x); })) {
-        return std::tuple{taylor_outcome::err_nf_state, T(0)};
-    }
+#if !defined(NDEBUG)
+    // NOTE: this is the only precondition on max_delta_t.
+    using std::isnan;
+    assert(!isnan(max_delta_t));
+#endif
 
     // Invoke the stepper.
     auto h = max_delta_t;
@@ -749,6 +754,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 
     // Update the time.
     m_time += h;
+
+    // Check if the time or the state vector are non-finite at the
+    // end of the timestep.
+    if (!detail::isfinite(m_time)
+        || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !detail::isfinite(x); })) {
+        return std::tuple{taylor_outcome::err_nf_state, h};
+    }
 
     return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
 }
@@ -789,79 +801,63 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 {
+    // Check the current time.
+    if (!detail::isfinite(m_time)) {
+        throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
+                                    "the current time is not finite");
+    }
+
+    // Check the final time.
     if (!detail::isfinite(t)) {
         throw std::invalid_argument(
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
-    // Initial values for the counter,
+    // Initial values for the counters,
     // the min/max abs of the integration
     // timesteps, and min/max Taylor orders.
-    std::size_t step_counter = 0;
+    // NOTE: iter_counter is for keeping track of the max_steps
+    // limits, step_counter counts the number of timesteps performed
+    // with a non-zero h. Most of the time these two quantities
+    // will be identical, apart from corner cases.
+    std::size_t iter_counter = 0, step_counter = 0;
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
 
-    if (t == m_time) {
-        return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
-    }
+    while (true) {
+        // NOTE: t - m_time is guaranteed not to be nan: t is never non-finite,
+        // and at the first iteration we have checked above the value of m_time.
+        // At successive iterations, we know that m_time must be finite because
+        // otherwise we would have exited the loop when checking res.
+        const auto [res, h] = step_impl(t - m_time);
 
-    if ((t > m_time && !detail::isfinite(t - m_time)) || (t < m_time && !detail::isfinite(m_time - t))) {
-        throw std::overflow_error("The time limit passed to the propagate_until() function is too large and it "
-                                  "results in an overflow condition");
-    }
-
-    if (t > m_time) {
-        while (true) {
-            const auto [res, h] = step_impl(t - m_time);
-
-            if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
-                return std::tuple{res, min_h, max_h, step_counter};
-            }
-
-            // Update the number of steps
-            // completed successfully.
-            ++step_counter;
-
-            // Break out if the time limit is reached,
-            // *before* updating the min_h/max_h values.
-            if (m_time >= t) {
-                break;
-            }
-
-            // Update min_h/max_h.
-            assert(h >= 0);
-            min_h = std::min(min_h, h);
-            max_h = std::max(max_h, h);
-
-            // Check the max number of steps stopping criterion.
-            if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
-            }
+        if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
+            // Something went wrong in the propagation of the timestep, exit.
+            return std::tuple{res, min_h, max_h, step_counter};
         }
-    } else {
-        while (true) {
-            const auto [res, h] = step_impl(t - m_time);
 
-            if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
-                return std::tuple{res, min_h, max_h, step_counter};
-            }
+        // Update the number of iterations.
+        ++iter_counter;
 
-            ++step_counter;
+        // Update the number of steps.
+        step_counter += static_cast<std::size_t>(h != 0);
 
-            if (m_time <= t) {
-                break;
-            }
+        // Break out if the time limit is reached,
+        // *before* updating the min_h/max_h values.
+        if (res == taylor_outcome::time_limit) {
+            return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
+        }
 
-            assert(h < 0);
-            min_h = std::min(min_h, -h);
-            max_h = std::max(max_h, -h);
+        // Update min_h/max_h.
+        using std::abs;
+        const auto abs_h = abs(h);
+        min_h = std::min(min_h, abs_h);
+        max_h = std::max(max_h, abs_h);
 
-            if (max_steps != 0u && step_counter == max_steps) {
-                return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
-            }
+        // Check the iteration limit.
+        if (max_steps != 0u && iter_counter == max_steps) {
+            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
         }
     }
-
-    return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
 }
 
 template <typename T>
@@ -880,6 +876,12 @@ template <typename T>
 std::uint32_t taylor_adaptive_impl<T>::get_order() const
 {
     return m_order;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_impl<T>::get_dim() const
+{
+    return m_dim;
 }
 
 // Explicit instantiation of the implementation classes/functions.
@@ -966,6 +968,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             + " instead");
     }
 
+    // Store the dimension of the system.
+    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
@@ -980,13 +985,22 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
     m_delta_ts.resize(m_batch_size);
+    m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
+    m_min_abs_h.resize(m_batch_size);
+    m_max_abs_h.resize(m_batch_size);
+    m_tmp_res.resize(boost::numeric_cast<decltype(m_tmp_res.size())>(m_batch_size));
+    m_cur_max_delta_ts.resize(m_batch_size);
+    m_pfor_ts.resize(m_batch_size);
 }
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_states(other.m_states), m_times(other.m_times), m_llvm(other.m_llvm),
-      m_dc(other.m_dc), m_order(other.m_order), m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts)
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_delta_ts(other.m_delta_ts), m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h),
+      m_max_abs_h(other.m_max_abs_h), m_tmp_res(other.m_tmp_res), m_cur_max_delta_ts(other.m_cur_max_delta_ts),
+      m_pfor_ts(other.m_pfor_ts)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -1042,14 +1056,31 @@ void taylor_adaptive_batch_impl<T>::step_impl(std::vector<std::tuple<taylor_outc
     // Invoke the stepper.
     m_step_f(m_states.data(), m_delta_ts.data());
 
+    // Helper to check if the state vector of a batch element
+    // contains a non-finite value.
+    auto check_nf_batch = [this](std::uint32_t batch_idx) {
+        for (std::uint32_t i = 0; i < m_dim; ++i) {
+            if (!detail::isfinite(m_states[i * m_batch_size + batch_idx])) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     // Update the times and write out the result.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         // The timestep that was actually used for
         // this batch element.
         const auto h = m_delta_ts[i];
-
         m_times[i] += h;
-        res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+
+        if (!detail::isfinite(m_times[i]) || check_nf_batch(i)) {
+            // Either the new time or state contain non-finite values,
+            // return an error condition.
+            res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+        } else {
+            res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        }
     }
 }
 
@@ -1063,6 +1094,136 @@ template <typename T>
 void taylor_adaptive_batch_impl<T>::step_backward(std::vector<std::tuple<taylor_outcome, T>> &res)
 {
     return step_impl(res, m_minf);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::propagate_for(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &res,
+                                                  const std::vector<T> &delta_ts, std::size_t max_steps)
+{
+    // Check the dimensionality of delta_ts.
+    if (delta_ts.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid number of time intervals specified in a Taylor integrator in batch mode: the batch size is "
+            + std::to_string(m_batch_size) + ", but the number of specified time intervals is "
+            + std::to_string(delta_ts.size()));
+    }
+
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_pfor_ts[i] = m_times[i] + delta_ts[i];
+    }
+
+    propagate_until(res, m_pfor_ts, max_steps);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::propagate_until(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &res,
+                                                    const std::vector<T> &ts, std::size_t max_steps)
+{
+    // Check the dimensionality of ts.
+    if (ts.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid number of time limits specified in a Taylor integrator in batch mode: the batch size is "
+            + std::to_string(m_batch_size) + ", but the number of specified time limits is "
+            + std::to_string(ts.size()));
+    }
+
+    // Check the current times.
+    if (std::any_of(m_times.begin(), m_times.end(), [](const auto &t) { return !detail::isfinite(t); })) {
+        throw std::invalid_argument(
+            "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
+            "one of the current times is not finite");
+    }
+
+    // Check the final times.
+    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !detail::isfinite(t); })) {
+        throw std::invalid_argument("A non-finite time was passed to the propagate_until() function of an adaptive "
+                                    "Taylor integrator in batch mode");
+    }
+
+    // Prepare res.
+    res.resize(m_batch_size);
+
+    // Reset the counters and the min/max abs(h) vectors.
+    std::size_t iter_counter = 0;
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_ts_count[i] = 0;
+        m_min_abs_h[i] = std::numeric_limits<T>::infinity();
+        m_max_abs_h[i] = 0;
+    }
+
+    while (true) {
+        // Compute the max integration times for this timestep.
+        // NOTE: ts[i] - m_times[i] is guaranteed not to be nan: ts[i] is never non-finite,
+        // and at the first iteration we have checked above the value of m_times.
+        // At successive iterations, we know that m_times[i] must be finite because
+        // otherwise we would have exited the loop when checking res.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_cur_max_delta_ts[i] = ts[i] - m_times[i];
+        }
+
+        // Run the integration timestep.
+        step_impl(m_tmp_res, m_cur_max_delta_ts);
+
+        // Check if the integration timestep produced an error condition.
+        if (std::any_of(m_tmp_res.begin(), m_tmp_res.end(), [](const auto &tup) {
+                return std::get<0>(tup) != taylor_outcome::success && std::get<0>(tup) != taylor_outcome::time_limit;
+            })) {
+            break;
+        }
+
+        // Update the iteration counter.
+        ++iter_counter;
+
+        // Update the local step counters.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: the local step counters increase only if we integrated
+            // for a non-zero time.
+            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_tmp_res[i]) != 0);
+        }
+
+        // Break out if we have reached the time limit for all
+        // batch elements.
+        if (std::all_of(m_tmp_res.begin(), m_tmp_res.end(),
+                        [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::time_limit; })) {
+            break;
+        }
+
+        // Update min_h/max_h.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Don't update if we reached the time limit.
+            if (std::get<0>(m_tmp_res[i]) == taylor_outcome::time_limit) {
+                continue;
+            }
+
+            using std::abs;
+            const auto abs_h = abs(std::get<1>(m_tmp_res[i]));
+            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+        }
+
+        // Check the iteration limit.
+        if (max_steps != 0u && iter_counter == max_steps) {
+            break;
+        }
+    }
+
+    // Assemble the return value.
+    if (max_steps != 0u && iter_counter == max_steps) {
+        // We reached the max_steps limit: if the last integration step was successful
+        // return step_limit, otherwise time_limit.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            res[i] = std::tuple{std::get<0>(m_tmp_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
+                                                                                     : taylor_outcome::time_limit,
+                                m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        }
+    } else {
+        // We exited either because of an error, or because all the batch
+        // elements reached the time limits. In this case, we just use the
+        // outcome of the last timestep.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            res[i] = std::tuple{std::get<0>(m_tmp_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        }
+    }
 }
 
 template <typename T>
@@ -1081,6 +1242,12 @@ template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
 {
     return m_order;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
+{
+    return m_dim;
 }
 
 // Explicit instantiation of the batch implementation classes.
@@ -2028,13 +2195,13 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Take the minimum.
     auto rho_m = taylor_step_min(s, rho_o, rho_om1);
 
-    // Copmute the safety factor.
-    const auto rhofac = 1 / (exp(T(1)) * exp(T(1))) * exp((T(-7) / T(10)) / (order - 1u));
+    // Compute the scaling + safety factor.
+    const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
 
-    // Determine the step size.
+    // Determine the step size in absolute value.
     auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
 
-    // Ensure that the step size does not exceed the limit.
+    // Ensure that the step size does not exceed the limit in absolute value.
     auto max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
     h = taylor_step_minabs(s, h, max_h_vec);
 
