@@ -290,11 +290,11 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
                     if constexpr (!std::is_same_v<T, mppp::real128>) {
 #endif
                         // Store the orbital elements wrt the Sun.
-                        for (auto i = 1u; i < 6u; ++i) {
+                        for (auto j = 1u; j < 6u; ++j) {
                             auto rel_x
-                                = xt::view(s_array, i, xt::range(0, 3), i) - xt::view(s_array, 0, xt::range(0, 3), i);
+                                = xt::view(s_array, j, xt::range(0, 3), i) - xt::view(s_array, 0, xt::range(0, 3), i);
                             auto rel_v
-                                = xt::view(s_array, i, xt::range(3, 6), i) - xt::view(s_array, 0, xt::range(3, 6), i);
+                                = xt::view(s_array, j, xt::range(3, 6), i) - xt::view(s_array, 0, xt::range(3, 6), i);
 
                             auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
 

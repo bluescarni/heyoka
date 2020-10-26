@@ -253,14 +253,13 @@ std::vector<expression> taylor_add_custom_step(llvm_state &s, const std::string 
     }
 }
 
-// Enum to represnt the outcome of a Taylor integration
+// Enum to represent the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome {
     success,     // Integration step was successful, no time/step limits were reached.
     step_limit,  // Maximum number of steps reached.
     time_limit,  // Time limit reached.
-    interrupted, // Interrupted by user-provided stopping criterion.
-    err_nf_state // Non-finite initial state detected.
+    err_nf_state // Non-finite state detected at the end of the timestep.
 };
 
 namespace kw
@@ -328,6 +327,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     T m_time;
     // The LLVM machinery.
     llvm_state m_llvm;
+    // Dimension of the system.
+    std::uint32_t m_dim;
     // Taylor decomposition.
     std::vector<expression> m_dc;
     // Taylor order.
@@ -395,6 +396,7 @@ public:
     const std::vector<expression> &get_decomposition() const;
 
     std::uint32_t get_order() const;
+    std::uint32_t get_dim() const;
 
     T get_time() const
     {
@@ -421,6 +423,7 @@ public:
     std::tuple<taylor_outcome, T> step();
     std::tuple<taylor_outcome, T> step_backward();
     std::tuple<taylor_outcome, T> step(T);
+
     // NOTE: return values:
     // - outcome,
     // - min abs(timestep),
@@ -506,6 +509,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_times;
     // The LLVM machinery.
     llvm_state m_llvm;
+    // Dimension of the system.
+    std::uint32_t m_dim;
     // Taylor decomposition.
     std::vector<expression> m_dc;
     // Taylor order.
@@ -515,9 +520,17 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     step_f_t m_step_f;
     // Temporary vectors for use
     // in the timestepping functions.
-    std::vector<T> m_pinf;
-    std::vector<T> m_minf;
+    // These two are used as default values,
+    // they must never be modified.
+    std::vector<T> m_pinf, m_minf;
+    // This is used as temporary storage in step_impl().
     std::vector<T> m_delta_ts;
+    // Temporary vectors used in the propagate_until() implementation.
+    std::vector<std::size_t> m_ts_count;
+    std::vector<T> m_min_abs_h, m_max_abs_h;
+    std::vector<std::tuple<taylor_outcome, T>> m_tmp_res;
+    std::vector<T> m_cur_max_delta_ts;
+    std::vector<T> m_pfor_ts;
 
     HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
 
@@ -580,6 +593,7 @@ public:
     const std::vector<expression> &get_decomposition() const;
 
     std::uint32_t get_order() const;
+    std::uint32_t get_dim() const;
 
     const std::vector<T> &get_times() const
     {
@@ -610,6 +624,11 @@ public:
     void step(std::vector<std::tuple<taylor_outcome, T>> &);
     void step_backward(std::vector<std::tuple<taylor_outcome, T>> &);
     void step(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
+
+    void propagate_for(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &, const std::vector<T> &,
+                       std::size_t = 0);
+    void propagate_until(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &, const std::vector<T> &,
+                         std::size_t = 0);
 };
 
 } // namespace detail
