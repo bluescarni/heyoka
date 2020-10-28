@@ -60,7 +60,9 @@ struct target_features {
     bool avx512f = false;
 };
 
-HEYOKA_DLL_PUBLIC const target_features &get_target_features();
+// NOTE: no need to make this DLL-public as long
+// as this is used only in library code.
+const target_features &get_target_features();
 
 } // namespace detail
 
