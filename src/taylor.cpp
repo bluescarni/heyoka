@@ -56,6 +56,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -95,6 +96,8 @@ std::vector<expression> taylor_decompose_cse(std::vector<expression> &v_ex, std:
     // n_eq variables at the end and possibly
     // extra variables in the middle.
     assert(v_ex.size() >= n_eq * 2u);
+
+    const auto orig_dc_size = v_ex.size();
 
     using idx_t = std::vector<expression>::size_type;
 
@@ -162,6 +165,8 @@ std::vector<expression> taylor_decompose_cse(std::vector<expression> &v_ex, std:
 
         retval.emplace_back(std::move(ex));
     }
+
+    get_logger()->info("Taylor decomposition CSE reduced the size from {} to {}", orig_dc_size, retval.size());
 
     return retval;
 }

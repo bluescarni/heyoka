@@ -24,4 +24,14 @@
 
 #endif
 
+#if defined(__GNUC__)
+
+#define HEYOKA_PRETTY_FUNCTION __PRETTY_FUNCTION__
+
+#else
+
+#define HEYOKA_PRETTY_FUNCTION __func__
+
+#endif
+
 #endif

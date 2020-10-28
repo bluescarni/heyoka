@@ -96,6 +96,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -107,6 +108,31 @@ namespace detail
 
 namespace
 {
+
+// String representation of a target_features object
+// for logging purposes.
+auto tf_to_string(const target_features &tf)
+{
+    std::ostringstream oss;
+
+    if (tf.sse2) {
+        oss << "sse2 ";
+    }
+
+    if (tf.avx) {
+        oss << "avx ";
+    }
+
+    if (tf.avx2) {
+        oss << "avx2 ";
+    }
+
+    if (tf.avx512f) {
+        oss << "avx512f ";
+    }
+
+    return oss.str();
+}
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -169,6 +195,8 @@ target_features get_target_features_impl()
         retval.sse2 = true;
     }
 
+    get_logger()->info("Target features: {}", tf_to_string(retval));
+
     return retval;
 }
 
@@ -215,9 +243,11 @@ struct llvm_state::jit {
     {
         // NOTE: the native target initialization needs to be done only once
         std::call_once(detail::nt_inited, []() {
+            get_logger()->info("Performing LLVM native target initialization...");
             llvm::InitializeNativeTarget();
             llvm::InitializeNativeTargetAsmPrinter();
             llvm::InitializeNativeTargetAsmParser();
+            get_logger()->info("LLVM native target initialised");
         });
 
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();

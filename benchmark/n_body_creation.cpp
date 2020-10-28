@@ -14,6 +14,9 @@
 
 #include <boost/program_options.hpp>
 
+#include <spdlog/spdlog.h>
+
+#include <heyoka/logging.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -49,6 +52,8 @@ int main(int argc, char *argv[])
     if (vm.count("disable_inlining")) {
         function_inlining = false;
     }
+
+    get_logger()->set_level(spdlog::level::info);
 
     std::vector<double> init_state(6u * n_bodies);
     std::iota(init_state.begin(), init_state.end(), 1.);
