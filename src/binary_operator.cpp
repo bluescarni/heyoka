@@ -111,6 +111,12 @@ const binary_operator::type &binary_operator::op() const
     return m_type;
 }
 
+const std::array<expression, 2> &binary_operator::args() const
+{
+    assert(m_ops);
+    return *m_ops;
+}
+
 void swap(binary_operator &bo0, binary_operator &bo1) noexcept
 {
     std::swap(bo0.m_type, bo1.m_type);

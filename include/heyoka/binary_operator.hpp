@@ -68,6 +68,7 @@ public:
     const expression &lhs() const;
     const expression &rhs() const;
     const type &op() const;
+    const std::array<expression, 2> &args() const;
 };
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const binary_operator &);
