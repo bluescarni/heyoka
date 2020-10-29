@@ -49,12 +49,14 @@
 
 #endif
 
+#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/function.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -353,13 +355,32 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
     }
 
     // From n_eq to dc.size() - n_eq, the expressions
-    // must contain variables only in the u_n form,
-    // where n < i.
+    // must be binary operators or functions whose arguments
+    // are either variables in the u_n form,
+    // where n < i, or numbers.
     for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
-        for (const auto &var : get_variables(dc[i])) {
-            assert(var.rfind("u_", 0) == 0);
-            assert(uname_to_index(var) < i);
-        }
+        std::visit(
+            [i](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                auto check_arg = [i](const auto &arg) {
+                    if (auto p_var = std::get_if<variable>(&arg.value())) {
+                        assert(p_var->name().rfind("u_", 0) == 0);
+                        assert(uname_to_index(p_var->name()) < i);
+                    } else if (std::get_if<number>(&arg.value()) == nullptr) {
+                        assert(false);
+                    }
+                };
+
+                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                    for (const auto &arg : v.args()) {
+                        check_arg(arg);
+                    }
+                } else {
+                    assert(false);
+                }
+            },
+            dc[i].value());
     }
 
     // From dc.size() - n_eq to dc.size(), the expressions
