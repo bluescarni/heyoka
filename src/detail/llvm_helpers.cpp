@@ -126,6 +126,23 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
     return vec;
 }
 
+llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
+{
+    assert(vector_size > 0u);
+
+    if (vector_size == 1u) {
+        return t;
+    } else {
+        return
+#if LLVM_VERSION_MAJOR == 10
+            llvm::VectorType::get
+#else
+            llvm::FixedVectorType::get
+#endif
+            (t, boost::numeric_cast<unsigned>(vector_size));
+    }
+}
+
 // Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
 // return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::Value *vec)

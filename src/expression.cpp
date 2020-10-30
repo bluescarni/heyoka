@@ -21,6 +21,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -305,11 +306,8 @@ expression operator/(expression e1, expression e2)
             } else if (is_negative_one(v2)) {
                 // e1 / -1 = -e1.
                 return -expression{std::forward<decltype(v1)>(v1)};
-            } else {
-                // e1 / x = e1 * 1/x.
-                return expression{std::forward<decltype(v1)>(v1)}
-                       * expression{number{1.} / std::forward<decltype(v2)>(v2)};
             }
+            // NOTE: fall through to the standard case.
         } else if constexpr (std::is_same_v<type1, number>) {
             // e1 is a number, e2 is symbolic.
             if (is_zero(v1)) {
@@ -626,15 +624,15 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_c_diff_impl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
-                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
 {
     return std::visit(
-        [&](const auto &v) -> llvm::Value * {
+        [&](const auto &v) -> llvm::Function * {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
-                return taylor_c_diff<T>(s, v, arr, n_uvars, order, idx, batch_size);
+                return taylor_c_diff_func<T>(s, v, n_uvars, batch_size);
             } else {
                 throw std::invalid_argument(
                     "Taylor derivatives in compact mode can be computed only for binary operators or functions");
@@ -647,25 +645,24 @@ llvm::Value *taylor_c_diff_impl(llvm_state &s, const expression &ex, llvm::Value
 
 } // namespace detail
 
-llvm::Value *taylor_c_diff_dbl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
-                               llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
-
+llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
+                                       std::uint32_t batch_size)
 {
-    return detail::taylor_c_diff_impl<double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_c_diff_func_impl<double>(s, ex, n_uvars, batch_size);
 }
 
-llvm::Value *taylor_c_diff_ldbl(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
-                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
 {
-    return detail::taylor_c_diff_impl<long double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_c_diff_func_impl<long double>(s, ex, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_c_diff_f128(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
-                                llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
+                                        std::uint32_t batch_size)
 {
-    return detail::taylor_c_diff_impl<mppp::real128>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_c_diff_func_impl<mppp::real128>(s, ex, n_uvars, batch_size);
 }
 
 #endif

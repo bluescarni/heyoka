@@ -81,6 +81,17 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
     }
 }
 
+HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
+
+// Helper to associate a C++ type to an LLVM vector type of size batch_size.
+// If batch_size is 1, the corresponding scalar type will be returned.
+// batch_size cannot be zero.
+template <typename T>
+inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch_size)
+{
+    return make_vector_type(to_llvm_type<T>(c), batch_size);
+}
+
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *);
 
