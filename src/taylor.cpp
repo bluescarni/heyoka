@@ -1450,6 +1450,115 @@ llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm:
         ex.value());
 }
 
+// Helper for the computation of a jet of derivatives in compact mode,
+// used in taylor_compute_jet() below.
+template <typename T>
+auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> order0,
+                                     const std::vector<expression> &dc, std::uint32_t n_eq, std::uint32_t n_uvars,
+                                     std::uint32_t order, std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    // Prepare the array that will contain the jet of derivatives.
+    // We will be storing all the derivatives of the u variables
+    // up to order 'order - 1', plus the derivatives of order
+    // 'order' of the state variables only.
+    // NOTE: the array size is specified as a 64-bit integer in the
+    // LLVM API.
+    auto array_type = llvm::ArrayType::get(order0[0]->getType(), n_uvars * order + n_eq);
+    // NOTE: fetch a pointer to the first element of the array.
+    auto diff_arr = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type, 0, "diff_arr"),
+                                              {builder.getInt32(0), builder.getInt32(0)});
+
+    // Copy over the order0 derivatives of the state variables.
+    for (std::uint32_t i = 0; i < n_eq; ++i) {
+        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), i, order0[i]);
+    }
+
+    // Run the init for the other u variables.
+    for (auto i = n_eq; i < n_uvars; ++i) {
+        auto val = taylor_c_u_init<T>(s, dc[i], diff_arr, batch_size);
+        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), i, val);
+    }
+
+    // Compute all derivatives up to order 'order - 1'.
+    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
+        // Begin with the state variables.
+        // NOTE: the derivatives of the state variables
+        // are at the end of the decomposition vector.
+        for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i - n_uvars,
+                                taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
+        }
+
+        // Helper to convert the arguments of an element of a Taylor decomposition
+        // into a vector of LLVM values. u variables will be converted to their indices,
+        // numbers will be subject to codegen.
+        auto to_cdiff_args = [&s](const expression &ex) {
+            return std::visit(
+                [&s](const auto &v) -> std::vector<llvm::Value *> {
+                    using type = detail::uncvref_t<decltype(v)>;
+
+                    if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                        std::vector<llvm::Value *> retval;
+                        auto &builder = s.builder();
+
+                        for (const auto &arg : v.args()) {
+                            if (auto p_var = std::get_if<variable>(&arg.value())) {
+                                retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
+                            } else if (auto p_num = std::get_if<number>(&arg.value())) {
+                                retval.push_back(codegen<T>(s, *p_num));
+                            } else {
+                                throw std::invalid_argument(
+                                    "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                    "argument is not a variable or a number");
+                            }
+                        }
+
+                        return retval;
+                    } else {
+                        throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
+                                                    "expression is not a function or a binary operator");
+                    }
+                },
+                ex.value());
+        };
+
+        // Now the other u variables.
+        for (auto i = n_eq; i < n_uvars; ++i) {
+            // Get the function for the computation of the derivative.
+            auto func = taylor_c_diff_func<T>(s, dc[i], n_uvars, batch_size);
+
+            // Compose the arguments for func. First order, index of the current
+            // u variable and diff array. Then the arguments specific to the current
+            // expression dc[i].
+            std::vector<llvm::Value *> args{cur_order, builder.getInt32(i), diff_arr};
+            auto cdiff_args = to_cdiff_args(dc[i]);
+            args.insert(args.end(), cdiff_args.begin(), cdiff_args.end());
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i, builder.CreateCall(func, args));
+        }
+    });
+
+    // Compute the last-order derivatives for the state variables.
+    for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+        taylor_c_store_diff(
+            s, diff_arr, n_uvars, builder.getInt32(order), i - n_uvars,
+            taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, builder.getInt32(order), batch_size));
+    }
+
+    // Build the return value.
+    std::vector<llvm::Value *> retval;
+    for (std::uint32_t o = 0; o <= order; ++o) {
+        for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
+            retval.push_back(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(o), builder.getInt32(var_idx)));
+        }
+    }
+
+    return retval;
+}
+
 // Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
 // is the number of equations/variables in the ODE sys, dc its Taylor decomposition,
 // n_uvars the total number of u variables in the decomposition.
@@ -1482,109 +1591,8 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
             "An overflow condition was detected in the computation of a jet of Taylor derivatives");
     }
 
-    std::vector<llvm::Value *> retval;
-
     if (compact_mode) {
-        auto &builder = s.builder();
-
-        // Prepare the array that will contain the jet of derivatives.
-        // We will be storing all the derivatives of the u variables
-        // up to order 'order - 1', plus the derivatives of order
-        // 'order' of the state variables only.
-        // NOTE: the array size is specified as a 64-bit integer in the
-        // LLVM API.
-        auto array_type = llvm::ArrayType::get(order0[0]->getType(), n_uvars * order + n_eq);
-        // NOTE: fetch a pointer to the first element of the array.
-        auto diff_arr = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type, 0, "diff_arr"),
-                                                  {builder.getInt32(0), builder.getInt32(0)});
-
-        // Copy over the order0 derivatives of the state variables.
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), i, order0[i]);
-        }
-
-        // Run the init for the other u variables.
-        for (auto i = n_eq; i < n_uvars; ++i) {
-            auto val = taylor_c_u_init<T>(s, dc[i], diff_arr, batch_size);
-            taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), i, val);
-        }
-
-        // Compute all derivatives up to order 'order - 1'.
-        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
-            // Begin with the state variables.
-            // NOTE: the derivatives of the state variables
-            // are at the end of the decomposition vector.
-            for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-                taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i - n_uvars,
-                                    taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
-            }
-
-            // Helper to convert the arguments of an element of a Taylor decomposition
-            // into a vector of LLVM values. u variables will be converted to their indices,
-            // numbers will be subject to codegen.
-            auto to_cdiff_args = [&s](const expression &ex) {
-                return std::visit(
-                    [&s](const auto &v) -> std::vector<llvm::Value *> {
-                        using type = detail::uncvref_t<decltype(v)>;
-
-                        if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
-                            std::vector<llvm::Value *> retval;
-                            auto &builder = s.builder();
-
-                            for (const auto &arg : v.args()) {
-                                if (auto p_var = std::get_if<variable>(&arg.value())) {
-                                    retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
-                                } else if (auto p_num = std::get_if<number>(&arg.value())) {
-                                    retval.push_back(codegen<T>(s, *p_num));
-                                } else {
-                                    throw std::invalid_argument(
-                                        "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                        "argument is not a variable or a number");
-                                }
-                            }
-
-                            return retval;
-                        } else {
-                            throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                                        "expression is not a function or a binary operator");
-                        }
-                    },
-                    ex.value());
-            };
-
-            // Now the other u variables.
-            for (auto i = n_eq; i < n_uvars; ++i) {
-                // Get the function for the computation of the derivative.
-                auto func = taylor_c_diff_func<T>(s, dc[i], n_uvars, batch_size);
-
-                // Compose the arguments for func. First order, index of the current
-                // u variable and diff array. Then the arguments specific to the current
-                // expression dc[i].
-                std::vector<llvm::Value *> args{cur_order, builder.getInt32(i), diff_arr};
-                auto cdiff_args = to_cdiff_args(dc[i]);
-                args.insert(args.end(), cdiff_args.begin(), cdiff_args.end());
-
-                // Calculate the derivative and store the result.
-                taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i, builder.CreateCall(func, args));
-            }
-        });
-
-        // Compute the last-order derivatives for the state variables.
-        for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-            taylor_c_store_diff(
-                s, diff_arr, n_uvars, builder.getInt32(order), i - n_uvars,
-                taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, builder.getInt32(order), batch_size));
-        }
-
-        // Build the return value.
-        for (std::uint32_t o = 0; o <= order; ++o) {
-            for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-                retval.push_back(
-                    taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(o), builder.getInt32(var_idx)));
-            }
-        }
-
-        return retval;
+        return taylor_compute_jet_compact_mode<T>(s, std::move(order0), dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr(std::move(order0));
@@ -1619,6 +1627,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
         assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
 
         // Extract the derivatives of the state variables from diff_arr.
+        std::vector<llvm::Value *> retval;
         for (std::uint32_t o = 0; o <= order; ++o) {
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
                 retval.push_back(taylor_fetch_diff(diff_arr, var_idx, o, n_uvars));
