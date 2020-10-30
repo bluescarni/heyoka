@@ -95,6 +95,12 @@ binary_operator::type &binary_operator::op()
     return m_type;
 }
 
+std::array<expression, 2> &binary_operator::args()
+{
+    assert(m_ops);
+    return *m_ops;
+}
+
 const expression &binary_operator::lhs() const
 {
     assert(m_ops);

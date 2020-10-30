@@ -83,7 +83,7 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 
-// Helper to associate a C++ type to an LLVM vector type.
+// Helper to associate a C++ type to an LLVM vector type of size batch_size.
 // If batch_size is 1, the corresponding scalar type will be returned.
 // batch_size cannot be zero.
 template <typename T>

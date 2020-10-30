@@ -1520,7 +1520,7 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
             }
 
             // Helper to convert the arguments of an element of a Taylor decomposition
-            // into a vector of LLVM values. u variables will be converted to their index,
+            // into a vector of LLVM values. u variables will be converted to their indices,
             // numbers will be subject to codegen.
             auto to_cdiff_args = [&s](const expression &ex) {
                 return std::visit(

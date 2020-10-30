@@ -66,6 +66,8 @@ public:
     expression &lhs();
     expression &rhs();
     type &op();
+    std::array<expression, 2> &args();
+
     const expression &lhs() const;
     const expression &rhs() const;
     const type &op() const;
