@@ -59,6 +59,67 @@ namespace detail
 namespace
 {
 
+// Helper to implement the function for the differentiation of
+// 'func(number)' in compact mode. The function will always return zero.
+template <typename T>
+llvm::Function *taylor_c_diff_func_unary_num(llvm_state &s, std::uint32_t batch_size, const std::string &fname,
+                                             const std::string &desc)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+
+    // The function arguments:
+    // - diff order,
+    // - idx of the u variable whose diff is being computed,
+    // - diff array,
+    // - number argument.
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the return value.
+        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of " + desc
+                                        + " in compact mode detected");
+        }
+    }
+
+    return f;
+}
+
 // Derivative of sin(number).
 template <typename T>
 llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
@@ -139,62 +200,9 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
 template <typename T>
 llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_sin_num_"} + taylor_mangle_suffix(val_t);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
-
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the square root "
-                                        "in compact mode detected");
-        }
-    }
-
-    return f;
+    return taylor_c_diff_func_unary_num<T>(
+        s, batch_size,
+        "heyoka_taylor_diff_sin_num_" + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)), "sine");
 }
 
 // Derivative of sin(variable).
@@ -562,62 +570,10 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vec
 template <typename T>
 llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_cos_num_"} + taylor_mangle_suffix(val_t);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
-
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of the cosine in compact mode detected");
-        }
-    }
-
-    return f;
+    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+                                           "heyoka_taylor_diff_cos_num_"
+                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+                                           "cosine");
 }
 
 // Derivative of cos(variable).
@@ -988,62 +944,10 @@ llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vec
 template <typename T>
 llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_log_num_"} + taylor_mangle_suffix(val_t);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
-
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of the logarithm in compact mode detected");
-        }
-    }
-
-    return f;
+    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+                                           "heyoka_taylor_diff_log_num_"
+                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+                                           "logarithm");
 }
 
 // Derivative of log(variable).
@@ -1388,62 +1292,10 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vec
 template <typename T>
 llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_exp_num_"} + taylor_mangle_suffix(val_t);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
-
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the exponential "
-                                        "in compact mode detected");
-        }
-    }
-
-    return f;
+    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+                                           "heyoka_taylor_diff_exp_num_"
+                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+                                           "exponential");
 }
 
 // Derivative of exp(variable).
@@ -2189,62 +2041,10 @@ llvm::Value *taylor_diff_sqrt(llvm_state &s, const function &func, const std::ve
 template <typename T>
 llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    auto &module = s.module();
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
-
-    // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_sqrt_num_"} + taylor_mangle_suffix(val_t);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
-
-    // Try to see if we already created the function.
-    auto f = module.getFunction(fname);
-
-    if (f == nullptr) {
-        // The function was not created before, do it now.
-
-        // Fetch the current insertion block.
-        auto orig_bb = builder.GetInsertBlock();
-
-        // The return type is val_t.
-        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-        // Create the function
-        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
-        assert(f != nullptr);
-
-        // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-        // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-
-        // Verify.
-        s.verify_function(f);
-
-        // Restore the original insertion block.
-        builder.SetInsertPoint(orig_bb);
-    } else {
-        // The function was created before. Check if the signatures match.
-        // NOTE: there could be a mismatch if the derivative function was created
-        // and then optimised - optimisation might remove arguments which are compile-time
-        // constants.
-        if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of the sine in compact mode detected");
-        }
-    }
-
-    return f;
+    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+                                           "heyoka_taylor_diff_sqrt_num_"
+                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+                                           "square root");
 }
 
 // Derivative of sqrt(variable).
