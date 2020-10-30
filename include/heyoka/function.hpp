@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -63,8 +64,8 @@ public:
                                       std::uint32_t, std::uint32_t, std::uint32_t)>;
     using taylor_c_u_init_t
         = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *, std::uint32_t)>;
-    using taylor_c_diff_t = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *, std::uint32_t,
-                                                        llvm::Value *, std::uint32_t, std::uint32_t)>;
+    using taylor_c_diff_func_t
+        = std::function<llvm::Function *(llvm_state &, const function &, std::uint32_t, std::uint32_t)>;
 
 private:
     codegen_t m_codegen_dbl_f, m_codegen_ldbl_f
@@ -104,10 +105,10 @@ private:
         m_taylor_c_u_init_f128_f
 #endif
         ;
-    taylor_c_diff_t m_taylor_c_diff_dbl_f, m_taylor_c_diff_ldbl_f
+    taylor_c_diff_func_t m_taylor_c_diff_func_dbl_f, m_taylor_c_diff_func_ldbl_f
 #if defined(HEYOKA_HAVE_REAL128)
         ,
-        m_taylor_c_diff_f128_f
+        m_taylor_c_diff_func_f128_f
 #endif
         ;
 
@@ -148,10 +149,10 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     taylor_c_u_init_t &taylor_c_u_init_f128_f();
 #endif
-    taylor_c_diff_t &taylor_c_diff_dbl_f();
-    taylor_c_diff_t &taylor_c_diff_ldbl_f();
+    taylor_c_diff_func_t &taylor_c_diff_func_dbl_f();
+    taylor_c_diff_func_t &taylor_c_diff_func_ldbl_f();
 #if defined(HEYOKA_HAVE_REAL128)
-    taylor_c_diff_t &taylor_c_diff_f128_f();
+    taylor_c_diff_func_t &taylor_c_diff_func_f128_f();
 #endif
 
     const codegen_t &codegen_dbl_f() const;
@@ -182,10 +183,10 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     const taylor_c_u_init_t &taylor_c_u_init_f128_f() const;
 #endif
-    const taylor_c_diff_t &taylor_c_diff_dbl_f() const;
-    const taylor_c_diff_t &taylor_c_diff_ldbl_f() const;
+    const taylor_c_diff_func_t &taylor_c_diff_func_dbl_f() const;
+    const taylor_c_diff_func_t &taylor_c_diff_func_ldbl_f() const;
 #if defined(HEYOKA_HAVE_REAL128)
-    const taylor_c_diff_t &taylor_c_diff_f128_f() const;
+    const taylor_c_diff_func_t &taylor_c_diff_func_f128_f() const;
 #endif
 };
 
@@ -332,30 +333,27 @@ inline llvm::Value *taylor_c_u_init(llvm_state &s, const function &f, llvm::Valu
     }
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t,
-                                                 llvm::Value *, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_dbl(llvm_state &, const function &, std::uint32_t, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t,
-                                                  llvm::Value *, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, const function &, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t,
-                                                  llvm::Value *, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_f128(llvm_state &, const function &, std::uint32_t, std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Value *taylor_c_diff(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t n_uvars,
-                                  llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
+inline llvm::Function *taylor_c_diff_func(llvm_state &s, const function &func, std::uint32_t n_uvars,
+                                          std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_c_diff_dbl(s, f, arr, n_uvars, order, idx, batch_size);
+        return taylor_c_diff_func_dbl(s, func, n_uvars, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_c_diff_ldbl(s, f, arr, n_uvars, order, idx, batch_size);
+        return taylor_c_diff_func_ldbl(s, func, n_uvars, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_c_diff_f128(s, f, arr, n_uvars, order, idx, batch_size);
+        return taylor_c_diff_func_f128(s, func, n_uvars, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");

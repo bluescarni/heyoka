@@ -1519,10 +1519,53 @@ auto taylor_compute_jet(llvm_state &s, std::vector<llvm::Value *> order0, const 
                                     taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
             }
 
+            // Helper to convert the arguments of an element of a Taylor decomposition
+            // into a vector of LLVM values. u variables will be converted to their index,
+            // numbers will be subject to codegen.
+            auto to_cdiff_args = [&s](const expression &ex) {
+                return std::visit(
+                    [&s](const auto &v) -> std::vector<llvm::Value *> {
+                        using type = detail::uncvref_t<decltype(v)>;
+
+                        if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                            std::vector<llvm::Value *> retval;
+                            auto &builder = s.builder();
+
+                            for (const auto &arg : v.args()) {
+                                if (auto p_var = std::get_if<variable>(&arg.value())) {
+                                    retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
+                                } else if (auto p_num = std::get_if<number>(&arg.value())) {
+                                    retval.push_back(codegen<T>(s, *p_num));
+                                } else {
+                                    throw std::invalid_argument(
+                                        "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                        "argument is not a variable or a number");
+                                }
+                            }
+
+                            return retval;
+                        } else {
+                            throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
+                                                        "expression is not a function or a binary operator");
+                        }
+                    },
+                    ex.value());
+            };
+
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i,
-                                    taylor_c_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, i, batch_size));
+                // Get the function for the computation of the derivative.
+                auto func = taylor_c_diff_func<T>(s, dc[i], n_uvars, batch_size);
+
+                // Compose the arguments for func. First order, index of the current
+                // u variable and diff array. Then the arguments specific to the current
+                // expression dc[i].
+                std::vector<llvm::Value *> args{cur_order, builder.getInt32(i), diff_arr};
+                auto cdiff_args = to_cdiff_args(dc[i]);
+                args.insert(args.end(), cdiff_args.begin(), cdiff_args.end());
+
+                // Calculate the derivative and store the result.
+                taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i, builder.CreateCall(func, args));
             }
         });
 
