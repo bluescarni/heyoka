@@ -305,11 +305,8 @@ expression operator/(expression e1, expression e2)
             } else if (is_negative_one(v2)) {
                 // e1 / -1 = -e1.
                 return -expression{std::forward<decltype(v1)>(v1)};
-            } else {
-                // e1 / x = e1 * 1/x.
-                return expression{std::forward<decltype(v1)>(v1)}
-                       * expression{number{1.} / std::forward<decltype(v2)>(v2)};
             }
+            // NOTE: fall through to the standard case.
         } else if constexpr (std::is_same_v<type1, number>) {
             // e1 is a number, e2 is symbolic.
             if (is_zero(v1)) {
