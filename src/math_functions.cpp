@@ -200,9 +200,10 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
 template <typename T>
 llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(
-        s, batch_size,
-        "heyoka_taylor_diff_sin_num_" + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)), "sine");
+    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+                                           "heyoka_taylor_diff_sin_num_"
+                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+                                           "the sine");
 }
 
 // Derivative of sin(variable).
@@ -573,7 +574,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const number &, std::
     return taylor_c_diff_func_unary_num<T>(s, batch_size,
                                            "heyoka_taylor_diff_cos_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
-                                           "cosine");
+                                           "the cosine");
 }
 
 // Derivative of cos(variable).
@@ -947,7 +948,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const number &, std::
     return taylor_c_diff_func_unary_num<T>(s, batch_size,
                                            "heyoka_taylor_diff_log_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
-                                           "logarithm");
+                                           "the logarithm");
 }
 
 // Derivative of log(variable).
@@ -1295,7 +1296,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const number &, std::
     return taylor_c_diff_func_unary_num<T>(s, batch_size,
                                            "heyoka_taylor_diff_exp_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
-                                           "exponential");
+                                           "the exponential");
 }
 
 // Derivative of exp(variable).
@@ -1654,7 +1655,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const number &, const
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_pow_num_num_"} + taylor_mangle_suffix(val_t);
+    const auto fname = "heyoka_taylor_diff_pow_num_num_" + taylor_mangle_suffix(val_t);
 
     // The function arguments:
     // - diff order,
@@ -2044,7 +2045,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const number &, std:
     return taylor_c_diff_func_unary_num<T>(s, batch_size,
                                            "heyoka_taylor_diff_sqrt_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
-                                           "square root");
+                                           "the square root");
 }
 
 // Derivative of sqrt(variable).

@@ -1010,8 +1010,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const variable 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_addsub_var_num_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_addsub_var_num_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1202,8 +1202,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const variable &, 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_mul_var_num_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_mul_var_num_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1277,8 +1277,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const number &, co
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_mul_num_var_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_mul_num_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1352,8 +1352,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const variable &, 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_mul_var_var_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_mul_var_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1464,8 +1464,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const variable &, 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_div_var_num_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_div_var_num_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1539,8 +1539,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const number &, co
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_div_num_var_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_div_num_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -1629,8 +1629,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const variable &, 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = std::string{"heyoka_taylor_diff_div_var_var_"} + taylor_mangle_suffix(val_t) + "_n_uvars_"
-                       + li_to_string(n_uvars);
+    const auto fname
+        = "heyoka_taylor_diff_div_var_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
 
     // The function arguments:
     // - diff order,
