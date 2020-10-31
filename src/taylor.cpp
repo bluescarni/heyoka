@@ -1357,6 +1357,20 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
     builder.CreateStore(val, ptr);
 }
 
+// As above, but u_idx is a variable instead of a constant.
+void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                         llvm::Value *u_idx, llvm::Value *val)
+{
+    auto &builder = s.builder();
+
+    // NOTE: overflow check has already been done to ensure that the
+    // total size of diff_arr fits in a 32-bit unsigned integer.
+    auto ptr = builder.CreateInBoundsGEP(
+        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
+
+    builder.CreateStore(val, ptr);
+}
+
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number), n_uvars the number of variables in
@@ -1450,6 +1464,84 @@ llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm:
         ex.value());
 }
 
+// Split the central part of the decomposition into parallelisable segments.
+std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<expression> &dc, std::uint32_t n_eq)
+{
+    // Helper that takes in input the definition of a u variable, and returns
+    // in output the list of indices of the u variables on which ex depends.
+    auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
+        return std::visit(
+            [](const auto &v) -> std::vector<std::uint32_t> {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                    std::vector<std::uint32_t> retval;
+
+                    for (const auto &arg : v.args()) {
+                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                            retval.push_back(uname_to_index(p_var->name()));
+                        } else if (!std::holds_alternative<number>(arg.value())) {
+                            throw std::invalid_argument(
+                                "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                "argument is not a variable or a number");
+                        }
+                    }
+
+                    return retval;
+                } else {
+                    throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
+                                                "expression is not a function or a binary operator");
+                }
+            },
+            ex.value());
+    };
+
+    std::vector<std::vector<expression>> s_dc;
+    auto cur_limit_idx = n_eq;
+    for (std::uint32_t i = n_eq; i < dc.size() - n_eq; ++i) {
+        const auto &ex = dc[i];
+
+        const auto u_indices = udef_args_indices(ex);
+        if (std::all_of(u_indices.begin(), u_indices.end(),
+                        [cur_limit_idx](auto idx) { return idx < cur_limit_idx; })) {
+            if (s_dc.empty()) {
+                s_dc.emplace_back();
+            }
+        } else {
+            cur_limit_idx = i;
+            s_dc.emplace_back();
+        }
+
+        s_dc.back().push_back(ex);
+    }
+
+#if !defined(NDEBUG)
+    // Verify s_dc.
+
+    decltype(dc.size()) counter = 0;
+    for (const auto &s : s_dc) {
+        // No segment can be empty.
+        assert(!s.empty());
+
+        for (const auto &ex : s) {
+            // All the indices in the definitions of the
+            // u variables in the current block must be
+            // less than counter + n_eq.
+            const auto u_indices = udef_args_indices(ex);
+            assert(std::all_of(u_indices.begin(), u_indices.end(),
+                               [idx_limit = counter + n_eq](auto idx) { return idx < idx_limit; }));
+        }
+
+        // Update the counter.
+        counter += s.size();
+    }
+
+    assert(counter == dc.size() - n_eq * 2u);
+#endif
+
+    return s_dc;
+}
+
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet() below.
 template <typename T>
@@ -1457,7 +1549,154 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> o
                                      const std::vector<expression> &dc, std::uint32_t n_eq, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t batch_size)
 {
+    // Helper to convert the arguments of an element of a Taylor decomposition
+    // into a vector of LLVM values. u variables will be converted to their indices,
+    // numbers will be subject to codegen.
+    auto to_cdiff_args = [&s](const expression &ex) {
+        return std::visit(
+            [&s](const auto &v) -> std::vector<llvm::Value *> {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                    std::vector<llvm::Value *> retval;
+                    auto &builder = s.builder();
+
+                    for (const auto &arg : v.args()) {
+                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                            retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
+                        } else if (auto p_num = std::get_if<number>(&arg.value())) {
+                            retval.push_back(codegen<T>(s, *p_num));
+                        } else {
+                            throw std::invalid_argument(
+                                "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                "argument is not a variable or a number");
+                        }
+                    }
+
+                    return retval;
+                } else {
+                    throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
+                                                "expression is not a function or a binary operator");
+                }
+            },
+            ex.value());
+    };
+
     auto &builder = s.builder();
+
+    // Split dc into segments.
+    const auto s_dc = taylor_segment_dc(dc, n_eq);
+
+    // For each segment in s_dc, this vector will contain a dict mapping a function
+    // for the computation of a Taylor derivative with arrays of arguments with
+    // which the function must be called. See below for details.
+    std::vector<std::unordered_map<llvm::Function *, std::vector<llvm::Value *>>> s_maps_arrays;
+
+    // Variable to keep track of the u variable
+    // on whose definition we are operating.
+    auto cur_u_idx = n_eq;
+    for (const auto &seg : s_dc) {
+        // This structure maps an LLVM function to sets of arguments
+        // with which the function is to be called. For instance, if function
+        // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
+        // will contain {f : [[a, b, c], [d, e, f]]}.
+        std::unordered_map<llvm::Function *, std::vector<std::vector<llvm::Value *>>> tmp_map;
+
+        for (const auto &ex : seg) {
+            // Get the function for the computation of the derivative.
+            auto func = taylor_c_diff_func<T>(s, ex, n_uvars, batch_size);
+
+            // Insert the function into tmp_map.
+            const auto [it, is_new_func] = tmp_map.try_emplace(func);
+
+            assert(is_new_func || !it->second.empty());
+
+            // Convert the variables/constants in the current dc
+            // element into a set of LLVM values.
+            auto cdiff_args = to_cdiff_args(ex);
+
+            if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
+                throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
+                                            "mode: the same function is being called with both "
+                                            + std::to_string(it->second.back().size() - 1u) + " and "
+                                            + std::to_string(cdiff_args.size()) + " arguments");
+            }
+
+            // Add the new set of arguments.
+            it->second.emplace_back();
+            // Add the idx of the u variable.
+            it->second.back().push_back(builder.getInt32(cur_u_idx));
+            // Add the actual function arguments.
+            it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
+
+            ++cur_u_idx;
+        }
+
+        // Add a new entry in s_maps_array for the current segment.
+        s_maps_arrays.emplace_back();
+        auto &a_map = s_maps_arrays.back();
+
+        // For each function f in tmp_map, build transposed arrays of the sets of arguments
+        // the function must be called with. E.g., {f : [[a, b, c], [d, e, f]]}
+        // will become {f : [[a, d], [b, e], [c, f]]}.
+        for (const auto &[func, vv] : tmp_map) {
+            assert(!vv.empty());
+
+            // Add the function.
+            const auto [it, ins_status] = a_map.try_emplace(func);
+            assert(ins_status);
+
+            const auto n_calls = vv.size();
+            const auto n_args = vv[0].size();
+            // NOTE: n_args must be at least 1 because the u idx
+            // is prepended to the actual function arguments in
+            // the tmp_map entries.
+            assert(n_args >= 1u);
+
+            for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
+                // Build the vector of values corresponding
+                // to the current argument index.
+                std::vector<llvm::Value *> tmp_c_vec;
+                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
+                    tmp_c_vec.push_back(vv[j][i]);
+                }
+
+                // Check that all the elements of tmp_c_vec have
+                // the same type.
+                // NOTE: ncalls is guaranteed to be 1 at least, thus
+                // tmp_c_vec cannot be empty.
+                if (!std::all_of(tmp_c_vec.begin() + 1, tmp_c_vec.end(),
+                                 [tp = tmp_c_vec[0]->getType()](auto *val) { return val->getType() == tp; })) {
+                    throw std::invalid_argument("Inconsistent types detected while building the transposed sets of "
+                                                "arguments for the Taylor derivative functions in compact mode");
+                }
+
+                // Determine the array type from the type of
+                // the first value.
+                auto arr_type
+                    = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(n_calls));
+                assert(arr_type != nullptr);
+
+                // Create the LLVM array.
+                auto c_arr = builder.CreateAlloca(arr_type);
+                assert(c_arr != nullptr);
+
+                // Fill the array.
+                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
+                    builder.CreateStore(
+                        tmp_c_vec[j],
+                        builder.CreateInBoundsGEP(
+                            c_arr, {builder.getInt32(0), builder.getInt32(boost::numeric_cast<std::uint32_t>(j))}));
+                }
+
+                // Add the LLVM array to the transposed list of arguments
+                // for the current function.
+                it->second.push_back(c_arr);
+            }
+        }
+    }
+
+    assert(cur_u_idx == dc.size() - n_eq);
 
     // Prepare the array that will contain the jet of derivatives.
     // We will be storing all the derivatives of the u variables
@@ -1491,53 +1730,41 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> o
                                 taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
         }
 
-        // Helper to convert the arguments of an element of a Taylor decomposition
-        // into a vector of LLVM values. u variables will be converted to their indices,
-        // numbers will be subject to codegen.
-        auto to_cdiff_args = [&s](const expression &ex) {
-            return std::visit(
-                [&s](const auto &v) -> std::vector<llvm::Value *> {
-                    using type = detail::uncvref_t<decltype(v)>;
-
-                    if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
-                        std::vector<llvm::Value *> retval;
-                        auto &builder = s.builder();
-
-                        for (const auto &arg : v.args()) {
-                            if (auto p_var = std::get_if<variable>(&arg.value())) {
-                                retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
-                            } else if (auto p_num = std::get_if<number>(&arg.value())) {
-                                retval.push_back(codegen<T>(s, *p_num));
-                            } else {
-                                throw std::invalid_argument(
-                                    "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                    "argument is not a variable or a number");
-                            }
-                        }
-
-                        return retval;
-                    } else {
-                        throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                                    "expression is not a function or a binary operator");
-                    }
-                },
-                ex.value());
-        };
-
         // Now the other u variables.
-        for (auto i = n_eq; i < n_uvars; ++i) {
-            // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, dc[i], n_uvars, batch_size);
+        for (const auto &map : s_maps_arrays) {
+            for (const auto &p : map) {
+                const auto &func = p.first;
+                const auto &arrs = p.second;
 
-            // Compose the arguments for func. First order, index of the current
-            // u variable and diff array. Then the arguments specific to the current
-            // expression dc[i].
-            std::vector<llvm::Value *> args{cur_order, builder.getInt32(i), diff_arr};
-            auto cdiff_args = to_cdiff_args(dc[i]);
-            args.insert(args.end(), cdiff_args.begin(), cdiff_args.end());
+                assert(!arrs.empty());
 
-            // Calculate the derivative and store the result.
-            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i, builder.CreateCall(func, args));
+                // Recover the number of calls from the size of the LLVM array.
+                const auto ncalls = boost::numeric_cast<std::uint32_t>(
+                    llvm::cast<llvm::ArrayType>(llvm::cast<llvm::PointerType>(arrs[0]->getType())->getElementType())
+                        ->getNumElements());
+
+                // Loop over the number of calls.
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                    // Recover the u variable index from the first array.
+                    auto u_idx
+                        = builder.CreateLoad(builder.CreateInBoundsGEP(arrs[0], {builder.getInt32(0), cur_call_idx}));
+
+                    // Initialise the vector of arguments with which func must be called:
+                    // - current Taylor order,
+                    // - u index of the variable,
+                    // - array of derivatives.
+                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr};
+
+                    // Add the arguments stored in the arrays.
+                    for (decltype(arrs.size()) i = 1; i < arrs.size(); ++i) {
+                        args.push_back(builder.CreateLoad(
+                            builder.CreateInBoundsGEP(arrs[i], {builder.getInt32(0), cur_call_idx})));
+                    }
+
+                    // Calculate the derivative and store the result.
+                    taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+                });
+            }
         }
     });
 
