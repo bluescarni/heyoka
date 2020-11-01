@@ -1348,20 +1348,6 @@ namespace
 // Store the value val as the derivative of order 'order' of the u variable u_idx
 // into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
 void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         std::uint32_t u_idx, llvm::Value *val)
-{
-    auto &builder = s.builder();
-
-    // NOTE: overflow check has already been done to ensure that the
-    // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), builder.getInt32(u_idx))});
-
-    builder.CreateStore(val, ptr);
-}
-
-// As above, but u_idx is a variable instead of a constant.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
                          llvm::Value *u_idx, llvm::Value *val)
 {
     auto &builder = s.builder();
@@ -1372,6 +1358,13 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
         diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
 
     builder.CreateStore(val, ptr);
+}
+
+// As above, but u_idx is a constant instead of a variable.
+void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                         std::uint32_t u_idx, llvm::Value *val)
+{
+    taylor_c_store_diff(s, diff_arr, n_uvars, order, s.builder().getInt32(u_idx), val);
 }
 
 // Compute the derivative of order "order" of a state variable.
