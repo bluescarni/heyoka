@@ -60,10 +60,11 @@ namespace
 {
 
 // Helper to implement the function for the differentiation of
-// 'func(number)' in compact mode. The function will always return zero.
+// 'func(number)' in compact mode. The function will always return zero,
+// unless the order is 0 (in which case it will return the result of the codegen).
 template <typename T>
-llvm::Function *taylor_c_diff_func_unary_num(llvm_state &s, std::uint32_t batch_size, const std::string &fname,
-                                             const std::string &desc)
+llvm::Function *taylor_c_diff_func_unary_num(llvm_state &s, const function &func, std::uint32_t batch_size,
+                                             const std::string &fname, const std::string &desc)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -95,11 +96,29 @@ llvm::Function *taylor_c_diff_func_unary_num(llvm_state &s, std::uint32_t batch_
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
 
+        // Fetch the necessary function arguments.
+        auto ord = f->args().begin();
+        auto num = f->args().begin() + 3;
+
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+        auto retval = builder.CreateAlloca(val_t);
+
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // If the order is zero, run the codegen.
+                builder.CreateStore(codegen_from_values<T>(s, func, {vector_splat(builder, num, batch_size)}), retval);
+            },
+            [&]() {
+                // Otherwise, return zero.
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -198,9 +217,10 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const function &func, const std::vec
 
 // Derivative of sin(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+                                            std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
                                            "heyoka_taylor_diff_sin_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
                                            "the sine");
@@ -208,8 +228,8 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const number &, std::
 
 // Derivative of sin(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const variable &, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const function &func, const variable &,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -254,29 +274,46 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const variable &, std
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-            // NOTE: the +1 is because we are accessing the cosine
-            // of the u var, which is conventionally placed
-            // right after the sine in the decomposition.
-            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
-                                           builder.CreateAdd(u_idx, builder.getInt32(1)));
-            auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    retval);
+            },
+            [&]() {
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
-            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+                    // NOTE: the +1 is because we are accessing the cosine
+                    // of the u var, which is conventionally placed
+                    // right after the sine in the decomposition.
+                    auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
+                                                   builder.CreateAdd(u_idx, builder.getInt32(1)));
+                    auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
-            builder.CreateStore(
-                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(j_v, builder.CreateFMul(a_nj, cj))),
-                acc);
-        });
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-        // Divide by the order to produce the return value.
-        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
-        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(j_v, builder.CreateFMul(a_nj, cj))),
+                                        acc);
+                });
+
+                // Divide by the order to produce the return value.
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -299,7 +336,7 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const variable &, std
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a sine in compact mode");
@@ -315,7 +352,7 @@ llvm::Function *taylor_c_diff_func_sin(llvm_state &s, const function &func, std:
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_sin_impl<T>(s, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_sin_impl<T>(s, func, v, n_uvars, batch_size); },
                       func.args()[0].value());
 }
 
@@ -569,9 +606,10 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const function &func, const std::vec
 
 // Derivative of cos(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+                                            std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
                                            "heyoka_taylor_diff_cos_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
                                            "the cosine");
@@ -579,8 +617,8 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const number &, std::
 
 // Derivative of cos(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const variable &, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const function &func, const variable &,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -625,29 +663,46 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const variable &, std
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-            // NOTE: the -1 is because we are accessing the sine
-            // of the u var, which is conventionally placed
-            // right before the cosine in the decomposition.
-            auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
-                                           builder.CreateSub(u_idx, builder.getInt32(1)));
-            auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    retval);
+            },
+            [&]() {
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
-            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+                    // NOTE: the -1 is because we are accessing the sine
+                    // of the u var, which is conventionally placed
+                    // right before the cosine in the decomposition.
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
+                                                   builder.CreateSub(u_idx, builder.getInt32(1)));
+                    auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
-            builder.CreateStore(
-                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(j_v, builder.CreateFMul(b_nj, cj))),
-                acc);
-        });
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-        // Divide by the order and negate to produce the return value.
-        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
-        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), builder.CreateFNeg(ord_v)));
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(j_v, builder.CreateFMul(b_nj, cj))),
+                                        acc);
+                });
+
+                // Divide by the order and negate to produce the return value.
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), builder.CreateFNeg(ord_v)), retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -670,7 +725,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const variable &, std
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a cosine in compact mode");
@@ -686,7 +741,7 @@ llvm::Function *taylor_c_diff_func_cos(llvm_state &s, const function &func, std:
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_cos_impl<T>(s, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_cos_impl<T>(s, func, v, n_uvars, batch_size); },
                       func.args()[0].value());
 }
 
@@ -943,9 +998,10 @@ llvm::Value *taylor_diff_log(llvm_state &s, const function &func, const std::vec
 
 // Derivative of log(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+                                            std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
                                            "heyoka_taylor_diff_log_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
                                            "the logarithm");
@@ -953,8 +1009,8 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const number &, std::
 
 // Derivative of log(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const variable &, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const function &func, const variable &,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -999,34 +1055,52 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const variable &, std
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Create a vector version of ord.
-        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    retval);
+            },
+            [&]() {
+                // Create a vector version of ord.
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
-            auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-            auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
-            // Compute the factor n - j.
-            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
-            auto fac = builder.CreateFSub(ord_v, j_v);
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
+                    auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
-            builder.CreateStore(
-                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(fac, builder.CreateFMul(a_nj, bj))),
-                acc);
-        });
+                    // Compute the factor n - j.
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = builder.CreateFSub(ord_v, j_v);
 
-        // ret = bn - acc / n.
-        auto ret = builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
-                                      builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(a_nj, bj))),
+                                        acc);
+                });
 
-        // Return ret / b0.
-        builder.CreateRet(
-            builder.CreateFDiv(ret, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)));
+                // ret = bn - acc / n.
+                auto ret = builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
+                                              builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+
+                // Return ret / b0.
+                builder.CreateStore(
+                    builder.CreateFDiv(ret, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)),
+                    retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -1049,7 +1123,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const variable &, std
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_log_impl(llvm_state &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_log_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a logarithm in compact mode");
@@ -1065,7 +1139,7 @@ llvm::Function *taylor_c_diff_func_log(llvm_state &s, const function &func, std:
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_log_impl<T>(s, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_log_impl<T>(s, func, v, n_uvars, batch_size); },
                       func.args()[0].value());
 }
 
@@ -1291,9 +1365,10 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const function &func, const std::vec
 
 // Derivative of exp(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+                                            std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
                                            "heyoka_taylor_diff_exp_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
                                            "the exponential");
@@ -1301,8 +1376,8 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const number &, std::
 
 // Derivative of exp(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const variable &, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const function &func, const variable &,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1347,29 +1422,46 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const variable &, std
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Create a vector version of ord.
-        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    retval);
+            },
+            [&]() {
+                // Create a vector version of ord.
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-            auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
-            auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
-            // Compute the factor n - j.
-            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
-            auto fac = builder.CreateFSub(ord_v, j_v);
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
 
-            builder.CreateStore(
-                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(fac, builder.CreateFMul(aj, b_nj))),
-                acc);
-        });
+                    // Compute the factor n - j.
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = builder.CreateFSub(ord_v, j_v);
 
-        // Return acc / n.
-        builder.CreateRet(builder.CreateFDiv(builder.CreateLoad(acc), ord_v));
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(aj, b_nj))),
+                                        acc);
+                });
+
+                // Return acc / n.
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -1392,7 +1484,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const variable &, std
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of an exponential in compact mode");
@@ -1408,7 +1500,7 @@ llvm::Function *taylor_c_diff_func_exp(llvm_state &s, const function &func, std:
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_exp_impl<T>(s, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_exp_impl<T>(s, func, v, n_uvars, batch_size); },
                       func.args()[0].value());
 }
 
@@ -1644,8 +1736,8 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const function &func, const std::vec
 
 // Derivative of pow(number, number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const number &, const number &, std::uint32_t,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const function &func, const number &, const number &,
+                                            std::uint32_t, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1682,11 +1774,33 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const number &, const
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
         assert(f != nullptr);
 
+        // Fetch the necessary function arguments.
+        auto ord = f->args().begin();
+        auto num_base = f->args().begin() + 3;
+        auto num_exp = f->args().begin() + 4;
+
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        builder.CreateRet(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+        auto retval = builder.CreateAlloca(val_t);
+
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // If the order is zero, run the codegen.
+                builder.CreateStore(codegen_from_values<T>(s, func,
+                                                           {vector_splat(builder, num_base, batch_size),
+                                                            vector_splat(builder, num_exp, batch_size)}),
+                                    retval);
+            },
+            [&]() {
+                // Otherwise, return zero.
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -1709,8 +1823,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const number &, const
 
 // Derivative of pow(variable, number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const variable &, const number &, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const function &func, const variable &, const number &,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1758,35 +1872,56 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const variable &, con
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Create FP vector versions of exponent and order.
-        auto alpha_v = vector_splat(builder, exponent, batch_size);
-        auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Create the accumulator.
-        auto acc = builder.CreateAlloca(val_t);
-        builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
+                                            vector_splat(builder, exponent, batch_size)}),
+                    retval);
+            },
+            [&]() {
+                // Create FP vector versions of exponent and order.
+                auto alpha_v = vector_splat(builder, exponent, batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-        // Run the loop.
-        llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-            auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-            auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
-            // Compute the factor n*alpha-j*(alpha+1).
-            auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
-            auto fac = builder.CreateFSub(
-                builder.CreateFMul(ord_v, alpha_v),
-                builder.CreateFMul(
-                    j_v, builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
 
-            builder.CreateStore(
-                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
-                acc);
-        });
+                    // Compute the factor n*alpha-j*(alpha+1).
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = builder.CreateFSub(
+                        builder.CreateFMul(ord_v, alpha_v),
+                        builder.CreateFMul(
+                            j_v,
+                            builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
 
-        // Finalize the result: acc / (n*b0).
-        builder.CreateRet(builder.CreateFDiv(
-            builder.CreateLoad(acc),
-            builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx))));
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
+                                        acc);
+                });
+
+                // Finalize the result: acc / (n*b0).
+                builder.CreateStore(
+                    builder.CreateFDiv(builder.CreateLoad(acc),
+                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars,
+                                                                                    builder.getInt32(0), var_idx))),
+                    retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -1809,7 +1944,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const variable &, con
 
 // All the other cases.
 template <typename T, typename U1, typename U2>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, const U1 &, const U2 &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, const function &, const U1 &, const U2 &, std::uint32_t,
+                                            std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a pow() in compact mode");
@@ -1826,7 +1962,9 @@ llvm::Function *taylor_c_diff_func_pow(llvm_state &s, const function &func, std:
     }
 
     return std::visit(
-        [&](const auto &v1, const auto &v2) { return taylor_c_diff_func_pow_impl<T>(s, v1, v2, n_uvars, batch_size); },
+        [&](const auto &v1, const auto &v2) {
+            return taylor_c_diff_func_pow_impl<T>(s, func, v1, v2, n_uvars, batch_size);
+        },
         func.args()[0].value(), func.args()[1].value());
 }
 
@@ -2040,9 +2178,10 @@ llvm::Value *taylor_diff_sqrt(llvm_state &s, const function &func, const std::ve
 
 // Derivative of sqrt(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const number &, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+                                             std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, batch_size,
+    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
                                            "heyoka_taylor_diff_sqrt_num_"
                                                + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
                                            "the square root");
@@ -2050,8 +2189,8 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const number &, std:
 
 // Derivative of sqrt(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const variable &, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const function &func, const variable &,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -2096,14 +2235,58 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const variable &, st
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Fetch the function for performing pow(var, num).
-        // NOTE: the var/num arguments used here are inconsequential.
-        auto inner_f = taylor_c_diff_func_pow_impl<T>(s, variable{"unused"}, number{0.}, n_uvars, batch_size);
-        assert(inner_f != nullptr);
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
 
-        // Invoke inner_f() fixing the exponent to 1/2.
-        builder.CreateRet(
-            builder.CreateCall(inner_f, {ord, u_idx, diff_ptr, var_idx, codegen<T>(s, number{T(1) / 2})}));
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+            [&]() {
+                // For order 0, invoke the function on the order 0 of var_idx.
+                builder.CreateStore(
+                    codegen_from_values<T>(s, func,
+                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    retval);
+            },
+            [&]() {
+                // NOTE: this is copy-pasted from the pow() implementation,
+                // and alpha_v hard-coded to 1/2. Perhaps we can avoid repetition
+                // with some refactoring.
+                // Create FP vector versions of exponent and order.
+                auto alpha_v = vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+
+                // Create the accumulator.
+                auto acc = builder.CreateAlloca(val_t);
+                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+
+                // Run the loop.
+                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+
+                    // Compute the factor n*alpha-j*(alpha+1).
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto fac = builder.CreateFSub(
+                        builder.CreateFMul(ord_v, alpha_v),
+                        builder.CreateFMul(
+                            j_v,
+                            builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
+
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
+                                        acc);
+                });
+
+                // Finalize the result: acc / (n*b0).
+                builder.CreateStore(
+                    builder.CreateFDiv(builder.CreateLoad(acc),
+                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars,
+                                                                                    builder.getInt32(0), var_idx))),
+                    retval);
+            });
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -2126,7 +2309,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const variable &, st
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a square root in compact mode");
@@ -2142,7 +2325,7 @@ llvm::Function *taylor_c_diff_func_sqrt(llvm_state &s, const function &func, std
                                     + std::to_string(func.args().size()) + " arguments were provided");
     }
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_sqrt_impl<T>(s, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_sqrt_impl<T>(s, func, v, n_uvars, batch_size); },
                       func.args()[0].value());
 }
 

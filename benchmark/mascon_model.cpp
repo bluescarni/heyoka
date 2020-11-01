@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     }
 
     // assembling the r.h.s.
-    for (double N = 3u; N < 1000; N += 10) {
+    for (double N = 500u; N < 1000; N += 10) {
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
         expression dx(0_dbl), dy(0_dbl), dz(0_dbl);
         for (double i = -N; i < N; ++i) {

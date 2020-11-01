@@ -55,17 +55,24 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_adaptive<double> ta{make_nbody_sys(n_bodies), std::move(init_state), kw::high_accuracy = true,
-                               kw::compact_mode = compact_mode, kw::inline_functions = function_inlining};
+    taylor_adaptive<double> ta{make_nbody_sys(n_bodies),
+                               std::move(init_state),
+                               kw::high_accuracy = true,
+                               kw::compact_mode = compact_mode,
+                               kw::inline_functions = function_inlining,
+                               kw::opt_level = 3};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
+    std::cout << ta.get_llvm_state().get_ir() << '\n';
+#if 0
     auto counter = 0u;
     for (const auto &ex : ta.get_decomposition()) {
         std::cout << "u_" << counter++ << " = " << ex << '\n';
     }
+#endif
 
     std::cout << "Construction time: " << elapsed << "ms\n";
 }
