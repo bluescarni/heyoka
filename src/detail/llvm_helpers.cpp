@@ -43,7 +43,6 @@ namespace heyoka::detail
 llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
-    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
 
     if (vector_size == 1u) {
         // Scalar case.
@@ -54,18 +53,8 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     // failure if ptr is not a pointer).
     auto ptr_t = llvm::cast<llvm::PointerType>(ptr->getType());
 
-    // Fetch the pointee type.
-    auto scalar_t = ptr_t->getPointerElementType();
-    assert(scalar_t != nullptr);
-
-    // Create the corresponding vector type.
-    auto vector_t =
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    // Create the vector type.
+    auto vector_t = make_vector_type(ptr_t->getElementType(), vector_size);
     assert(vector_t != nullptr);
 
     // Create the output vector.
@@ -108,13 +97,8 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
         return c;
     }
 
-    llvm::Value *vec = llvm::UndefValue::get(
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (c->getType(), boost::numeric_cast<unsigned>(vector_size)));
+    llvm::Value *vec = llvm::UndefValue::get(make_vector_type(c->getType(), vector_size));
+    assert(vec != nullptr);
 
     // Fill up the vector with insertelement.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
@@ -128,18 +112,23 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
 
 llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 {
+    assert(t != nullptr);
     assert(vector_size > 0u);
 
     if (vector_size == 1u) {
         return t;
     } else {
-        return
+        auto retval =
 #if LLVM_VERSION_MAJOR == 10
             llvm::VectorType::get
 #else
             llvm::FixedVectorType::get
 #endif
             (t, boost::numeric_cast<unsigned>(vector_size));
+
+        assert(retval != nullptr);
+
+        return retval;
     }
 }
 
@@ -181,13 +170,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
     auto scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
-    auto vector_t =
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    auto vector_t = make_vector_type(scalar_t, boost::numeric_cast<std::uint32_t>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
