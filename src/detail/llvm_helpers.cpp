@@ -481,4 +481,70 @@ bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::v
     return it == f->arg_end();
 }
 
+// Create an LLVM if statement in the form:
+// if (cond) {
+//   then_f();
+// } else {
+//   else_f();
+// }
+void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<void()> &then_f,
+                       const std::function<void()> &else_f)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    // Fetch the current function.
+    assert(builder.GetInsertBlock() != nullptr);
+    auto f = builder.GetInsertBlock()->getParent();
+    assert(f != nullptr);
+
+    // Create and insert the "then" block.
+    auto *then_bb = llvm::BasicBlock::Create(context, "", f);
+
+    // Create but do not insert the "else" and merge blocks.
+    auto *else_bb = llvm::BasicBlock::Create(context);
+    auto *merge_bb = llvm::BasicBlock::Create(context);
+
+    // Create the conditional jump.
+    builder.CreateCondBr(cond, then_bb, else_bb);
+
+    // Emit the code for the "then" branch.
+    builder.SetInsertPoint(then_bb);
+    try {
+        then_f();
+    } catch (...) {
+        // NOTE: else_bb and merge_bb have not been
+        // inserted into any parent yet, clean them
+        // up manually.
+        else_bb->deleteValue();
+        merge_bb->deleteValue();
+
+        throw;
+    }
+
+    // Jump to the merge block.
+    builder.CreateBr(merge_bb);
+
+    // Emit the "else" block.
+    f->getBasicBlockList().push_back(else_bb);
+    builder.SetInsertPoint(else_bb);
+    try {
+        else_f();
+    } catch (...) {
+        // NOTE: merge_bb has not been
+        // inserted into any parent yet, clean it
+        // up manually.
+        merge_bb->deleteValue();
+
+        throw;
+    }
+
+    // Jump to the merge block.
+    builder.CreateBr(merge_bb);
+
+    // Emit the merge block.
+    f->getBasicBlockList().push_back(merge_bb);
+    builder.SetInsertPoint(merge_bb);
+}
+
 } // namespace heyoka::detail
