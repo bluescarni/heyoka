@@ -1730,23 +1730,9 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const s
         builder.CreateStore(vec, builder.CreateInBoundsGEP(diff_arr, {cur_var_idx}));
     });
 
-    // Run the init for the other u variables.
-    for (auto i = n_eq; i < n_uvars; ++i) {
-        auto val = taylor_c_u_init<T>(s, dc[i], diff_arr, batch_size);
-        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), i, val);
-    }
-
-    // Compute all derivatives up to order 'order - 1'.
-    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
-        // Begin with the state variables.
-        // NOTE: the derivatives of the state variables
-        // are at the end of the decomposition vector.
-        for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i - n_uvars,
-                                taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
-        }
-
-        // Now the other u variables.
+    // Helper to compute and store the derivatives of order cur_order
+    // of the u variables which are not state variables.
+    auto compute_u_diffs = [&](llvm::Value *cur_order) {
         for (const auto &map : s_maps_arrays) {
             for (const auto &p : map) {
                 const auto &func = p.first;
@@ -1782,6 +1768,23 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const s
                 });
             }
         }
+    };
+
+    // Compute the order-0 derivatives (i.e., the initial values)
+    // for all u variables which are not state variables.
+    compute_u_diffs(builder.getInt32(0));
+
+    // Compute all derivatives up to order 'order - 1'.
+    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
+        // Begin with the state variables.
+        // NOTE: the derivatives of the state variables
+        // are at the end of the decomposition vector.
+        for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i - n_uvars,
+                                taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
+        }
+
+        compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
