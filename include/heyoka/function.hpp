@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -354,6 +355,36 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const function &func, s
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return taylor_c_diff_func_f128(s, func, n_uvars, batch_size);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+// Helper to run the codegen of a function with the arguments
+// represented as a vector of LLVM values.
+template <typename T>
+inline llvm::Value *codegen_from_values(llvm_state &s, const function &f, const std::vector<llvm::Value *> &args_v)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        if (!f.codegen_dbl_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for double codegen");
+        }
+        return f.codegen_dbl_f()(s, args_v);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        if (!f.codegen_ldbl_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for long double codegen");
+        }
+        return f.codegen_ldbl_f()(s, args_v);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        if (!f.codegen_f128_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for float128 codegen");
+        }
+        return f.codegen_f128_f()(s, args_v);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
