@@ -35,8 +35,11 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Pass.h>
@@ -1464,7 +1467,9 @@ llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm:
         ex.value());
 }
 
-// Split the central part of the decomposition into parallelisable segments.
+// Function to split the central part of the decomposition (i.e., the definitions of the u variables
+// that do not represent state variables) into parallelisable segments. Within a segment,
+// the definition of a u variable does not depend on any u variable defined within that segment.
 std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<expression> &dc, std::uint32_t n_eq)
 {
     // Helper that takes in input the definition of a u variable, and returns
@@ -1583,6 +1588,7 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> o
     };
 
     auto &builder = s.builder();
+    auto &module = s.module();
 
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
@@ -1656,9 +1662,9 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> o
             for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
                 // Build the vector of values corresponding
                 // to the current argument index.
-                std::vector<llvm::Value *> tmp_c_vec;
+                std::vector<llvm::Constant *> tmp_c_vec;
                 for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
-                    tmp_c_vec.push_back(vv[j][i]);
+                    tmp_c_vec.push_back(llvm::cast<llvm::Constant>(vv[j][i]));
                 }
 
                 // Check that all the elements of tmp_c_vec have
@@ -1677,21 +1683,17 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, std::vector<llvm::Value *> o
                     = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(n_calls));
                 assert(arr_type != nullptr);
 
-                // Create the LLVM array.
-                auto c_arr = builder.CreateAlloca(arr_type);
-                assert(c_arr != nullptr);
-
-                // Fill the array.
-                for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
-                    builder.CreateStore(
-                        tmp_c_vec[j],
-                        builder.CreateInBoundsGEP(
-                            c_arr, {builder.getInt32(0), builder.getInt32(boost::numeric_cast<std::uint32_t>(j))}));
-                }
+                // Create the constant array as a global read-only variable.
+                auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
+                assert(const_arr != nullptr);
+                // NOTE: naked new here is fine, gvar will be registered in the module
+                // object and cleaned up when the module is destroyed.
+                auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true,
+                                                     llvm::GlobalVariable::InternalLinkage, const_arr);
 
                 // Add the LLVM array to the transposed list of arguments
                 // for the current function.
-                it->second.push_back(c_arr);
+                it->second.push_back(gvar);
             }
         }
     }
