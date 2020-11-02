@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -1360,13 +1361,6 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
     builder.CreateStore(val, ptr);
 }
 
-// As above, but u_idx is a constant instead of a variable.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         std::uint32_t u_idx, llvm::Value *val)
-{
-    taylor_c_store_diff(s, diff_arr, n_uvars, order, s.builder().getInt32(u_idx), val);
-}
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number), n_uvars the number of variables in
@@ -1406,52 +1400,6 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // nonzero value that can be produced here is the first-order
                 // derivative.
                 return vector_splat(builder, codegen<T>(s, (order == 1u) ? v : number{0.}), batch_size);
-            } else {
-                assert(false);
-                return nullptr;
-            }
-        },
-        ex.value());
-}
-
-// Compute the derivative of order "order" of a state variable.
-// ex is the formula for the first-order derivative of the state variable (which
-// is either a u variable or a number), n_uvars the number of variables in
-// the decomposition, arr the array containing the derivatives of all u variables
-// up to order - 1.
-template <typename T>
-llvm::Value *taylor_c_compute_sv_diff(llvm_state &s, const expression &ex, llvm::Value *diff_arr, std::uint32_t n_uvars,
-                                      llvm::Value *order, std::uint32_t batch_size)
-{
-    auto &builder = s.builder();
-
-    return std::visit(
-        [&](const auto &v) -> llvm::Value * {
-            using type = uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, variable>) {
-                // Extract the index of the u variable in the expression
-                // of the first-order derivative.
-                const auto u_idx = uname_to_index(v.name());
-
-                // Fetch from arr the derivative of order 'order - 1' of the u variable u_idx.
-                auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, builder.getInt32(1)),
-                                              builder.getInt32(u_idx));
-
-                // We have to divide the derivative by 'order'
-                // to get the normalised derivative of the state variable.
-                return builder.CreateFDiv(
-                    ret, vector_splat(builder, builder.CreateUIToFP(order, to_llvm_type<T>(s.context())), batch_size));
-            } else if constexpr (std::is_same_v<type, number>) {
-                // The first-order derivative is a constant.
-                // If the first-order derivative is being requested,
-                // do the codegen for the constant itself, otherwise
-                // return 0. No need for normalization as the only
-                // nonzero value that can be produced here is the first-order
-                // derivative.
-                auto cmp_cond = builder.CreateICmpEQ(order, builder.getInt32(1));
-                return builder.CreateSelect(cmp_cond, vector_splat(builder, codegen<T>(s, v), batch_size),
-                                            vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
             } else {
                 assert(false);
                 return nullptr;
@@ -1538,6 +1486,141 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
 #endif
 
     return s_dc;
+}
+
+// Small helper to compute the size of a global array.
+std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
+{
+    assert(llvm::isa<llvm::GlobalVariable>(v));
+
+    return boost::numeric_cast<std::uint32_t>(
+        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::PointerType>(v->getType())->getElementType())->getNumElements());
+}
+
+// Helper to construct the global arrays needed for the computation of the
+// derivatives of the state variables. The return value is a set
+// of 4 arrays:
+// - the indices of the state variables whose derivative is a u variable, paired to
+// - the indices of the u variables appearing in the derivatives, and
+// - the indices of the state variables whose derivative is a constant, paired to
+// - the values of said constants.
+template <typename T>
+auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t n_uvars)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+    auto &module = s.module();
+
+    // Construct the output values as vectors of constants.
+    std::vector<llvm::Constant *> var_indices, vars, num_indices, nums;
+
+    // NOTE: the derivatives of the state variables are at the end of the decomposition.
+    for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
+        std::visit(
+            [&](const auto &v) {
+                using type = uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    // NOTE: remove from i the n_uvars offset to get the
+                    // true index of the state variable.
+                    var_indices.push_back(builder.getInt32(i - n_uvars));
+                    vars.push_back(builder.getInt32(uname_to_index(v.name())));
+                } else if constexpr (std::is_same_v<type, number>) {
+                    num_indices.push_back(builder.getInt32(i - n_uvars));
+                    nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                } else {
+                    assert(false);
+                }
+            },
+            dc[i].value());
+    }
+
+    assert(var_indices.size() == vars.size());
+    assert(num_indices.size() == nums.size());
+
+    // Turn the vectors into global read-only LLVM arrays.
+    auto var_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(var_indices.size()));
+
+    auto var_indices_arr = llvm::ConstantArray::get(var_arr_type, var_indices);
+    auto g_var_indices = new llvm::GlobalVariable(module, var_indices_arr->getType(), true,
+                                                  llvm::GlobalVariable::InternalLinkage, var_indices_arr);
+
+    auto vars_arr = llvm::ConstantArray::get(var_arr_type, vars);
+    auto g_vars
+        = new llvm::GlobalVariable(module, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
+
+    auto num_indices_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
+    auto num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
+    auto g_num_indices = new llvm::GlobalVariable(module, num_indices_arr->getType(), true,
+                                                  llvm::GlobalVariable::InternalLinkage, num_indices_arr);
+
+    auto nums_arr_type
+        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
+    auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    auto g_nums
+        = new llvm::GlobalVariable(module, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
+
+    return std::array{g_var_indices, g_vars, g_num_indices, g_nums};
+}
+
+// Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
+// sv_diff_gl is the set of arrays produced by taylor_c_make_sv_diff_globals() which contain
+// the indices/constants necessary for the computation.
+template <typename T>
+void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 4> &sv_diff_gl,
+                               llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                               std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Recover the number of state variables whose derivatives are given
+    // by u variables and numbers.
+    const auto n_vars = taylor_c_gl_arr_size(sv_diff_gl[0]);
+    const auto n_nums = taylor_c_gl_arr_size(sv_diff_gl[2]);
+
+    // Handle the u variables definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the state variable.
+        auto sv_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[0], {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the u variable.
+        auto u_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
+
+        // Fetch from diff_arr the derivative of order 'order - 1' of the u variable u_idx.
+        auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, builder.getInt32(1)), u_idx);
+
+        // We have to divide the derivative by 'order' in order
+        // to get the normalised derivative of the state variable.
+        ret = builder.CreateFDiv(
+            ret, vector_splat(builder, builder.CreateUIToFP(order, to_llvm_type<T>(context)), batch_size));
+
+        // Store the derivative.
+        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+    });
+
+    // Handle the number definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_nums), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the state variable.
+        auto sv_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[2], {builder.getInt32(0), cur_idx}));
+
+        // Fetch the constant.
+        auto num = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[3], {builder.getInt32(0), cur_idx}));
+
+        // If the first-order derivative is being requested,
+        // do the codegen for the constant itself, otherwise
+        // return 0. No need for normalization as the only
+        // nonzero value that can be produced here is the first-order
+        // derivative.
+        auto cmp_cond = builder.CreateICmpEQ(order, builder.getInt32(1));
+        auto ret = builder.CreateSelect(cmp_cond, vector_splat(builder, num, batch_size),
+                                        vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+
+        // Store the derivative.
+        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+    });
 }
 
 // Helper for the computation of a jet of derivatives in compact mode,
@@ -1693,6 +1776,10 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const s
 
     assert(cur_u_idx == dc.size() - n_eq);
 
+    // Generate the global arrays for the computation of the derivatives
+    // of the state variables.
+    const auto sv_diff_gl = taylor_c_make_sv_diff_globals<T>(s, dc, n_uvars);
+
     // Prepare the array that will contain the jet of derivatives.
     // We will be storing all the derivatives of the u variables
     // up to order 'order - 1', plus the derivatives of order
@@ -1734,9 +1821,7 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const s
                 assert(!arrs.empty());
 
                 // Recover the number of calls from the size of the LLVM array.
-                const auto ncalls = boost::numeric_cast<std::uint32_t>(
-                    llvm::cast<llvm::ArrayType>(llvm::cast<llvm::PointerType>(arrs[0]->getType())->getElementType())
-                        ->getNumElements());
+                const auto ncalls = taylor_c_gl_arr_size(arrs[0]);
 
                 // Loop over the number of calls.
                 llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
@@ -1769,23 +1854,15 @@ auto taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const s
 
     // Compute all derivatives up to order 'order - 1'.
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
-        // Begin with the state variables.
-        // NOTE: the derivatives of the state variables
-        // are at the end of the decomposition vector.
-        for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, i - n_uvars,
-                                taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, batch_size));
-        }
+        // State variables first.
+        taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, n_uvars, cur_order, batch_size);
 
+        // The other u variables.
         compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
-    for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-        taylor_c_store_diff(
-            s, diff_arr, n_uvars, builder.getInt32(order), i - n_uvars,
-            taylor_c_compute_sv_diff<T>(s, dc[i], diff_arr, n_uvars, builder.getInt32(order), batch_size));
-    }
+    taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, n_uvars, builder.getInt32(order), batch_size);
 
     // Build the return value.
     std::vector<llvm::Value *> retval;
