@@ -238,8 +238,6 @@ TEST_CASE("update_node_values_dbl")
         REQUIRE(node_values.size() == 3u);
         REQUIRE(node_values[0] == 1);
         REQUIRE(node_values[1] == 2.345);
-        // Note here that the tree built (after the simplifictions) is *, "x", 1/2.345
-        REQUIRE(node_values[2] == 1. / 2.345);
     }
     // We test on a deeper tree
     {

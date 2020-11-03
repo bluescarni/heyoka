@@ -23,6 +23,7 @@
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -267,55 +268,30 @@ inline llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::
     }
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_dbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_ldbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_dbl(llvm_state &, const expression &, std::uint32_t,
+                                                         std::uint32_t);
+
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, const expression &, std::uint32_t,
+                                                          std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_f128(llvm_state &, const expression &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_f128(llvm_state &, const expression &, std::uint32_t,
+                                                          std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Value *taylor_c_u_init(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t batch_size)
+inline llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
+                                          std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_c_u_init_dbl(s, ex, arr, batch_size);
+        return taylor_c_diff_func_dbl(s, ex, n_uvars, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_c_u_init_ldbl(s, ex, arr, batch_size);
+        return taylor_c_diff_func_ldbl(s, ex, n_uvars, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_c_u_init_f128(s, ex, arr, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_dbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
-                                                 llvm::Value *, std::uint32_t, std::uint32_t);
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_ldbl(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
-                                                  llvm::Value *, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_f128(llvm_state &, const expression &, llvm::Value *, std::uint32_t,
-                                                  llvm::Value *, std::uint32_t, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *taylor_c_diff(llvm_state &s, const expression &ex, llvm::Value *arr, std::uint32_t n_uvars,
-                                  llvm::Value *order, std::uint32_t idx, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_c_diff_dbl(s, ex, arr, n_uvars, order, idx, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_c_diff_ldbl(s, ex, arr, n_uvars, order, idx, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_c_diff_f128(s, ex, arr, n_uvars, order, idx, batch_size);
+        return taylor_c_diff_func_f128(s, ex, n_uvars, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
