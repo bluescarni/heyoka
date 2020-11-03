@@ -83,9 +83,9 @@ inline llvm::Type *to_llvm_type(llvm::LLVMContext &c)
 
 HEYOKA_DLL_PUBLIC llvm::Type *make_vector_type(llvm::Type *, std::uint32_t);
 
-// Helper to associate a C++ type to an LLVM vector type of size batch_size.
-// If batch_size is 1, the corresponding scalar type will be returned.
-// batch_size cannot be zero.
+// Helper to construct an LLVM vector type of size batch_size with elements
+// of the LLVM type tp corresponding to the C++ type T. If batch_size is 1, tp
+// will be returned. batch_size cannot be zero.
 template <typename T>
 inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch_size)
 {
@@ -116,6 +116,9 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_internal(llvm_state &, const std::str
 
 HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
                                      const std::function<void(llvm::Value *)> &);
+
+HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
+                                         const std::function<void()> &);
 
 HEYOKA_DLL_PUBLIC llvm::Type *pointee_type(llvm::Value *);
 

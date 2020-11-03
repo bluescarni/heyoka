@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -62,8 +63,6 @@ public:
     using taylor_diff_t
         = std::function<llvm::Value *(llvm_state &, const function &, const std::vector<llvm::Value *> &, std::uint32_t,
                                       std::uint32_t, std::uint32_t, std::uint32_t)>;
-    using taylor_c_u_init_t
-        = std::function<llvm::Value *(llvm_state &, const function &, llvm::Value *, std::uint32_t)>;
     using taylor_c_diff_func_t
         = std::function<llvm::Function *(llvm_state &, const function &, std::uint32_t, std::uint32_t)>;
 
@@ -97,12 +96,6 @@ private:
 #if defined(HEYOKA_HAVE_REAL128)
         ,
         m_taylor_diff_f128_f
-#endif
-        ;
-    taylor_c_u_init_t m_taylor_c_u_init_dbl_f, m_taylor_c_u_init_ldbl_f
-#if defined(HEYOKA_HAVE_REAL128)
-        ,
-        m_taylor_c_u_init_f128_f
 #endif
         ;
     taylor_c_diff_func_t m_taylor_c_diff_func_dbl_f, m_taylor_c_diff_func_ldbl_f
@@ -144,11 +137,6 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     taylor_diff_t &taylor_diff_f128_f();
 #endif
-    taylor_c_u_init_t &taylor_c_u_init_dbl_f();
-    taylor_c_u_init_t &taylor_c_u_init_ldbl_f();
-#if defined(HEYOKA_HAVE_REAL128)
-    taylor_c_u_init_t &taylor_c_u_init_f128_f();
-#endif
     taylor_c_diff_func_t &taylor_c_diff_func_dbl_f();
     taylor_c_diff_func_t &taylor_c_diff_func_ldbl_f();
 #if defined(HEYOKA_HAVE_REAL128)
@@ -177,11 +165,6 @@ public:
     const taylor_diff_t &taylor_diff_ldbl_f() const;
 #if defined(HEYOKA_HAVE_REAL128)
     const taylor_diff_t &taylor_diff_f128_f() const;
-#endif
-    const taylor_c_u_init_t &taylor_c_u_init_dbl_f() const;
-    const taylor_c_u_init_t &taylor_c_u_init_ldbl_f() const;
-#if defined(HEYOKA_HAVE_REAL128)
-    const taylor_c_u_init_t &taylor_c_u_init_f128_f() const;
 #endif
     const taylor_c_diff_func_t &taylor_c_diff_func_dbl_f() const;
     const taylor_c_diff_func_t &taylor_c_diff_func_ldbl_f() const;
@@ -308,31 +291,6 @@ inline llvm::Value *taylor_diff(llvm_state &s, const function &f, const std::vec
     }
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_dbl(llvm_state &, const function &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_ldbl(llvm_state &, const function &, llvm::Value *, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_u_init_f128(llvm_state &, const function &, llvm::Value *, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *taylor_c_u_init(llvm_state &s, const function &f, llvm::Value *arr, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_c_u_init_dbl(s, f, arr, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_c_u_init_ldbl(s, f, arr, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_c_u_init_f128(s, f, arr, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_dbl(llvm_state &, const function &, std::uint32_t, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, const function &, std::uint32_t, std::uint32_t);
@@ -354,6 +312,36 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const function &func, s
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return taylor_c_diff_func_f128(s, func, n_uvars, batch_size);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+// Helper to run the codegen of a function with the arguments
+// represented as a vector of LLVM values.
+template <typename T>
+inline llvm::Value *codegen_from_values(llvm_state &s, const function &f, const std::vector<llvm::Value *> &args_v)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        if (!f.codegen_dbl_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for double codegen");
+        }
+        return f.codegen_dbl_f()(s, args_v);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        if (!f.codegen_ldbl_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for long double codegen");
+        }
+        return f.codegen_ldbl_f()(s, args_v);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        if (!f.codegen_f128_f()) {
+            throw std::invalid_argument("The function '" + f.display_name()
+                                        + "' does not provide a function for float128 codegen");
+        }
+        return f.codegen_f128_f()(s, args_v);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
