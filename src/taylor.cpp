@@ -1413,7 +1413,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 // the definition of a u variable does not depend on any u variable defined within that segment.
 std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<expression> &dc, std::uint32_t n_eq)
 {
-    // Helper that takes in input the definition of a u variable, and returns
+    // Helper that takes in input the definition ex of a u variable, and returns
     // in output the list of indices of the u variables on which ex depends.
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
         return std::visit(
@@ -1442,22 +1442,37 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
             ex.value());
     };
 
+    // Init the return value.
     std::vector<std::vector<expression>> s_dc;
+
+    // cur_limit_idx is initially the index of the first
+    // u variable which is not a state variable.
     auto cur_limit_idx = n_eq;
     for (std::uint32_t i = n_eq; i < dc.size() - n_eq; ++i) {
-        const auto &ex = dc[i];
-
-        const auto u_indices = udef_args_indices(ex);
-        if (std::all_of(u_indices.begin(), u_indices.end(),
-                        [cur_limit_idx](auto idx) { return idx < cur_limit_idx; })) {
-            if (s_dc.empty()) {
-                s_dc.emplace_back();
-            }
-        } else {
-            cur_limit_idx = i;
+        // NOTE: at the very first iteration of this for loop,
+        // no block has been created yet. Do it now.
+        if (i == n_eq) {
+            assert(s_dc.empty());
             s_dc.emplace_back();
+        } else {
+            assert(!s_dc.empty());
         }
 
+        const auto &ex = dc[i];
+
+        // Determine the u indices on which ex depends.
+        const auto u_indices = udef_args_indices(ex);
+
+        if (std::any_of(u_indices.begin(), u_indices.end(),
+                        [cur_limit_idx](auto idx) { return idx >= cur_limit_idx; })) {
+            // The current expression depends on one or more variables
+            // within the current block. Start a new block and
+            // update cur_limit_idx with the start index of the new block.
+            s_dc.emplace_back();
+            cur_limit_idx = i;
+        }
+
+        // Append ex to the current block.
         s_dc.back().push_back(ex);
     }
 
@@ -1472,7 +1487,8 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
         for (const auto &ex : s) {
             // All the indices in the definitions of the
             // u variables in the current block must be
-            // less than counter + n_eq.
+            // less than counter + n_eq (which is the starting
+            // index of the block).
             const auto u_indices = udef_args_indices(ex);
             assert(std::all_of(u_indices.begin(), u_indices.end(),
                                [idx_limit = counter + n_eq](auto idx) { return idx < idx_limit; }));
@@ -1511,7 +1527,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
     auto &builder = s.builder();
     auto &module = s.module();
 
-    // Construct the output values as vectors of constants.
+    // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums;
 
     // NOTE: the derivatives of the state variables are at the end of the decomposition.
@@ -1566,7 +1582,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
 }
 
 // Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
-// sv_diff_gl is the set of arrays produced by taylor_c_make_sv_diff_globals() which contain
+// sv_diff_gl is the set of arrays produced by taylor_c_make_sv_diff_globals(), which contain
 // the indices/constants necessary for the computation.
 template <typename T>
 void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 4> &sv_diff_gl,
@@ -1623,54 +1639,51 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
     });
 }
 
-// Helper for the computation of a jet of derivatives in compact mode,
-// used in taylor_compute_jet() below.
+// Helper to convert the arguments of the definition of a u variable
+// into a vector of LLVM values. u variables will be converted to their indices,
+// numbers will be subject to codegen.
 template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const std::vector<expression> &dc,
-                                             std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                                             std::uint32_t batch_size)
+auto taylor_udef_to_vals(llvm_state &s, const expression &ex)
+{
+    return std::visit(
+        [&s](const auto &v) -> std::vector<llvm::Value *> {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                std::vector<llvm::Value *> retval;
+
+                for (const auto &arg : v.args()) {
+                    if (auto p_var = std::get_if<variable>(&arg.value())) {
+                        retval.push_back(s.builder().getInt32(uname_to_index(p_var->name())));
+                    } else if (auto p_num = std::get_if<number>(&arg.value())) {
+                        retval.push_back(codegen<T>(s, *p_num));
+                    } else {
+                        throw std::invalid_argument(
+                            "Invalid argument encountered in an element of a Taylor decomposition: the "
+                            "argument is not a variable or a number");
+                    }
+                }
+
+                return retval;
+            } else {
+                throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
+                                            "expression is not a function or a binary operator");
+            }
+        },
+        ex.value());
+}
+
+// For each segment in s_dc, this function will return a vector containing a dict mapping a function
+// for the computation of a Taylor derivative with arrays of arguments with
+// which the function must be called.
+template <typename T>
+auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t n_eq,
+                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
     auto &module = s.module();
 
-    // Helper to convert the arguments of an element of a Taylor decomposition
-    // into a vector of LLVM values. u variables will be converted to their indices,
-    // numbers will be subject to codegen.
-    auto to_cdiff_args = [&s, &builder](const expression &ex) {
-        return std::visit(
-            [&s, &builder](const auto &v) -> std::vector<llvm::Value *> {
-                using type = detail::uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
-                    std::vector<llvm::Value *> retval;
-
-                    for (const auto &arg : v.args()) {
-                        if (auto p_var = std::get_if<variable>(&arg.value())) {
-                            retval.push_back(builder.getInt32(uname_to_index(p_var->name())));
-                        } else if (auto p_num = std::get_if<number>(&arg.value())) {
-                            retval.push_back(codegen<T>(s, *p_num));
-                        } else {
-                            throw std::invalid_argument(
-                                "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                "argument is not a variable or a number");
-                        }
-                    }
-
-                    return retval;
-                } else {
-                    throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                                "expression is not a function or a binary operator");
-                }
-            },
-            ex.value());
-    };
-
-    // Split dc into segments.
-    const auto s_dc = taylor_segment_dc(dc, n_eq);
-
-    // For each segment in s_dc, this vector will contain a dict mapping a function
-    // for the computation of a Taylor derivative with arrays of arguments with
-    // which the function must be called. See below for details.
+    // Init the return value.
     std::vector<std::unordered_map<llvm::Function *, std::vector<llvm::Value *>>> s_maps_arrays;
 
     // Variable to keep track of the u variable
@@ -1694,7 +1707,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
             // Convert the variables/constants in the current dc
             // element into a set of LLVM values.
-            auto cdiff_args = to_cdiff_args(ex);
+            const auto cdiff_args = taylor_udef_to_vals<T>(s, ex);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
@@ -1773,7 +1786,23 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         }
     }
 
-    assert(cur_u_idx == dc.size() - n_eq);
+    return s_maps_arrays;
+}
+
+// Helper for the computation of a jet of derivatives in compact mode,
+// used in taylor_compute_jet() below.
+template <typename T>
+llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const std::vector<expression> &dc,
+                                             std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                                             std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    // Split dc into segments.
+    const auto s_dc = taylor_segment_dc(dc, n_eq);
+
+    // Generate the function maps.
+    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size);
 
     // Generate the global arrays for the computation of the derivatives
     // of the state variables.
@@ -1810,7 +1839,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Helper to compute and store the derivatives of order cur_order
     // of the u variables which are not state variables.
     auto compute_u_diffs = [&](llvm::Value *cur_order) {
-        for (const auto &map : s_maps_arrays) {
+        for (const auto &map : f_maps) {
             for (const auto &p : map) {
                 const auto &func = p.first;
                 const auto &arrs = p.second;
@@ -1867,7 +1896,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
 // Given an input pointer 'in', load the first n * batch_size values in it as n vectors
 // with size batch_size. If batch_size is 1, the values will be loaded as scalars.
-template <typename T>
 auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
@@ -1925,7 +1953,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, const std::vector<express
         return taylor_compute_jet_compact_mode<T>(s, order0, dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
-        auto diff_arr = taylor_load_values<T>(s, order0, n_eq, batch_size);
+        auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
@@ -2973,22 +3001,6 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     auto h_fac = builder.CreateSelect(backward, vector_splat(builder, codegen<T>(s, number{-1.}), batch_size),
                                       vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
     h = builder.CreateFMul(h_fac, h);
-
-    // Build the Taylor polynomials that need to be evaluated for the propagation.
-    std::vector<std::vector<llvm::Value *>> cf_vecs;
-    for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-        cf_vecs.emplace_back();
-        auto &cf_vec = cf_vecs.back();
-
-        for (std::uint32_t o = 0; o <= order; ++o) {
-            if (compact_mode) {
-                cf_vec.push_back(builder.CreateLoad(builder.CreateInBoundsGEP(
-                    std::get<llvm::Value *>(diff_variant), {builder.getInt32(o * n_uvars + var_idx)})));
-            } else {
-                cf_vec.push_back(std::get<std::vector<llvm::Value *>>(diff_variant)[o * n_eq + var_idx]);
-            }
-        }
-    }
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_states_var
