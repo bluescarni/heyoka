@@ -792,60 +792,6 @@ namespace detail
 namespace
 {
 
-template <typename T>
-llvm::Value *taylor_c_u_init_bo_impl(llvm_state &s, const binary_operator &bo, llvm::Value *diff_arr,
-                                     std::uint32_t batch_size)
-{
-    // Do the Taylor init for lhs and rhs.
-    auto l = taylor_c_u_init<T>(s, bo.lhs(), diff_arr, batch_size);
-    auto r = taylor_c_u_init<T>(s, bo.rhs(), diff_arr, batch_size);
-
-    // Do the codegen for the corresponding operation.
-    auto &builder = s.builder();
-    switch (bo.op()) {
-        case binary_operator::type::add:
-            return builder.CreateFAdd(l, r);
-        case binary_operator::type::sub:
-            return builder.CreateFSub(l, r);
-        case binary_operator::type::mul:
-            return builder.CreateFMul(l, r);
-        default:
-            return builder.CreateFDiv(l, r);
-    }
-}
-
-} // namespace
-
-} // namespace detail
-
-llvm::Value *taylor_c_u_init_dbl(llvm_state &s, const binary_operator &bo, llvm::Value *diff_arr,
-                                 std::uint32_t batch_size)
-{
-    return detail::taylor_c_u_init_bo_impl<double>(s, bo, diff_arr, batch_size);
-}
-
-llvm::Value *taylor_c_u_init_ldbl(llvm_state &s, const binary_operator &bo, llvm::Value *diff_arr,
-                                  std::uint32_t batch_size)
-{
-    return detail::taylor_c_u_init_bo_impl<long double>(s, bo, diff_arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_c_u_init_f128(llvm_state &s, const binary_operator &bo, llvm::Value *diff_arr,
-                                  std::uint32_t batch_size)
-{
-    return detail::taylor_c_u_init_bo_impl<mppp::real128>(s, bo, diff_arr, batch_size);
-}
-
-#endif
-
-namespace detail
-{
-
-namespace
-{
-
 // Helper to implement the function for the differentiation of
 // 'number op number' in compact mode. The function will always return zero,
 // unless the order is 0 (in which case it will return the result of the codegen).

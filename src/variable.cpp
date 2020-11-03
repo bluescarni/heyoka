@@ -234,37 +234,4 @@ llvm::Value *taylor_u_init_f128(llvm_state &s, const variable &var, const std::v
 
 #endif
 
-llvm::Value *taylor_c_u_init_dbl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t)
-{
-    // Check that var is a u variable and extract its index.
-    const auto &var_name = var.name();
-    if (var_name.rfind("u_", 0) != 0) {
-        throw std::invalid_argument("Invalid variable name '" + var_name
-                                    + "' encountered in the Taylor initialization phase (the name "
-                                      "must be in the form 'u_n', where n is a non-negative integer)");
-    }
-    const auto idx = detail::uname_to_index(var_name);
-
-    auto &builder = s.builder();
-
-    // NOTE: n_uvars will be set to zero here,
-    // it does not matter as the order is also zero.
-    return detail::taylor_c_load_diff(s, diff_arr, 0, builder.getInt32(0), builder.getInt32(idx));
-}
-
-llvm::Value *taylor_c_u_init_ldbl(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t batch_size)
-{
-    // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_c_u_init_dbl(s, var, diff_arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_c_u_init_f128(llvm_state &s, const variable &var, llvm::Value *diff_arr, std::uint32_t batch_size)
-{
-    return taylor_c_u_init_dbl(s, var, diff_arr, batch_size);
-}
-
-#endif
-
 } // namespace heyoka
