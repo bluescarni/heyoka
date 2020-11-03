@@ -55,12 +55,8 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_adaptive<double> ta{make_nbody_sys(n_bodies),
-                               std::move(init_state),
-                               kw::high_accuracy = true,
-                               kw::compact_mode = compact_mode,
-                               kw::inline_functions = function_inlining,
-                               kw::opt_level = 3};
+    taylor_adaptive<double> ta{make_nbody_sys(n_bodies), std::move(init_state), kw::high_accuracy = true,
+                               kw::compact_mode = compact_mode, kw::inline_functions = function_inlining};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
