@@ -63,12 +63,11 @@ int main(int argc, char *argv[])
             .count());
 
     std::cout << ta.get_llvm_state().get_ir() << '\n';
-#if 0
+
     auto counter = 0u;
     for (const auto &ex : ta.get_decomposition()) {
         std::cout << "u_" << counter++ << " = " << ex << '\n';
     }
-#endif
 
     std::cout << "Construction time: " << elapsed << "ms\n";
 }
