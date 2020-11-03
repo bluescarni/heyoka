@@ -1795,9 +1795,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                                               {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the order-0 derivatives of the state variables.
-    if (n_eq > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("Overflow while loading Taylor values");
-    }
+    // NOTE: overflow checking is already done in the parent function.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from order0.
         auto ptr = builder.CreateInBoundsGEP(order0, {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))});
@@ -1874,16 +1872,12 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 {
     assert(batch_size > 0u);
 
-    // Overflow check.
-    if (n > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("Overflow while loading Taylor values");
-    }
-
     auto &builder = s.builder();
 
     std::vector<llvm::Value *> retval;
     for (std::uint32_t i = 0; i < n; ++i) {
         // Fetch the pointer from in.
+        // NOTE: overflow checking is done in the parent function.
         auto ptr = builder.CreateInBoundsGEP(in, {builder.getInt32(i * batch_size)});
 
         // Load the value in vector mode.
@@ -1908,6 +1902,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, const std::vector<expression> &dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
 {
+    assert(batch_size > 0u);
     assert(n_eq > 0u);
     assert(order > 0u);
 
@@ -1916,6 +1911,12 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, const std::vector<express
     // and store.
     if (n_uvars > std::numeric_limits<std::uint32_t>::max() / order
         || n_uvars * order > std::numeric_limits<std::uint32_t>::max() - n_eq) {
+        throw std::overflow_error(
+            "An overflow condition was detected in the computation of a jet of Taylor derivatives");
+    }
+
+    // We also need to be able to index up to n_eq * batch_size in order0.
+    if (n_eq > std::numeric_limits<std::uint32_t>::max() / batch_size) {
         throw std::overflow_error(
             "An overflow condition was detected in the computation of a jet of Taylor derivatives");
     }
