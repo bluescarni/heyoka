@@ -172,7 +172,13 @@ llvm::Function *taylor_c_diff_func_sum(llvm_state &s, const function &func, std:
                     }
                 }
 
-                builder.CreateStore(pairwise_sum(builder, vals), retval);
+                if (vals.empty()) {
+                    // NOTE: this is a corner case for a sum without arguments.
+                    // Not sure how likely it is to end up here.
+                    builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                } else {
+                    builder.CreateStore(pairwise_sum(builder, vals), retval);
+                }
             },
             [&]() {
                 // For order nonzero, we load the derivatives for the uvars
