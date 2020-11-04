@@ -54,7 +54,7 @@ binary_operator::binary_operator(type t, expression e1, expression e2)
     : m_type(t),
       // NOTE: need to use naked new as make_unique won't work with aggregate
       // initialization.
-      m_ops(::new std::array<expression, 2>{std::move(e1), std::move(e2)})
+      m_ops(new std::array<expression, 2>{std::move(e1), std::move(e2)})
 {
 }
 
