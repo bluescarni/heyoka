@@ -67,6 +67,8 @@ int main(int argc, char *argv[])
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
+    std::cout << ta.get_llvm_state().get_ir() << '\n';
+
     auto counter = 0u;
     for (const auto &ex : ta.get_decomposition()) {
         std::cout << "u_" << counter++ << " = " << ex << '\n';

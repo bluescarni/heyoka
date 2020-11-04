@@ -43,7 +43,6 @@ namespace heyoka::detail
 llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
-    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
 
     if (vector_size == 1u) {
         // Scalar case.
@@ -54,18 +53,8 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
     // failure if ptr is not a pointer).
     auto ptr_t = llvm::cast<llvm::PointerType>(ptr->getType());
 
-    // Fetch the pointee type.
-    auto scalar_t = ptr_t->getPointerElementType();
-    assert(scalar_t != nullptr);
-
-    // Create the corresponding vector type.
-    auto vector_t =
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    // Create the vector type.
+    auto vector_t = make_vector_type(ptr_t->getElementType(), vector_size);
     assert(vector_t != nullptr);
 
     // Create the output vector.
@@ -108,13 +97,8 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
         return c;
     }
 
-    llvm::Value *vec = llvm::UndefValue::get(
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (c->getType(), boost::numeric_cast<unsigned>(vector_size)));
+    llvm::Value *vec = llvm::UndefValue::get(make_vector_type(c->getType(), vector_size));
+    assert(vec != nullptr);
 
     // Fill up the vector with insertelement.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
@@ -124,6 +108,28 @@ llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint3
     }
 
     return vec;
+}
+
+llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
+{
+    assert(t != nullptr);
+    assert(vector_size > 0u);
+
+    if (vector_size == 1u) {
+        return t;
+    } else {
+        auto retval =
+#if LLVM_VERSION_MAJOR == 10
+            llvm::VectorType::get
+#else
+            llvm::FixedVectorType::get
+#endif
+            (t, boost::numeric_cast<unsigned>(vector_size));
+
+        assert(retval != nullptr);
+
+        return retval;
+    }
 }
 
 // Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
@@ -164,13 +170,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
     auto scalar_t = scalars[0]->getType();
 
     // Create the corresponding vector type.
-    auto vector_t =
-#if LLVM_VERSION_MAJOR == 10
-        llvm::VectorType::get
-#else
-        llvm::FixedVectorType::get
-#endif
-        (scalar_t, boost::numeric_cast<unsigned>(vector_size));
+    auto vector_t = make_vector_type(scalar_t, boost::numeric_cast<std::uint32_t>(vector_size));
     assert(vector_t != nullptr);
 
     // Create an empty vector.
@@ -428,11 +428,7 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 // pointed-to type.
 llvm::Type *pointee_type(llvm::Value *ptr)
 {
-    if (auto ptr_t = llvm::dyn_cast<llvm::PointerType>(ptr->getType())) {
-        return ptr_t->getElementType();
-    } else {
-        throw std::invalid_argument("Cannot get the pointee type of a non-pointer value");
-    }
+    return llvm::cast<llvm::PointerType>(ptr->getType())->getElementType();
 }
 
 // Small helper to fetch a string representation
@@ -479,6 +475,72 @@ bool compare_function_signature(llvm::Function *f, llvm::Type *ret, const std::v
     // we must be at the end of f's arguments list
     // (otherwise f has more arguments than args).
     return it == f->arg_end();
+}
+
+// Create an LLVM if statement in the form:
+// if (cond) {
+//   then_f();
+// } else {
+//   else_f();
+// }
+void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<void()> &then_f,
+                       const std::function<void()> &else_f)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    // Fetch the current function.
+    assert(builder.GetInsertBlock() != nullptr);
+    auto f = builder.GetInsertBlock()->getParent();
+    assert(f != nullptr);
+
+    // Create and insert the "then" block.
+    auto *then_bb = llvm::BasicBlock::Create(context, "", f);
+
+    // Create but do not insert the "else" and merge blocks.
+    auto *else_bb = llvm::BasicBlock::Create(context);
+    auto *merge_bb = llvm::BasicBlock::Create(context);
+
+    // Create the conditional jump.
+    builder.CreateCondBr(cond, then_bb, else_bb);
+
+    // Emit the code for the "then" branch.
+    builder.SetInsertPoint(then_bb);
+    try {
+        then_f();
+    } catch (...) {
+        // NOTE: else_bb and merge_bb have not been
+        // inserted into any parent yet, clean them
+        // up manually.
+        else_bb->deleteValue();
+        merge_bb->deleteValue();
+
+        throw;
+    }
+
+    // Jump to the merge block.
+    builder.CreateBr(merge_bb);
+
+    // Emit the "else" block.
+    f->getBasicBlockList().push_back(else_bb);
+    builder.SetInsertPoint(else_bb);
+    try {
+        else_f();
+    } catch (...) {
+        // NOTE: merge_bb has not been
+        // inserted into any parent yet, clean it
+        // up manually.
+        merge_bb->deleteValue();
+
+        throw;
+    }
+
+    // Jump to the merge block.
+    builder.CreateBr(merge_bb);
+
+    // Emit the merge block.
+    f->getBasicBlockList().push_back(merge_bb);
+    builder.SetInsertPoint(merge_bb);
 }
 
 } // namespace heyoka::detail
