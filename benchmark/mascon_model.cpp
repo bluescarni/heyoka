@@ -11,8 +11,7 @@
 #include <iostream>
 #include <vector>
 
-#include <boost/program_options.hpp>
-
+#include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -26,44 +25,27 @@ using namespace std::chrono;
 
 int main(int argc, char *argv[])
 {
-    namespace po = boost::program_options;
-
-    bool inline_functions = false;
-
-    po::options_description desc("Options");
-
-    desc.add_options()("help", "produce help message")("inline_functions", "enable function inlining");
-
-    po::variables_map vm;
-    po::store(po::parse_command_line(argc, argv, desc), vm);
-    po::notify(vm);
-
-    if (vm.count("help")) {
-        std::cout << desc << "\n";
-        return 0;
-    }
-
-    if (vm.count("inline_functions")) {
-        inline_functions = true;
-    }
-
     // assembling the r.h.s.
     for (double N = 3u; N < 1000; N += 10) {
         auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
-        expression dx(0_dbl), dy(0_dbl), dz(0_dbl);
+
+        // Contributions to the x/y/z accelerations from each mass.
+        std::vector<expression> x_acc, y_acc, z_acc;
+
         for (double i = -N; i < N; ++i) {
             auto xpos = expression{number(i)};
             auto r2 = (x - xpos) * (x - xpos) + y * y + z * z;
-            dx += (x - xpos) * pow(r2, expression{number{-3. / 4.}});
-            dy += y * pow(r2, expression{number{-3. / 4.}});
-            dz += z * pow(r2, expression{number{-3. / 4.}});
+
+            x_acc.push_back((xpos - x) * pow(r2, expression{number{-3. / 2}}));
+            y_acc.push_back(-y * pow(r2, expression{number{-3. / 2}}));
+            z_acc.push_back(-z * pow(r2, expression{number{-3. / 2}}));
         }
+
         auto start = high_resolution_clock::now();
-        taylor_adaptive<double> taylor{
-            {prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = dx, prime(vy) = dy, prime(vz) = dz},
-            {0.123, 0.123, 0.123, 0., 0., 0.},
-            kw::compact_mode = true,
-            kw::inline_functions = inline_functions};
+        taylor_adaptive<double> taylor{{prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = pairwise_sum(x_acc),
+                                        prime(vy) = pairwise_sum(y_acc), prime(vz) = pairwise_sum(z_acc)},
+                                       {0.123, 0.123, 0.123, 0., 0., 0.},
+                                       kw::compact_mode = true};
         auto stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         std::cout << N << ": " << duration.count() / 1e6 << "s" << std::endl;
