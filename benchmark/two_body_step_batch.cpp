@@ -16,7 +16,6 @@
 #include <limits>
 #include <random>
 #include <stdexcept>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -98,13 +97,11 @@ void run_bench(T tol, bool high_accuracy, std::uint32_t batch_size, bool compact
 
     std::cout << "Construction time: " << elapsed << "ms\n";
 
-    std::vector<std::tuple<taylor_outcome, T>> res(batch_size);
-
     start = std::chrono::high_resolution_clock::now();
 
     // Do 4000 steps.
     for (auto i = 0; i < 4000; ++i) {
-        tad.step(res);
+        tad.step();
     }
 
     elapsed = static_cast<double>(
