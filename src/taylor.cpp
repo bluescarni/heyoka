@@ -17,7 +17,6 @@
 #include <deque>
 #include <iterator>
 #include <limits>
-#include <memory>
 #include <numeric>
 #include <optional>
 #include <sstream>
@@ -43,9 +42,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Pass.h>
 #include <llvm/Support/Casting.h>
-#include <llvm/Transforms/Vectorize.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -2150,19 +2147,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.verify_function(f);
 
     // Run the optimisation pass.
-    if (batch_size > 1u) {
-        // In vector mode, add a pass to vectorize load/stores.
-        // This is useful to ensure that the
-        // pattern adopted in load_vector_from_memory() and
-        // store_vector_to_memory() is translated to
-        // vectorized store/load instructions.
-        std::vector<std::unique_ptr<llvm::Pass>> passes;
-        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
-
-        s.optimise(std::move(passes));
-    } else {
-        s.optimise();
-    }
+    s.optimise();
 
     return dc;
 }
@@ -3074,19 +3059,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     s.verify_function(f);
 
     // Run the optimisation pass.
-    if (batch_size > 1u) {
-        // In vector mode, add a pass to vectorize load/stores.
-        // This is useful to ensure that the
-        // pattern adopted in load_vector_from_memory() and
-        // store_vector_to_memory() is translated to
-        // vectorized store/load instructions.
-        std::vector<std::unique_ptr<llvm::Pass>> passes;
-        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
-
-        s.optimise(std::move(passes));
-    } else {
-        s.optimise();
-    }
+    s.optimise();
 
     return std::tuple{std::move(dc), order};
 }
@@ -3272,19 +3245,7 @@ auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, 
     od.reset();
 
     // Run the optimisation pass.
-    if (batch_size > 1u) {
-        // In vector mode, add a pass to vectorize load/stores.
-        // This is useful to ensure that the
-        // pattern adopted in load_vector_from_memory() and
-        // store_vector_to_memory() is translated to
-        // vectorized store/load instructions.
-        std::vector<std::unique_ptr<llvm::Pass>> passes;
-        passes.push_back(std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass()));
-
-        s.optimise(std::move(passes));
-    } else {
-        s.optimise();
-    }
+    s.optimise();
 
     return dc;
 }

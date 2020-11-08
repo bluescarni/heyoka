@@ -32,7 +32,6 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Pass.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -219,7 +218,7 @@ public:
     void verify_function(const std::string &);
     void verify_function(llvm::Function *);
 
-    void optimise(std::vector<std::unique_ptr<llvm::Pass>> = {});
+    void optimise();
 
     void add_nary_function_dbl(const std::string &, const expression &);
     void add_nary_function_ldbl(const std::string &, const expression &);
