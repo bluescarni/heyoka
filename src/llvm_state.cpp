@@ -630,8 +630,8 @@ void llvm_state::optimise()
         // pattern adopted in load_vector_from_memory() and
         // store_vector_to_memory() is translated to
         // vectorized store/load instructions.
-        auto ls_pass = std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass());
-        f_pm->add(ls_pass.release());
+        auto lsv_pass = std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass());
+        f_pm->add(lsv_pass.release());
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
@@ -643,9 +643,8 @@ void llvm_state::optimise()
         // NOTE: perhaps in the future we can make the autovectorizer an
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
-        if (m_opt_level >= 2u && m_inline_functions) {
-            // Enable function inlining at O2 and if the inlining
-            // flag is enabled.
+        if (m_inline_functions) {
+            // Enable function inlining if the inlining flag is enabled.
             pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
         }
 
