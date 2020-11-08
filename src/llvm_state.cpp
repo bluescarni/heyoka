@@ -75,6 +75,7 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Vectorize.h>
 
 #if LLVM_VERSION_MAJOR == 10
 
@@ -546,7 +547,7 @@ void llvm_state::verify_function(const std::string &name)
     verify_function(f);
 }
 
-void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
+void llvm_state::optimise()
 {
     check_uncompiled(__func__);
 
@@ -624,10 +625,13 @@ void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
         auto f_pm = std::make_unique<llvm::legacy::FunctionPassManager>(m_module.get());
         f_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
-        // Add the optimisation pre-passes for functions.
-        for (auto &p_ptr : f_pass_pre) {
-            f_pm->add(p_ptr.release());
-        }
+        // Add an initial pass to vectorize load/stores.
+        // This is useful to ensure that the
+        // pattern adopted in load_vector_from_memory() and
+        // store_vector_to_memory() is translated to
+        // vectorized store/load instructions.
+        auto lsv_pass = std::unique_ptr<llvm::Pass>(llvm::createLoadStoreVectorizerPass());
+        f_pm->add(lsv_pass.release());
 
         // We use the helper class PassManagerBuilder to populate the module
         // pass manager with standard options.
@@ -639,9 +643,8 @@ void llvm_state::optimise(std::vector<std::unique_ptr<llvm::Pass>> f_pass_pre)
         // NOTE: perhaps in the future we can make the autovectorizer an
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
-        if (m_opt_level >= 2u && m_inline_functions) {
-            // Enable function inlining at O2 and if the inlining
-            // flag is enabled.
+        if (m_inline_functions) {
+            // Enable function inlining if the inlining flag is enabled.
             pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
         }
 
