@@ -1131,6 +1131,7 @@ template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
 taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts)
 {
+    // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
         throw std::invalid_argument(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is "
@@ -1138,6 +1139,7 @@ taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts)
             + std::to_string(max_delta_ts.size()));
     }
 
+    // Make sure no values in max_delta_ts are nan.
     if (std::any_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
             using std::isnan;
             return isnan(x);
