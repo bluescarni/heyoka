@@ -255,11 +255,6 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
     const auto t_begin = times_v.begin();
     const auto t_end = times_v.end();
 
-    // The vector that will hold the result of each integration timestep.
-    std::vector<std::tuple<taylor_outcome, T>> int_res(batch_size);
-    const auto ires_begin = int_res.begin();
-    const auto ires_end = int_res.end();
-
     start = std::chrono::high_resolution_clock::now();
 
     // NOTE: keep on integrating as long as at least one time in
@@ -316,10 +311,10 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
         }
 
         // Run the timestep.
-        ta.step(int_res);
+        const auto &int_res = ta.step();
 
         // Check that no error was produced.
-        if (std::any_of(ires_begin, ires_end,
+        if (std::any_of(int_res.begin(), int_res.end(),
                         [](const auto &t) { return std::get<0>(t) != taylor_outcome::success; })) {
             throw std::runtime_error("Error status detected");
         }

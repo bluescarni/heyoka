@@ -525,14 +525,17 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_pinf, m_minf;
     // This is used as temporary storage in step_impl().
     std::vector<T> m_delta_ts;
+    // The vectors used to store the results of the step
+    // and propagate functions.
+    std::vector<std::tuple<taylor_outcome, T>> m_step_res;
+    std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> m_prop_res;
     // Temporary vectors used in the propagate_until() implementation.
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
-    std::vector<std::tuple<taylor_outcome, T>> m_tmp_res;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<T> m_pfor_ts;
 
-    HEYOKA_DLL_LOCAL void step_impl(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
+    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
@@ -621,14 +624,14 @@ public:
         return m_states.data();
     }
 
-    void step(std::vector<std::tuple<taylor_outcome, T>> &);
-    void step_backward(std::vector<std::tuple<taylor_outcome, T>> &);
-    void step(std::vector<std::tuple<taylor_outcome, T>> &, const std::vector<T> &);
+    const std::vector<std::tuple<taylor_outcome, T>> &step();
+    const std::vector<std::tuple<taylor_outcome, T>> &step_backward();
+    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &);
 
-    void propagate_for(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &, const std::vector<T> &,
-                       std::size_t = 0);
-    void propagate_until(std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &, const std::vector<T> &,
-                         std::size_t = 0);
+    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_for(const std::vector<T> &,
+                                                                                    std::size_t = 0);
+    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_until(const std::vector<T> &,
+                                                                                      std::size_t = 0);
 };
 
 } // namespace detail
