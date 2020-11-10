@@ -160,6 +160,14 @@ std::string sleef_function_name(llvm::LLVMContext &c, const std::string &f, llvm
 
 #else
 
+#include <cstdint>
+#include <string>
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Type.h>
+
+#include <heyoka/detail/sleef.hpp>
+
 namespace heyoka::detail
 {
 
