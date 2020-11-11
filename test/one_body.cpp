@@ -21,6 +21,8 @@ using namespace heyoka_test;
 
 TEST_CASE("one_body")
 {
+    std::cout.precision(16);
+
     auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
 
     auto r_m3 = pow(x * x + y * y + z * z, -3_dbl / 2_dbl);
