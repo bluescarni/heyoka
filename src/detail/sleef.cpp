@@ -7,6 +7,21 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <heyoka/config.hpp>
+#include <string>
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Type.h>
+
+#include <heyoka/detail/sleef.hpp>
+
 
 #if defined(HEYOKA_WITH_SLEEF)
 
