@@ -8,11 +8,9 @@
 
 #include <heyoka/config.hpp>
 
-#include <array>
 #include <chrono>
 #include <initializer_list>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -26,41 +24,23 @@
 
 #endif
 
-#include <heyoka/expression.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
-#include "benchmark_utils.hpp"
-
 using namespace heyoka;
-using namespace heyoka_benchmark;
 
 template <typename T>
 void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 {
-    auto [vx0, vx1, vy0, vy1, vz0, vz1, x0, x1, y0, y1, z0, z1]
-        = make_vars("vx0", "vx1", "vy0", "vy1", "vz0", "vz1", "x0", "x1", "y0", "y1", "z0", "z1");
+    // NOTE: this setup mimics the 'simplest' test from rebound.
+    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
 
-    auto x01 = x1 - x0;
-    auto y01 = y1 - y0;
-    auto z01 = z1 - z0;
-    auto r01_m3 = pow(x01 * x01 + y01 * y01 + z01 * z01, -3_dbl / 2_dbl);
-
-    const auto kep = std::array{T(1.5), T(.2), T(.3), T(.4), T(.5), T(.6)};
-    const auto [c_x, c_v] = kep_to_cart(kep, T(1) / 4);
-
-    std::vector init_state{c_v[0], -c_v[0], c_v[1], -c_v[1], c_v[2], -c_v[2],
-                           c_x[0], -c_x[0], c_x[1], -c_x[1], c_x[2], -c_x[2]};
+    std::vector init_state{T(0), T(0), T(0), T(0), T(0), T(0), T(1), T(0), T(0), T(0), T(1), T(0)};
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto tad = taylor_adaptive<T>{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
-                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
-                                  std::move(init_state),
-                                  kw::high_accuracy = high_accuracy,
-                                  kw::tol = tol,
-                                  kw::compact_mode = compact_mode,
-                                  kw::fast_math = fast_math};
+    auto tad = taylor_adaptive<T>{std::move(sys), std::move(init_state),           kw::high_accuracy = high_accuracy,
+                                  kw::tol = tol,  kw::compact_mode = compact_mode, kw::fast_math = fast_math};
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -70,15 +50,13 @@ void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 
     start = std::chrono::high_resolution_clock::now();
 
-    for (auto i = 0; i < 4000; ++i) {
-        tad.step();
-    }
+    tad.propagate_until(T(10000));
 
     elapsed = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start)
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
 
-    std::cout << "Elapsed time for a single timestep: " << elapsed / 4000 << "ns\n";
+    std::cout << "Integration time: " << elapsed << "μs\n";
 }
 
 int main(int argc, char *argv[])
