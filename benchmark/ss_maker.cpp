@@ -11,10 +11,14 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <initializer_list>
+#include <ios>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -92,10 +96,50 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
     s_array(0, 0) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 0))[0];
     s_array(0, 4) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 4))[0];
 
+    std::ofstream ofs("out.txt", std::ios_base::out | std::ios_base::trunc);
+    ofs.precision(std::numeric_limits<T>::max_digits10);
+
     start = std::chrono::high_resolution_clock::now();
 
     // Run the integration.
-    ta.propagate_until(T(final_time));
+    T next_save_point(0);
+    while (true) {
+        if (auto [oc, _] = ta.step(T(final_time) - ta.get_time()); oc == taylor_outcome::time_limit) {
+            break;
+        }
+        if (ta.get_time() > next_save_point) {
+            ofs << ta.get_time() << " ";
+
+            for (auto val : s_array) {
+                ofs << val << " ";
+            }
+
+#if defined(HEYOKA_HAVE_REAL128)
+            // NOTE: don't try to save the orbital elements
+            // if real128 is being used, as the xt linalg functions
+            // don't work on real128.
+            if constexpr (!std::is_same_v<T, mppp::real128>) {
+#endif
+                // Store the orbital elements wrt the Sun.
+                for (std::uint32_t i = 1; i < nplanets + 1u; ++i) {
+                    auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
+                    auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
+
+                    auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+
+                    for (auto oe : kep) {
+                        ofs << oe << " ";
+                    }
+                }
+#if defined(HEYOKA_HAVE_REAL128)
+            }
+#endif
+
+            ofs << std::endl;
+
+            next_save_point += 100;
+        }
+    }
 
     elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
