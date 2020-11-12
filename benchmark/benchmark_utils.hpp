@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstddef>
 #include <initializer_list>
+#include <iostream>
 #include <type_traits>
 #include <utility>
 
@@ -176,6 +177,18 @@ inline vNd<T, 6> cart_to_kep(const E1 &x, const E2 &v, T mu)
     const auto a = 1 / (2 / norm(x) - xt::linalg::dot(v, v)[0] / mu);
 
     return {a, e, i, om, Om, nu};
+}
+
+void warmup()
+{
+    std::cout << "Warming up";
+    for (auto volatile counter = 0ull; counter < 1000000000ull; ++counter) {
+        if (counter % 100000000ull == 0u) {
+            std::cout << '.';
+            std::cout.flush();
+        }
+    }
+    std::cout << " Done\n";
 }
 
 } // namespace heyoka_benchmark

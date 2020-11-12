@@ -31,7 +31,9 @@ TEST_CASE("one_body")
 
     taylor_adaptive<double> ta{{prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = -x * r_m3,
                                 prime(vy) = -y * r_m3, prime(vz) = -z * r_m3},
-                               {s_x[0], s_x[1], s_x[2], s_v[0], s_v[1], s_v[2]}};
+                               {s_x[0], s_x[1], s_x[2], s_v[0], s_v[1], s_v[2]},
+                               kw::high_accuracy = true,
+                               kw::tol = 1e-18};
 
     const auto &st = ta.get_state();
 
@@ -44,7 +46,7 @@ TEST_CASE("one_body")
 
         REQUIRE((res == taylor_outcome::success || res == taylor_outcome::time_limit));
 
-        if (abs(ta.get_time() - 2 * 3.141592653589793238460) < 1e-11) {
+        if (abs(ta.get_time() - 2 * 3.141592653589793238460) < 1e-13) {
             std::cout << st[0] << " " << st[1] << " " << st[2] << " " << st[3] << " " << st[4] << " " << st[5] << "\n";
 
             break;

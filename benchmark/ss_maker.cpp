@@ -34,7 +34,10 @@
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "benchmark_utils.hpp"
+
 using namespace heyoka;
+using namespace heyoka_benchmark;
 
 template <typename T>
 void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math)
@@ -83,7 +86,8 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
         s_array(i + 1u, 4) = sqrt(G / (i + 1u));
     }
 
-    // Adjust the Sun's velocity so that the COM of the system does not move.
+    // Move the COM.
+    s_array(0, 0) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 0))[0];
     s_array(0, 4) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 4))[0];
 
     start = std::chrono::high_resolution_clock::now();
@@ -102,6 +106,8 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
 int main(int argc, char *argv[])
 {
+    warmup();
+
     namespace po = boost::program_options;
 
     std::string fp_type;

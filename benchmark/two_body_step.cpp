@@ -27,7 +27,10 @@
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "benchmark_utils.hpp"
+
 using namespace heyoka;
+using namespace heyoka_benchmark;
 
 template <typename T>
 void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
@@ -61,6 +64,8 @@ void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 
 int main(int argc, char *argv[])
 {
+    warmup();
+
     namespace po = boost::program_options;
 
     std::string fp_type;
