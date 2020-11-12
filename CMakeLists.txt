@@ -151,14 +151,10 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    # NOTE: sleef.cpp needs to be compiled even if we are not
+    # building with sleef support on.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
-
-if(HEYOKA_WITH_SLEEF)
-    set(HEYOKA_SRC_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
-        "${HEYOKA_SRC_FILES}"
-    )
-endif()
 
 # Setup of the heyoka shared library.
 add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
