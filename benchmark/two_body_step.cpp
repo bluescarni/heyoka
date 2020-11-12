@@ -35,6 +35,8 @@ using namespace heyoka_benchmark;
 template <typename T>
 void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 {
+    warmup();
+
     // NOTE: this setup mimics the 'simplest' test from rebound.
     auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
 
@@ -64,8 +66,6 @@ void run_bench(T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 
 int main(int argc, char *argv[])
 {
-    warmup();
-
     namespace po = boost::program_options;
 
     std::string fp_type;

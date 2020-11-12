@@ -42,6 +42,8 @@ using namespace heyoka_benchmark;
 template <typename T>
 void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math)
 {
+    warmup();
+
     // Init the masses vector with the solar mass.
     std::vector masses{T(1)};
 
@@ -106,8 +108,6 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
 int main(int argc, char *argv[])
 {
-    warmup();
-
     namespace po = boost::program_options;
 
     std::string fp_type;
