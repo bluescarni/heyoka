@@ -40,7 +40,7 @@ using namespace heyoka;
 using namespace heyoka_benchmark;
 
 template <typename T>
-void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math)
+void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math, double final_time)
 {
     warmup();
 
@@ -94,8 +94,8 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
     start = std::chrono::high_resolution_clock::now();
 
-    // Run the integration for 1e5 years.
-    ta.propagate_until(T(1e5));
+    // Run the integration.
+    ta.propagate_until(T(final_time));
 
     elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -116,6 +116,7 @@ int main(int argc, char *argv[])
     bool high_accuracy = false;
     bool fast_math = false;
     std::uint32_t nplanets;
+    double final_time;
 
     po::options_description desc("Options");
 
@@ -124,7 +125,8 @@ int main(int argc, char *argv[])
         "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be the type's epsilon)")(
         "high_accuracy", "enable high-accuracy mode")("compact_mode", "enable compact mode")(
         "fast_math", "enable fast math flags")("nplanets", po::value<std::uint32_t>(&nplanets)->default_value(1),
-                                               "number of planets (>=1)");
+                                               "number of planets (>=1)")(
+        "final_time", po::value<double>(&final_time)->default_value(1e5), "total integration time (years)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -137,6 +139,10 @@ int main(int argc, char *argv[])
 
     if (nplanets == 0u) {
         throw std::invalid_argument("The number of planets cannot be zero");
+    }
+
+    if (!std::isfinite(final_time) || final_time <= 0) {
+        throw std::invalid_argument("Invalid final time specified: the final time must be finite and positive");
     }
 
     if (vm.count("high_accuracy")) {
@@ -152,12 +158,12 @@ int main(int argc, char *argv[])
     }
 
     if (fp_type == "double") {
-        run_bench<double>(nplanets, tol, high_accuracy, compact_mode, fast_math);
+        run_bench<double>(nplanets, tol, high_accuracy, compact_mode, fast_math, final_time);
     } else if (fp_type == "long double") {
-        run_bench<long double>(nplanets, tol, high_accuracy, compact_mode, fast_math);
+        run_bench<long double>(nplanets, tol, high_accuracy, compact_mode, fast_math, final_time);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_bench<mppp::real128>(nplanets, mppp::real128(tol), high_accuracy, compact_mode, fast_math);
+        run_bench<mppp::real128>(nplanets, mppp::real128(tol), high_accuracy, compact_mode, fast_math, final_time);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
