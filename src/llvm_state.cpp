@@ -30,7 +30,6 @@
 #include <cassert>
 #include <cstdint>
 #include <fstream>
-#include <functional>
 #include <initializer_list>
 #include <ios>
 #include <iterator>
@@ -50,6 +49,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
@@ -148,43 +148,20 @@ target_features get_target_features_impl()
     if (target_name == "x86-64" || target_name == "x86") {
         const auto t_features = (*tm)->getTargetFeatureString();
 
-        std::string feature = "+avx512f";
-
-        auto it = std::search(t_features.begin(), t_features.end(),
-                              std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx512f")) {
             retval.avx512f = true;
         }
 
-        feature = "+avx2";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx2")) {
             retval.avx2 = true;
         }
 
-        feature = "+avx";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx")) {
             retval.avx = true;
         }
 
         // SSE2 is always available on x86-64.
-#if !defined(NDEBUG)
-        feature = "+sse2";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        assert(it != t_features.end());
-#endif
-
+        assert(boost::algorithm::contains(t_features, "+sse2"));
         retval.sse2 = true;
     }
 
