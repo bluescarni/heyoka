@@ -11,10 +11,14 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <initializer_list>
+#include <ios>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -40,16 +44,16 @@ using namespace heyoka;
 using namespace heyoka_benchmark;
 
 template <typename T>
-void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math)
+void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_mode, bool fast_math, double final_time)
 {
     warmup();
 
     // Init the masses vector with the solar mass.
     std::vector masses{T(1)};
 
-    // Add the Earth-like planets' masses.
+    // Add the planets' masses.
     for (std::uint32_t i = 0; i < nplanets; ++i) {
-        masses.push_back(T(1) / 333000);
+        masses.push_back((T(1) / 333000) / ((i + 1u) * (i + 1u)));
     }
 
     // G constant, in terms of solar masses, AUs and years.
@@ -92,10 +96,51 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
     s_array(0, 0) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 0))[0];
     s_array(0, 4) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 4))[0];
 
+    std::ofstream ofs("out.txt", std::ios_base::out | std::ios_base::trunc);
+    ofs.precision(std::numeric_limits<T>::max_digits10);
+
     start = std::chrono::high_resolution_clock::now();
 
-    // Run the integration for 1e5 years.
-    ta.propagate_until(T(1e5));
+    // Run the integration.
+    T next_save_point(0);
+    while (true) {
+        if (auto [oc, _] = ta.step(T(final_time) - ta.get_time()); oc == taylor_outcome::time_limit) {
+            break;
+        }
+        if (ta.get_time() > next_save_point) {
+            ofs << ta.get_time() << " ";
+
+            for (auto val : s_array) {
+                ofs << val << " ";
+            }
+
+#if defined(HEYOKA_HAVE_REAL128)
+            // NOTE: don't try to save the orbital elements
+            // if real128 is being used, as the xt linalg functions
+            // don't work on real128.
+            if constexpr (!std::is_same_v<T, mppp::real128>) {
+#endif
+                // Store the orbital elements wrt the Sun.
+                for (std::uint32_t i = 1; i < nplanets + 1u; ++i) {
+                    auto rel_x = xt::view(s_array, i, xt::range(0, 3)) - xt::view(s_array, 0, xt::range(0, 3));
+                    auto rel_v = xt::view(s_array, i, xt::range(3, 6)) - xt::view(s_array, 0, xt::range(3, 6));
+
+                    auto kep = cart_to_kep(rel_x, rel_v, G * masses[0]);
+
+                    for (auto oe : kep) {
+                        ofs << oe << " ";
+                    }
+                }
+#if defined(HEYOKA_HAVE_REAL128)
+            }
+#endif
+
+            ofs << std::endl;
+
+            // Save every 100 years.
+            next_save_point += 100;
+        }
+    }
 
     elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -116,6 +161,7 @@ int main(int argc, char *argv[])
     bool high_accuracy = false;
     bool fast_math = false;
     std::uint32_t nplanets;
+    double final_time;
 
     po::options_description desc("Options");
 
@@ -124,7 +170,8 @@ int main(int argc, char *argv[])
         "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be the type's epsilon)")(
         "high_accuracy", "enable high-accuracy mode")("compact_mode", "enable compact mode")(
         "fast_math", "enable fast math flags")("nplanets", po::value<std::uint32_t>(&nplanets)->default_value(1),
-                                               "number of planets (>=1)");
+                                               "number of planets (>=1)")(
+        "final_time", po::value<double>(&final_time)->default_value(1e5), "total integration time (years)");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -137,6 +184,10 @@ int main(int argc, char *argv[])
 
     if (nplanets == 0u) {
         throw std::invalid_argument("The number of planets cannot be zero");
+    }
+
+    if (!std::isfinite(final_time) || final_time <= 0) {
+        throw std::invalid_argument("Invalid final time specified: the final time must be finite and positive");
     }
 
     if (vm.count("high_accuracy")) {
@@ -152,12 +203,12 @@ int main(int argc, char *argv[])
     }
 
     if (fp_type == "double") {
-        run_bench<double>(nplanets, tol, high_accuracy, compact_mode, fast_math);
+        run_bench<double>(nplanets, tol, high_accuracy, compact_mode, fast_math, final_time);
     } else if (fp_type == "long double") {
-        run_bench<long double>(nplanets, tol, high_accuracy, compact_mode, fast_math);
+        run_bench<long double>(nplanets, tol, high_accuracy, compact_mode, fast_math, final_time);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_bench<mppp::real128>(nplanets, mppp::real128(tol), high_accuracy, compact_mode, fast_math);
+        run_bench<mppp::real128>(nplanets, mppp::real128(tol), high_accuracy, compact_mode, fast_math, final_time);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");
