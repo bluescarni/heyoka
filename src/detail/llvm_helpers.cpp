@@ -347,13 +347,18 @@ llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const 
 
 // Create an LLVM for loop in the form:
 //
-// for (auto i = begin; i < end; ++i) {
+// for (auto i = begin; i < end; i = next_cur(i)) {
 //   body(i);
 // }
 //
+// The default implementation of i = next_cur(i),
+// if next_cur is not provided, is ++i.
+//
 // begin/end must be 32-bit unsigned integer values.
-void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const std::function<void(llvm::Value *)> &body)
+void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const std::function<void(llvm::Value *)> &body,
+                   const std::function<llvm::Value *(llvm::Value *)> &next_cur)
 {
+    assert(body);
     assert(begin->getType() == end->getType());
     assert(begin->getType() == s.builder().getInt32Ty());
 
@@ -401,9 +406,10 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
         throw;
     }
 
-    // Compute the next value of the iteration.
+    // Compute the next value of the iteration. Use the next_cur
+    // function if provided, otherwise, by default, increase cur by 1.
     // NOTE: addition works regardless of integral signedness.
-    auto next = builder.CreateAdd(cur, builder.getInt32(1));
+    auto next = next_cur ? next_cur(cur) : builder.CreateAdd(cur, builder.getInt32(1));
 
     // Compute the end condition.
     // NOTE: we use the unsigned less-than predicate.
