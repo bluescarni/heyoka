@@ -364,16 +364,16 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
             [i](const auto &v) {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                auto check_arg = [i](const auto &arg) {
-                    if (auto p_var = std::get_if<variable>(&arg.value())) {
-                        assert(p_var->name().rfind("u_", 0) == 0);
-                        assert(uname_to_index(p_var->name()) < i);
-                    } else if (std::get_if<number>(&arg.value()) == nullptr) {
-                        assert(false);
-                    }
-                };
-
                 if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                    auto check_arg = [i](const auto &arg) {
+                        if (auto p_var = std::get_if<variable>(&arg.value())) {
+                            assert(p_var->name().rfind("u_", 0) == 0);
+                            assert(uname_to_index(p_var->name()) < i);
+                        } else if (std::get_if<number>(&arg.value()) == nullptr) {
+                            assert(false);
+                        }
+                    };
+
                     for (const auto &arg : v.args()) {
                         check_arg(arg);
                     }
