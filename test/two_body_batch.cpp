@@ -122,14 +122,12 @@ TEST_CASE("two body batch")
         auto bst_copy(bst);
         auto times_copy(tab.get_times());
 
-        std::vector<std::tuple<taylor_outcome, fp_t>> res;
-
         for (auto _ = 0; _ < 200; ++_) {
             // Copy the batch state/times before propagation.
             bst_copy = bst;
             times_copy = tab.get_times();
 
-            tab.step(res);
+            const auto &res = tab.step();
 
             for (std::uint32_t i = 0; i < batch_size; ++i) {
                 // Evolve separately the scalar integrators.
