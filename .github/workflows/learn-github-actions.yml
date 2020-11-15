@@ -1,10 +1,8 @@
-name: learn-github-actions
+name: OSX build
 on: [push]
 jobs:
-  check-bats-version:
-    runs-on: ubuntu-latest
+  osx_build:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-      - run: npm install -g bats
-      - run: bats -v
+      - run: bash tools/gha_osx.sh
