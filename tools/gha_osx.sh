@@ -24,7 +24,7 @@ mkdir build
 cd build
 
 # GCC build.
-CXX=clang++ CC=clang cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_SLEEF=yes -DHEYOKA_ENABLE_IPO=yes
+CXX=clang++ CC=clang cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_WITH_SLEEF=yes -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
 make -j2 VERBOSE=1
 ctest -V -j2
 
