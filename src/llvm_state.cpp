@@ -295,11 +295,11 @@ struct llvm_state::jit {
     }
     std::string get_target_cpu() const
     {
-        return std::string{m_tm->getTargetCPU()};
+        return m_tm->getTargetCPU().str();
     }
     std::string get_target_features() const
     {
-        return std::string{m_tm->getTargetFeatureString()};
+        return m_tm->getTargetFeatureString().str();
     }
     llvm::TargetIRAnalysis get_target_ir_analysis() const
     {
