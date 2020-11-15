@@ -157,7 +157,7 @@ target_features get_target_features_impl()
         }
 
         if (boost::algorithm::contains(t_features, "+avx")) {
-            retval.avx2 = true;
+            retval.avx = true;
         }
 
         // SSE2 is always available on x86-64.
