@@ -53,7 +53,7 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
     // Add the Earth-like planets' masses.
     for (std::uint32_t i = 0; i < nplanets; ++i) {
-        masses.push_back(T(1) / 333000);
+        masses.push_back((T(1) / 333000) / ((i + 1u) * (i + 1u)));
     }
 
     // G constant, in terms of solar masses, AUs and years.
