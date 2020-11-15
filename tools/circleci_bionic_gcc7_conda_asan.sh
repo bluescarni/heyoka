@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda_pkgs="cmake llvmdev boost-cpp mppp sleef"
+conda_pkgs="cmake llvmdev boost-cpp mppp sleef xtensor xtensor-blas"
 conda create -q -p $deps_dir -y
 source activate $deps_dir
 conda install mamba -y
