@@ -155,7 +155,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             // into a single number by expression's operator*().
             auto fac_j = Gconst * masses[j] * r_m3;
             // NOTE: c_ij will also be compressed into a single
-            // constant by expression' operators.
+            // constant by expression's operators.
             auto c_ij = -masses[i] / masses[j];
 
             // Acceleration exerted by j on i.
