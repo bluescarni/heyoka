@@ -51,7 +51,7 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
     // Init the masses vector with the solar mass.
     std::vector masses{T(1)};
 
-    // Add the Earth-like planets' masses.
+    // Add the planets' masses.
     for (std::uint32_t i = 0; i < nplanets; ++i) {
         masses.push_back((T(1) / 333000) / ((i + 1u) * (i + 1u)));
     }
@@ -137,6 +137,7 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
             ofs << std::endl;
 
+            // Save every 100 years.
             next_save_point += 100;
         }
     }

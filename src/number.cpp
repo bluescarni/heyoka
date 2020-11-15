@@ -129,11 +129,6 @@ bool is_negative_one(const number &n)
     return std::visit([](const auto &arg) { return arg == -1; }, n.value());
 }
 
-number operator-(number n)
-{
-    return std::visit([](auto &&v) { return number{-std::forward<decltype(v)>(v)}; }, std::move(n.value()));
-}
-
 number operator+(number n1, number n2)
 {
     return std::visit(

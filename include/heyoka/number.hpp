@@ -79,8 +79,6 @@ HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
 
-HEYOKA_DLL_PUBLIC number operator-(number);
-
 HEYOKA_DLL_PUBLIC number operator+(number, number);
 HEYOKA_DLL_PUBLIC number operator-(number, number);
 HEYOKA_DLL_PUBLIC number operator*(number, number);
