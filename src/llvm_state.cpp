@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
+#include <cstddef>
 #include <ios>
 #include <iterator>
 #include <limits>
@@ -149,19 +150,23 @@ target_features get_target_features_impl()
         const auto t_features = (*tm)->getTargetFeatureString();
 
         if (boost::algorithm::contains(t_features, "+avx512f")) {
+            retval.simd_align = std::max<std::size_t>(retval.simd_align, 64);
             retval.avx512f = true;
         }
 
         if (boost::algorithm::contains(t_features, "+avx2")) {
+            retval.simd_align = std::max<std::size_t>(retval.simd_align, 32);
             retval.avx2 = true;
         }
 
         if (boost::algorithm::contains(t_features, "+avx")) {
+            retval.simd_align = std::max<std::size_t>(retval.simd_align, 32);
             retval.avx = true;
         }
 
         // SSE2 is always available on x86-64.
         assert(boost::algorithm::contains(t_features, "+sse2"));
+        retval.simd_align = std::max<std::size_t>(retval.simd_align, 16);
         retval.sse2 = true;
     }
 
@@ -1278,6 +1283,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Inline functions   : " << s.m_inline_functions << '\n';
     oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
+    oss << "SIMD alignment     : " << detail::get_target_features().simd_align << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
     oss << "IR size            : " << s.get_ir().size() << '\n';
 
