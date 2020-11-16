@@ -1,5 +1,11 @@
 name: OSX build
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 jobs:
   osx_build:
     runs-on: macos-latest
