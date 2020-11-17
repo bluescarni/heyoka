@@ -147,20 +147,28 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             auto diff_z = z_vars[j] - z_vars[i];
 
             auto r_m3 = pow(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z, expression{number{-3. / 2}});
-
-            // Acceleration exerted by j on i.
+            // NOTE: the idea here is that we want to help the CSE process
+            // when computing the Taylor decomposition. Thus, we try
+            // to maximise the re-use of an expression with the goal
+            // of having it simplified in the CSE.
             // NOTE: Gconst * masses[j] will be contracted
             // into a single number by expression's operator*().
-            x_acc[i].push_back(Gconst * masses[j] * (diff_x * r_m3));
-            y_acc[i].push_back(Gconst * masses[j] * (diff_y * r_m3));
-            z_acc[i].push_back(Gconst * masses[j] * (diff_z * r_m3));
+            auto fac_j = Gconst * masses[j] * r_m3;
+            // NOTE: c_ij will also be compressed into a single
+            // constant by expression's operators.
+            auto c_ij = -masses[i] / masses[j];
+
+            // Acceleration exerted by j on i.
+            x_acc[i].push_back(diff_x * fac_j);
+            y_acc[i].push_back(diff_y * fac_j);
+            z_acc[i].push_back(diff_z * fac_j);
 
             // Acceleration exerted by i on j.
             // NOTE: do the negation on the masses, which
             // here are guaranteed to have numerical values.
-            x_acc[j].push_back(Gconst * -masses[i] * (diff_x * r_m3));
-            y_acc[j].push_back(Gconst * -masses[i] * (diff_y * r_m3));
-            z_acc[j].push_back(Gconst * -masses[i] * (diff_z * r_m3));
+            x_acc[j].push_back(diff_x * fac_j * c_ij);
+            y_acc[j].push_back(diff_y * fac_j * c_ij);
+            z_acc[j].push_back(diff_z * fac_j * c_ij);
         }
 
         // Add the expressions of the accelerations to the system.

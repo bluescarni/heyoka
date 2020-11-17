@@ -150,15 +150,10 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    # NOTE: sleef.cpp needs to be compiled even if we are not
+    # building with sleef support on.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
-
-if(HEYOKA_WITH_SLEEF)
-    set(HEYOKA_SRC_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
-        "${HEYOKA_SRC_FILES}"
-    )
-endif()
 
 # Setup of the heyoka shared library.
 add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
@@ -208,17 +203,24 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
-# Mandatory dependency on fmt.
-find_package(fmt REQUIRED)
+add_library(heyoka::llvm_headers INTERFACE IMPORTED)
+set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
+target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
 
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
 
+target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
+# NOTE: quench warnings from Boost when building the library.
+target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
+
 # Optional dependency on mp++.
 if(HEYOKA_WITH_MPPP)
+    # NOTE: put this into a separate variable for reuse later.
+    set(_HEYOKA_MIN_MPPP_VERSION "0.21")
     find_package(mp++ REQUIRED)
-    if(${mp++_VERSION} VERSION_LESS "0.21")
-        message(FATAL_ERROR "mp++ >= 0.21 is required.")
+    if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
+        message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
     endif()
     target_link_libraries(heyoka PUBLIC mp++::mp++)
 endif()
@@ -228,15 +230,6 @@ if(HEYOKA_WITH_SLEEF)
     find_package(heyoka_SLEEF REQUIRED)
     target_link_libraries(heyoka PRIVATE heyoka::SLEEF)
 endif()
-
-add_library(heyoka::llvm_headers INTERFACE IMPORTED)
-set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
-target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
-target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
-target_link_libraries(heyoka PUBLIC fmt::fmt)
-
-# NOTE: quench warnings from Boost when building the library.
-target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
@@ -254,6 +247,10 @@ install(TARGETS heyoka
 )
 
 # Setup of the optional deps.
+set(_HEYOKA_CONFIG_OPTIONAL_DEPS)
+if(HEYOKA_WITH_MPPP)
+    set(_HEYOKA_CONFIG_OPTIONAL_DEPS "${_HEYOKA_CONFIG_OPTIONAL_DEPS}find_package(mp++ REQUIRED)\nif(\$\{mp++_VERSION\} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})\n    message(FATAL_ERROR \"mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.\")\nendif()\n")
+endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/heyoka-config.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
     DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")

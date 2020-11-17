@@ -6,15 +6,35 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+<<<<<<< HEAD
 #define __STDC_FORMAT_MACROS
 
+=======
+// NOTE: on some setups (e.g., the current conda-forge compiler toolchain)
+// there is an issue triggered by code in the LLVM headers, involving
+// a macro called 'PRIxPTR' in some C IO API. It seems like defining
+// __STDC_FORMAT_MACROS works around the issue, and this does not seem to hurt
+// where the problem does not arise. In any case, we include limits.h
+// so that we can detect if we are using GLIBC, and activate the workaround
+// only if that's the case. See:
+// https://github.com/tensorflow/tensorflow/issues/12998
+// https://en.cppreference.com/w/cpp/types/integer
+// https://sourceforge.net/p/predef/wiki/Libraries/
+#include <climits>
+
+#if defined(__GLIBC__)
+
+#define __STDC_FORMAT_MACROS
+
+#endif
+
+>>>>>>> bluescarni/master
 #include <heyoka/config.hpp>
 
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
-#include <functional>
 #include <initializer_list>
 #include <ios>
 #include <iterator>
@@ -34,6 +54,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
@@ -132,43 +153,20 @@ target_features get_target_features_impl()
     if (target_name == "x86-64" || target_name == "x86") {
         const auto t_features = (*tm)->getTargetFeatureString();
 
-        std::string feature = "+avx512f";
-
-        auto it = std::search(t_features.begin(), t_features.end(),
-                              std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx512f")) {
             retval.avx512f = true;
         }
 
-        feature = "+avx2";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx2")) {
             retval.avx2 = true;
         }
 
-        feature = "+avx";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        if (it != t_features.end()) {
+        if (boost::algorithm::contains(t_features, "+avx")) {
             retval.avx = true;
         }
 
         // SSE2 is always available on x86-64.
-#if !defined(NDEBUG)
-        feature = "+sse2";
-
-        it = std::search(t_features.begin(), t_features.end(),
-                         std::boyer_moore_searcher(feature.begin(), feature.end()));
-
-        assert(it != t_features.end());
-#endif
-
+        assert(boost::algorithm::contains(t_features, "+sse2"));
         retval.sse2 = true;
     }
 
@@ -279,11 +277,11 @@ struct llvm_state::jit {
     }
     std::string get_target_cpu() const
     {
-        return std::string{m_tm->getTargetCPU()};
+        return m_tm->getTargetCPU().str();
     }
     std::string get_target_features() const
     {
-        return std::string{m_tm->getTargetFeatureString()};
+        return m_tm->getTargetFeatureString().str();
     }
     llvm::TargetIRAnalysis get_target_ir_analysis() const
     {

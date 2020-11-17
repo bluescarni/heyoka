@@ -1,0 +1,14 @@
+name: OSX build
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  osx_build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: bash tools/gha_osx.sh

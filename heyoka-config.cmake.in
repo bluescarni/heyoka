@@ -8,6 +8,8 @@ endif()
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
 
+@_HEYOKA_CONFIG_OPTIONAL_DEPS@
+
 # Get current dir.
 get_filename_component(_HEYOKA_CONFIG_SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 
