@@ -180,6 +180,9 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -190,8 +193,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
                     retval);
             },
             [&]() {
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Distinguish the odd/even cases for the order.
