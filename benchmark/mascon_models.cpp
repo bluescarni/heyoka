@@ -19,10 +19,11 @@
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "data/mascon_bennu.hpp"
 #include "data/mascon_itokawa.hpp"
 
-// This benchmark builds a Taylor integrator for the motion around asteroid Itokawa.
-// The mascon model for Itokawa was generated using a thetraedral mesh built upon
+// This benchmark builds a Taylor integrator for the motion around asteroid Bennu.
+// The mascon model for Bennu was generated using a thetraedral mesh built upon
 // the polyhedral surface model available. Model units are L = asteroid diameter, M = asteroid mass.
 // TODO: check the exact values
 
@@ -93,7 +94,7 @@ struct mascon_dynamics {
         for (decltype(dim) i = 0; i < dim; ++i) {
             auto r2 = (x[0] - m_mascon_points[i][0]) * (x[0] - m_mascon_points[i][0])
                       + (x[1] - m_mascon_points[i][1]) * (x[1] - m_mascon_points[i][1])
-                      + (x[2] - mascon_points_itokawa[i][2]) * (x[2] - m_mascon_points[i][2]);
+                      + (x[2] - m_mascon_points[i][2]) * (x[2] - m_mascon_points[i][2]);
             auto mGpow = m_G * std::pow(r2, -3. / 2.) * m_mascon_masses[i];
             x_acc.push_back((m_mascon_points[i][0] - x[0]) * mGpow);
             y_acc.push_back((m_mascon_points[i][1] - x[1]) * mGpow);
@@ -140,7 +141,7 @@ double compute_energy(const std::vector<double> x, const P &mascon_points, const
 // G -> Cavendish constant (units L^3/T^2/M)
 // pd, qd, rd -> angular velocity of the asteroid in the frame used for the mascon model (units rad/T)
 //
-// Note, units must be consistent. Choosing L and M is done via the mascon model, T is drived by the value of G. The
+// Note, units must be consistent. Choosing L and M is done via the mascon model, T is derived by the value of G. The
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename P, typename M, typename... KwArgs>
 std::vector<std::pair<expression, expression>> make_mascon_system(const P &mascon_points, const M &mascon_masses,
@@ -212,46 +213,44 @@ std::vector<std::pair<expression, expression>> make_mascon_system(const P &masco
     }
 }
 
-int main(int argc, char *argv[])
+template <typename P, typename M>
+taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_masses, double wz, double r0 = 2.,
+                                       double incl = 45., double G = 1.)
 {
-    // Equations of motion.
-    // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
-    // 3D model) M = 3.51E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T = sqrt(L^3/G/M)
-    // = 6833.636194780773s The asteroid angular velocity in our units is thus Wz = 2pi / (12.132 * 60 * 60 / T)
-    // = 1.6005276908596755
-    auto wz = 0.9830980174940738;
-    // auto eom = make_mascon_system(mascon_points_itokawa, mascon_masses_itokawa, 0., 0., wz, benchmark::kw::G = 1.);
     // Initial conditions
-    auto r0 = 2.;
-    double incl = 45.;
-    // 1 - Initional conditions
     auto v0y = std::cos(incl / 360 * 6.28) * std::sqrt(1. / r0) - wz * r0;
     auto v0z = std::sin(incl / 360 * 6.28) * std::sqrt(1. / r0);
     std::vector<double> ic = {r0, 0., 0., 0., v0y, v0z};
-    double E0 = compute_energy(ic, mascon_points_itokawa, mascon_masses_itokawa, 0., 0., wz, 1.);
+    // Constructing the integrator.
+    auto eom = make_mascon_system(mascon_points, mascon_masses, 0., 0., wz, benchmark::kw::G = G);
+    auto start = high_resolution_clock::now();
+    taylor_adaptive<double> taylor{eom, ic, kw::compact_mode = true, kw::tol = 1e-14};
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    std::cout << "Time to construct the integrator: " << duration.count() / 1e6 << "s" << std::endl;
+    return taylor;
+}
+
+template <typename P, typename M>
+void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
+                           double test_time = 10.)
+{
+    // 1 - Initional conditions
+    auto ic = taylor.get_state();
+    double E0 = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
     // Declarations
     decltype(high_resolution_clock::now()) start, stop;
     decltype(duration_cast<microseconds>(stop - start)) duration;
     double energy;
 
-    double test_time = 10.;
-
     // TAYLOR ------------------------------------------------------------------------------
-    // Constructing the integrator.
-    // auto eom = make_mascon_system(mascon_points, mascon_masses, 0., 0., wz, benchmark::kw::G = 1.);
-    // start = high_resolution_clock::now();
-    // taylor_adaptive<double> taylor{eom, ic, kw::compact_mode = true, kw::tol = 1e-14};
-    // stop = high_resolution_clock::now();
-    // duration = duration_cast<microseconds>(stop - start);
-    // std::cout << "Time to construct the integrator: " << duration.count() / 1e6 << "s" << std::endl;
-    //
-    // start = high_resolution_clock::now();
-    // taylor.propagate_until(test_time);
-    // stop = high_resolution_clock::now();
-    // duration = duration_cast<microseconds>(stop - start);
-    // std::cout << "Integration time (Taylor): " << duration.count() / 1e6 << "s" << std::endl;
-    // energy = compute_energy(taylor.get_state(), mascon_points, mascon_masses, 0., 0., wz, 1.);
-    //::print("Energy error: {}\n", (energy - E0) / E0);
+    start = high_resolution_clock::now();
+    taylor.propagate_until(test_time);
+    stop = high_resolution_clock::now();
+    duration = duration_cast<microseconds>(stop - start);
+    std::cout << "Integration time (Taylor): " << duration.count() / 1e6 << "s" << std::endl;
+    energy = compute_energy(taylor.get_state(), mascon_points, mascon_masses, 0., 0., wz, 1.);
+    fmt::print("Energy error: {}\n", (energy - E0) / E0);
     // TAYLOR ------------------------------------------------------------------------------
 
     // RKF7(8) -----------------------------------------------------------------------------
@@ -261,15 +260,66 @@ int main(int argc, char *argv[])
     typedef odeint::controlled_runge_kutta<error_stepper_type> controlled_stepper_type;
     controlled_stepper_type controlled_stepper;
     // The dynamics
-    mascon_dynamics dynamics(mascon_points_itokawa, mascon_masses_itokawa, 0., 0., wz, 1.);
+    mascon_dynamics dynamics(mascon_points, mascon_masses, 0., 0., wz, 1.);
     start = high_resolution_clock::now();
     odeint::integrate_adaptive(odeint::make_controlled<error_stepper_type>(1.0e-14, 1.0e-14), dynamics, ic, 0.0,
                                test_time, 1e-8);
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << "Integration time (RKF7(8)): " << duration.count() / 1e6 << "s" << std::endl;
-    energy = compute_energy(ic, mascon_points_itokawa, mascon_masses_itokawa, 0., 0., wz, 1.);
+    energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
     fmt::print("Energy error: {}\n", (energy - E0) / E0);
     // RKF7(8) -----------------------------------------------------------------------------
+}
+
+template <typename P, typename M>
+void plot_data(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
+               double integration_time, unsigned N = 5000)
+{
+    auto dt = integration_time / N;
+    for (decltype(N) i = 0u; i < N + 1; ++i) {
+        auto state = taylor.get_state();
+        auto energy = compute_energy(state, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        fmt::print("[{}, {}, {}, {}, {}, {}, {}],\n", state[0], state[1], state[2], state[3], state[4], state[5],
+                   energy);
+        taylor.propagate_for(dt);
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    auto inclination = 45.;         // degrees
+    auto distance = 2.;             // non dimensional units
+    auto integration_time = 86400.; // seconds (1day of operations)
+    // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
+
+    // Bennu
+    // L = 416.45655931190163m (computed from the mascon model and since Bennu  is 562.8699958324432m long from the NASA
+    // 3D model) M = 7.329E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
+    // sqrt(L^3/G/M) = 3842.6367987779804s The asteroid angular velocity in our units is thus Wz = 2pi / (4.29 * 60 * 60
+    // / T) = 1.5633255034258877
+    // auto T_bennu = 3842.6367987779804;
+    // auto wz_bennu = 1.5633255034258877;
+    // fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
+    // auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance,
+    // inclination, 1.);
+    // compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time /
+    // T_bennu);
+    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
+    // 1000u);
+    // Itokawa
+    // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
+    // 3D model) M = 3.51E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T = sqrt(L^3/G/M)
+    // = 6833.636194780773s The asteroid angular velocity in our units is thus Wz = 2pi / (12.132 * 60 * 60 / T)
+    // = 0.9830980174940738
+    auto T_itokawa = 6833.636194780773;
+    auto wz_itokawa = 0.9830980174940738;
+    fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
+    auto taylor_itokawa = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, 3., inclination, 1.);
+    // compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+    //                      integration_time / T_itokawa);
+    plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+              integration_time / T_itokawa * 7, 1000u);
+
     return 0;
 }
