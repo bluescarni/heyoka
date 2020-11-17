@@ -218,6 +218,12 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
                     },
                     [&]() {
                         // Even order.
+
+                        // Pre-compute the final term.
+                        auto ak2 = taylor_c_load_diff(s, diff_ptr, n_uvars,
+                                                      builder.CreateUDiv(ord, builder.getInt32(2)), var_idx);
+                        auto sq_ak2 = builder.CreateFMul(ak2, ak2);
+
                         auto loop_end = builder.CreateAdd(
                             builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(2)), builder.getInt32(2)),
                             builder.getInt32(1));
@@ -231,11 +237,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
 
                         // Return 2 * acc + ak2 * ak2.
                         auto acc_load = builder.CreateLoad(acc);
-                        auto ak2 = taylor_c_load_diff(s, diff_ptr, n_uvars,
-                                                      builder.CreateUDiv(ord, builder.getInt32(2)), var_idx);
-                        builder.CreateStore(
-                            builder.CreateFAdd(builder.CreateFAdd(acc_load, acc_load), builder.CreateFMul(ak2, ak2)),
-                            retval);
+                        builder.CreateStore(builder.CreateFAdd(builder.CreateFAdd(acc_load, acc_load), sq_ak2), retval);
                     });
             });
 
