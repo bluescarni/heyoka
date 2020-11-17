@@ -198,6 +198,9 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const function &func,
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -208,8 +211,7 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const function &func,
                     retval);
             },
             [&]() {
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumlator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -587,6 +589,9 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const function &func,
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -597,8 +602,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const function &func,
                     retval);
             },
             [&]() {
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -979,6 +983,9 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const function &func,
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -992,8 +999,7 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const function &func,
                 // Create a vector version of ord.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -1346,6 +1352,9 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const function &func,
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -1359,8 +1368,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const function &func,
                 // Create a vector version of ord.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -1796,6 +1804,9 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const function &func,
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -1811,8 +1822,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const function &func,
                 auto alpha_v = vector_splat(builder, exponent, batch_size);
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
@@ -2159,6 +2169,9 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const function &func
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -2176,8 +2189,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const function &func
                 auto alpha_v = vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size);
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
