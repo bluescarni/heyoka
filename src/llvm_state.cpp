@@ -6,10 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-<<<<<<< HEAD
-#define __STDC_FORMAT_MACROS
-
-=======
 // NOTE: on some setups (e.g., the current conda-forge compiler toolchain)
 // there is an issue triggered by code in the LLVM headers, involving
 // a macro called 'PRIxPTR' in some C IO API. It seems like defining
@@ -28,7 +24,6 @@
 
 #endif
 
->>>>>>> bluescarni/master
 #include <heyoka/config.hpp>
 
 #include <algorithm>

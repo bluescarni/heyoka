@@ -298,15 +298,13 @@ int main(int argc, char *argv[])
     // 3D model) M = 7.329E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
     // sqrt(L^3/G/M) = 3842.6367987779804s The asteroid angular velocity in our units is thus Wz = 2pi / (4.29 * 60 * 60
     // / T) = 1.5633255034258877
-    // auto T_bennu = 3842.6367987779804;
-    // auto wz_bennu = 1.5633255034258877;
-    // fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
-    // auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance,
-    // inclination, 1.);
-    // compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time /
-    // T_bennu);
-    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
-    // 1000u);
+    auto T_bennu = 3842.6367987779804;
+    auto wz_bennu = 1.5633255034258877;
+    fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
+    auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time /T_bennu);
+    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7, 1000u);
+
     // Itokawa
     // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
     // 3D model) M = 3.51E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T = sqrt(L^3/G/M)
@@ -316,10 +314,9 @@ int main(int argc, char *argv[])
     auto wz_itokawa = 0.9830980174940738;
     fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
     auto taylor_itokawa = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, 3., inclination, 1.);
-    // compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
-    //                      integration_time / T_itokawa);
-    plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
-              integration_time / T_itokawa * 7, 1000u);
+    compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa, integration_time / T_itokawa);
+    // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+    //         integration_time / T_itokawa * 7, 1000u);
 
     return 0;
 }
