@@ -1606,6 +1606,9 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
         // Create the return value.
         auto retval = builder.CreateAlloca(val_t);
 
+        // Create the accumulator.
+        auto acc = builder.CreateAlloca(val_t);
+
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
@@ -1616,8 +1619,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
                 builder.CreateStore(builder.CreateFDiv(num_vec, ret), retval);
             },
             [&]() {
-                // Create the accumulator.
-                auto acc = builder.CreateAlloca(val_t);
+                // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
