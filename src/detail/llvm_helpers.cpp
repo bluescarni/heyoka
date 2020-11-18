@@ -26,6 +26,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
@@ -548,6 +549,20 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     // Emit the merge block.
     f->getBasicBlockList().push_back(merge_bb);
     builder.SetInsertPoint(merge_bb);
+}
+
+// Helper to create a global zero-inited array variable in the module m
+// with type t. The array is mutable and with internal linkage.
+llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
+{
+    assert(t != nullptr);
+
+    // Make the global array.
+    auto gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+                                           llvm::ConstantAggregateZero::get(t));
+
+    // Return it.
+    return gl_arr;
 }
 
 } // namespace heyoka::detail

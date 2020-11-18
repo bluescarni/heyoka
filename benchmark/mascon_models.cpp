@@ -17,9 +17,8 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/square.hpp>
-
+#include <heyoka/taylor.hpp>
 
 #include "data/mascon_bennu.hpp"
 #include "data/mascon_itokawa.hpp"
@@ -74,6 +73,7 @@ struct mascon_dynamics {
     // data members
     std::vector<std::vector<double>> m_mascon_points;
     std::vector<double> m_mascon_masses;
+    std::vector<double> x_acc, y_acc, z_acc;
     double m_p, m_q, m_r;
     double m_G;
     // constructor
@@ -85,22 +85,29 @@ struct mascon_dynamics {
             m_mascon_points.push_back(
                 std::vector<double>{mascon_points[i][0], mascon_points[i][1], mascon_points[i][2]});
         }
+
+        x_acc.resize(std::size(m_mascon_masses));
+        y_acc.resize(std::size(m_mascon_masses));
+        z_acc.resize(std::size(m_mascon_masses));
     }
     // call operator
     void operator()(const std::vector<double> &x, std::vector<double> &dxdt, const double /* t */)
     {
         auto dim = std::size(m_mascon_masses);
-        std::vector<double> x_acc, y_acc, z_acc;
 
         // FIRST: Assemble the acceleration due to mascons
+        // TODO: switch to pairwise/compensated summation here?
+        double x_a = 0, y_a = 0, z_a = 0;
         for (decltype(dim) i = 0; i < dim; ++i) {
             auto r2 = (x[0] - m_mascon_points[i][0]) * (x[0] - m_mascon_points[i][0])
                       + (x[1] - m_mascon_points[i][1]) * (x[1] - m_mascon_points[i][1])
                       + (x[2] - m_mascon_points[i][2]) * (x[2] - m_mascon_points[i][2]);
-            auto mGpow = m_G * std::pow(r2, -3. / 2.) * m_mascon_masses[i];
-            x_acc.push_back((m_mascon_points[i][0] - x[0]) * mGpow);
-            y_acc.push_back((m_mascon_points[i][1] - x[1]) * mGpow);
-            z_acc.push_back((m_mascon_points[i][2] - x[2]) * mGpow);
+            // auto mGpow = m_G * std::pow(r2, -3. / 2.) * m_mascon_masses[i];
+            auto r = std::sqrt(r2);
+            auto mGpow = m_G * m_mascon_masses[i] / (r * r * r);
+            x_a += (m_mascon_points[i][0] - x[0]) * mGpow;
+            y_a += (m_mascon_points[i][1] - x[1]) * mGpow;
+            z_a += (m_mascon_points[i][2] - x[2]) * mGpow;
         }
         // SECOND: centripetal and Coriolis
         // w x w x r
@@ -115,9 +122,9 @@ struct mascon_dynamics {
         dxdt[0] = x[3];
         dxdt[1] = x[4];
         dxdt[2] = x[5];
-        dxdt[3] = pairwise_sum(x_acc) - centripetal_x - coriolis_x;
-        dxdt[4] = pairwise_sum(y_acc) - centripetal_y - coriolis_y;
-        dxdt[5] = pairwise_sum(z_acc) - centripetal_z - coriolis_z;
+        dxdt[3] = x_a - centripetal_x - coriolis_x;
+        dxdt[4] = y_a - centripetal_y - coriolis_y;
+        dxdt[5] = z_a - centripetal_z - coriolis_z;
     }
 };
 
@@ -147,7 +154,7 @@ double compute_energy(const std::vector<double> x, const P &mascon_points, const
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename P, typename M, typename... KwArgs>
 std::vector<std::pair<expression, expression>> make_mascon_system(const P &mascon_points, const M &mascon_masses,
-                                                                  double pd, double qd, double rd, KwArgs &&... kw_args)
+                                                                  double pd, double qd, double rd, KwArgs &&...kw_args)
 {
     // 1 - Check input consistency (TODO)
     // 2 - We parse the unnamed arguments
@@ -304,8 +311,9 @@ int main(int argc, char *argv[])
     auto wz_bennu = 1.5633255034258877;
     fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
     auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
-    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time /T_bennu);
-    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7, 1000u);
+    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
+    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
+    // 1000u);
 
     // Itokawa
     // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
@@ -316,7 +324,8 @@ int main(int argc, char *argv[])
     auto wz_itokawa = 0.9830980174940738;
     fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
     auto taylor_itokawa = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, 3., inclination, 1.);
-    compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa, integration_time / T_itokawa);
+    compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+                          integration_time / T_itokawa);
     // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
     //         integration_time / T_itokawa * 7, 1000u);
 
