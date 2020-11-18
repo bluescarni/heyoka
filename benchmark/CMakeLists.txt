@@ -20,7 +20,7 @@ find_package(xtensor-blas REQUIRED)
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
   target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas)
-  target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
+  target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
     "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
