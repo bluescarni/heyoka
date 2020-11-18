@@ -1848,11 +1848,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     auto fp_type = llvm::cast<llvm::PointerType>(order0->getType())->getElementType();
     auto array_type = llvm::ArrayType::get(make_vector_type(fp_type, batch_size), n_uvars * order + n_eq);
 
-    // Make the global array.
-    auto gl_diff_arr = make_global_zero_array(s.module(), array_type);
-
-    // Fetch a pointer to the first element of the array.
-    auto diff_arr = builder.CreateInBoundsGEP(gl_diff_arr, {builder.getInt32(0), builder.getInt32(0)});
+    // Make the global array and fetch a pointer to its first element.
+    auto diff_arr = builder.CreateInBoundsGEP(make_global_zero_array(s.module(), array_type),
+                                              {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the order-0 derivatives of the state variables.
     // NOTE: overflow checking is already done in the parent function.

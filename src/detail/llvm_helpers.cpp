@@ -552,7 +552,7 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 }
 
 // Helper to create a global zero-inited array variable in the module m
-// with type t.
+// with type t. The array is mutable and with internal linkage.
 llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
 {
     assert(t != nullptr);
