@@ -18,6 +18,8 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/square.hpp>
+
 
 #include "data/mascon_bennu.hpp"
 #include "data/mascon_itokawa.hpp"
@@ -181,7 +183,7 @@ std::vector<std::pair<expression, expression>> make_mascon_system(const P &masco
             auto xdiff = (x - x_masc);
             auto ydiff = (y - y_masc);
             auto zdiff = (z - z_masc);
-            auto r2 = xdiff * xdiff + ydiff * ydiff + zdiff * zdiff;
+            auto r2 = square(xdiff) + square(ydiff) + square(zdiff);
             auto common_factor = -G_const * m_masc * pow(r2, expression{number{-3. / 2.}});
             x_acc.push_back(common_factor * xdiff);
             y_acc.push_back(common_factor * ydiff);
