@@ -1849,6 +1849,10 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     auto array_type = llvm::ArrayType::get(make_vector_type(fp_type, batch_size), n_uvars * order + n_eq);
 
     // Make the global array and fetch a pointer to its first element.
+    // NOTE: we use a global array rather than a local one here because
+    // its size can grow quite large, which can lead to stack overflow issues.
+    // This has of course consequences in terms of thread safety, which
+    // we will have to document.
     auto diff_arr = builder.CreateInBoundsGEP(make_global_zero_array(s.module(), array_type),
                                               {builder.getInt32(0), builder.getInt32(0)});
 
