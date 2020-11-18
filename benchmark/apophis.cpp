@@ -141,7 +141,7 @@ int main()
         auto v_d = sqrt(states_d[i][15] * states_d[i][15] + states_d[i][16] * states_d[i][16]
                         + states_d[i][17] * states_d[i][17]);
         // Uncomment these lines to print to screen the error on the radius and velocity magnitude
-        std::cout << times_d[i] << ", " << abs(r_d - r_q) << ", " << abs(v_q - v_d) << "," << std::endl;
+        // std::cout << "[" << times_d[i] << ", " << abs(r_d - r_q) << ", " << abs(v_q - v_d) << "]," << std::endl;
     }
     return 0;
 #else

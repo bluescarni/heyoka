@@ -19,7 +19,7 @@ find_package(xtensor-blas REQUIRED)
 
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka Boost::program_options xtensor xtensor-blas)
+  target_link_libraries(${arg1} PRIVATE heyoka Boost::boost Boost::program_options xtensor xtensor-blas)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -45,7 +45,7 @@ ADD_HEYOKA_BENCHMARK(two_body_step_batch)
 ADD_HEYOKA_BENCHMARK(taylor_ANN)
 ADD_HEYOKA_BENCHMARK(apophis)
 ADD_HEYOKA_BENCHMARK(stiff_equation)
-ADD_HEYOKA_BENCHMARK(mascon_model)
+ADD_HEYOKA_BENCHMARK(mascon_models)
 ADD_HEYOKA_BENCHMARK(outer_ss_jet_benchmark)
 ADD_HEYOKA_BENCHMARK(outer_ss_long_term)
 ADD_HEYOKA_BENCHMARK(outer_ss_long_term_batch)
