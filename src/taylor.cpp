@@ -1787,6 +1787,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
                 // the same type.
                 // NOTE: ncalls is guaranteed to be 1 at least, thus
                 // tmp_c_vec cannot be empty.
+                assert(!tmp_c_vec.empty());
                 if (!std::all_of(tmp_c_vec.begin() + 1, tmp_c_vec.end(),
                                  [tp = tmp_c_vec[0]->getType()](auto *val) { return val->getType() == tp; })) {
                     throw std::invalid_argument("Inconsistent types detected while building the transposed sets of "
