@@ -1847,9 +1847,23 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // make_vector_type() below.
     auto fp_type = llvm::cast<llvm::PointerType>(order0->getType())->getElementType();
     auto array_type = llvm::ArrayType::get(make_vector_type(fp_type, batch_size), n_uvars * order + n_eq);
-    // NOTE: fetch a pointer to the first element of the array.
-    auto diff_arr = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type, 0, "diff_arr"),
-                                              {builder.getInt32(0), builder.getInt32(0)});
+
+    // Prepare the vector of initializers for the global array.
+    std::vector<llvm::Constant *> v_zero_init;
+    for (std::uint32_t i = 0; i < n_uvars * order + n_eq; ++i) {
+        v_zero_init.emplace_back(
+            llvm::cast<llvm::Constant>(vector_splat(builder, codegen<T>(s, number{0.}), batch_size)));
+    }
+
+    // Create the initializer.
+    auto v_init = llvm::ConstantArray::get(array_type, v_zero_init);
+
+    // Make the global array.
+    auto gl_diff_arr
+        = new llvm::GlobalVariable(s.module(), v_init->getType(), false, llvm::GlobalVariable::InternalLinkage, v_init);
+
+    // Fetch a pointer to the first element of the array.
+    auto diff_arr = builder.CreateInBoundsGEP(gl_diff_arr, {builder.getInt32(0), builder.getInt32(0)});
 
     // Copy over the order-0 derivatives of the state variables.
     // NOTE: overflow checking is already done in the parent function.
