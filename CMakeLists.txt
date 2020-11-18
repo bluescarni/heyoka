@@ -212,7 +212,6 @@ target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
 find_package(fmt REQUIRED)
 target_link_libraries(heyoka PUBLIC fmt::fmt)
 
-
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
 
