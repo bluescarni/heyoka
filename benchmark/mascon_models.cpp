@@ -20,6 +20,7 @@
 #include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "data/mascon_67p.hpp"
 #include "data/mascon_bennu.hpp"
 #include "data/mascon_itokawa.hpp"
 
@@ -154,7 +155,7 @@ double compute_energy(const std::vector<double> x, const P &mascon_points, const
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename P, typename M, typename... KwArgs>
 std::vector<std::pair<expression, expression>> make_mascon_system(const P &mascon_points, const M &mascon_masses,
-                                                                  double pd, double qd, double rd, KwArgs &&...kw_args)
+                                                                  double pd, double qd, double rd, KwArgs &&... kw_args)
 {
     // 1 - Check input consistency (TODO)
     // 2 - We parse the unnamed arguments
@@ -300,7 +301,19 @@ int main(int argc, char *argv[])
     auto inclination = 45.;         // degrees
     auto distance = 2.;             // non dimensional units
     auto integration_time = 86400.; // seconds (1day of operations)
+
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
+    // 67P
+    // L = 2380.7169179463426m (computed from the mascon model and since 67P is 3909.769775390625m long from the ESA
+    // 3D model) M = (9.982E12 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
+    // sqrt(L^3/G/M) = 4500.388359040116s The asteroid angular velocity in our units is thus Wz = 2pi / (12.4 * 60 * 60
+    // / T) = 0.633440278094151
+    auto T_67p = 4500.388359040116;
+    auto wz_67p = 0.633440278094151;
+    fmt::print("67P, {} mascons:\n", std::size(mascon_masses_67p));
+    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
+    // plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_bennu, integration_time / T_67p * 7, 1000u);
 
     // Bennu
     // L = 416.45655931190163m (computed from the mascon model and since Bennu  is 562.8699958324432m long from the NASA
@@ -309,7 +322,7 @@ int main(int argc, char *argv[])
     // / T) = 1.5633255034258877
     auto T_bennu = 3842.6367987779804;
     auto wz_bennu = 1.5633255034258877;
-    fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
+    fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
     auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
     compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
     // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
