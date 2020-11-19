@@ -299,7 +299,7 @@ void plot_data(const P &mascon_points, const M &mascon_masses, taylor_adaptive<d
 int main(int argc, char *argv[])
 {
     auto inclination = 45.;         // degrees
-    auto distance = 2.;             // non dimensional units
+    auto distance = 3.;             // non dimensional units
     auto integration_time = 86400.; // seconds (1day of operations)
 
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
@@ -311,36 +311,37 @@ int main(int argc, char *argv[])
     auto T_67p = 4500.388359040116;
     auto wz_67p = 0.633440278094151;
     fmt::print("67P, {} mascons:\n", std::size(mascon_masses_67p));
-    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, 3., inclination, 1.);
-    //compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
-    plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p * 365.25, 5000u);
+    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
+    // plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p * 365.25, 5000u);
 
- //      // Bennu
- //      // L = 416.45655931190163m (computed from the mascon model and since Bennu  is 562.8699958324432m long from the NASA
- //      // 3D model) M = 7.329E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
- //      // sqrt(L^3/G/M) = 3842.6367987779804s The asteroid angular velocity in our units is thus Wz = 2pi / (4.29 * 60 * 60
- //      // / T) = 1.5633255034258877
- //      auto T_bennu = 3842.6367987779804;
- //      auto wz_bennu = 1.5633255034258877;
- //      fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
- //      auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
- //      compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
- //      // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
- //      // 1000u);
-//   
- //      // Itokawa
- //      // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
- //      // 3D model) M = 3.51E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T = sqrt(L^3/G/M)
- //      // = 6833.636194780773s The asteroid angular velocity in our units is thus Wz = 2pi / (12.132 * 60 * 60 / T)
- //      // = 0.9830980174940738
- //      auto T_itokawa = 6833.636194780773;
- //      auto wz_itokawa = 0.9830980174940738;
- //      fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
- //      auto taylor_itokawa = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, 3., inclination, 1.);
- //      compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
- //                            integration_time / T_itokawa);
- //      // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
- //      //         integration_time / T_itokawa * 7, 1000u);
+    // Bennu
+    // L = 416.45655931190163m (computed from the mascon model and since Bennu  is 562.8699958324432m long from the NASA
+    // 3D model) M = 7.329E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
+    // sqrt(L^3/G/M) = 3842.6367987779804s The asteroid angular velocity in our units is thus Wz = 2pi / (4.29 * 60 * 60
+    // / T) = 1.5633255034258877
+    auto T_bennu = 3842.6367987779804;
+    auto wz_bennu = 1.5633255034258877;
+    fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
+    auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
+    // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
+    // 1000u);
+
+    // Itokawa
+    // L = 478.2689458860669m (computed from the mascon model and since Itokawa is 535.3104705810547m long from the NASA
+    // 3D model) M = 3.51E10 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T = sqrt(L^3/G/M)
+    // = 6833.636194780773s The asteroid angular velocity in our units is thus Wz = 2pi / (12.132 * 60 * 60 / T)
+    // = 0.9830980174940738
+    auto T_itokawa = 6833.636194780773;
+    auto wz_itokawa = 0.9830980174940738;
+    fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
+    auto taylor_itokawa
+        = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+                          integration_time / T_itokawa);
+    // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+    //         integration_time / T_itokawa * 7, 1000u);
 
     return 0;
 }
