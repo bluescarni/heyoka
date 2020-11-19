@@ -1759,6 +1759,26 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
     assert(!ind.empty());
 
     auto &builder = s.builder();
+
+    // Check if ind consists of consecutive indices.
+    bool are_consecutive = true;
+    auto prev_ind = ind[0];
+    for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
+        if (ind[i] != prev_ind + 1u) {
+            are_consecutive = false;
+            break;
+        }
+        prev_ind = ind[i];
+    }
+
+    if (are_consecutive) {
+        // If ind consists of consecutive indices, we can replace
+        // the index array with a simple offset computation.
+        return [&s, start_idx = builder.getInt32(ind[0])](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return s.builder().CreateAdd(start_idx, cur_call_idx);
+        };
+    }
+
     auto &module = s.module();
 
     // Generate the array of indices as llvm constants.
