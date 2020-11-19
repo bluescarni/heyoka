@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
 {
     auto inclination = 45.;         // degrees
     auto distance = 3.;             // non dimensional units
-    auto integration_time = 86400.; // seconds (1day of operations)
+    auto integration_time = 86400.*30; // seconds (1day of operations)
 
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
     // 67P
