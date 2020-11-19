@@ -1671,10 +1671,10 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
 // Helper to convert the arguments of the definition of a u variable
 // into a vector of variants. u variables will be converted to their indices,
 // numbers will be unchanged.
-auto taylor_udef_to_variants(llvm_state &s, const expression &ex)
+auto taylor_udef_to_variants(const expression &ex)
 {
     return std::visit(
-        [&s](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
+        [](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
@@ -1750,6 +1750,76 @@ auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
     return retval;
 }
 
+// Functions the create the arguments generators for the functions that compute
+// the Taylor derivatives in compact mode. The generators are created from vectors
+// of either u var indices or floating-point constants.
+std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_state &s,
+                                                                       const std::vector<std::uint32_t> &ind)
+{
+    assert(!ind.empty());
+
+    auto &builder = s.builder();
+    auto &module = s.module();
+
+    // Generate the array of indices as llvm constants.
+    std::vector<llvm::Constant *> tmp_c_vec;
+    for (const auto &val : ind) {
+        tmp_c_vec.push_back(builder.getInt32(val));
+    }
+
+    // Create the array type.
+    auto arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(ind.size()));
+    assert(arr_type != nullptr);
+
+    // Create the constant array as a global read-only variable.
+    auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
+    assert(const_arr != nullptr);
+    // NOTE: naked new here is fine, gvar will be registered in the module
+    // object and cleaned up when the module is destroyed.
+    auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
+                                         const_arr);
+
+    // Return the generator.
+    return [gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
+        auto &builder = s.builder();
+
+        return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
+    };
+}
+
+template <typename T>
+std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state &s, const std::vector<number> &vc)
+{
+    assert(!vc.empty());
+
+    auto &module = s.module();
+
+    // Generate the array of constants as llvm constants.
+    std::vector<llvm::Constant *> tmp_c_vec;
+    for (const auto &val : vc) {
+        tmp_c_vec.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, val)));
+    }
+
+    // Create the array type.
+    auto arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(vc.size()));
+    assert(arr_type != nullptr);
+
+    // Create the constant array as a global read-only variable.
+    auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
+    assert(const_arr != nullptr);
+    // NOTE: naked new here is fine, gvar will be registered in the module
+    // object and cleaned up when the module is destroyed.
+    auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
+                                         const_arr);
+
+    // Return the generator.
+    return [gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
+        auto &builder = s.builder();
+
+        return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
+    };
+}
+
 // For each segment in s_dc, this function will return a vector containing a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
@@ -1761,9 +1831,6 @@ template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-    auto &module = s.module();
-
     // Init the return value.
     std::vector<std::unordered_map<llvm::Function *,
                                    std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>>>
@@ -1792,7 +1859,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = taylor_udef_to_variants(s, ex);
+            const auto cdiff_args = taylor_udef_to_variants(ex);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
@@ -1854,58 +1921,24 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
             const auto [it, ins_status] = a_map.try_emplace(func);
             assert(ins_status);
 
-            const auto n_args = vv.size();
-            const auto n_calls
-                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(n_calls > 0u);
-
             // Set the number of calls for this function.
-            it->second.first = n_calls;
+            it->second.first
+                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
+            assert(it->second.first > 0u);
 
-            // Generate the g functions for each argument.
-            for (decltype(vv.size()) i = 0; i < n_args; ++i) {
-                // For the current argument, generate the array
-                // of corresponding indices/constants as llvm values.
-                auto tmp_c_vec = std::visit(
-                    [&builder, &s](const auto &x) {
+            // Create the g functions for each argument.
+            for (const auto &v : vv) {
+                it->second.second.push_back(std::visit(
+                    [&s](const auto &x) {
                         using type = detail::uncvref_t<decltype(x)>;
 
-                        std::vector<llvm::Constant *> tmp_c_vec;
-
                         if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            for (const auto &val : x) {
-                                tmp_c_vec.push_back(builder.getInt32(val));
-                            }
+                            return taylor_c_make_arg_gen_vidx(s, x);
                         } else {
-                            for (const auto &val : x) {
-                                tmp_c_vec.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, val)));
-                            }
+                            return taylor_c_make_arg_gen_vc<T>(s, x);
                         }
-
-                        return tmp_c_vec;
                     },
-                    vv[i]);
-
-                // Determine the array type from the type of
-                // the first value.
-                assert(!tmp_c_vec.empty());
-                auto arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), n_calls);
-                assert(arr_type != nullptr);
-
-                // Create the constant array as a global read-only variable.
-                auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-                assert(const_arr != nullptr);
-                // NOTE: naked new here is fine, gvar will be registered in the module
-                // object and cleaned up when the module is destroyed.
-                auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true,
-                                                     llvm::GlobalVariable::InternalLinkage, const_arr);
-
-                // Add the function.
-                it->second.second.emplace_back([gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
-                    auto &builder = s.builder();
-
-                    return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
-                });
+                    v));
             }
         }
     }
