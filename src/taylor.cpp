@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -1668,23 +1669,22 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
 }
 
 // Helper to convert the arguments of the definition of a u variable
-// into a vector of LLVM values. u variables will be converted to their indices,
-// numbers will be subject to codegen.
-template <typename T>
-auto taylor_udef_to_vals(llvm_state &s, const expression &ex)
+// into a vector of variants. u variables will be converted to their indices,
+// numbers will be unchanged.
+auto taylor_udef_to_variants(const expression &ex)
 {
     return std::visit(
-        [&s](const auto &v) -> std::vector<llvm::Value *> {
+        [](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
-                std::vector<llvm::Value *> retval;
+                std::vector<std::variant<std::uint32_t, number>> retval;
 
                 for (const auto &arg : v.args()) {
                     if (auto p_var = std::get_if<variable>(&arg.value())) {
-                        retval.push_back(s.builder().getInt32(uname_to_index(p_var->name())));
+                        retval.emplace_back(uname_to_index(p_var->name()));
                     } else if (auto p_num = std::get_if<number>(&arg.value())) {
-                        retval.push_back(codegen<T>(s, *p_num));
+                        retval.emplace_back(*p_num);
                     } else {
                         throw std::invalid_argument(
                             "Invalid argument encountered in an element of a Taylor decomposition: the "
@@ -1701,18 +1701,172 @@ auto taylor_udef_to_vals(llvm_state &s, const expression &ex)
         ex.value());
 }
 
-// For each segment in s_dc, this function will return a vector containing a dict mapping a function
-// for the computation of a Taylor derivative with arrays of arguments with
-// which the function must be called.
+// Helper to convert a vector of variants into a variant of vectors.
+// All elements of v must be of the same type, and v cannot be empty.
+template <typename... T>
+auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
+{
+    assert(!v.empty());
+
+    // Init the return value based on the type
+    // of the first element of v.
+    auto retval = std::visit(
+        [size = v.size()](const auto &x) {
+            using type = detail::uncvref_t<decltype(x)>;
+
+            std::vector<type> tmp;
+            tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(size));
+            tmp.push_back(x);
+
+            return std::variant<std::vector<T>...>(std::move(tmp));
+        },
+        v[0]);
+
+    // Append the other values from v.
+    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
+        std::visit(
+            [&retval](const auto &x) {
+                std::visit(
+                    [&x](auto &vv) {
+                        // The value type of retval.
+                        using scal_t = typename detail::uncvref_t<decltype(vv)>::value_type;
+
+                        // The type of the current element of v.
+                        using x_t = detail::uncvref_t<decltype(x)>;
+
+                        if constexpr (std::is_same_v<scal_t, x_t>) {
+                            vv.push_back(x);
+                        } else {
+                            throw std::invalid_argument(
+                                "Inconsistent types detected while building the transposed sets of "
+                                "arguments for the Taylor derivative functions in compact mode");
+                        }
+                    },
+                    retval);
+            },
+            v[i]);
+    }
+
+    return retval;
+}
+
+// Functions the create the arguments generators for the functions that compute
+// the Taylor derivatives in compact mode. The generators are created from vectors
+// of either u var indices or floating-point constants.
+std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_state &s,
+                                                                       const std::vector<std::uint32_t> &ind)
+{
+    assert(!ind.empty());
+
+    auto &builder = s.builder();
+
+    // Check if ind consists of consecutive indices.
+    bool are_consecutive = true;
+    auto prev_ind = ind[0];
+    for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
+        if (ind[i] != prev_ind + 1u) {
+            are_consecutive = false;
+            break;
+        }
+        prev_ind = ind[i];
+    }
+
+    if (are_consecutive) {
+        // If ind consists of consecutive indices, we can replace
+        // the index array with a simple offset computation.
+        return [&s, start_idx = builder.getInt32(ind[0])](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return s.builder().CreateAdd(start_idx, cur_call_idx);
+        };
+    }
+
+    auto &module = s.module();
+
+    // Generate the array of indices as llvm constants.
+    std::vector<llvm::Constant *> tmp_c_vec;
+    for (const auto &val : ind) {
+        tmp_c_vec.push_back(builder.getInt32(val));
+    }
+
+    // Create the array type.
+    auto arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(ind.size()));
+    assert(arr_type != nullptr);
+
+    // Create the constant array as a global read-only variable.
+    auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
+    assert(const_arr != nullptr);
+    // NOTE: naked new here is fine, gvar will be registered in the module
+    // object and cleaned up when the module is destroyed.
+    auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
+                                         const_arr);
+
+    // Return the generator.
+    return [gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
+        auto &builder = s.builder();
+
+        return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
+    };
+}
+
+template <typename T>
+std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state &s, const std::vector<number> &vc)
+{
+    assert(!vc.empty());
+
+    // Check if all the numbers are the same.
+    // NOTE: the current implementation of operator== for number will return false
+    // if the internal number types differ, even if their values are equal. Thus this
+    // simplification will not trigger if the ODE expressions contain different
+    // number types. Perhaps in the future we can change the operator== implementation
+    // to take into account the values only, but then we need to adapt the hasher as well.
+    if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
+        // If all constants are the same, don't construct an array, just always return
+        // the same value.
+        return [num = codegen<T>(s, vc[0])](llvm::Value *) -> llvm::Value * { return num; };
+    }
+
+    auto &module = s.module();
+
+    // Generate the array of constants as llvm constants.
+    std::vector<llvm::Constant *> tmp_c_vec;
+    for (const auto &val : vc) {
+        tmp_c_vec.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, val)));
+    }
+
+    // Create the array type.
+    auto arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(vc.size()));
+    assert(arr_type != nullptr);
+
+    // Create the constant array as a global read-only variable.
+    auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
+    assert(const_arr != nullptr);
+    // NOTE: naked new here is fine, gvar will be registered in the module
+    // object and cleaned up when the module is destroyed.
+    auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
+                                         const_arr);
+
+    // Return the generator.
+    return [gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
+        auto &builder = s.builder();
+
+        return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
+    };
+}
+
+// For each segment in s_dc, this function will return a vector containing a dict mapping an LLVM function
+// f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
+// in the return value will read something like:
+// {f : (2, [g_0, g_1, g_2])}
+// The meaning in this example is that the arity of f is 3 and it will be called with 2 different
+// sets of arguments. The g_i functions are expected to be called with input argument j in [0, 1]
+// to yield the value of the i-th function argument for f at the j-th invocation.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-    auto &module = s.module();
-
     // Init the return value.
-    std::vector<std::unordered_map<llvm::Function *, std::vector<llvm::Value *>>> s_maps_arrays;
+    std::vector<std::unordered_map<llvm::Function *,
+                                   std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>>>
+        retval;
 
     // Variable to keep track of the u variable
     // on whose definition we are operating.
@@ -1722,7 +1876,9 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
         // with which the function is to be called. For instance, if function
         // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
         // will contain {f : [[a, b, c], [d, e, f]]}.
-        std::unordered_map<llvm::Function *, std::vector<std::vector<llvm::Value *>>> tmp_map;
+        // After construction, we have verified that for each function
+        // in the map the sets of arguments have all the same size.
+        std::unordered_map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
@@ -1734,8 +1890,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
             assert(is_new_func || !it->second.empty());
 
             // Convert the variables/constants in the current dc
-            // element into a set of LLVM values.
-            const auto cdiff_args = taylor_udef_to_vals<T>(s, ex);
+            // element into a set of indices/constants.
+            const auto cdiff_args = taylor_udef_to_variants(ex);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
@@ -1747,25 +1903,22 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
             // Add the new set of arguments.
             it->second.emplace_back();
             // Add the idx of the u variable.
-            it->second.back().push_back(builder.getInt32(cur_u_idx));
+            it->second.back().emplace_back(cur_u_idx);
             // Add the actual function arguments.
             it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
 
             ++cur_u_idx;
         }
 
-        // Add a new entry in s_maps_array for the current segment.
-        s_maps_arrays.emplace_back();
-        auto &a_map = s_maps_arrays.back();
-
-        // For each function f in tmp_map, build transposed arrays of the sets of arguments
-        // the function must be called with. E.g., {f : [[a, b, c], [d, e, f]]}
-        // will become {f : [[a, d], [b, e], [c, f]]}.
+        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
+        // to {f : [[a, d], [b, e], [c, f]]}.
+        std::unordered_map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
+            tmp_map_transpose;
         for (const auto &[func, vv] : tmp_map) {
             assert(!vv.empty());
 
             // Add the function.
-            const auto [it, ins_status] = a_map.try_emplace(func);
+            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
             assert(ins_status);
 
             const auto n_calls = vv.size();
@@ -1778,43 +1931,51 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
             for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
                 // Build the vector of values corresponding
                 // to the current argument index.
-                std::vector<llvm::Constant *> tmp_c_vec;
+                std::vector<std::variant<std::uint32_t, number>> tmp_c_vec;
                 for (decltype(vv.size()) j = 0; j < n_calls; ++j) {
-                    tmp_c_vec.push_back(llvm::cast<llvm::Constant>(vv[j][i]));
+                    tmp_c_vec.push_back(vv[j][i]);
                 }
 
-                // Check that all the elements of tmp_c_vec have
-                // the same type.
-                // NOTE: ncalls is guaranteed to be 1 at least, thus
-                // tmp_c_vec cannot be empty.
-                if (!std::all_of(tmp_c_vec.begin() + 1, tmp_c_vec.end(),
-                                 [tp = tmp_c_vec[0]->getType()](auto *val) { return val->getType() == tp; })) {
-                    throw std::invalid_argument("Inconsistent types detected while building the transposed sets of "
-                                                "arguments for the Taylor derivative functions in compact mode");
-                }
+                // Turn tmp_c_vec (a vector of variants) into a variant
+                // of vectors, and insert the result.
+                it->second.push_back(taylor_c_vv_transpose(tmp_c_vec));
+            }
+        }
 
-                // Determine the array type from the type of
-                // the first value.
-                auto arr_type
-                    = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(n_calls));
-                assert(arr_type != nullptr);
+        // Add a new entry in retval for the current segment.
+        retval.emplace_back();
+        auto &a_map = retval.back();
 
-                // Create the constant array as a global read-only variable.
-                auto const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-                assert(const_arr != nullptr);
-                // NOTE: naked new here is fine, gvar will be registered in the module
-                // object and cleaned up when the module is destroyed.
-                auto gvar = new llvm::GlobalVariable(module, const_arr->getType(), true,
-                                                     llvm::GlobalVariable::InternalLinkage, const_arr);
+        for (const auto &[func, vv] : tmp_map_transpose) {
+            assert(!vv.empty());
 
-                // Add the LLVM array to the transposed list of arguments
-                // for the current function.
-                it->second.push_back(gvar);
+            // Add the function.
+            const auto [it, ins_status] = a_map.try_emplace(func);
+            assert(ins_status);
+
+            // Set the number of calls for this function.
+            it->second.first
+                = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
+            assert(it->second.first > 0u);
+
+            // Create the g functions for each argument.
+            for (const auto &v : vv) {
+                it->second.second.push_back(std::visit(
+                    [&s](const auto &x) {
+                        using type = detail::uncvref_t<decltype(x)>;
+
+                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
+                            return taylor_c_make_arg_gen_vidx(s, x);
+                        } else {
+                            return taylor_c_make_arg_gen_vc<T>(s, x);
+                        }
+                    },
+                    v));
             }
         }
     }
 
-    return s_maps_arrays;
+    return retval;
 }
 
 // Helper for the computation of a jet of derivatives in compact mode,
@@ -1874,19 +2035,24 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     auto compute_u_diffs = [&](llvm::Value *cur_order) {
         for (const auto &map : f_maps) {
             for (const auto &p : map) {
+                // The LLVM function for the computation of the
+                // derivative in compact mpde.
                 const auto &func = p.first;
-                const auto &arrs = p.second;
 
-                assert(!arrs.empty());
+                // The number of func calss.
+                const auto ncalls = p.second.first;
 
-                // Recover the number of calls from the size of the LLVM array.
-                const auto ncalls = taylor_c_gl_arr_size(arrs[0]);
+                // The generators for the arguments of func.
+                const auto &gens = p.second.second;
+
+                assert(ncalls > 0u);
+                assert(!gens.empty());
+                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
 
                 // Loop over the number of calls.
                 llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                    // Recover the u variable index from the first array.
-                    auto u_idx
-                        = builder.CreateLoad(builder.CreateInBoundsGEP(arrs[0], {builder.getInt32(0), cur_call_idx}));
+                    // Create the u variable index from the first generator.
+                    auto u_idx = gens[0](cur_call_idx);
 
                     // Initialise the vector of arguments with which func must be called:
                     // - current Taylor order,
@@ -1894,10 +2060,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // - array of derivatives.
                     std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr};
 
-                    // Add the arguments stored in the arrays.
-                    for (decltype(arrs.size()) i = 1; i < arrs.size(); ++i) {
-                        args.push_back(builder.CreateLoad(
-                            builder.CreateInBoundsGEP(arrs[i], {builder.getInt32(0), cur_call_idx})));
+                    // Create the other arguments via the generators.
+                    for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                        args.push_back(gens[i](cur_call_idx));
                     }
 
                     // Calculate the derivative and store the result.
