@@ -1792,6 +1792,18 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
 {
     assert(!vc.empty());
 
+    // Check if all the numbers are the same.
+    // NOTE: the current implementation of operator== for number will return false
+    // if the internal number types differ, even if their values are equal. Thus this
+    // simplification will not trigger if the ODE expressions contain different
+    // number types. Perhaps in the future we can change the operator== implementation
+    // to take into account the values only, but then we need to adapt the hasher as well.
+    if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
+        // If all constants are the same, don't construct an array, just always return
+        // the same value.
+        return [num = codegen<T>(s, vc[0])](llvm::Value *) -> llvm::Value * { return num; };
+    }
+
     auto &module = s.module();
 
     // Generate the array of constants as llvm constants.
