@@ -38,9 +38,9 @@ namespace benchmark::kw
 IGOR_MAKE_NAMED_ARGUMENT(G);
 } // namespace benchmark::kw
 
-// Pairwise summation of a vector of doubles. TODO make the other one templated?
+// Pairwise summation of a vector of doubles. Avoiding copies
 // https://en.wikipedia.org/wiki/Pairwise_summation
-double pairwise_sum(std::vector<double> sum)
+double pairwise_sum(std::vector<double> &sum)
 {
     if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
         throw std::overflow_error("Overflow detected in pairwise_sum()");
@@ -49,22 +49,22 @@ double pairwise_sum(std::vector<double> sum)
     if (sum.empty()) {
         return 0.;
     }
-
     while (sum.size() != 1u) {
-        std::vector<double> new_sum;
-
         for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
             if (i + 1u == sum.size()) {
                 // We are at the last element of the vector
                 // and the size of the vector is odd. Just append
                 // the existing value.
-                new_sum.push_back(std::move(sum[i]));
+                sum[i / 2u] = sum[i];
             } else {
-                new_sum.push_back(std::move(sum[i]) + std::move(sum[i + 1u]));
+                sum[i / 2u] = sum[i] + sum[i + 1u];
             }
         }
-
-        new_sum.swap(sum);
+        if (sum.size() % 2) {
+            sum.resize(sum.size() / 2 + 1);
+        } else {
+            sum.resize(sum.size() / 2);
+        }
     }
     return sum[0];
 }
@@ -86,16 +86,14 @@ struct mascon_dynamics {
             m_mascon_points.push_back(
                 std::vector<double>{mascon_points[i][0], mascon_points[i][1], mascon_points[i][2]});
         }
-
-        x_acc.resize(std::size(m_mascon_masses));
-        y_acc.resize(std::size(m_mascon_masses));
-        z_acc.resize(std::size(m_mascon_masses));
     }
     // call operator
     void operator()(const std::vector<double> &x, std::vector<double> &dxdt, const double /* t */)
     {
         auto dim = std::size(m_mascon_masses);
-
+        x_acc.resize(std::size(m_mascon_masses));
+        y_acc.resize(std::size(m_mascon_masses));
+        z_acc.resize(std::size(m_mascon_masses));
         // FIRST: Assemble the acceleration due to mascons
         // TODO: switch to pairwise/compensated summation here?
         double x_a = 0, y_a = 0, z_a = 0;
@@ -106,10 +104,15 @@ struct mascon_dynamics {
             // auto mGpow = m_G * std::pow(r2, -3. / 2.) * m_mascon_masses[i];
             auto r = std::sqrt(r2);
             auto mGpow = m_G * m_mascon_masses[i] / (r * r * r);
-            x_a += (m_mascon_points[i][0] - x[0]) * mGpow;
-            y_a += (m_mascon_points[i][1] - x[1]) * mGpow;
-            z_a += (m_mascon_points[i][2] - x[2]) * mGpow;
+            x_acc[i] = (m_mascon_points[i][0] - x[0]) * mGpow;
+            y_acc[i] = (m_mascon_points[i][1] - x[1]) * mGpow;
+            z_acc[i] = (m_mascon_points[i][2] - x[2]) * mGpow;
+
         }
+        x_a = pairwise_sum(x_acc);
+        y_a = pairwise_sum(y_acc);
+        z_a = pairwise_sum(z_acc);
+
         // SECOND: centripetal and Coriolis
         // w x w x r
         auto centripetal_x = -m_q * m_q * x[0] - m_r * m_r * x[0] + m_q * x[1] * m_p + m_r * x[2] * m_p;
@@ -300,7 +303,7 @@ int main(int argc, char *argv[])
 {
     auto inclination = 45.;         // degrees
     auto distance = 3.;             // non dimensional units
-    auto integration_time = 86400.*30; // seconds (1day of operations)
+    auto integration_time = 86400.; // seconds (1day of operations)
 
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
     // 67P
