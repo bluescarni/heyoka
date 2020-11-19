@@ -1858,7 +1858,7 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
 // {f : (2, [g_0, g_1, g_2])}
 // The meaning in this example is that the arity of f is 3 and it will be called with 2 different
 // sets of arguments. The g_i functions are expected to be called with input argument j in [0, 1]
-// to yield the value of the i-th function arguments for f at the j-th invocation.
+// to yield the value of the i-th function argument for f at the j-th invocation.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<expression>> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
@@ -2047,10 +2047,11 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
                 assert(ncalls > 0u);
                 assert(!gens.empty());
+                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
 
                 // Loop over the number of calls.
                 llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                    // Recover the u variable index from the first generator.
+                    // Create the u variable index from the first generator.
                     auto u_idx = gens[0](cur_call_idx);
 
                     // Initialise the vector of arguments with which func must be called:
