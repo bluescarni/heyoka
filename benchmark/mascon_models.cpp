@@ -107,7 +107,6 @@ struct mascon_dynamics {
             x_acc[i] = (m_mascon_points[i][0] - x[0]) * mGpow;
             y_acc[i] = (m_mascon_points[i][1] - x[1]) * mGpow;
             z_acc[i] = (m_mascon_points[i][2] - x[2]) * mGpow;
-
         }
         x_a = pairwise_sum(x_acc);
         y_a = pairwise_sum(y_acc);
@@ -158,7 +157,7 @@ double compute_energy(const std::vector<double> x, const P &mascon_points, const
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename P, typename M, typename... KwArgs>
 std::vector<std::pair<expression, expression>> make_mascon_system(const P &mascon_points, const M &mascon_masses,
-                                                                  double pd, double qd, double rd, KwArgs &&... kw_args)
+                                                                  double pd, double qd, double rd, KwArgs &&...kw_args)
 {
     // 1 - Check input consistency (TODO)
     // 2 - We parse the unnamed arguments
@@ -301,9 +300,9 @@ void plot_data(const P &mascon_points, const M &mascon_masses, taylor_adaptive<d
 
 int main(int argc, char *argv[])
 {
-    auto inclination = 45.;         // degrees
-    auto distance = 3.;             // non dimensional units
-    auto integration_time = 86400.; // seconds (1day of operations)
+    auto inclination = 45.;              // degrees
+    auto distance = 3.;                  // non dimensional units
+    auto integration_time = 86400. * 30; // seconds (1day of operations)
 
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
     // 67P
