@@ -39,6 +39,26 @@ void to_screen(const taylor_adaptive<Fp_type> &taylor)
     std::cout << "v_a = [" << st[15] << ", " << st[16] << ", " << st[17] << "]" << std::endl;
 }
 
+double energy(const std::vector<double> &st, const std::vector<double> &masses, double G)
+{
+    // Kinetic
+    auto kin = (st[3] * st[3] + st[4] * st[4] + st[5] * st[5])*masses[0];
+    kin += (st[9] * st[9] + st[10] * st[10] + st[11] * st[11])*masses[1];
+    kin += (st[15] * st[15] + st[16] * st[16] + st[17] * st[17])*masses[2];
+    kin *= 0.5;
+    // Potential
+    auto rSE
+        = (st[0] - st[6]) * (st[0] - st[6]) + (st[1] - st[7]) * (st[1] - st[7]) + (st[2] - st[8]) * (st[2] - st[8]);
+    auto rSA = (st[0] - st[12]) * (st[0] - st[12]) + (st[1] - st[13]) * (st[1] - st[13])
+               + (st[2] - st[14]) * (st[2] - st[14]);
+    auto rAE = (st[6] - st[12]) * (st[6] - st[12]) + (st[7] - st[13]) * (st[7] - st[13])
+               + (st[8] - st[14]) * (st[8] - st[14]);
+    rSE = sqrt(rSE);
+    rSA = sqrt(rSA);
+    rAE = sqrt(rAE);
+    return kin - G * masses[0] * masses[1] / rSE - G * masses[0] * masses[2] / rSA - G * masses[2] * masses[1] / rAE;
+}
+
 // In this benchmark we integrate the simplified dynamics of the asteroid Apophis over 100 years, including
 // its 2029 Earth close encounter. The dynamics is that of a full three body problem in cartesian coordinates (Cowell's
 // method) the initial position of the planets are derived by starting at the Apophis-Earth close encounter conditions
@@ -53,6 +73,7 @@ int main()
 {
 #if defined(HEYOKA_HAVE_REAL128)
     using namespace mppp::literals;
+    using std::abs;
 
     // Bodies are Sun, Earth and Apophis.
     const auto masses = std::vector{1.989e30, 5.9722e24, 6.1e10};
@@ -111,6 +132,8 @@ int main()
     std::vector<double> ic_d(18);
     std::transform(ic_d.begin(), ic_d.end(), baseline_s[0].begin(), ic_d.begin(),
                    [](double d, mppp::real128 q) { return static_cast<double>(q); });
+    auto J0 = energy(ic_d, masses, G);
+
     start = high_resolution_clock::now();
     taylor_adaptive<double> taylor_d{sys, ic_d, kw::time = -50. * 365.25 * 24. * 60. * 60., kw::high_accuracy = true};
     stop = high_resolution_clock::now();
@@ -122,6 +145,7 @@ int main()
     std::vector<double> times_d;               // baseline times
     std::cout << "Numerical integration forward 100 years (double) ... " << std::flush;
     start = high_resolution_clock::now();
+    std::cout.precision(16);
     for (const auto t : baseline_t) {
         taylor_d.propagate_until(static_cast<double>(t));
         states_d.push_back(taylor_d.get_state());
@@ -130,16 +154,32 @@ int main()
     stop = high_resolution_clock::now();
     duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() / 1e6 << "s" << std::endl;
+    auto last = times_d.size() - 1;
+    auto r_q = sqrt(baseline_s[last][12] * baseline_s[last][12] + baseline_s[last][13] * baseline_s[last][13]
+                    + baseline_s[last][14] * baseline_s[last][14]);
+    auto r_d = sqrt(states_d[last][12] * states_d[last][12] + states_d[last][13] * states_d[last][13]
+                    + states_d[last][14] * states_d[last][14]);
+    auto v_q = sqrt(baseline_s[last][15] * baseline_s[last][15] + baseline_s[last][16] * baseline_s[last][16]
+                    + baseline_s[last][17] * baseline_s[last][17]);
+    auto v_d = sqrt(states_d[last][15] * states_d[last][15] + states_d[last][16] * states_d[last][16]
+                    + states_d[last][17] * states_d[last][17]);
+
+    std::cout << "Position Error (absolute (m)): " << abs(r_d - r_q) << std::endl;
+    std::cout << "Position Error (relative): " << abs(r_d - r_q) / r_d << std::endl;
+    auto J = energy(taylor_d.get_state(), masses, G);
+    std::cout << "J0: " << J0 << std::endl;
+    std::cout << "J: " << J << std::endl;
+    std::cout << "Energy error (relative): " << abs(J0 - J) / J0 << std::endl;
 
     for (decltype(times_d.size()) i = 0u; i < times_d.size(); ++i) {
-        auto r_q = sqrt(baseline_s[i][12] * baseline_s[i][12] + baseline_s[i][13] * baseline_s[i][13]
-                        + baseline_s[i][14] * baseline_s[i][14]);
-        auto r_d = sqrt(states_d[i][12] * states_d[i][12] + states_d[i][13] * states_d[i][13]
-                        + states_d[i][14] * states_d[i][14]);
-        auto v_q = sqrt(baseline_s[i][15] * baseline_s[i][15] + baseline_s[i][16] * baseline_s[i][16]
-                        + baseline_s[i][17] * baseline_s[i][17]);
-        auto v_d = sqrt(states_d[i][15] * states_d[i][15] + states_d[i][16] * states_d[i][16]
-                        + states_d[i][17] * states_d[i][17]);
+        r_q = sqrt(baseline_s[i][12] * baseline_s[i][12] + baseline_s[i][13] * baseline_s[i][13]
+                   + baseline_s[i][14] * baseline_s[i][14]);
+        r_d = sqrt(states_d[i][12] * states_d[i][12] + states_d[i][13] * states_d[i][13]
+                   + states_d[i][14] * states_d[i][14]);
+        v_q = sqrt(baseline_s[i][15] * baseline_s[i][15] + baseline_s[i][16] * baseline_s[i][16]
+                   + baseline_s[i][17] * baseline_s[i][17]);
+        v_d = sqrt(states_d[i][15] * states_d[i][15] + states_d[i][16] * states_d[i][16]
+                   + states_d[i][17] * states_d[i][17]);
         // Uncomment these lines to print to screen the error on the radius and velocity magnitude
         // std::cout << "[" << times_d[i] << ", " << abs(r_d - r_q) << ", " << abs(v_q - v_d) << "]," << std::endl;
     }
