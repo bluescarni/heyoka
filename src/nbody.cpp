@@ -15,6 +15,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/format.h>
+
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math_functions.hpp>
@@ -103,9 +105,11 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     assert(n >= 2u);
 
     if (masses.size() != n) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
             "Inconsistent sizes detected while creating an N-body system: the vector of masses has a size of "
-            + std::to_string(masses.size()) + ", while the number of bodies is " + std::to_string(n));
+            "{}, while the number of bodies is {}"_format(masses.size(), n));
     }
 
     // Create the state variables.
@@ -165,8 +169,6 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             z_acc[i].push_back(diff_z * fac_j);
 
             // Acceleration exerted by i on j.
-            // NOTE: do the negation on the masses, which
-            // here are guaranteed to have numerical values.
             x_acc[j].push_back(diff_x * fac_j * c_ij);
             y_acc[j].push_back(diff_y * fac_j * c_ij);
             z_acc[j].push_back(diff_z * fac_j * c_ij);
