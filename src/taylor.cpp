@@ -1760,6 +1760,13 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
     auto &builder = s.builder();
 
+    // Check if all indices in ind are the same.
+    if (std::all_of(ind.begin() + 1, ind.end(), [&ind](const auto &n) { return n == ind[0]; })) {
+        // If all indices are the same, don't construct an array, just always return
+        // the same value.
+        return [num = builder.getInt32(ind[0])](llvm::Value *) -> llvm::Value * { return num; };
+    }
+
     // Check if ind consists of consecutive indices.
     bool are_consecutive = true;
     auto prev_ind = ind[0];
