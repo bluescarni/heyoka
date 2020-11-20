@@ -590,18 +590,18 @@ void llvm_state::optimise()
         }
 #endif
 
-        if (detail::get_target_features().avx512f) {
-            // NOTE: currently LLVM forces 256-bit vector
-            // width when AVX-512 is available, due to clock
-            // frequency scaling concerns. It seems like for
-            // our purposes 512-bit vectors work fine,
-            // thus we force their use via a specific
-            // function attribute to be set on all the
-            // functions in the module.
-            for (auto &f : *m_module) {
-                f.addFnAttr("prefer-vector-width", "512");
-            }
-        }
+        // NOTE: currently LLVM forces 256-bit vector
+        // width when AVX-512 is available, due to clock
+        // frequency scaling concerns. We used to have the following
+        // code here:
+        // for (auto &f : *m_module) {
+        //     f.addFnAttr("prefer-vector-width", "512");
+        // }
+        // in order to force 512-bit vector width, but it looks
+        // like this can hurt performance in scalar mode.
+        // Let's keep this in mind for the future, perhaps
+        // we could consider enabling 512-bit vector width
+        // only in batch mode?
 
         // Init the module pass manager.
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
