@@ -6,15 +6,22 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstdint>
 #include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/format.h>
 
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
@@ -33,11 +40,83 @@
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
 namespace heyoka::detail
 {
+
+namespace
+{
+
+// The global type map to associate a C++ type to an LLVM type.
+const auto type_map = []() {
+    std::unordered_map<std::type_index, llvm::Type *(*)(llvm::LLVMContext &)> retval;
+
+    // Try to associate C++ double to LLVM double.
+    if (std::numeric_limits<double>::is_iec559 && std::numeric_limits<double>::digits == 53) {
+        retval[typeid(double)] = [](llvm::LLVMContext &c) {
+            auto ret = llvm::Type::getDoubleTy(c);
+            assert(ret != nullptr);
+            return ret;
+        };
+    }
+
+    // Try to associate C++ long double to LLVM double or x86_fp80.
+    if (std::numeric_limits<long double>::is_iec559) {
+        if (std::numeric_limits<long double>::digits == 53) {
+            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+                // IEEE double-precision type (this is the case on MSVC for instance).
+                auto ret = llvm::Type::getDoubleTy(c);
+                assert(ret != nullptr);
+                return ret;
+            };
+        } else if (std::numeric_limits<long double>::digits == 64) {
+            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+                // x86 extended precision format.
+                auto ret = llvm::Type::getX86_FP80Ty(c);
+                assert(ret != nullptr);
+                return ret;
+            };
+        }
+    }
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    // Associate mppp::real128 to fp128.
+    retval[typeid(mppp::real128)] = [](llvm::LLVMContext &c) {
+        auto ret = llvm::Type::getFP128Ty(c);
+        assert(ret != nullptr);
+        return ret;
+    };
+
+#endif
+
+    return retval;
+}();
+
+} // namespace
+
+// Implementation of the function to associate a C++ type to
+// an LLVM type.
+llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
+{
+    const auto it = type_map.find(tp);
+
+    if (it == type_map.end()) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Unable to associate the C++ type '{}' to an LLVM type"_format(tp.name()));
+    } else {
+        return it->second(c);
+    }
+}
 
 // Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
 // 1, a scalar is loaded instead.
