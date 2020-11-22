@@ -212,22 +212,22 @@ endif()
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
+# In order to handle the dependency on LLVM,
+# we create a helper target heyoka::llvm.
 add_library(heyoka::llvm INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${LLVM_INCLUDE_DIRS})
 target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
-llvm_config(heyoka::llvm core)
+
+if(TARGET LLVM)
+    target_link_libraries(heyoka::llvm INTERFACE LLVM)
+else()
+    execute_process(COMMAND "llvm-config" "--libfiles" OUTPUT_VARIABLE _HEYOKA_LLVM_LIBFILES)
+    message(STATUS "LLVM libfiles: ${_HEYOKA_LLVM_LIBFILES}")
+    target_link_libraries(heyoka::llvm INTERFACE ${_HEYOKA_LLVM_LIBFILES})
+    # TODO unset?
+endif()
 
 target_link_libraries(heyoka PUBLIC heyoka::llvm)
-
-# if(TARGET LLVM)
-#     message(STATUS "LLVM target found, linking to it.")
-#     target_link_libraries(heyoka PUBLIC heyoka::llvm LLVM)
-# else()
-#     message(STATUS "LLVM target not found, trying random stuff.")
-#     llvm_config(heyoka all)
-#     message(STATUS "LLVM libs: ${llvm_libs}")
-#     target_link_libraries(heyoka PUBLIC heyoka::llvm ${llvm_libs})
-# endif()
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED)
