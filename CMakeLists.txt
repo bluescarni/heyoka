@@ -120,8 +120,8 @@ if(YACMA_COMPILER_IS_MSVC)
     unset(_HEYOKA_CLANG_CL_DISABLED_WARNINGS)
   else()
     # Same as above, disable some cl warnings.
-    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127")
-    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127")
+    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251")
+    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251")
   endif()
   # Enable strict conformance mode, if supported.
   set(CMAKE_REQUIRED_QUIET TRUE)
@@ -195,6 +195,11 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
         unset(_HEYOKA_IPO_RESULT)
         unset(_HEYOKA_IPO_OUTPUT)
     endif()
+endif()
+
+if(MSVC)
+    # On MSVC, silence std::iterator warnings coming from the LLVM headers.
+    target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
 # Mandatory dependency on LLVM.
