@@ -7,16 +7,20 @@ on:
     branches:
       - master
 jobs:
-  osx_build:
+  osx_latest:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - name: Build
         run: bash tools/gha_osx.sh
-  windows_build:
+  windows_2019:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v2
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.2
+        with:
+          vs-version: '[15.9,15.10)'
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
