@@ -183,10 +183,11 @@ public:
     // - if there is only 1 argument, it cannot be of type llvm_state
     //   (so that it does not interfere with copy/move ctors).
     template <typename... KwArgs,
-              std::enable_if_t<(sizeof...(KwArgs) > 0u)
-                                   && (sizeof...(KwArgs) > 1u
-                                       || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
-                               int> = 0>
+              std::enable_if_t<
+                  (sizeof...(KwArgs) > 0u)
+                      && (sizeof...(KwArgs) > 1u
+                          || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
+                  int> = 0>
     explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
