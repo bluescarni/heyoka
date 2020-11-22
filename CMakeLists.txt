@@ -225,12 +225,13 @@ else()
 
     set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
 
-    llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
-    llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
+    # llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
+    # llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
 
-    message(STATUS "llvm libs: ${llvm_libs}")
+    # message(STATUS "llvm libs: ${llvm_libs}")
 
-    target_link_libraries(heyoka::llvm INTERFACE ZLIB::ZLIB ${llvm_libs})
+    # target_link_libraries(heyoka::llvm INTERFACE ZLIB::ZLIB ${llvm_libs})
+    llvm_config(heyoka ${_HEYOKA_LLVM_COMPONENTS})
     # TODO unset?
 endif()
 
