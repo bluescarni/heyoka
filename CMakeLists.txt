@@ -221,6 +221,8 @@ target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
 if(TARGET LLVM)
     target_link_libraries(heyoka::llvm INTERFACE LLVM)
 else()
+    find_package(ZLIB REQUIRED)
+
     set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
 
     llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
@@ -228,7 +230,7 @@ else()
 
     message(STATUS "llvm libs: ${llvm_libs}")
 
-    target_link_libraries(heyoka::llvm INTERFACE ${llvm_libs})
+    target_link_libraries(heyoka::llvm INTERFACE ZLIB::ZLIB ${llvm_libs})
     # TODO unset?
 endif()
 
