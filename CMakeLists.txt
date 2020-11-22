@@ -218,12 +218,12 @@ target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
 
 if(TARGET LLVM)
     message(STATUS "LLVM target found, linking to it.")
-    target_link_libraries(heyoka PUBLIC LLVM)
+    target_link_libraries(heyoka PUBLIC heyoka::llvm LLVM)
 else()
     message(STATUS "LLVM target not found, trying random stuff.")
     llvm_map_components_to_libnames(llvm_libs all)
     message(STATUS "LLVM libs: ${llvm_libs}")
-    target_link_libraries(heyoka PUBLIC ${llvm_libs})
+    target_link_libraries(heyoka PUBLIC heyoka::llvm ${llvm_libs})
 endif()
 
 # Mandatory dependency on fmt.
