@@ -211,7 +211,14 @@ endif()
 
 add_library(heyoka::llvm_headers INTERFACE IMPORTED)
 set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
-target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
+target_link_libraries(heyoka PUBLIC heyoka::llvm_headers)
+if(TARGET LLVM)
+    message(STATUS "LLVM target found, linking to it.")
+    target_link_libraries(heyoka PUBLIC LLVM)
+else()
+    message(STATUS "LLVM target not found, trying random stuff.")
+    target_link_libraries(heyoka PUBLIC LLVMCore)
+endif()
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED)
