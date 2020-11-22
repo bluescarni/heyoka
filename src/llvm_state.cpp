@@ -709,7 +709,7 @@ void llvm_state::compile()
             // Make sure to close the file before throwing.
             // NOTE: the file will be removed by the fr object
             // destructor.
-            llvm::sys::fs::closeFile(fd);
+            dest.close();
 
             throw std::invalid_argument("The target machine can't emit a file of this type");
         }
@@ -718,7 +718,7 @@ void llvm_state::compile()
         pass.run(*m_module);
 
         // Close the file.
-        llvm::sys::fs::closeFile(fd);
+        dest.close();
 
         // Re-open it for reading in binary mode.
         std::ifstream ifile(res_path.c_str(), std::ios::binary);
