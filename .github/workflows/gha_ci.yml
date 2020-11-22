@@ -1,4 +1,4 @@
-name: OSX/Windows build
+name: GitHub CI
 on:
   push:
     branches:
@@ -11,7 +11,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - run: bash tools/gha_osx.sh
+      - name: Build
+        run: bash tools/gha_osx.sh
   windows_build:
     runs-on: windows-2019
     steps:
@@ -20,3 +21,7 @@ jobs:
         with:
           auto-update-conda: true
           python-version: 3.8
+      - name: Build
+        shell: cmd
+        run: |
+          msvcprep.bat x86_amd64
