@@ -209,15 +209,21 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
-add_library(heyoka::llvm_headers INTERFACE IMPORTED)
-set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
-target_link_libraries(heyoka PUBLIC heyoka::llvm_headers)
+message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
+message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
+
+add_library(heyoka::llvm INTERFACE IMPORTED)
+set_target_properties(heyoka::llvm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${LLVM_INCLUDE_DIRS})
+target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
+
 if(TARGET LLVM)
     message(STATUS "LLVM target found, linking to it.")
     target_link_libraries(heyoka PUBLIC LLVM)
 else()
     message(STATUS "LLVM target not found, trying random stuff.")
-    target_link_libraries(heyoka PUBLIC LLVMCore)
+    llvm_map_components_to_libnames(llvm_libs all)
+    message(STATUS "LLVM libs: ${llvm_libs}")
+    target_link_libraries(heyoka PUBLIC ${llvm_libs})
 endif()
 
 # Mandatory dependency on fmt.

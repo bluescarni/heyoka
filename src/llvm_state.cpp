@@ -6,24 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// NOTE: on some setups (e.g., the current conda-forge compiler toolchain)
-// there is an issue triggered by code in the LLVM headers, involving
-// a macro called 'PRIxPTR' in some C IO API. It seems like defining
-// __STDC_FORMAT_MACROS works around the issue, and this does not seem to hurt
-// where the problem does not arise. In any case, we include limits.h
-// so that we can detect if we are using GLIBC, and activate the workaround
-// only if that's the case. See:
-// https://github.com/tensorflow/tensorflow/issues/12998
-// https://en.cppreference.com/w/cpp/types/integer
-// https://sourceforge.net/p/predef/wiki/Libraries/
-#include <climits>
-
-#if defined(__GLIBC__)
-
-#define __STDC_FORMAT_MACROS
-
-#endif
-
 #include <heyoka/config.hpp>
 
 #include <algorithm>
