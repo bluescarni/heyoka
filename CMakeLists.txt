@@ -221,15 +221,14 @@ target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
 if(TARGET LLVM)
     target_link_libraries(heyoka::llvm INTERFACE LLVM)
 else()
-    function(string_to_list s output_var)
-        string(REPLACE " " ";" _output "${s}")
-        set(${output_var} ${_output} PARENT_SCOPE)
-    endfunction()
+    set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
 
-    execute_process(COMMAND "llvm-config" "--libfiles" OUTPUT_VARIABLE _HEYOKA_LLVM_LIBFILES OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string_to_list("${_HEYOKA_LLVM_LIBFILES}" _HEYOKA_LLVM_LIBFILES_LIST)
-    message(STATUS "LLVM libfiles: ${_HEYOKA_LLVM_LIBFILES_LIST}")
-    target_link_libraries(heyoka::llvm INTERFACE ${_HEYOKA_LLVM_LIBFILES_LIST})
+    llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
+    llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
+
+    message(STATUS "llvm libs: ${llvm_libs}")
+
+    target_link_libraries(heyoka::llvm INTERFACE ${llvm_libs})
     # TODO unset?
 endif()
 
