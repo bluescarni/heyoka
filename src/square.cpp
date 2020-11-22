@@ -21,6 +21,12 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -30,6 +36,7 @@
 #include <heyoka/number.hpp>
 #include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
