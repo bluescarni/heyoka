@@ -22,7 +22,7 @@
 #include <heyoka/math_functions.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/square.hpp>
+#include <heyoka/sos_3d.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka::detail
@@ -151,7 +151,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             auto diff_y = y_vars[j] - y_vars[i];
             auto diff_z = z_vars[j] - z_vars[i];
 
-            auto r_m3 = pow(square(diff_x) + square(diff_y) + square(diff_z), expression{number{-3. / 2}});
+            auto r_m3 = pow(sos_3d(diff_x, diff_y, diff_z), expression{number{-3. / 2}});
             // NOTE: the idea here is that we want to help the CSE process
             // when computing the Taylor decomposition. Thus, we try
             // to maximise the re-use of an expression with the goal
