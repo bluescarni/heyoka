@@ -17,8 +17,8 @@ jobs:
     runs-on: windows-2016
     steps:
       - uses: actions/checkout@v2
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.0.2
+      # - name: Add msbuild to PATH
+      #   uses: microsoft/setup-msbuild@v1.0.2
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-update-conda: true
@@ -34,5 +34,5 @@ jobs:
           mamba install -y cmake llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt clang ninja
           mkdir build
           cd build
-          cmake ../ -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
+          cmake ../ -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
           cmake --build . -- -v
