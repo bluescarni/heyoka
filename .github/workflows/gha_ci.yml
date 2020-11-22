@@ -12,7 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: bash tools/gha_osx.sh
-jobs:
   windows_build:
     runs-on: windows-2019
     steps:
