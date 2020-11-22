@@ -22,6 +22,8 @@ jobs:
           auto-update-conda: true
           python-version: 3.8
       - name: Build
-        shell: cmd
+        shell: pwsh
         run: |
-          msvcprep.bat x86_amd64
+          conda config --add channels conda-forge
+          conda config --set channel_priority strict
+          conda install mamba -y
