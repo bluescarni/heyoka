@@ -12,9 +12,7 @@
 #include <cstdint>
 #include <string>
 
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
-
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka::detail

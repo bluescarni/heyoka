@@ -27,12 +27,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Value.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -41,6 +35,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
@@ -88,7 +83,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
-    std::unique_ptr<llvm::IRBuilder<>> m_builder;
+    std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     unsigned m_opt_level;
@@ -198,7 +193,7 @@ public:
     ~llvm_state();
 
     llvm::Module &module();
-    llvm::IRBuilder<> &builder();
+    llvm::IRBuilderBase &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
     bool &fast_math();
@@ -206,7 +201,7 @@ public:
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
-    const llvm::IRBuilder<> &builder() const;
+    const llvm::IRBuilderBase &builder() const;
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
     const bool &fast_math() const;

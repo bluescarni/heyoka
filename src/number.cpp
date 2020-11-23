@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>

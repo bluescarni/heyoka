@@ -93,6 +93,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -394,7 +395,7 @@ llvm::Module &llvm_state::module()
     return *m_module;
 }
 
-llvm::IRBuilder<> &llvm_state::builder()
+llvm::IRBuilderBase &llvm_state::builder()
 {
     check_uncompiled(__func__);
     return *m_builder;
@@ -431,7 +432,7 @@ const llvm::Module &llvm_state::module() const
     return *m_module;
 }
 
-const llvm::IRBuilder<> &llvm_state::builder() const
+const llvm::IRBuilderBase &llvm_state::builder() const
 {
     check_uncompiled(__func__);
     return *m_builder;

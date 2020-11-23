@@ -19,9 +19,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -29,6 +26,7 @@
 #endif
 
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>

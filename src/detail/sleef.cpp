@@ -23,6 +23,7 @@
 
 #include <sleef.h>
 
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>

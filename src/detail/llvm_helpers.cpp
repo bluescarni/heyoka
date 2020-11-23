@@ -46,6 +46,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
@@ -120,7 +121,7 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
 
 // Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
 // 1, a scalar is loaded instead.
-llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, std::uint32_t vector_size)
+llvm::Value *load_vector_from_memory(llvm::IRBuilderBase &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
 
@@ -151,7 +152,7 @@ llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &builder, llvm::Value *pt
 
 // Helper to store the content of vector vec to the pointer ptr. If vec is not a vector,
 // a plain store will be performed.
-void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::Value *vec)
+void store_vector_to_memory(llvm::IRBuilderBase &builder, llvm::Value *ptr, llvm::Value *vec)
 {
     if (auto v_ptr_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
         // Determine the vector size.
@@ -169,7 +170,7 @@ void store_vector_to_memory(llvm::IRBuilder<> &builder, llvm::Value *ptr, llvm::
 
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
 // c will be returned.
-llvm::Value *vector_splat(llvm::IRBuilder<> &builder, llvm::Value *c, std::uint32_t vector_size)
+llvm::Value *vector_splat(llvm::IRBuilderBase &builder, llvm::Value *c, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
 
@@ -214,7 +215,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 
 // Convert the input LLVM vector to a std::vector of values. If vec is not a vector,
 // return {vec}.
-std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::Value *vec)
+std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilderBase &builder, llvm::Value *vec)
 {
     if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
         // Fetch the vector width.
@@ -235,7 +236,7 @@ std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &builder, llvm::V
 
 // Convert a std::vector of values into an LLVM vector of the corresponding size.
 // If scalars contains only 1 value, return that value.
-llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llvm::Value *> &scalars)
+llvm::Value *scalars_to_vector(llvm::IRBuilderBase &builder, const std::vector<llvm::Value *> &scalars)
 {
     assert(!scalars.empty());
 
@@ -269,7 +270,7 @@ llvm::Value *scalars_to_vector(llvm::IRBuilder<> &builder, const std::vector<llv
 
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
-llvm::Value *pairwise_sum(llvm::IRBuilder<> &builder, std::vector<llvm::Value *> &sum)
+llvm::Value *pairwise_sum(llvm::IRBuilderBase &builder, std::vector<llvm::Value *> &sum)
 {
     assert(!sum.empty());
 
@@ -338,8 +339,7 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
 
 // Helper to invoke an external function called 'name' with arguments args and return type ret_type.
 llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::Type *ret_type,
-                                  const std::vector<llvm::Value *> &args,
-                                  const std::vector<llvm::Attribute::AttrKind> &attrs)
+                                  const std::vector<llvm::Value *> &args, const std::vector<int> &attrs)
 {
     // Look up the name in the global module table.
     auto callee_f = s.module().getFunction(name);
@@ -358,7 +358,7 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
 
         // Add the function attributes.
         for (const auto &att : attrs) {
-            callee_f->addFnAttr(att);
+            callee_f->addFnAttr(boost::numeric_cast<llvm::Attribute::AttrKind>(att));
         }
     } else {
         // The function declaration exists already. Check that it is only a

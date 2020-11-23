@@ -16,15 +16,7 @@
 #include <typeinfo>
 #include <vector>
 
-#include <llvm/IR/Attributes.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -52,24 +44,23 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
     return make_vector_type(to_llvm_type<T>(c), batch_size);
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilder<> &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilderBase &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilderBase &, llvm::Value *, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(llvm::IRBuilder<> &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(llvm::IRBuilderBase &, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilder<> &, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilderBase &, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilder<> &, const std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilderBase &, const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm::IRBuilder<> &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm::IRBuilderBase &, std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::string &,
                                                      const std::vector<llvm::Type *> &,
                                                      const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
-                                                    const std::vector<llvm::Value *> &,
-                                                    const std::vector<llvm::Attribute::AttrKind> & = {});
+                                                    const std::vector<llvm::Value *> &, const std::vector<int> & = {});
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_internal(llvm_state &, const std::string &,
                                                     const std::vector<llvm::Value *> &);

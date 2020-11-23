@@ -197,11 +197,6 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
     endif()
 endif()
 
-if(MSVC)
-    # On MSVC, silence std::iterator warnings coming from the LLVM headers.
-    target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
-endif()
-
 # Mandatory dependency on LLVM.
 find_package(LLVM REQUIRED CONFIG)
 
@@ -212,17 +207,19 @@ endif()
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
-# In order to handle the dependency on LLVM,
-# we create a helper target heyoka::llvm.
-add_library(heyoka::llvm INTERFACE IMPORTED)
-set_target_properties(heyoka::llvm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${LLVM_INCLUDE_DIRS})
-target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
+target_compile_definitions(heyoka PRIVATE ${LLVM_DEFINITIONS})
+if(MSVC)
+    # On MSVC, silence std::iterator warnings coming from the LLVM headers.
+    target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+endif()
+
+target_include_directories(heyoka SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
 if(TARGET LLVM)
     # On some platforms, LLVM is built as a single library,
     # which is exported by LLVM's CMake config-file package as
     # a target called LLVM.
-    target_link_libraries(heyoka::llvm INTERFACE LLVM)
+    target_link_libraries(heyoka PRIVATE LLVM)
 else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
@@ -233,12 +230,10 @@ else()
     llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
     llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
 
-    target_link_libraries(heyoka::llvm INTERFACE ${llvm_libs})
+    target_link_libraries(heyoka PRIVATE ${llvm_libs})
 
     # TODO
 endif()
-
-target_link_libraries(heyoka PUBLIC heyoka::llvm)
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED)

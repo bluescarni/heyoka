@@ -41,6 +41,7 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -52,6 +53,7 @@
 #endif
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/sleef.hpp>
