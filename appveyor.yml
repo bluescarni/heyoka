@@ -35,10 +35,12 @@ test_script:
 # NOTE: ensure the PATH variable contains the path to the heyoka dll,
 # otherwise the tests will fail to run.
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] set PATH=%PATH%;%CD%
-- if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -j4 -V .
+# TODO debug
+- if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -VV .
+#- if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -j4 -V .
 
 # Enable this to be able to login to the build worker. You can use the
 # `remmina` program in Ubuntu, use the login information that the line below
 # prints into the log.
-# on_finish:
-# - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+on_finish:
+- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
