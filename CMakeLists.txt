@@ -202,9 +202,6 @@ if(MSVC)
     target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
-find_package(ZLIB REQUIRED)
-add_library(z ALIAS ZLIB::ZLIB)
-
 # Mandatory dependency on LLVM.
 find_package(LLVM REQUIRED CONFIG)
 
@@ -229,6 +226,10 @@ if(TARGET LLVM)
 else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
+    find_package(ZLIB REQUIRED)
+    add_library(z ALIAS ZLIB::ZLIB)
+
+
     # set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
     target_link_libraries(heyoka::llvm INTERFACE LLVMCore)
 
