@@ -229,11 +229,13 @@ else()
     find_package(ZLIB REQUIRED)
     add_library(z ALIAS ZLIB::ZLIB)
 
+    set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
+    llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
+    llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
 
-    # set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
-    target_link_libraries(heyoka::llvm INTERFACE LLVMCore)
+    target_link_libraries(heyoka::llvm INTERFACE ${llvm_libs})
 
-    # TODO fix.
+    # TODO
 endif()
 
 target_link_libraries(heyoka PUBLIC heyoka::llvm)
