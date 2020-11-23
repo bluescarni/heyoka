@@ -203,7 +203,7 @@ if(MSVC)
 endif()
 
 # Mandatory dependency on LLVM.
-find_package(LLVM REQUIRED)
+find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
@@ -219,21 +219,16 @@ set_target_properties(heyoka::llvm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${LL
 target_compile_definitions(heyoka::llvm INTERFACE ${LLVM_DEFINITIONS})
 
 if(TARGET LLVM)
+    # On some platforms, LLVM is built as a single library,
+    # which is exported by LLVM's CMake config-file package as
+    # a target called LLVM.
     target_link_libraries(heyoka::llvm INTERFACE LLVM)
 else()
-    find_package(ZLIB REQUIRED)
+    # Otherwise, LLVM is built as a collection of
+    # separate libraries/components.
+    # set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
 
-    #set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
-    set(_HEYOKA_LLVM_COMPONENTS core)
-
-    # llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
-    # llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
-
-    # message(STATUS "llvm libs: ${llvm_libs}")
-
-    # target_link_libraries(heyoka::llvm INTERFACE ZLIB::ZLIB ${llvm_libs})
-    #llvm_config(heyoka ${_HEYOKA_LLVM_COMPONENTS})
-    # TODO unset?
+    # TODO fix.
 endif()
 
 target_link_libraries(heyoka PUBLIC heyoka::llvm)
