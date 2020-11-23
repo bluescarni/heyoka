@@ -341,7 +341,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -539,7 +539,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
