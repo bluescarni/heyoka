@@ -26,4 +26,4 @@ jobs:
           python-version: 3.8
       - name: Build
         shell: cmd
-        run: cmd tools/gha_win.bat
+        run: tools/gha_win.bat
