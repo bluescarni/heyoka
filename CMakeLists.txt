@@ -232,7 +232,7 @@ else()
     # message(STATUS "llvm libs: ${llvm_libs}")
 
     # target_link_libraries(heyoka::llvm INTERFACE ZLIB::ZLIB ${llvm_libs})
-    llvm_config(heyoka ${_HEYOKA_LLVM_COMPONENTS})
+    #llvm_config(heyoka ${_HEYOKA_LLVM_COMPONENTS})
     # TODO unset?
 endif()
 
