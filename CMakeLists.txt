@@ -227,6 +227,7 @@ else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
     # set(_HEYOKA_LLVM_COMPONENTS asmparser core executionengine instcombine mcjit native nativecodegen scalaropts vectorize support transformutils)
+    target_link_libraries(heyoka::llvm INTERFACE LLVMCore)
 
     # TODO fix.
 endif()
