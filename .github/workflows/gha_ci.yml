@@ -25,7 +25,7 @@ jobs:
           auto-update-conda: false
           python-version: 3.8
       - name: Build
-        shell: pwsh
+        shell: cmd
         run: |
           conda config --add channels conda-forge
           conda config --set channel_priority strict
@@ -37,6 +37,6 @@ jobs:
           cd build
           cmake ../ -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
           cmake --build . --config Release
-          $env:Path += ";%CD%\Release"
+          set PATH=%PATH%;%CD%\Release
           echo %PATH%
           ctest -V -C Release
