@@ -20,6 +20,7 @@
 #include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "data/mascon_67p.hpp"
 #include "data/mascon_bennu.hpp"
 #include "data/mascon_itokawa.hpp"
 
@@ -37,9 +38,9 @@ namespace benchmark::kw
 IGOR_MAKE_NAMED_ARGUMENT(G);
 } // namespace benchmark::kw
 
-// Pairwise summation of a vector of doubles. TODO make the other one templated?
+// Pairwise summation of a vector of doubles. Avoiding copies
 // https://en.wikipedia.org/wiki/Pairwise_summation
-double pairwise_sum(std::vector<double> sum)
+double pairwise_sum(std::vector<double> &sum)
 {
     if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
         throw std::overflow_error("Overflow detected in pairwise_sum()");
@@ -48,22 +49,22 @@ double pairwise_sum(std::vector<double> sum)
     if (sum.empty()) {
         return 0.;
     }
-
     while (sum.size() != 1u) {
-        std::vector<double> new_sum;
-
         for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
             if (i + 1u == sum.size()) {
                 // We are at the last element of the vector
                 // and the size of the vector is odd. Just append
                 // the existing value.
-                new_sum.push_back(std::move(sum[i]));
+                sum[i / 2u] = sum[i];
             } else {
-                new_sum.push_back(std::move(sum[i]) + std::move(sum[i + 1u]));
+                sum[i / 2u] = sum[i] + sum[i + 1u];
             }
         }
-
-        new_sum.swap(sum);
+        if (sum.size() % 2) {
+            sum.resize(sum.size() / 2 + 1);
+        } else {
+            sum.resize(sum.size() / 2);
+        }
     }
     return sum[0];
 }
@@ -85,16 +86,14 @@ struct mascon_dynamics {
             m_mascon_points.push_back(
                 std::vector<double>{mascon_points[i][0], mascon_points[i][1], mascon_points[i][2]});
         }
-
-        x_acc.resize(std::size(m_mascon_masses));
-        y_acc.resize(std::size(m_mascon_masses));
-        z_acc.resize(std::size(m_mascon_masses));
     }
     // call operator
     void operator()(const std::vector<double> &x, std::vector<double> &dxdt, const double /* t */)
     {
         auto dim = std::size(m_mascon_masses);
-
+        x_acc.resize(std::size(m_mascon_masses));
+        y_acc.resize(std::size(m_mascon_masses));
+        z_acc.resize(std::size(m_mascon_masses));
         // FIRST: Assemble the acceleration due to mascons
         // TODO: switch to pairwise/compensated summation here?
         double x_a = 0, y_a = 0, z_a = 0;
@@ -105,10 +104,14 @@ struct mascon_dynamics {
             // auto mGpow = m_G * std::pow(r2, -3. / 2.) * m_mascon_masses[i];
             auto r = std::sqrt(r2);
             auto mGpow = m_G * m_mascon_masses[i] / (r * r * r);
-            x_a += (m_mascon_points[i][0] - x[0]) * mGpow;
-            y_a += (m_mascon_points[i][1] - x[1]) * mGpow;
-            z_a += (m_mascon_points[i][2] - x[2]) * mGpow;
+            x_acc[i] = (m_mascon_points[i][0] - x[0]) * mGpow;
+            y_acc[i] = (m_mascon_points[i][1] - x[1]) * mGpow;
+            z_acc[i] = (m_mascon_points[i][2] - x[2]) * mGpow;
         }
+        x_a = pairwise_sum(x_acc);
+        y_a = pairwise_sum(y_acc);
+        z_a = pairwise_sum(z_acc);
+
         // SECOND: centripetal and Coriolis
         // w x w x r
         auto centripetal_x = -m_q * m_q * x[0] - m_r * m_r * x[0] + m_q * x[1] * m_p + m_r * x[2] * m_p;
@@ -297,10 +300,22 @@ void plot_data(const P &mascon_points, const M &mascon_masses, taylor_adaptive<d
 
 int main(int argc, char *argv[])
 {
-    auto inclination = 45.;         // degrees
-    auto distance = 2.;             // non dimensional units
-    auto integration_time = 86400.; // seconds (1day of operations)
+    auto inclination = 45.;              // degrees
+    auto distance = 3.;                  // non dimensional units
+    auto integration_time = 86400. * 30; // seconds (1day of operations)
+
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
+    // 67P
+    // L = 2380.7169179463426m (computed from the mascon model and since 67P is 3909.769775390625m long from the ESA
+    // 3D model) M = (9.982E12 Kg (from wikipedia) G = 6.67430E-11 (wikipedia again) induced time units: T =
+    // sqrt(L^3/G/M) = 4500.388359040116s The asteroid angular velocity in our units is thus Wz = 2pi / (12.4 * 60 * 60
+    // / T) = 0.633440278094151
+    auto T_67p = 4500.388359040116;
+    auto wz_67p = 0.633440278094151;
+    fmt::print("67P, {} mascons:\n", std::size(mascon_masses_67p));
+    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
+    compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
+    // plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p * 365.25, 5000u);
 
     // Bennu
     // L = 416.45655931190163m (computed from the mascon model and since Bennu  is 562.8699958324432m long from the NASA
@@ -309,7 +324,7 @@ int main(int argc, char *argv[])
     // / T) = 1.5633255034258877
     auto T_bennu = 3842.6367987779804;
     auto wz_bennu = 1.5633255034258877;
-    fmt::print("Bennu, {} mascons:\n", std::size(mascon_masses_bennu));
+    fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
     auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
     compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
     // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
@@ -323,7 +338,8 @@ int main(int argc, char *argv[])
     auto T_itokawa = 6833.636194780773;
     auto wz_itokawa = 0.9830980174940738;
     fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
-    auto taylor_itokawa = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, 3., inclination, 1.);
+    auto taylor_itokawa
+        = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, distance, inclination, 1.);
     compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
                           integration_time / T_itokawa);
     // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
