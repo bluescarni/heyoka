@@ -14,6 +14,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <ios>
+#include <iostream>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -235,6 +236,16 @@ struct llvm_state::jit {
         }
 
         m_main_jd.addGenerator(std::move(*dlsg));
+
+        m_es.setErrorReporter([](llvm::Error err) {
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            ostr << err;
+
+            std::cout << "Error detected in the execution session. The full error message follows:\n"
+                      << ostr.str() << std::endl;
+        });
     }
 
     jit(const jit &) = delete;
