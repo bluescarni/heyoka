@@ -111,6 +111,9 @@ namespace detail
 namespace
 {
 
+// Make sure our definition of ir_builder matches llvm::IRBuilder<>.
+static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>);
+
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
 target_features get_target_features_impl()
@@ -406,7 +409,7 @@ llvm::Module &llvm_state::module()
     return *m_module;
 }
 
-llvm::IRBuilderBase &llvm_state::builder()
+ir_builder &llvm_state::builder()
 {
     check_uncompiled(__func__);
     return *m_builder;
@@ -443,7 +446,7 @@ const llvm::Module &llvm_state::module() const
     return *m_module;
 }
 
-const llvm::IRBuilderBase &llvm_state::builder() const
+const ir_builder &llvm_state::builder() const
 {
     check_uncompiled(__func__);
     return *m_builder;

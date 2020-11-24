@@ -193,7 +193,7 @@ public:
     ~llvm_state();
 
     llvm::Module &module();
-    llvm::IRBuilderBase &builder();
+    ir_builder &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
     bool &fast_math();
@@ -201,7 +201,7 @@ public:
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
-    const llvm::IRBuilderBase &builder() const;
+    const ir_builder &builder() const;
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
     const bool &fast_math() const;

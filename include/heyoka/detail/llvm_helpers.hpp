@@ -44,16 +44,16 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
     return make_vector_type(to_llvm_type<T>(c), batch_size);
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(llvm::IRBuilderBase &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC void store_vector_to_memory(llvm::IRBuilderBase &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(llvm::IRBuilderBase &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(llvm::IRBuilderBase &, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::vector<llvm::Value *> vector_to_scalars(ir_builder &, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(llvm::IRBuilderBase &, const std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *scalars_to_vector(ir_builder &, const std::vector<llvm::Value *> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(llvm::IRBuilderBase &, std::vector<llvm::Value *> &);
+HEYOKA_DLL_PUBLIC llvm::Value *pairwise_sum(ir_builder &, std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::string &,
                                                      const std::vector<llvm::Type *> &,

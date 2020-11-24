@@ -24,8 +24,13 @@ class IRBuilderDefaultInserter;
 template <typename, typename>
 class IRBuilder;
 
-class IRBuilderBase;
-
 } // namespace llvm
+
+namespace heyoka
+{
+
+using ir_builder = llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>;
+
+}
 
 #endif
