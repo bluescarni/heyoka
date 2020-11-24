@@ -19,6 +19,10 @@ class LLVMContext;
 class Type;
 class ArrayType;
 
+// NOTE: IRBuilder is a template with default
+// parameters, hence we declare the default parameters
+// here and we use them in the definition of the
+// ir_builder helper below.
 class ConstantFolder;
 class IRBuilderDefaultInserter;
 template <typename, typename>

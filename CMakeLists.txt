@@ -269,7 +269,7 @@ else()
         message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
         get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
         message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
-        link_directories("${_HEYOKA_ZLIB_LOCATION_DIR}")
+        target_link_directories(heyoka PRIVATE "${_HEYOKA_ZLIB_LOCATION_DIR}")
     endif()
 
     set(_HEYOKA_LLVM_COMPONENTS native orcjit)

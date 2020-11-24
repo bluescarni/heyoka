@@ -338,6 +338,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
 
     // Private implementation-detail constructor machinery.
+    // NOTE: apparently on Windows we need to re-iterate
+    // here that this is going to be dll-exported.
     template <typename U>
     HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
     template <typename U, typename... KwArgs>
