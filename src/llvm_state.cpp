@@ -6,24 +6,6 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// NOTE: on some setups (e.g., the current conda-forge compiler toolchain)
-// there is an issue triggered by code in the LLVM headers, involving
-// a macro called 'PRIxPTR' in some C IO API. It seems like defining
-// __STDC_FORMAT_MACROS works around the issue, and this does not seem to hurt
-// where the problem does not arise. In any case, we include limits.h
-// so that we can detect if we are using GLIBC, and activate the workaround
-// only if that's the case. See:
-// https://github.com/tensorflow/tensorflow/issues/12998
-// https://en.cppreference.com/w/cpp/types/integer
-// https://sourceforge.net/p/predef/wiki/Libraries/
-#include <climits>
-
-#if defined(__GLIBC__)
-
-#define __STDC_FORMAT_MACROS
-
-#endif
-
 #include <heyoka/config.hpp>
 
 #include <algorithm>
@@ -32,6 +14,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <ios>
+#include <iostream>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -111,6 +94,7 @@
 
 #endif
 
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -126,6 +110,9 @@ namespace detail
 
 namespace
 {
+
+// Make sure our definition of ir_builder matches llvm::IRBuilder<>.
+static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent definition of the ir_builder type.");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -192,13 +179,13 @@ std::once_flag nt_inited;
 struct llvm_state::jit {
     llvm::orc::ExecutionSession m_es;
     llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
+    llvm::orc::ThreadSafeContext m_ctx;
+    llvm::orc::JITDylib &m_main_jd;
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
     std::unique_ptr<llvm::DataLayout> m_dl;
     std::unique_ptr<llvm::Triple> m_triple;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
-    llvm::orc::ThreadSafeContext m_ctx;
-    llvm::orc::JITDylib &m_main_jd;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
@@ -252,6 +239,20 @@ struct llvm_state::jit {
         }
 
         m_main_jd.addGenerator(std::move(*dlsg));
+
+        // NOTE: by default, errors in the execution session are printed
+        // to screen. A custom error reported can be specified, ideally
+        // we would like th throw here but I am not sure whether throwing
+        // here would disrupt LLVM's cleanup actions?
+        // m_es.setErrorReporter([](llvm::Error err) {
+        //     std::string err_report;
+        //     llvm::raw_string_ostream ostr(err_report);
+
+        //     ostr << err;
+
+        //     std::cout << "Error detected in the execution session. The full error message follows:\n"
+        //               << ostr.str() << std::endl;
+        // });
     }
 
     jit(const jit &) = delete;
@@ -317,7 +318,7 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
     m_module->setTargetTriple(m_jitter->m_triple->str());
 
     // Create a new builder for the module.
-    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+    m_builder = std::make_unique<ir_builder>(context());
 
     if (m_fast_math) {
         // Set flags for faster math at the
@@ -366,7 +367,7 @@ llvm_state::llvm_state(const llvm_state &other)
     }
 
     // Create a new builder for the module.
-    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+    m_builder = std::make_unique<ir_builder>(context());
 
     if (m_fast_math) {
         // Set flags for faster math at the
@@ -412,7 +413,7 @@ llvm::Module &llvm_state::module()
     return *m_module;
 }
 
-llvm::IRBuilder<> &llvm_state::builder()
+ir_builder &llvm_state::builder()
 {
     check_uncompiled(__func__);
     return *m_builder;
@@ -449,7 +450,7 @@ const llvm::Module &llvm_state::module() const
     return *m_module;
 }
 
-const llvm::IRBuilder<> &llvm_state::builder() const
+const ir_builder &llvm_state::builder() const
 {
     check_uncompiled(__func__);
     return *m_builder;
@@ -709,7 +710,7 @@ void llvm_state::compile()
             // Make sure to close the file before throwing.
             // NOTE: the file will be removed by the fr object
             // destructor.
-            llvm::sys::fs::closeFile(fd);
+            dest.close();
 
             throw std::invalid_argument("The target machine can't emit a file of this type");
         }
@@ -718,7 +719,7 @@ void llvm_state::compile()
         pass.run(*m_module);
 
         // Close the file.
-        llvm::sys::fs::closeFile(fd);
+        dest.close();
 
         // Re-open it for reading in binary mode.
         std::ifstream ifile(res_path.c_str(), std::ios::binary);

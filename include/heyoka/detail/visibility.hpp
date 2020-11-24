@@ -9,6 +9,18 @@
 #ifndef HEYOKA_DETAIL_VISIBILITY_HPP
 #define HEYOKA_DETAIL_VISIBILITY_HPP
 
+#include <heyoka/config.hpp>
+
+// The visibility setup makes sense only for shared
+// library builds.
+#if defined(HEYOKA_BUILD_STATIC_LIBRARY)
+
+#define HEYOKA_DLL_PUBLIC
+#define HEYOKA_DLL_LOCAL
+#define HEYOKA_DLL_PUBLIC_INLINE_CLASS
+
+#else
+
 // Convenience macros for setting the visibility of entities
 // when building/using the shared library. Mostly inspired by:
 // https://gcc.gnu.org/wiki/Visibility
@@ -56,6 +68,8 @@
 #else
 
 #define HEYOKA_DLL_PUBLIC_INLINE_CLASS HEYOKA_DLL_PUBLIC
+
+#endif
 
 #endif
 

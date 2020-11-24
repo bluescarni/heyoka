@@ -19,9 +19,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Value.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -29,6 +26,7 @@
 #endif
 
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
@@ -340,8 +338,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
 
     // Private implementation-detail constructor machinery.
+    // NOTE: apparently on Windows we need to re-iterate
+    // here that this is going to be dll-exported.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -539,7 +539,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&...kw_args)
     {

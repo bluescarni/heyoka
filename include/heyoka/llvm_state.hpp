@@ -27,12 +27,6 @@
 #include <utility>
 #include <vector>
 
-#include <llvm/IR/Function.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Value.h>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -41,6 +35,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
@@ -82,13 +77,13 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {
-    friend std::ostream &operator<<(std::ostream &, const llvm_state &);
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 
     struct jit;
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
-    std::unique_ptr<llvm::IRBuilder<>> m_builder;
+    std::unique_ptr<ir_builder> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     unsigned m_opt_level;
@@ -183,10 +178,11 @@ public:
     // - if there is only 1 argument, it cannot be of type llvm_state
     //   (so that it does not interfere with copy/move ctors).
     template <typename... KwArgs,
-              std::enable_if_t<(sizeof...(KwArgs) > 0u)
-                                   && (sizeof...(KwArgs) > 1u
-                                       || (... && !std::is_same_v<detail::uncvref_t<KwArgs>, llvm_state>)),
-                               int> = 0>
+              std::enable_if_t<
+                  (sizeof...(KwArgs) > 0u)
+                      && (sizeof...(KwArgs) > 1u
+                          || std::conjunction_v<std::negation<std::is_same<detail::uncvref_t<KwArgs>, llvm_state>>...>),
+                  int> = 0>
     explicit llvm_state(KwArgs &&...kw_args) : llvm_state(kw_args_ctor_impl(std::forward<KwArgs>(kw_args)...))
     {
     }
@@ -197,7 +193,7 @@ public:
     ~llvm_state();
 
     llvm::Module &module();
-    llvm::IRBuilder<> &builder();
+    ir_builder &builder();
     llvm::LLVMContext &context();
     unsigned &opt_level();
     bool &fast_math();
@@ -205,7 +201,7 @@ public:
     std::unordered_map<std::string, llvm::Value *> &named_values();
 
     const llvm::Module &module() const;
-    const llvm::IRBuilder<> &builder() const;
+    const ir_builder &builder() const;
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
     const bool &fast_math() const;

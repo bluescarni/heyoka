@@ -11,6 +11,7 @@
 
 #cmakedefine HEYOKA_WITH_MPPP
 #cmakedefine HEYOKA_WITH_SLEEF
+#cmakedefine HEYOKA_BUILD_STATIC_LIBRARY
 
 #if defined(HEYOKA_WITH_MPPP)
 

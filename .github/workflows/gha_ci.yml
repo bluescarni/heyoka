@@ -1,4 +1,4 @@
-name: OSX build
+name: GitHub CI
 on:
   push:
     branches:
@@ -7,8 +7,9 @@ on:
     branches:
       - master
 jobs:
-  osx_build:
-    runs-on: macos-latest
+  osx_10_15:
+    runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2
-      - run: bash tools/gha_osx.sh
+      - name: Build
+        run: bash tools/gha_osx.sh

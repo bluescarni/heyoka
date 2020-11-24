@@ -31,6 +31,7 @@ option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
+option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
 
@@ -120,8 +121,8 @@ if(YACMA_COMPILER_IS_MSVC)
     unset(_HEYOKA_CLANG_CL_DISABLED_WARNINGS)
   else()
     # Same as above, disable some cl warnings.
-    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127")
-    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127")
+    list(APPEND HEYOKA_CXX_FLAGS_DEBUG "/wd4459" "/wd4127" "/wd4251")
+    list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/wd4459" "/wd4127" "/wd4251")
   endif()
   # Enable strict conformance mode, if supported.
   set(CMAKE_REQUIRED_QUIET TRUE)
@@ -133,6 +134,27 @@ if(YACMA_COMPILER_IS_MSVC)
     list(APPEND HEYOKA_CXX_FLAGS_RELEASE "/permissive-")
   endif()
   unset(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
+endif()
+
+# Explanation: on MSVC, when building static libraries, it is good practice to link
+# to the static runtime. CMake, however, is hard-coded to link to the dynamic runtime.
+# Hence we hackishly replace the /MD flag with /MT. This is the approach suggested
+# in the CMake FAQ:
+#
+# https://gitlab.kitware.com/cmake/community/wikis/FAQ#how-can-i-build-my-msvc-application-with-a-static-runtime
+#
+# Note that at one point CMake added the possiblity to set this as a target property,
+# so in the future we should definitely migrate to that approach:
+#
+# https://cmake.org/cmake/help/git-master/prop_tgt/MSVC_RUNTIME_LIBRARY.html
+if(YACMA_COMPILER_IS_MSVC AND HEYOKA_BUILD_STATIC_LIBRARY)
+    foreach(flag_var
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
 endif()
 
 # List of source files.
@@ -156,12 +178,18 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
-# Setup of the heyoka shared library.
-add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-set_property(TARGET heyoka PROPERTY VERSION "1.0")
-set_property(TARGET heyoka PROPERTY SOVERSION 1)
-set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
-set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+if(HEYOKA_BUILD_STATIC_LIBRARY)
+    # Setup of the heyoka static library.
+    message(STATUS "heyoka will be built as a static library.")
+    add_library(heyoka STATIC "${HEYOKA_SRC_FILES}")
+else()
+    # Setup of the heyoka shared library.
+    add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
+    set_property(TARGET heyoka PROPERTY VERSION "1.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 1)
+    set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+endif()
 
 # Setup common to both the shared and static variants.
 target_compile_options(heyoka PRIVATE
@@ -170,6 +198,7 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
+
 # Let's setup the target C++ standard, but only if the user did not provide it manually.
 if(NOT CMAKE_CXX_STANDARD)
     set_property(TARGET heyoka PROPERTY CXX_STANDARD 17)
@@ -198,19 +227,67 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
 endif()
 
 # Mandatory dependency on LLVM.
-find_package(LLVM REQUIRED)
+find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
-add_library(heyoka::llvm_headers INTERFACE IMPORTED)
-set_target_properties(heyoka::llvm_headers PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}")
-target_link_libraries(heyoka PUBLIC heyoka::llvm_headers LLVM)
+message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
+message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
+
+# Add the definitions required by LLVM.
+target_compile_definitions(heyoka PRIVATE ${LLVM_DEFINITIONS})
+if(MSVC)
+    # On MSVC, silence std::iterator warnings coming from the LLVM headers.
+    target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+endif()
+
+# Add the LLVM include dirs.
+target_include_directories(heyoka SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+
+if(TARGET LLVM)
+    # On some platforms, LLVM is built as a single library,
+    # which is exported by LLVM's CMake config-file package as
+    # a target called LLVM.
+    target_link_libraries(heyoka PRIVATE LLVM)
+else()
+    # Otherwise, LLVM is built as a collection of
+    # separate libraries/components.
+
+    # NOTE: this is a nasty hack originating from the fact
+    # that currently the CMake files installed by LLVM contain a direct
+    # link to an entity called "z" representing the zlib library.
+    # If the file z.lib is not in a "standard" location (as it is
+    # often the case), the linker will not find it, resulting in
+    # an error at build time. Thus, we fetch the location
+    # of z.lib from CMake's FindZLIB.cmake and add it
+    # to the linker path.
+    find_package(ZLIB REQUIRED)
+    get_target_property(_HEYOKA_ZLIB_LOCATION ZLIB::ZLIB LOCATION)
+    message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
+    get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
+    message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
+    target_link_directories(heyoka PRIVATE "${_HEYOKA_ZLIB_LOCATION_DIR}")
+
+    unset(_HEYOKA_ZLIB_LOCATION)
+    unset(_HEYOKA_ZLIB_LOCATION_DIR)
+
+    # NOTE: these components have been determined heuristically.
+    set(_HEYOKA_LLVM_COMPONENTS native orcjit)
+    # NOTE: not sure what these two do, I copied from symengine's CMakeLists.txt.
+    llvm_map_components_to_libnames(_HEYOKA_LLVM_LIBS_DIRECT ${_HEYOKA_LLVM_COMPONENTS})
+    llvm_expand_dependencies(_HEYOKA_LLVM_LIBS ${_HEYOKA_LLVM_LIBS_DIRECT})
+    target_link_libraries(heyoka PRIVATE ${_HEYOKA_LLVM_LIBS})
+
+    unset(_HEYOKA_LLVM_COMPONENTS)
+    unset(_HEYOKA_LLVM_LIBS_DIRECT)
+    unset(_HEYOKA_LLVM_LIBS)
+endif()
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED)
-target_link_libraries(heyoka PUBLIC fmt::fmt)
+target_link_libraries(heyoka PRIVATE fmt::fmt)
 
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
