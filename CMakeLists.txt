@@ -289,7 +289,7 @@ endif()
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED)
-target_link_libraries(heyoka PUBLIC fmt::fmt)
+target_link_libraries(heyoka PRIVATE fmt::fmt)
 
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
