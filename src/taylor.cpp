@@ -911,6 +911,8 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 }
 
 // Explicit instantiation of the implementation classes/functions.
+// NOTE: on Windows apparently it is necessary to declare that
+// these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,

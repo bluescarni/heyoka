@@ -261,24 +261,30 @@ else()
         # link to an entity called "z" representing the zlib library.
         # If the file z.lib is not in a "standard" location (as it is
         # often the case), the linker will not find it, resulting in
-        # an error at build time. Thus, we create a new target called
-        # "z" that points to the zlib library, which will be used instead.
+        # an error at build time. Thus, we fetch the location
+        # of z.lib from CMake's FindZLIB.cmake and add it
+        # to the linker path.
         find_package(ZLIB REQUIRED)
-        #add_library(z ALIAS ZLIB::ZLIB)
         get_target_property(_HEYOKA_ZLIB_LOCATION ZLIB::ZLIB LOCATION)
         message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
         get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
         message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
         target_link_directories(heyoka PRIVATE "${_HEYOKA_ZLIB_LOCATION_DIR}")
+
+        unset(_HEYOKA_ZLIB_LOCATION)
+        unset(_HEYOKA_ZLIB_LOCATION_DIR)
     endif()
 
+    # NOTE: these components have been determined heuristically.
     set(_HEYOKA_LLVM_COMPONENTS native orcjit)
-    llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
-    llvm_expand_dependencies(llvm_libs ${llvm_libs_direct})
+    # NOTE: not sure what these two do, I copied from symengine's CMakeLists.txt.
+    llvm_map_components_to_libnames(_HEYOKA_LLVM_LIBS_DIRECT ${_HEYOKA_LLVM_COMPONENTS})
+    llvm_expand_dependencies(_HEYOKA_LLVM_LIBS ${_HEYOKA_LLVM_LIBS_DIRECT})
+    target_link_libraries(heyoka PRIVATE ${_HEYOKA_LLVM_LIBS})
 
-    target_link_libraries(heyoka PRIVATE ${llvm_libs})
-
-    # TODO
+    unset(_HEYOKA_LLVM_COMPONENTS)
+    unset(_HEYOKA_LLVM_LIBS_DIRECT)
+    unset(_HEYOKA_LLVM_LIBS)
 endif()
 
 # Mandatory dependency on fmt.

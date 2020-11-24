@@ -358,6 +358,7 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
 
         // Add the function attributes.
         for (const auto &att : attrs) {
+            // NOTE: convert back to the LLVM attribute enum.
             callee_f->addFnAttr(boost::numeric_cast<llvm::Attribute::AttrKind>(att));
         }
     } else {

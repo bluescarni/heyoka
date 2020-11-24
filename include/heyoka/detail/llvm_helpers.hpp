@@ -60,7 +60,11 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_intrinsic(llvm_state &, const std::st
                                                      const std::vector<llvm::Value *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_external(llvm_state &, const std::string &, llvm::Type *,
-                                                    const std::vector<llvm::Value *> &, const std::vector<int> & = {});
+                                                    const std::vector<llvm::Value *> &,
+                                                    // NOTE: this is going to be converted into
+                                                    // a vector of llvm attributes (represented
+                                                    // as an enum) in the implementation.
+                                                    const std::vector<int> & = {});
 
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_invoke_internal(llvm_state &, const std::string &,
                                                     const std::vector<llvm::Value *> &);

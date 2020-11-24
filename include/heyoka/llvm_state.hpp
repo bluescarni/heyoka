@@ -83,7 +83,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
-    std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter>> m_builder;
+    std::unique_ptr<ir_builder> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
     std::unordered_map<std::string, std::pair<std::type_index, std::vector<std::type_index>>> m_sig_map;
     unsigned m_opt_level;

@@ -112,7 +112,7 @@ namespace
 {
 
 // Make sure our definition of ir_builder matches llvm::IRBuilder<>.
-static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>);
+static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent definition of the ir_builder type.");
 
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
@@ -240,15 +240,19 @@ struct llvm_state::jit {
 
         m_main_jd.addGenerator(std::move(*dlsg));
 
-        m_es.setErrorReporter([](llvm::Error err) {
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
+        // NOTE: by default, errors in the execution session are printed
+        // to screen. A custom error reported can be specified, ideally
+        // we would like th throw here but I am not sure whether throwing
+        // here would disrupt LLVM's cleanup actions?
+        // m_es.setErrorReporter([](llvm::Error err) {
+        //     std::string err_report;
+        //     llvm::raw_string_ostream ostr(err_report);
 
-            ostr << err;
+        //     ostr << err;
 
-            std::cout << "Error detected in the execution session. The full error message follows:\n"
-                      << ostr.str() << std::endl;
-        });
+        //     std::cout << "Error detected in the execution session. The full error message follows:\n"
+        //               << ostr.str() << std::endl;
+        // });
     }
 
     jit(const jit &) = delete;
@@ -314,7 +318,7 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
     m_module->setTargetTriple(m_jitter->m_triple->str());
 
     // Create a new builder for the module.
-    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+    m_builder = std::make_unique<ir_builder>(context());
 
     if (m_fast_math) {
         // Set flags for faster math at the
@@ -363,7 +367,7 @@ llvm_state::llvm_state(const llvm_state &other)
     }
 
     // Create a new builder for the module.
-    m_builder = std::make_unique<llvm::IRBuilder<>>(context());
+    m_builder = std::make_unique<ir_builder>(context());
 
     if (m_fast_math) {
         // Set flags for faster math at the
