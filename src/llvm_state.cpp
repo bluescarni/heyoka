@@ -45,12 +45,9 @@
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
-#include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
-#include <llvm/ExecutionEngine/SectionMemoryManager.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DataLayout.h>
@@ -82,10 +79,6 @@
 #if LLVM_VERSION_MAJOR == 10
 
 #include <llvm/CodeGen/CommandFlags.inc>
-
-#else
-
-#include <llvm/ExecutionEngine/Orc/Mangling.h>
 
 #endif
 
@@ -184,14 +177,6 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
 
-#if 0
-    llvm::orc::ExecutionSession m_es;
-    llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
-    llvm::orc::ThreadSafeContext m_ctx;
-    llvm::orc::JITDylib &m_main_jd;
-    std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
-#endif
-
     jit()
     {
         // NOTE: the native target initialization needs to be done only once
@@ -206,19 +191,20 @@ struct llvm_state::jit {
         if (!jtmb) {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
-
         // Set the codegen optimisation level to aggressive.
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
-        // TODO set other properties?
+        // NOTE: other settable properties may
+        // be of interest:
+        // https://www.llvm.org/doxygen/classllvm_1_1orc_1_1LLJITBuilder.html
         lljit_builder.setJITTargetMachineBuilder(*jtmb);
 
         // Create the jit.
         auto lljit = lljit_builder.create();
         if (!lljit) {
-            throw std::invalid_argument("Error creating a LLJIT object");
+            throw std::invalid_argument("Error creating an LLJIT object");
         }
         m_lljit = std::move(*lljit);
 
@@ -229,6 +215,7 @@ struct llvm_state::jit {
         }
         m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
 
+        // Setup the jit so that it can look up symbols from the current process.
         auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_dl->getGlobalPrefix());
         if (!dlsg) {
             throw std::invalid_argument("Could not create the dynamic library search generator");
