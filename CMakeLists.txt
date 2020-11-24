@@ -198,6 +198,7 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
+
 # Let's setup the target C++ standard, but only if the user did not provide it manually.
 if(NOT CMAKE_CXX_STANDARD)
     set_property(TARGET heyoka PROPERTY CXX_STANDARD 17)
@@ -235,12 +236,14 @@ endif()
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
+# Add the definitions required by LLVM.
 target_compile_definitions(heyoka PRIVATE ${LLVM_DEFINITIONS})
 if(MSVC)
     # On MSVC, silence std::iterator warnings coming from the LLVM headers.
     target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
+# Add the LLVM include dirs.
 target_include_directories(heyoka SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
 if(TARGET LLVM)
@@ -251,8 +254,23 @@ if(TARGET LLVM)
 else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
-    find_package(ZLIB REQUIRED)
-    add_library(z ALIAS ZLIB::ZLIB)
+
+    if(WIN32)
+        # NOTE: this is a nasty hack originating from the fact
+        # that currently the CMake files installed by LLVM contain a direct
+        # link to an entity called "z" representing the zlib library.
+        # If the file z.lib is not in a "standard" location (as it is
+        # often the case), the linker will not find it, resulting in
+        # an error at build time. Thus, we create a new target called
+        # "z" that points to the zlib library, which will be used instead.
+        find_package(ZLIB REQUIRED)
+        #add_library(z ALIAS ZLIB::ZLIB)
+        get_target_property(_HEYOKA_ZLIB_LOCATION ZLIB::ZLIB LOCATION)
+        message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
+        get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
+        message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
+        link_directories("${_HEYOKA_ZLIB_LOCATION_DIR}")
+    endif()
 
     set(_HEYOKA_LLVM_COMPONENTS native orcjit)
     llvm_map_components_to_libnames(llvm_libs_direct ${_HEYOKA_LLVM_COMPONENTS})
