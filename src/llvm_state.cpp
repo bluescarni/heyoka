@@ -36,7 +36,6 @@
 #include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/TargetPassConfig.h>
@@ -50,7 +49,6 @@
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -172,8 +170,6 @@ std::once_flag nt_inited;
 // Implementation of the jit class.
 struct llvm_state::jit {
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
-    std::unique_ptr<llvm::DataLayout> m_dl;
-    std::unique_ptr<llvm::Triple> m_triple;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
 
@@ -208,22 +204,13 @@ struct llvm_state::jit {
         }
         m_lljit = std::move(*lljit);
 
-        // Create the data layout.
-        auto dlout = jtmb->getDefaultDataLayoutForTarget();
-        if (!dlout) {
-            throw std::invalid_argument("Error fetching the default data layout for the host system");
-        }
-        m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
-
         // Setup the jit so that it can look up symbols from the current process.
-        auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_dl->getGlobalPrefix());
+        auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            m_lljit->getDataLayout().getGlobalPrefix());
         if (!dlsg) {
             throw std::invalid_argument("Could not create the dynamic library search generator");
         }
         m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
-
-        // Fetch the target triple.
-        m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
 
         // Keep a target machine around to fetch various
         // properties of the host CPU.
@@ -302,8 +289,8 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
     // Setup the data layout and the target triple.
-    m_module->setDataLayout(*m_jitter->m_dl);
-    m_module->setTargetTriple(m_jitter->m_triple->str());
+    m_module->setDataLayout(m_jitter->m_lljit->getDataLayout());
+    m_module->setTargetTriple(m_jitter->m_lljit->getTargetTriple().str());
 
     // Create a new builder for the module.
     m_builder = std::make_unique<ir_builder>(context());
@@ -596,8 +583,8 @@ void llvm_state::optimise()
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
         // These are passes which set up target-specific info
         // that are used by successive optimisation passes.
-        auto tliwp
-            = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(llvm::TargetLibraryInfoImpl(*m_jitter->m_triple));
+        auto tliwp = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(
+            llvm::TargetLibraryInfoImpl(m_jitter->m_lljit->getTargetTriple()));
         module_pm->add(tliwp.release());
         module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
@@ -1265,7 +1252,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Fast math          : " << s.m_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
     oss << "Inline functions   : " << s.m_inline_functions << '\n';
-    oss << "Target triple      : " << s.m_jitter->m_triple->str() << '\n';
+    oss << "Target triple      : " << s.m_jitter->m_lljit->getTargetTriple().str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
     oss << "IR size            : " << s.get_ir().size() << '\n';

@@ -6,8 +6,6 @@ branches:
 
 environment:
   matrix:
-    # - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-    #   BUILD_TYPE: MSVC19_64
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       BUILD_TYPE: MSVC17_clang_64
 
@@ -17,7 +15,6 @@ install:
 - conda update -n base conda
 - conda config --add channels conda-forge
 - conda config --set channel_priority strict
-- if [%BUILD_TYPE%]==[MSVC19_64] conda create --name heyoka cmake llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] conda create --name heyoka cmake llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt ninja sleef clang clangxx
 - call activate heyoka
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] clang-cl -v
@@ -29,9 +26,6 @@ build_script:
 - cd build
 
 # heyoka
-- if [%BUILD_TYPE%]==[MSVC19_64] cmake .. -G "Visual Studio 16 2019" -A x64 -DHEYOKA_BUILD_TESTS=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_ENABLE_IPO=yes
-- if [%BUILD_TYPE%]==[MSVC19_64] cmake --build . --config RelWithDebInfo
-
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DCMAKE_INSTALL_PREFIX=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=ON -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_ENABLE_IPO=yes -DHEYOKA_WITH_SLEEF=yes
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] cmake --build . -- -v
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] cmake --build . --target install
@@ -40,9 +34,6 @@ build_script:
 test_script:
 # NOTE: ensure the PATH variable contains the path to the heyoka dll,
 # otherwise the tests will fail to run.
-- if [%BUILD_TYPE%]==[MSVC19_64] set PATH=%PATH%;%CD%\RelWithDebInfo
-# - if [%BUILD_TYPE%]==[MSVC19_64] ctest -j4 -V -C RelWithDebInfo
-
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] set PATH=%PATH%;%CD%
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -j4 -V .
 
