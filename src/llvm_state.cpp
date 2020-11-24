@@ -179,13 +179,13 @@ std::once_flag nt_inited;
 struct llvm_state::jit {
     llvm::orc::ExecutionSession m_es;
     llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
+    llvm::orc::ThreadSafeContext m_ctx;
+    llvm::orc::JITDylib &m_main_jd;
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
     std::unique_ptr<llvm::DataLayout> m_dl;
     std::unique_ptr<llvm::Triple> m_triple;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
-    llvm::orc::ThreadSafeContext m_ctx;
-    llvm::orc::JITDylib &m_main_jd;
 
     jit()
         : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
