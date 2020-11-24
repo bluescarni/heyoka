@@ -44,7 +44,7 @@ test_script:
 # - if [%BUILD_TYPE%]==[MSVC19_64] ctest -j4 -V -C RelWithDebInfo
 
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] set PATH=%PATH%;%CD%
-# - if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -j4 -V .
+- if [%BUILD_TYPE%]==[MSVC17_clang_64] ctest -j4 -V .
 
 # Enable this to be able to login to the build worker. You can use the
 # `remmina` program in Ubuntu, use the login information that the line below

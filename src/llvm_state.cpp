@@ -47,6 +47,7 @@
 #include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 #include <llvm/ExecutionEngine/Orc/IRCompileLayer.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
@@ -177,24 +178,21 @@ std::once_flag nt_inited;
 
 // Implementation of the jit class.
 struct llvm_state::jit {
+    std::unique_ptr<llvm::orc::LLJIT> m_lljit;
+    std::unique_ptr<llvm::DataLayout> m_dl;
+    std::unique_ptr<llvm::Triple> m_triple;
+    std::unique_ptr<llvm::TargetMachine> m_tm;
+    std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
+
+#if 0
     llvm::orc::ExecutionSession m_es;
     llvm::orc::RTDyldObjectLinkingLayer m_object_layer;
     llvm::orc::ThreadSafeContext m_ctx;
     llvm::orc::JITDylib &m_main_jd;
     std::unique_ptr<llvm::orc::IRCompileLayer> m_compile_layer;
-    std::unique_ptr<llvm::DataLayout> m_dl;
-    std::unique_ptr<llvm::Triple> m_triple;
-    std::unique_ptr<llvm::TargetMachine> m_tm;
-    std::unique_ptr<llvm::orc::MangleAndInterner> m_mangle;
+#endif
 
     jit()
-        : m_object_layer(m_es, []() { return std::make_unique<llvm::SectionMemoryManager>(); }),
-          m_ctx(std::make_unique<llvm::LLVMContext>()),
-#if LLVM_VERSION_MAJOR == 10
-          m_main_jd(m_es.createJITDylib("<main>"))
-#else
-          m_main_jd(*m_es.createJITDylib("<main>"))
-#endif
     {
         // NOTE: the native target initialization needs to be done only once
         std::call_once(detail::nt_inited, []() {
@@ -203,17 +201,39 @@ struct llvm_state::jit {
             llvm::InitializeNativeTargetAsmParser();
         });
 
+        // Create the target machine builder.
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
         if (!jtmb) {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
+
         // Set the codegen optimisation level to aggressive.
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
+        // Create the jit builder.
+        llvm::orc::LLJITBuilder lljit_builder;
+        // TODO set other properties?
+        lljit_builder.setJITTargetMachineBuilder(*jtmb);
+
+        // Create the jit.
+        auto lljit = lljit_builder.create();
+        if (!lljit) {
+            throw std::invalid_argument("Error creating a LLJIT object");
+        }
+        m_lljit = std::move(*lljit);
+
+        // Create the data layout.
         auto dlout = jtmb->getDefaultDataLayoutForTarget();
         if (!dlout) {
             throw std::invalid_argument("Error fetching the default data layout for the host system");
         }
+        m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
+
+        auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_dl->getGlobalPrefix());
+        if (!dlsg) {
+            throw std::invalid_argument("Could not create the dynamic library search generator");
+        }
+        m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
 
         // Fetch the target triple.
         m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
@@ -226,33 +246,14 @@ struct llvm_state::jit {
         }
         m_tm = std::move(*tm);
 
-        m_compile_layer = std::make_unique<llvm::orc::IRCompileLayer>(
-            m_es, m_object_layer, std::make_unique<llvm::orc::ConcurrentIRCompiler>(std::move(*jtmb)));
-
-        m_dl = std::make_unique<llvm::DataLayout>(std::move(*dlout));
-
-        m_mangle = std::make_unique<llvm::orc::MangleAndInterner>(m_es, *m_dl);
-
-        auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(m_dl->getGlobalPrefix());
-        if (!dlsg) {
-            throw std::invalid_argument("Could not create the dynamic library search generator");
-        }
-
-        m_main_jd.addGenerator(std::move(*dlsg));
+        // Create the context.
+        m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
 
         // NOTE: by default, errors in the execution session are printed
         // to screen. A custom error reported can be specified, ideally
         // we would like th throw here but I am not sure whether throwing
         // here would disrupt LLVM's cleanup actions?
-        // m_es.setErrorReporter([](llvm::Error err) {
-        //     std::string err_report;
-        //     llvm::raw_string_ostream ostr(err_report);
-
-        //     ostr << err;
-
-        //     std::cout << "Error detected in the execution session. The full error message follows:\n"
-        //               << ostr.str() << std::endl;
-        // });
+        // https://llvm.org/doxygen/classllvm_1_1orc_1_1ExecutionSession.html
     }
 
     jit(const jit &) = delete;
@@ -265,11 +266,11 @@ struct llvm_state::jit {
     // Accessors.
     llvm::LLVMContext &get_context()
     {
-        return *m_ctx.getContext();
+        return *m_ctx->getContext();
     }
     const llvm::LLVMContext &get_context() const
     {
-        return *m_ctx.getContext();
+        return *m_ctx->getContext();
     }
     std::string get_target_cpu() const
     {
@@ -286,13 +287,13 @@ struct llvm_state::jit {
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
-        auto handle = m_compile_layer->add(m_main_jd, llvm::orc::ThreadSafeModule(std::move(m), m_ctx));
+        auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
 
-        if (handle) {
+        if (err) {
             std::string err_report;
             llvm::raw_string_ostream ostr(err_report);
 
-            ostr << handle;
+            ostr << err;
 
             throw std::invalid_argument("The function for adding a module to the jit failed. The full error message:\n"
                                         + ostr.str());
@@ -302,7 +303,7 @@ struct llvm_state::jit {
     // Symbol lookup.
     llvm::Expected<llvm::JITEvaluatedSymbol> lookup(const std::string &name)
     {
-        return m_es.lookup({&m_main_jd}, (*m_mangle)(name));
+        return m_lljit->lookup(name);
     }
 };
 
