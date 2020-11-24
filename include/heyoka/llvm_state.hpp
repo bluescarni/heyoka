@@ -77,7 +77,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {
-    friend std::ostream &operator<<(std::ostream &, const llvm_state &);
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 
     struct jit;
 
