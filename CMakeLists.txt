@@ -31,6 +31,7 @@ option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
+option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
 
@@ -135,6 +136,27 @@ if(YACMA_COMPILER_IS_MSVC)
   unset(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
 endif()
 
+# Explanation: on MSVC, when building static libraries, it is good practice to link
+# to the static runtime. CMake, however, is hard-coded to link to the dynamic runtime.
+# Hence we hackishly replace the /MD flag with /MT. This is the approach suggested
+# in the CMake FAQ:
+#
+# https://gitlab.kitware.com/cmake/community/wikis/FAQ#how-can-i-build-my-msvc-application-with-a-static-runtime
+#
+# Note that at one point CMake added the possiblity to set this as a target property,
+# so in the future we should definitely migrate to that approach:
+#
+# https://cmake.org/cmake/help/git-master/prop_tgt/MSVC_RUNTIME_LIBRARY.html
+if(YACMA_COMPILER_IS_MSVC AND HEYOKA_BUILD_STATIC_LIBRARY)
+    foreach(flag_var
+            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
+endif()
+
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
@@ -156,12 +178,18 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
-# Setup of the heyoka shared library.
-add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-set_property(TARGET heyoka PROPERTY VERSION "1.0")
-set_property(TARGET heyoka PROPERTY SOVERSION 1)
-set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
-set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+if(HEYOKA_BUILD_STATIC_LIBRARY)
+    # Setup of the heyoka static library.
+    message(STATUS "heyoka will be built as a static library.")
+    add_library(heyoka STATIC "${HEYOKA_SRC_FILES}")
+else()
+    # Setup of the heyoka shared library.
+    add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
+    set_property(TARGET heyoka PROPERTY VERSION "1.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 1)
+    set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
+endif()
 
 # Setup common to both the shared and static variants.
 target_compile_options(heyoka PRIVATE
