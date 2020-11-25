@@ -36,6 +36,7 @@
 #include <boost/filesystem.hpp>
 
 #include <llvm/ADT/SmallString.h>
+#include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/TargetPassConfig.h>
@@ -172,6 +173,9 @@ struct llvm_state::jit {
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
     std::unique_ptr<llvm::TargetMachine> m_tm;
     std::unique_ptr<llvm::orc::ThreadSafeContext> m_ctx;
+#if LLVM_VERSION_MAJOR == 10
+    std::unique_ptr<llvm::Triple> m_triple;
+#endif
 
     jit()
     {
@@ -223,6 +227,12 @@ struct llvm_state::jit {
         // Create the context.
         m_ctx = std::make_unique<llvm::orc::ThreadSafeContext>(std::make_unique<llvm::LLVMContext>());
 
+#if LLVM_VERSION_MAJOR == 10
+        // NOTE: on LLVM 10, we cannot fetch the target triple
+        // from the lljit class. Thus, we get it from the jtmb instead.
+        m_triple = std::make_unique<llvm::Triple>(jtmb->getTargetTriple());
+#endif
+
         // NOTE: by default, errors in the execution session are printed
         // to screen. A custom error reported can be specified, ideally
         // we would like th throw here but I am not sure whether throwing
@@ -258,6 +268,14 @@ struct llvm_state::jit {
     {
         return m_tm->getTargetIRAnalysis();
     }
+    const llvm::Triple &get_target_triple() const
+    {
+#if LLVM_VERSION_MAJOR == 10
+        return *m_triple;
+#else
+        return m_lljit->getTargetTriple();
+#endif
+    }
 
     void add_module(std::unique_ptr<llvm::Module> &&m)
     {
@@ -290,7 +308,7 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
     // Setup the data layout and the target triple.
     m_module->setDataLayout(m_jitter->m_lljit->getDataLayout());
-    m_module->setTargetTriple(m_jitter->m_lljit->getTargetTriple().str());
+    m_module->setTargetTriple(m_jitter->get_target_triple().str());
 
     // Create a new builder for the module.
     m_builder = std::make_unique<ir_builder>(context());
@@ -584,7 +602,7 @@ void llvm_state::optimise()
         // These are passes which set up target-specific info
         // that are used by successive optimisation passes.
         auto tliwp = std::make_unique<llvm::TargetLibraryInfoWrapperPass>(
-            llvm::TargetLibraryInfoImpl(m_jitter->m_lljit->getTargetTriple()));
+            llvm::TargetLibraryInfoImpl(m_jitter->get_target_triple()));
         module_pm->add(tliwp.release());
         module_pm->add(llvm::createTargetTransformInfoWrapperPass(m_jitter->get_target_ir_analysis()));
 
@@ -1252,7 +1270,7 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Fast math          : " << s.m_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
     oss << "Inline functions   : " << s.m_inline_functions << '\n';
-    oss << "Target triple      : " << s.m_jitter->m_lljit->getTargetTriple().str() << '\n';
+    oss << "Target triple      : " << s.m_jitter->get_target_triple().str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
     oss << "IR size            : " << s.get_ir().size() << '\n';
