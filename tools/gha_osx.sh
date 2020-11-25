@@ -13,11 +13,8 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda_pkgs="c-compiler cxx-compiler libcxx cmake llvmdev boost-cpp sleef xtensor xtensor-blas blas blas-devel fmt"
-conda create -q -p $deps_dir -y
+conda create -y -q -p $deps_dir c-compiler cxx-compiler libcxx cmake llvmdev boost-cpp sleef xtensor xtensor-blas blas blas-devel fmt
 source activate $deps_dir
-conda install mamba -y
-mamba install $conda_pkgs -y
 
 # Create the build dir and cd into it.
 mkdir build
