@@ -35,20 +35,8 @@ IGOR_MAKE_NAMED_ARGUMENT(Gconst);
 namespace detail
 {
 
-struct parametric_masses_tag {
-};
-
-} // namespace detail
-
-inline constexpr auto parametric_masses = detail::parametric_masses_tag{};
-
-namespace detail
-{
-
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_parametric_masses(std::uint32_t,
-                                                                                                  expression);
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::uint32_t, expression,
-                                                                                             std::vector<expression>);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::uint32_t, number,
+                                                                                             std::vector<number>);
 
 } // namespace detail
 
@@ -56,10 +44,7 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 // n is the number of bodies (>= 2), while the following optional kwargs
 // can be passed:
 //
-// - 'masses', which can either contain the numerical values of the masses
-//   or be the special value parametric_masses (see above), in which case the masses
-//   are added at the end of the state vector for each body as variables
-//   with null derivative;
+// - 'masses', which contains the numerical values of the masses,
 // - 'Gconst', which contains the numerical value of the gravitational constant.
 //
 // 'Gconst' defaults to a value of 1 if not specified.
@@ -74,7 +59,6 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 // vx_0' = ...
 // vy_0' = ...
 // vz_0' = ...
-// m_0' = 0 (only for parametric masses)
 // x_1' = ...
 // y_1' = ...
 // etc.
@@ -95,34 +79,24 @@ inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32
         // G constant (defaults to 1).
         auto G_const = [&p]() {
             if constexpr (p.has(kw::Gconst)) {
-                return expression{number{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))}};
+                return number{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))};
             } else {
-                return expression{number{1.}};
+                return number{1.};
             }
         }();
 
+        std::vector<number> masses_vec;
+
         if constexpr (p.has(kw::masses)) {
-            if constexpr (std::is_same_v<decltype(p(kw::masses)), const detail::parametric_masses_tag &>) {
-                // Parametric masses were requested.
-                return detail::make_nbody_sys_parametric_masses(n, std::move(G_const));
-            } else {
-                // Fixed masses were explicitly passed in.
-                std::vector<expression> masses_vec;
-
-                for (const auto &mass_value : p(kw::masses)) {
-                    masses_vec.emplace_back(number{mass_value});
-                }
-
-                return detail::make_nbody_sys_fixed_masses(n, std::move(G_const), std::move(masses_vec));
+            for (const auto &mass_value : p(kw::masses)) {
+                masses_vec.emplace_back(mass_value);
             }
         } else {
-            // If no masses are provided, fix all masses
-            // to 1.
-            std::vector<expression> masses_vec;
-            masses_vec.resize(static_cast<decltype(masses_vec.size())>(n), expression{number{1.}});
-
-            return detail::make_nbody_sys_fixed_masses(n, std::move(G_const), std::move(masses_vec));
+            // If no masses are provided, fix all masses to 1.
+            masses_vec.resize(static_cast<decltype(masses_vec.size())>(n), number{1.});
         }
+
+        return detail::make_nbody_sys_fixed_masses(n, std::move(G_const), std::move(masses_vec));
     }
 }
 
