@@ -156,17 +156,23 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
     auto get_energy = [&s_array, &m_array, G, batch_size]() {
         // Kinetic energy.
         auto kin = xt::eval(xt::zeros<T>({batch_size}));
+        auto c = xt::eval(xt::zeros<T>({batch_size}));
 
         for (auto i = 0u; i < 6u; ++i) {
             auto vx = xt::view(s_array, i, 3, xt::all());
             auto vy = xt::view(s_array, i, 4, xt::all());
             auto vz = xt::view(s_array, i, 5, xt::all());
 
-            kin += T{1} / 2 * xt::row(m_array, i) * (vx * vx + vy * vy + vz * vz);
+            auto tmp = T{1} / 2 * xt::row(m_array, i) * (vx * vx + vy * vy + vz * vz);
+            auto y = tmp - c;
+            auto t = kin + y;
+            c = (t - kin) - y;
+            kin = t;
         }
 
         // Potential energy.
         auto pot = xt::eval(xt::zeros<T>({batch_size}));
+        c = xt::eval(xt::zeros<T>({batch_size}));
 
         for (auto i = 0u; i < 6u; ++i) {
             auto xi = xt::view(s_array, i, 0, xt::all());
@@ -178,8 +184,12 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
                 auto yj = xt::view(s_array, j, 1, xt::all());
                 auto zj = xt::view(s_array, j, 2, xt::all());
 
-                pot -= G * xt::row(m_array, i) * xt::row(m_array, j)
-                       / xt::sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
+                auto tmp = -G * xt::row(m_array, i) * xt::row(m_array, j)
+                           / xt::sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
+                auto y = tmp - c;
+                auto t = pot + y;
+                c = (t - pot) - y;
+                pot = t;
             }
         }
 
@@ -325,6 +335,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
             .count());
 
     std::cout << "Integration time: " << elapsed << "ms\n";
+    std::cout << "Final energy error: " << abs((init_energy - get_energy()) / init_energy) << '\n';
 }
 
 int main(int argc, char *argv[])
