@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <initializer_list>
@@ -28,6 +29,22 @@
 
 using namespace heyoka;
 using namespace heyoka_test;
+
+// Test case for an issue that arised when using
+// null masses.
+TEST_CASE("zero mass")
+{
+    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+
+    auto tad = taylor_adaptive<double>{std::move(sys), {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}};
+
+    auto [oc, _1, _2, _3] = tad.propagate_until(10000);
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(std::isfinite(tad.get_time()));
+    REQUIRE(
+        std::all_of(tad.get_state().begin(), tad.get_state().end(), [](const auto &x) { return std::isfinite(x); }));
+}
 
 TEST_CASE("N-body")
 {

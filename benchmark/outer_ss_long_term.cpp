@@ -131,17 +131,22 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
         using std::sqrt;
 
         // Kinetic energy.
-        T kin(0);
+        T kin(0), c(0);
         for (auto i = 0u; i < 6u; ++i) {
             auto vx = xt::view(s_array, i, 3)[0];
             auto vy = xt::view(s_array, i, 4)[0];
             auto vz = xt::view(s_array, i, 5)[0];
 
-            kin += T{1} / 2 * m_array[i] * (vx * vx + vy * vy + vz * vz);
+            auto tmp = T{1} / 2 * m_array[i] * (vx * vx + vy * vy + vz * vz);
+            auto y = tmp - c;
+            auto t = kin + y;
+            c = (t - kin) - y;
+            kin = t;
         }
 
         // Potential energy.
         T pot(0);
+        c = 0;
         for (auto i = 0u; i < 6u; ++i) {
             auto xi = xt::view(s_array, i, 0)[0];
             auto yi = xt::view(s_array, i, 1)[0];
@@ -152,8 +157,12 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
                 auto yj = xt::view(s_array, j, 1)[0];
                 auto zj = xt::view(s_array, j, 2)[0];
 
-                pot -= G * m_array[i] * m_array[j]
-                       / sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
+                auto tmp = -G * m_array[i] * m_array[j]
+                           / sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj) + (zi - zj) * (zi - zj));
+                auto y = tmp - c;
+                auto t = pot + y;
+                c = (t - pot) - y;
+                pot = t;
             }
         }
 
@@ -261,6 +270,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
             .count());
 
     std::cout << "Integration time: " << elapsed << "ms\n";
+    std::cout << "Final energy error: " << abs((init_energy - get_energy()) / init_energy) << '\n';
 }
 
 int main(int argc, char *argv[])
