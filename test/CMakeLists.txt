@@ -1,6 +1,6 @@
 # Find the xtensor bits.
-find_package(xtensor REQUIRED)
-find_package(xtensor-blas REQUIRED)
+find_package(xtensor REQUIRED CONFIG)
+find_package(xtensor-blas REQUIRED CONFIG)
 
 add_library(heyoka_test STATIC catch_main.cpp)
 target_compile_options(heyoka_test PRIVATE
