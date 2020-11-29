@@ -90,22 +90,22 @@ inline namespace literals
 
 expression operator""_dbl(long double x)
 {
-    return expression{number{static_cast<double>(x)}};
+    return expression{static_cast<double>(x)};
 }
 
 expression operator""_dbl(unsigned long long n)
 {
-    return expression{number{static_cast<double>(n)}};
+    return expression{static_cast<double>(n)};
 }
 
 expression operator""_ldbl(long double x)
 {
-    return expression{number{x}};
+    return expression{x};
 }
 
 expression operator""_ldbl(unsigned long long n)
 {
-    return expression{number{static_cast<long double>(n)}};
+    return expression{static_cast<long double>(n)};
 }
 
 expression operator""_var(const char *s, std::size_t n)

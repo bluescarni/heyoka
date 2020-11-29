@@ -91,7 +91,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 template <char... Chars>
 inline expression operator"" _f128()
 {
-    return expression{number{mppp::literals::operator"" _rq<Chars...>()}};
+    return expression{mppp::literals::operator"" _rq<Chars...>()};
 }
 
 #endif
