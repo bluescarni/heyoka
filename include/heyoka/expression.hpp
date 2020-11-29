@@ -51,12 +51,23 @@ private:
     value_type m_value;
 
 public:
+    expression();
+
+    explicit expression(double);
+    explicit expression(long double);
+#if defined(HEYOKA_HAVE_REAL128)
+    explicit expression(mppp::real128);
+#endif
+    explicit expression(std::string);
+
     explicit expression(number);
     explicit expression(variable);
     explicit expression(binary_operator);
     explicit expression(function);
+
     expression(const expression &);
     expression(expression &&) noexcept;
+
     ~expression();
 
     expression &operator=(const expression &);

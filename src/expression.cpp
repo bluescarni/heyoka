@@ -43,6 +43,20 @@
 namespace heyoka
 {
 
+expression::expression() : expression(number{0.}) {}
+
+expression::expression(double x) : expression(number{x}) {}
+
+expression::expression(long double x) : expression(number{x}) {}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression::expression(mppp::real128 x) : expression(number{x}) {}
+
+#endif
+
+expression::expression(std::string s) : expression(variable{std::move(s)}) {}
+
 expression::expression(number n) : m_value(std::move(n)) {}
 
 expression::expression(variable var) : m_value(std::move(var)) {}
