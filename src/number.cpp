@@ -13,7 +13,9 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
+#include <limits>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -105,7 +107,19 @@ std::size_t hash(const number &n)
 
 std::ostream &operator<<(std::ostream &os, const number &n)
 {
-    return std::visit([&os](const auto &arg) -> std::ostream & { return os << arg; }, n.value());
+    return std::visit(
+        [&os](const auto &arg) -> std::ostream & {
+            // NOTE: we make sure to print all digits
+            // necessary for short-circuiting.
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            std::ostringstream oss;
+            oss.precision(std::numeric_limits<type>::max_digits10);
+            oss << arg;
+
+            return os << oss.str();
+        },
+        n.value());
 }
 
 std::vector<std::string> get_variables(const number &)
