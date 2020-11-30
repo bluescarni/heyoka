@@ -2063,6 +2063,25 @@ expression pow(expression e1, expression e2)
     return expression{std::move(fc)};
 }
 
+expression pow(expression ex, double x)
+{
+    return pow(std::move(ex), expression{x});
+}
+
+expression pow(expression ex, long double x)
+{
+    return pow(std::move(ex), expression{x});
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression pow(expression ex, mppp::real128 x)
+{
+    return pow(std::move(ex), expression{x});
+}
+
+#endif
+
 namespace detail
 {
 
