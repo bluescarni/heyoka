@@ -511,6 +511,82 @@ expression &operator/=(expression &x, expression e)
     return x = std::move(x) / std::move(e);
 }
 
+expression &operator+=(expression &ex, double x)
+{
+    return ex += expression{x};
+}
+
+expression &operator+=(expression &ex, long double x)
+{
+    return ex += expression{x};
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression &operator+=(expression &ex, mppp::real128 x)
+{
+    return ex += expression{x};
+}
+
+#endif
+
+expression &operator-=(expression &ex, double x)
+{
+    return ex -= expression{x};
+}
+
+expression &operator-=(expression &ex, long double x)
+{
+    return ex -= expression{x};
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression &operator-=(expression &ex, mppp::real128 x)
+{
+    return ex -= expression{x};
+}
+
+#endif
+
+expression &operator*=(expression &ex, double x)
+{
+    return ex *= expression{x};
+}
+
+expression &operator*=(expression &ex, long double x)
+{
+    return ex *= expression{x};
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression &operator*=(expression &ex, mppp::real128 x)
+{
+    return ex *= expression{x};
+}
+
+#endif
+
+expression &operator/=(expression &ex, double x)
+{
+    return ex /= expression{x};
+}
+
+expression &operator/=(expression &ex, long double x)
+{
+    return ex /= expression{x};
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression &operator/=(expression &ex, mppp::real128 x)
+{
+    return ex /= expression{x};
+}
+
+#endif
+
 bool operator==(const expression &e1, const expression &e2)
 {
     auto visitor = [](const auto &v1, const auto &v2) {

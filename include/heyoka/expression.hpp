@@ -188,9 +188,32 @@ HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, expression);
 #endif
 
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
+#endif
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
