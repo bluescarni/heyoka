@@ -9,6 +9,13 @@
 #ifndef HEYOKA_CONFIG_HPP
 #define HEYOKA_CONFIG_HPP
 
+// clang-format off
+#define HEYOKA_VERSION_STRING "@heyoka_VERSION@"
+#define HEYOKA_VERSION_MAJOR @heyoka_VERSION_MAJOR@
+#define HEYOKA_VERSION_MINOR @heyoka_VERSION_MINOR@
+#define HEYOKA_VERSION_PATCH @heyoka_VERSION_PATCH@
+// clang-format on
+
 #cmakedefine HEYOKA_WITH_MPPP
 #cmakedefine HEYOKA_WITH_SLEEF
 #cmakedefine HEYOKA_BUILD_STATIC_LIBRARY
