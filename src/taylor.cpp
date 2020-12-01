@@ -3510,6 +3510,7 @@ namespace detail
 namespace
 {
 
+// Implementation of the streaming operator for the scalar integrators.
 template <typename T>
 std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive_impl<T> &ta)
 {
