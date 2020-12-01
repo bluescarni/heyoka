@@ -3515,8 +3515,8 @@ template <typename T>
 std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive_impl<T> &ta)
 {
     std::ostringstream oss;
-
     oss.precision(std::numeric_limits<T>::max_digits10);
+
     oss << "Taylor order: " << ta.get_order() << '\n';
     oss << "Dimension   : " << ta.get_dim() << '\n';
     oss << "Time        : " << ta.get_time() << '\n';
