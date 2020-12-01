@@ -20,6 +20,7 @@
 #include <limits>
 #include <numeric>
 #include <optional>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -3502,5 +3503,58 @@ std::vector<expression> taylor_add_custom_step_f128(llvm_state &s, const std::st
 }
 
 #endif
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive_impl<T> &ta)
+{
+    std::ostringstream oss;
+
+    oss.precision(std::numeric_limits<T>::max_digits10);
+    oss << "Taylor order: " << ta.get_order() << '\n';
+    oss << "Dimension   : " << ta.get_dim() << '\n';
+    oss << "Time        : " << ta.get_time() << '\n';
+    oss << "State       : [";
+    for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
+        oss << ta.get_state()[i];
+        if (i != ta.get_state().size() - 1u) {
+            oss << ", ";
+        }
+    }
+    oss << "]\n";
+
+    return os << oss.str();
+}
+
+} // namespace
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<double> &ta)
+{
+    return taylor_adaptive_stream_impl(os, ta);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<long double> &ta)
+{
+    return taylor_adaptive_stream_impl(os, ta);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<mppp::real128> &ta)
+{
+    return taylor_adaptive_stream_impl(os, ta);
+}
+
+#endif
+
+} // namespace detail
 
 } // namespace heyoka
