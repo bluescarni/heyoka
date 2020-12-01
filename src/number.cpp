@@ -14,6 +14,7 @@
 #include <functional>
 #include <initializer_list>
 #include <limits>
+#include <locale>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -107,19 +108,23 @@ std::size_t hash(const number &n)
 
 std::ostream &operator<<(std::ostream &os, const number &n)
 {
-    return std::visit(
-        [&os](const auto &arg) -> std::ostream & {
-            // NOTE: we make sure to print all digits
-            // necessary for short-circuiting.
-            using type = detail::uncvref_t<decltype(arg)>;
+    // NOTE: we make sure to print all digits
+    // necessary for short-circuiting. Make also
+    // sure to always print the decimal point and to
+    // use the C locale.
+    std::ostringstream oss;
+    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    oss.imbue(std::locale::classic());
+    oss << std::showpoint;
 
-            std::ostringstream oss;
-            oss.precision(std::numeric_limits<type>::max_digits10);
+    std::visit(
+        [&oss](const auto &arg) {
+            oss.precision(std::numeric_limits<detail::uncvref_t<decltype(arg)>>::max_digits10);
             oss << arg;
-
-            return os << oss.str();
         },
         n.value());
+
+    return os << oss.str();
 }
 
 std::vector<std::string> get_variables(const number &)
