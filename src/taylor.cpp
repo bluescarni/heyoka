@@ -18,6 +18,7 @@
 #include <functional>
 #include <iterator>
 #include <limits>
+#include <locale>
 #include <numeric>
 #include <optional>
 #include <ostream>
@@ -3515,6 +3516,9 @@ template <typename T>
 std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptive_impl<T> &ta)
 {
     std::ostringstream oss;
+    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    oss.imbue(std::locale::classic());
+    oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
     oss << "Taylor order: " << ta.get_order() << '\n';
