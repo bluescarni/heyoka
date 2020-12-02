@@ -9,6 +9,14 @@
 #ifndef HEYOKA_MATH_FUNCTIONS_HPP
 #define HEYOKA_MATH_FUNCTIONS_HPP
 
+#include <heyoka/config.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 
@@ -19,8 +27,14 @@ HEYOKA_DLL_PUBLIC expression sin(expression);
 HEYOKA_DLL_PUBLIC expression cos(expression);
 HEYOKA_DLL_PUBLIC expression log(expression);
 HEYOKA_DLL_PUBLIC expression exp(expression);
-HEYOKA_DLL_PUBLIC expression pow(expression, expression);
 HEYOKA_DLL_PUBLIC expression sqrt(expression);
+
+HEYOKA_DLL_PUBLIC expression pow(expression, expression);
+HEYOKA_DLL_PUBLIC expression pow(expression, double);
+HEYOKA_DLL_PUBLIC expression pow(expression, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
+#endif
 
 } // namespace heyoka
 

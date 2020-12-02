@@ -38,7 +38,7 @@ inline std::string li_to_string(const T &x)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    oss.imbue(std::locale("C"));
+    oss.imbue(std::locale::classic());
     if constexpr (std::is_floating_point_v<T>
 #if defined(HEYOKA_HAVE_REAL128)
                   || std::is_same_v<T, mppp::real128>
@@ -59,7 +59,7 @@ inline T li_from_string(const std::string &s)
     T out(0);
     std::istringstream iss(s);
     iss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-    iss.imbue(std::locale("C"));
+    iss.imbue(std::locale::classic());
     iss >> out;
     // NOTE: if we did not reach the end of the string,
     // raise an error.

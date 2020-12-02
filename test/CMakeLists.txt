@@ -1,6 +1,6 @@
 # Find the xtensor bits.
-find_package(xtensor REQUIRED)
-find_package(xtensor-blas REQUIRED)
+find_package(xtensor REQUIRED CONFIG)
+find_package(xtensor-blas REQUIRED CONFIG)
 
 add_library(heyoka_test STATIC catch_main.cpp)
 target_compile_options(heyoka_test PRIVATE
@@ -41,6 +41,7 @@ ADD_HEYOKA_TESTCASE(add_expression)
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(math_functions)
 ADD_HEYOKA_TESTCASE(gp)
+ADD_HEYOKA_TESTCASE(taylor_adaptive)
 ADD_HEYOKA_TESTCASE(taylor_div)
 ADD_HEYOKA_TESTCASE(taylor_exp)
 ADD_HEYOKA_TESTCASE(taylor_log)

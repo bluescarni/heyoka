@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <ostream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -692,6 +693,32 @@ struct taylor_adaptive_batch_t_impl<mppp::real128> {
 
 template <typename T>
 using taylor_adaptive_batch = typename detail::taylor_adaptive_batch_t_impl<T>::type;
+
+namespace detail
+{
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<T> &)
+{
+    static_assert(always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<mppp::real128> &);
+
+#endif
+
+} // namespace detail
 
 } // namespace heyoka
 

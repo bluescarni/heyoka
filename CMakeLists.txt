@@ -286,7 +286,7 @@ else()
 endif()
 
 # Mandatory dependency on fmt.
-find_package(fmt REQUIRED)
+find_package(fmt REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE fmt::fmt)
 
 # Mandatory dependency on Boost.
@@ -297,10 +297,10 @@ target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # Optional dependency on mp++.
+# NOTE: put this into a separate variable for reuse later.
+set(_HEYOKA_MIN_MPPP_VERSION "0.21")
 if(HEYOKA_WITH_MPPP)
-    # NOTE: put this into a separate variable for reuse later.
-    set(_HEYOKA_MIN_MPPP_VERSION "0.21")
-    find_package(mp++ REQUIRED)
+    find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})
         message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
     endif()
@@ -328,11 +328,7 @@ install(TARGETS heyoka
     RUNTIME DESTINATION bin
 )
 
-# Setup of the optional deps.
-set(_HEYOKA_CONFIG_OPTIONAL_DEPS)
-if(HEYOKA_WITH_MPPP)
-    set(_HEYOKA_CONFIG_OPTIONAL_DEPS "${_HEYOKA_CONFIG_OPTIONAL_DEPS}find_package(mp++ REQUIRED)\nif(\$\{mp++_VERSION\} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})\n    message(FATAL_ERROR \"mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.\")\nendif()\n")
-endif()
+# Setup of the CMake config file.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/heyoka-config.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake" @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config.cmake"
     DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
@@ -347,6 +343,9 @@ else()
     write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" COMPATIBILITY SameMinorVersion)
 endif()
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/heyoka-config-version.cmake" DESTINATION "${HEYOKA_INSTALL_LIBDIR}/cmake/heyoka")
+
+# Cleanup.
+unset(_HEYOKA_MIN_MPPP_VERSION)
 
 if(HEYOKA_BUILD_TESTS)
     enable_testing()

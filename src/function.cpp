@@ -382,7 +382,7 @@ std::ostream &operator<<(std::ostream &os, const function &f)
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
         os << args[i];
         if (i != args.size() - 1u) {
-            os << ',';
+            os << ", ";
         }
     }
 

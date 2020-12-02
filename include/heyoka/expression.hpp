@@ -51,12 +51,23 @@ private:
     value_type m_value;
 
 public:
+    expression();
+
+    explicit expression(double);
+    explicit expression(long double);
+#if defined(HEYOKA_HAVE_REAL128)
+    explicit expression(mppp::real128);
+#endif
+    explicit expression(std::string);
+
     explicit expression(number);
     explicit expression(variable);
     explicit expression(binary_operator);
     explicit expression(function);
+
     expression(const expression &);
     expression(expression &&) noexcept;
+
     ~expression();
 
     expression &operator=(const expression &);
@@ -80,7 +91,7 @@ HEYOKA_DLL_PUBLIC expression operator""_ldbl(unsigned long long);
 template <char... Chars>
 inline expression operator"" _f128()
 {
-    return expression{number{mppp::literals::operator"" _rq<Chars...>()}};
+    return expression{mppp::literals::operator"" _rq<Chars...>()};
 }
 
 #endif
@@ -129,14 +140,80 @@ HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
 
 HEYOKA_DLL_PUBLIC expression operator+(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator+(expression, double);
+HEYOKA_DLL_PUBLIC expression operator+(expression, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator+(expression, mppp::real128);
+#endif
+HEYOKA_DLL_PUBLIC expression operator+(double, expression);
+HEYOKA_DLL_PUBLIC expression operator+(long double, expression);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator+(mppp::real128, expression);
+#endif
+
 HEYOKA_DLL_PUBLIC expression operator-(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator-(expression, double);
+HEYOKA_DLL_PUBLIC expression operator-(expression, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator-(expression, mppp::real128);
+#endif
+HEYOKA_DLL_PUBLIC expression operator-(double, expression);
+HEYOKA_DLL_PUBLIC expression operator-(long double, expression);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator-(mppp::real128, expression);
+#endif
+
 HEYOKA_DLL_PUBLIC expression operator*(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator*(expression, double);
+HEYOKA_DLL_PUBLIC expression operator*(expression, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator*(expression, mppp::real128);
+#endif
+HEYOKA_DLL_PUBLIC expression operator*(double, expression);
+HEYOKA_DLL_PUBLIC expression operator*(long double, expression);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator*(mppp::real128, expression);
+#endif
+
 HEYOKA_DLL_PUBLIC expression operator/(expression, expression);
+HEYOKA_DLL_PUBLIC expression operator/(expression, double);
+HEYOKA_DLL_PUBLIC expression operator/(expression, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator/(expression, mppp::real128);
+#endif
+HEYOKA_DLL_PUBLIC expression operator/(double, expression);
+HEYOKA_DLL_PUBLIC expression operator/(long double, expression);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression operator/(mppp::real128, expression);
+#endif
 
 HEYOKA_DLL_PUBLIC expression &operator+=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator+=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator-=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator-=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator*=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator*=(expression &, mppp::real128);
+#endif
+
 HEYOKA_DLL_PUBLIC expression &operator/=(expression &, expression);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, double);
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, long double);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
+#endif
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);

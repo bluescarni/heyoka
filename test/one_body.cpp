@@ -27,7 +27,7 @@ TEST_CASE("one_body")
 
     auto r_m3 = pow(x * x + y * y + z * z, -3_dbl / 2_dbl);
 
-    auto [s_x, s_v] = kep_to_cart({1., .05, .0001, 0., 0., 0.}, 1.);
+    auto [s_x, s_v] = kep_to_cart({1., .5, .0001, 0., 0., 0.}, 1.);
 
     taylor_adaptive<double> ta{{prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = -x * r_m3,
                                 prime(vy) = -y * r_m3, prime(vz) = -z * r_m3},

@@ -14,8 +14,8 @@ if(NOT TARGET Boost::program_options)
 endif()
 
 # Find the xtensor bits.
-find_package(xtensor REQUIRED)
-find_package(xtensor-blas REQUIRED)
+find_package(xtensor REQUIRED CONFIG)
+find_package(xtensor-blas REQUIRED CONFIG)
 
 function(ADD_HEYOKA_BENCHMARK arg1)
   add_executable(${arg1} ${arg1}.cpp)
