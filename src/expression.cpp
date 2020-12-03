@@ -645,7 +645,7 @@ expression pairwise_sum(std::vector<expression> sum)
     }
 
     if (sum.empty()) {
-        return expression{number{0.}};
+        return expression{0.};
     }
 
     while (sum.size() != 1u) {
