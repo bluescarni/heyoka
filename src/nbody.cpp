@@ -6,12 +6,19 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
+#include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
+#include <initializer_list>
+#include <limits>
+#include <random>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -24,7 +31,11 @@
 #include <heyoka/square.hpp>
 #include <heyoka/variable.hpp>
 
-namespace heyoka::detail
+namespace heyoka
+{
+
+namespace detail
+
 {
 
 std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::uint32_t n, number Gconst,
@@ -214,4 +225,196 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     return retval;
 }
 
-} // namespace heyoka::detail
+namespace
+{
+
+// 3d dot product helper.
+template <typename T>
+auto dot(const T &a, const T &b)
+{
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+} // namespace
+
+} // namespace detail
+
+// Helper to generate a random elliptic orbit and convert it to cartesian variables. The min/max
+// values of a, e, i, om, Om and f are passed in the bounds array. mu is the gravitational parameter
+// of the two-body system.
+std::array<double, 6> random_elliptic_state(double mu, const std::array<std::pair<double, double>, 6> &bounds,
+                                            unsigned seed)
+{
+    using namespace fmt::literals;
+
+    // Validate input params.
+    if (!std::isfinite(mu) || mu <= 0) {
+        throw std::invalid_argument(
+            "Invalid mu parameter used in random_elliptic_state(): it must be positive and finite, but it is {} instead"_format(
+                mu));
+    }
+
+    for (const auto &b : bounds) {
+        const auto &[lb, ub] = b;
+
+        if (!std::isfinite(lb) || !std::isfinite(ub) || !(ub > lb)) {
+            throw std::invalid_argument(
+                "Invalid lower/upper bounds detected in random_elliptic_state(): the bounds must be finite and such that ub > lb, but they are [{}, {}) instead"_format(
+                    lb, ub));
+        }
+    }
+
+    // Element-specific validation.
+    const auto &[a_min, a_max] = bounds[0];
+    if (a_min <= 0) {
+        throw std::invalid_argument(
+            "Invalid minimum semi-major axis detected in random_elliptic_state(): a_min must be positive, but it is {} instead"_format(
+                a_min));
+    }
+    if ((a_max - a_min) > std::numeric_limits<double>::max()) {
+        throw std::overflow_error("Overflow error in the semi-major axis range passed to random_elliptic_state()");
+    }
+
+    const auto &[e_min, e_max] = bounds[1];
+    if (e_min <= 0 || e_max > 1) {
+        throw std::invalid_argument(
+            "Invalid eccentricity range detected in random_elliptic_state(): the range must be (0, 1), but it is [{}, {}) instead"_format(
+                e_min, e_max));
+    }
+
+    const auto &[inc_min, inc_max] = bounds[2];
+    if (inc_min <= 0 || inc_max > boost::math::constants::pi<double>()) {
+        throw std::invalid_argument(
+            "Invalid inclination range detected in random_elliptic_state(): the range must be (0, π), but it is [{}, {}) instead"_format(
+                inc_min, inc_max));
+    }
+
+    const auto &[om_min, om_max] = bounds[3];
+    if ((om_max - om_min) > std::numeric_limits<double>::max()) {
+        throw std::overflow_error("Overflow error in the omega range passed to random_elliptic_state()");
+    }
+
+    const auto &[Om_min, Om_max] = bounds[4];
+    if ((Om_max - Om_min) > std::numeric_limits<double>::max()) {
+        throw std::overflow_error("Overflow error in the Omega range passed to random_elliptic_state()");
+    }
+
+    const auto &[f_min, f_max] = bounds[5];
+    if ((f_max - f_min) > std::numeric_limits<double>::max()) {
+        throw std::overflow_error("Overflow error in the true anomaly range passed to random_elliptic_state()");
+    }
+
+    // Setup the rng.
+    static thread_local std::mt19937 rng;
+    rng.seed(static_cast<decltype(rng())>(seed));
+
+    // Throw the dice for the orbital elements.
+    std::uniform_real_distribution rdist(a_min, a_max);
+    using p_type = decltype(rdist.param());
+    const auto a = rdist(rng);
+    rdist.param(p_type(e_min, e_max));
+    const auto e = rdist(rng);
+    rdist.param(p_type(inc_min, inc_max));
+    const auto inc = rdist(rng);
+    rdist.param(p_type(om_min, om_max));
+    const auto om = rdist(rng);
+    rdist.param(p_type(Om_min, Om_max));
+    const auto Om = rdist(rng);
+    rdist.param(p_type(f_min, f_max));
+    const auto f = rdist(rng);
+
+    // Transform into cartesian state.
+    using std::atan;
+    using std::cos;
+    using std::sin;
+    using std::sqrt;
+    using std::tan;
+
+    // Fetch the elliptic anomaly.
+    const auto E = 2 * atan(sqrt((1 - e) / (1 + e)) * tan(f / 2));
+
+    // Mean motion.
+    const auto n = sqrt(mu / (a * a * a));
+
+    // Position/velocity in the orbital frame.
+    const auto q = std::array{a * (cos(E) - e), a * sqrt(1 - e * e) * sin(E), 0.};
+    const auto vq
+        = std::array{-n * a * sin(E) / (1 - e * cos(E)), n * a * sqrt(1 - e * e) * cos(E) / (1 - e * cos(E)), 0.};
+
+    // The rotation matrix.
+    const auto r1 = std::array{cos(Om) * cos(om) - sin(Om) * cos(inc) * sin(om),
+                               -cos(Om) * sin(om) - sin(Om) * cos(inc) * cos(om), sin(Om) * sin(inc)};
+    const auto r2 = std::array{sin(Om) * cos(om) + cos(Om) * cos(inc) * sin(om),
+                               -sin(Om) * sin(om) + cos(Om) * cos(inc) * cos(om), -cos(Om) * sin(inc)};
+    const auto r3 = std::array{sin(inc) * sin(om), sin(inc) * cos(om), cos(inc)};
+
+    // Final position/velocity.
+    using detail::dot;
+    const auto x = std::array{dot(r1, q), dot(r2, q), dot(r3, q)};
+    const auto v = std::array{dot(r1, vq), dot(r2, vq), dot(r3, vq)};
+
+    return {x[0], x[1], x[2], v[0], v[1], v[2]};
+}
+
+// Convert the input cartesian state into Keplerian orbital elements.
+std::array<double, 6> cartesian_to_oe(double mu, const std::array<double, 6> &s)
+{
+    if (std::any_of(s.begin(), s.end(), [](const auto &x) { return !std::isfinite(x); })) {
+        throw std::invalid_argument("Non-finite values detected in the cartesian state passed to cartesian_to_oe()");
+    }
+
+    const auto [x, y, z, vx, vy, vz] = s;
+    const auto pos = std::array{x, y, z};
+    const auto vel = std::array{vx, vy, vz};
+
+    // Cross product helper.
+    auto cross = [](const auto &a, const auto &b) {
+        auto [a1, a2, a3] = a;
+        auto [b1, b2, b3] = b;
+
+        return std::array{a2 * b3 - a3 * b2, a3 * b1 - a1 * b3, a1 * b2 - a2 * b1};
+    };
+
+    // Divide array by scalar.
+    auto div = [](const auto &a, const auto &d) { return std::array{a[0] / d, a[1] / d, a[2] / d}; };
+
+    // Array subtraction.
+    auto sub = [](const auto &a, const auto &b) { return std::array{a[0] - b[0], a[1] - b[1], a[2] - b[2]}; };
+
+    // Array norm2.
+    auto norm2 = [](const auto &a) { return a[0] * a[0] + a[1] * a[1] + a[2] * a[2]; };
+
+    // Array norm.
+    auto norm = [norm2](const auto &a) { return std::sqrt(norm2(a)); };
+
+    const auto h = cross(pos, vel);
+    const auto e_v = sub(div(cross(vel, h), mu), div(pos, norm(pos)));
+    const auto n = std::array{-h[1], h[0], 0.};
+
+    using detail::dot;
+    using std::acos;
+    auto f = acos(dot(e_v, pos) / (norm(e_v) * norm(pos)));
+    if (dot(pos, vel) < 0) {
+        f = 2 * boost::math::constants::pi<double>() - f;
+    }
+
+    const auto inc = acos(h[2] / norm(h));
+
+    const auto e = norm(e_v);
+
+    auto Om = acos(n[0] / norm(n));
+    if (n[1] < 0) {
+        Om = 2 * boost::math::constants::pi<double>() - Om;
+    }
+
+    auto om = acos(dot(n, e_v) / (norm(n) * norm(e_v)));
+    if (e_v[2] < 0) {
+        om = 2 * boost::math::constants::pi<double>() - om;
+    }
+
+    const auto a = 1 / (2 / norm(pos) - norm2(vel) / mu);
+
+    return {a, e, inc, om, Om, f};
+}
+
+} // namespace heyoka
