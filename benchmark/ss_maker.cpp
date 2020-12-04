@@ -78,9 +78,9 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 
     std::cout << "Construction time: " << elapsed << "ms\n";
 
-    // Create an xtensor view on the the state vector
-    // for ease of indexing.
+    // Create xtensor views for ease of indexing.
     auto s_array = xt::adapt(ta.get_state_data(), {nplanets + 1u, 6u});
+    auto m_array = xt::adapt(masses.data(), {nplanets + 1u});
 
     // Set the initial positions at regular intervals on the x axis
     // on circular orbits. The Sun is already in the origin with zero
@@ -93,8 +93,14 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
     }
 
     // Move the COM.
-    s_array(0, 0) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 0))[0];
-    s_array(0, 4) = -T(1) / 333000 * xt::sum(xt::view(s_array, xt::range(1, xt::placeholders::_), 4))[0];
+    const auto com_x = xt::sum(xt::view(s_array, xt::all(), 0) * m_array) / xt::sum(m_array);
+    const auto com_vx = xt::sum(xt::view(s_array, xt::all(), 4) * m_array) / xt::sum(m_array);
+    std::cout << "Original com_x: " << com_x << '\n';
+    std::cout << "Original com_vx: " << com_vx << '\n';
+    xt::view(s_array, xt::all(), 0) -= com_x;
+    xt::view(s_array, xt::all(), 4) -= com_vx;
+    std::cout << "New com_x: " << xt::sum(xt::view(s_array, xt::all(), 0) * m_array) / xt::sum(m_array) << '\n';
+    std::cout << "New com_vx: " << xt::sum(xt::view(s_array, xt::all(), 4) * m_array) / xt::sum(m_array) << '\n';
 
     std::ofstream ofs("out.txt", std::ios_base::out | std::ios_base::trunc);
     ofs.precision(std::numeric_limits<T>::max_digits10);

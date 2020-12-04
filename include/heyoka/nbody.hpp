@@ -9,7 +9,9 @@
 #ifndef HEYOKA_NBODY_HPP
 #define HEYOKA_NBODY_HPP
 
+#include <array>
 #include <cstdint>
+#include <random>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -99,6 +101,11 @@ inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32
         return detail::make_nbody_sys_fixed_masses(n, std::move(G_const), std::move(masses_vec));
     }
 }
+
+HEYOKA_DLL_PUBLIC std::array<double, 6> random_elliptic_state(double, const std::array<std::pair<double, double>, 6> &,
+                                                              unsigned = std::random_device{}());
+
+HEYOKA_DLL_PUBLIC std::array<double, 6> cartesian_to_oe(double, const std::array<double, 6> &);
 
 } // namespace heyoka
 
