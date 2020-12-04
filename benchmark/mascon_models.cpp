@@ -16,6 +16,8 @@
 
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
+#include <heyoka/mascon.hpp>
 #include <heyoka/math_functions.hpp>
 #include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
@@ -32,11 +34,6 @@
 using namespace heyoka;
 using namespace std::chrono;
 namespace odeint = boost::numeric::odeint;
-
-namespace benchmark::kw
-{
-IGOR_MAKE_NAMED_ARGUMENT(G);
-} // namespace benchmark::kw
 
 // Pairwise summation of a vector of doubles. Avoiding copies
 // https://en.wikipedia.org/wiki/Pairwise_summation
@@ -132,100 +129,6 @@ struct mascon_dynamics {
 };
 
 template <typename P, typename M>
-double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
-                      double r, double G)
-{
-    double kinetic = (x[3] * x[3] + x[4] * x[4] + x[5] * x[5]) / 2.;
-    double potential_g = 0.;
-    for (decltype(std::size(mascon_masses)) i = 0u; i < std::size(mascon_masses); ++i) {
-        double distance = std::sqrt((x[0] - mascon_points[i][0]) * (x[0] - mascon_points[i][0])
-                                    + (x[1] - mascon_points[i][1]) * (x[1] - mascon_points[i][1])
-                                    + (x[2] - mascon_points[i][2]) * (x[2] - mascon_points[i][2]));
-        potential_g -= G * mascon_masses[i] / distance;
-    }
-    double potential_c = -0.5 * (p * p + q * q + r * r) * (x[0] * x[0] + x[1] * x[1] + x[2] * x[2])
-                         + 0.5 * (x[0] * p + x[1] * q + x[2] * r) * (x[0] * p + x[1] * q + x[2] * r);
-    return kinetic + potential_g + potential_c;
-}
-
-// mascon_points -> [N,3] array containing the positions of the masses (units L)
-// mascon_masses -> [N] array containing the position of the masses (units M)
-// G -> Cavendish constant (units L^3/T^2/M)
-// pd, qd, rd -> angular velocity of the asteroid in the frame used for the mascon model (units rad/T)
-//
-// Note, units must be consistent. Choosing L and M is done via the mascon model, T is derived by the value of G. The
-// angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
-template <typename P, typename M, typename... KwArgs>
-std::vector<std::pair<expression, expression>> make_mascon_system(const P &mascon_points, const M &mascon_masses,
-                                                                  double pd, double qd, double rd, KwArgs &&...kw_args)
-{
-    // 1 - Check input consistency (TODO)
-    // 2 - We parse the unnamed arguments
-    igor::parser p{kw_args...};
-    if constexpr (p.has_unnamed_arguments()) {
-        static_assert(detail::always_false_v<KwArgs...>,
-                      "The variadic arguments in the construction of an N-body system contain "
-                      "unnamed arguments.");
-    } else {
-        // G constant (defaults to 1).
-        auto G_const = [&p]() {
-            if constexpr (p.has(benchmark::kw::G)) {
-                return expression{number{std::forward<decltype(p(benchmark::kw::G))>(p(benchmark::kw::G))}};
-            } else {
-                return expression{number{1.}};
-            }
-        }();
-
-        // 3 - Create the return value.
-        std::vector<std::pair<expression, expression>> retval;
-        // 4 - Main code
-        auto dim = std::size(mascon_masses);
-        auto [x, y, z, vx, vy, vz] = make_vars("x", "y", "z", "vx", "vy", "vz");
-        // Assemble the contributions to the x/y/z accelerations from each mass.
-        std::vector<expression> x_acc, y_acc, z_acc;
-        // Assembling the r.h.s.
-        // FIRST: the acceleration due to the mascon points
-        for (decltype(dim) i = 0; i < dim; ++i) {
-            auto x_masc = expression{number{mascon_points[i][0]}};
-            auto y_masc = expression{number{mascon_points[i][1]}};
-            auto z_masc = expression{number{mascon_points[i][2]}};
-            auto m_masc = expression{number{mascon_masses[i]}};
-            auto xdiff = (x - x_masc);
-            auto ydiff = (y - y_masc);
-            auto zdiff = (z - z_masc);
-            auto r2 = square(xdiff) + square(ydiff) + square(zdiff);
-            auto common_factor = -G_const * m_masc * pow(r2, expression{number{-3. / 2.}});
-            x_acc.push_back(common_factor * xdiff);
-            y_acc.push_back(common_factor * ydiff);
-            z_acc.push_back(common_factor * zdiff);
-        }
-        // SECOND: centripetal and Coriolis
-        auto p = expression{number{pd}};
-        auto q = expression{number{qd}};
-        auto r = expression{number{rd}};
-        // w x w x r
-        auto centripetal_x = -q * q * x - r * r * x + q * y * p + r * z * p;
-        auto centripetal_y = -p * p * y - r * r * y + p * x * q + r * z * q;
-        auto centripetal_z = -p * p * z - q * q * z + p * x * r + q * y * r;
-        // 2 w x v
-        auto coriolis_x = expression{number{2.}} * (q * vz - r * vy);
-        auto coriolis_y = expression{number{2.}} * (r * vx - p * vz);
-        auto coriolis_z = expression{number{2.}} * (p * vy - q * vx);
-
-        // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of pairwise_sum for
-        // efficiency and to allow compact mode to do his job)
-        retval.push_back(prime(x) = vx);
-        retval.push_back(prime(y) = vy);
-        retval.push_back(prime(z) = vz);
-        retval.push_back(prime(vx) = pairwise_sum(x_acc) - centripetal_x - coriolis_x);
-        retval.push_back(prime(vy) = pairwise_sum(y_acc) - centripetal_y - coriolis_y);
-        retval.push_back(prime(vz) = pairwise_sum(z_acc) - centripetal_z - coriolis_z);
-
-        return retval;
-    }
-}
-
-template <typename P, typename M>
 taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_masses, double wz, double r0 = 2.,
                                        double incl = 45., double G = 1.)
 {
@@ -234,13 +137,24 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     auto v0z = std::sin(incl / 360 * 6.28) * std::sqrt(1. / r0);
     std::vector<double> ic = {r0, 0., 0., 0., v0y, v0z};
     // Constructing the integrator.
-    auto eom = make_mascon_system(mascon_points, mascon_masses, 0., 0., wz, benchmark::kw::G = G);
+    auto eom = make_mascon_system(kw::mascon_points = mascon_points, kw::mascon_masses = mascon_masses,
+                                  kw::omega = std::vector<double>{0., 0., wz}, kw::Gconst = G);
     auto start = high_resolution_clock::now();
     taylor_adaptive<double> taylor{eom, ic, kw::compact_mode = true, kw::tol = 1e-14};
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << "Time to construct the integrator: " << duration.count() / 1e6 << "s" << std::endl;
     return taylor;
+}
+
+template <typename P, typename M>
+double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
+                      double r, double G)
+{
+    auto energy
+        = energy_mascon_system(kw::state = x, kw::mascon_points = mascon_points, kw::mascon_masses = mascon_masses,
+                               kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
+    return eval_dbl(energy, std::unordered_map<std::string, double>());
 }
 
 template <typename P, typename M>
@@ -302,7 +216,7 @@ int main(int argc, char *argv[])
 {
     auto inclination = 45.;              // degrees
     auto distance = 3.;                  // non dimensional units
-    auto integration_time = 86400. * 30; // seconds (1day of operations)
+    auto integration_time = 86400. * 1.; // seconds (1day of operations)
 
     // The non dimensional units L, T and M allow to compute the non dimensional period and hence the rotation speed.
     // 67P
