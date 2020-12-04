@@ -31,6 +31,9 @@ namespace heyoka
 namespace detail
 {
 
+namespace
+{
+
 template <typename It, typename Rng>
 It random_element(It start, It end, Rng &g)
 {
@@ -48,13 +51,7 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
         std::visit(
             [node_id, &node_counter, &ret](auto &node) {
                 using type = detail::uncvref_t<decltype(node)>;
-                if constexpr (std::is_same_v<type, binary_operator>) {
-                    fetch_from_node_id_impl(node.lhs(), node_id, node_counter, ret);
-                    if (ret) {
-                        return;
-                    }
-                    fetch_from_node_id_impl(node.rhs(), node_id, node_counter, ret);
-                } else if constexpr (std::is_same_v<type, function>) {
+                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
                     for (auto &arg : node.args()) {
                         fetch_from_node_id_impl(arg, node_id, node_counter, ret);
                         if (ret) {
@@ -73,12 +70,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
     std::visit(
         [&node_counter](auto &node) {
             using type = detail::uncvref_t<decltype(node)>;
-            if constexpr (std::is_same_v<type, binary_operator>) {
-                // code for binary_operator
-                count_nodes_impl(node.lhs(), node_counter);
-                count_nodes_impl(node.rhs(), node_counter);
-            } else if constexpr (std::is_same_v<type, function>) {
-                // code for function
+            if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
                 for (auto &arg : node.args()) {
                     count_nodes_impl(arg, node_counter);
                 }
@@ -86,6 +78,9 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
         },
         e.value());
 }
+
+} // namespace
+
 } // namespace detail
 
 expression_generator::expression_generator(const std::vector<std::string> &vars, splitmix64 &engine)
@@ -321,12 +316,8 @@ void mutate(expression &e, const expression_generator &generator, const double m
     } else {
         std::visit(
             [&generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
-                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
-                    // code for binary_operator
-                    mutate(node.lhs(), generator, mut_p, engine, min_depth, max_depth, depth + 1);
-                    mutate(node.rhs(), generator, mut_p, engine, min_depth, max_depth, depth + 1);
-                } else if constexpr (std::is_same_v<decltype(node), function &>) {
-                    // code for function
+                if constexpr (std::is_same_v<decltype(node),
+                                             function &> || std::is_same_v<decltype(node), binary_operator &>) {
                     for (auto &branch : node.args()) {
                         mutate(branch, generator, mut_p, engine, min_depth, max_depth, depth + 1);
                     }
