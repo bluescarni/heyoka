@@ -47,10 +47,17 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
         }();
 
         // mascon_points (no default)
-        std::vector<std::vector<number>> mascon_points;
+        std::vector<std::vector<expression>> mascon_points;
         if constexpr (p.has(kw::mascon_points)) {
             for (const auto &point : p(kw::mascon_points)) {
-                mascon_points.emplace_back(std::vector<number>{number{point[0]}, number{point[1]}, number{point[2]}});
+                if (std::size(point) == 3) {
+                    mascon_points.emplace_back(std::vector<expression>{
+                        expression{number{point[0]}}, expression{number{point[1]}}, expression{number{point[2]}}});
+                } else {
+                    throw std::invalid_argument("All mascon points must have a dimension of exactly 3. A dimension of "
+                                                + std::to_string(std::size(point))
+                                                + " was detected when constructing the mascon system.");
+                }
             }
         } else {
             static_assert(detail::always_false_v<KwArgs...>, "mascon_points is missing from the kwarg list!");
@@ -165,8 +172,14 @@ expression energy_mascon_system(KwArgs &&... kw_args)
         std::vector<std::vector<expression>> mascon_points;
         if constexpr (p.has(kw::mascon_points)) {
             for (const auto &point : p(kw::mascon_points)) {
-                mascon_points.emplace_back(std::vector<expression>{
-                    expression{number{point[0]}}, expression{number{point[1]}}, expression{number{point[2]}}});
+                if (std::size(point) == 3) {
+                    mascon_points.emplace_back(std::vector<expression>{
+                        expression{number{point[0]}}, expression{number{point[1]}}, expression{number{point[2]}}});
+                } else {
+                    throw std::invalid_argument("All mascon points must have a dimension of exactly 3. A dimension of "
+                                                + std::to_string(std::size(point))
+                                                + " was detected when computing the energy of the mascon system.");
+                }
             }
         } else {
             static_assert(detail::always_false_v<KwArgs...>, "mascon_points is missing from the kwarg list!");
