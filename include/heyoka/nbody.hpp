@@ -21,18 +21,11 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/number.hpp>
 
 namespace heyoka
 {
-
-namespace kw
-{
-
-IGOR_MAKE_NAMED_ARGUMENT(masses);
-IGOR_MAKE_NAMED_ARGUMENT(Gconst);
-
-} // namespace kw
 
 namespace detail
 {
@@ -65,7 +58,7 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 // y_1' = ...
 // etc.
 template <typename... KwArgs>
-inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&...kw_args)
+inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&... kw_args)
 {
     if (n < 2u) {
         throw std::invalid_argument("At least 2 bodies are needed to construct an N-body system");

@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <vector>
