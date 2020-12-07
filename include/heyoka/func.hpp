@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -66,6 +67,13 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 #if defined(HEYOKA_HAVE_REAL128)
     virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
 #endif
+
+    virtual expression diff(const std::string &) const = 0;
+
+    virtual double eval_dbl(const std::unordered_map<std::string, double> &) const = 0;
+    virtual void eval_batch_dbl(std::vector<double> &,
+                                const std::unordered_map<std::string, std::vector<double>> &) const = 0;
+    virtual double eval_num_dbl(const std::vector<double> &) const = 0;
 };
 
 template <typename T>
@@ -92,6 +100,35 @@ template <typename T>
 inline constexpr bool func_has_codegen_f128_v = std::is_same_v<detected_t<func_codegen_f128_t, T>, llvm::Value *>;
 
 #endif
+
+template <typename T>
+using func_diff_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(std::declval<const std::string &>()));
+
+template <typename T>
+inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T>, expression>;
+
+template <typename T>
+using func_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_dbl(
+    std::declval<const std::unordered_map<std::string, double> &>()));
+
+template <typename T>
+inline constexpr bool func_has_eval_dbl_v = std::is_same_v<detected_t<func_eval_dbl_t, T>, double>;
+
+template <typename T>
+using func_eval_batch_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_batch_dbl(
+    std::declval<std::vector<double> &>(),
+    std::declval<const std::unordered_map<std::string, std::vector<double>> &>()));
+
+template <typename T>
+inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
+
+template <typename T>
+using func_eval_num_dbl_t = decltype(
+    std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(std::declval<const std::vector<double> &>()));
+
+template <typename T>
+inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
 
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
@@ -131,6 +168,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 
     const std::string &get_display_name() const final
     {
+        // NOTE: make sure we are invoking the member functions
+        // from func_base (these functions could have been overriden
+        // in the derived class).
         return static_cast<const func_base *>(&m_value)->get_display_name();
     }
     const std::vector<expression> &get_args() const final
@@ -168,6 +208,46 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 #endif
+
+    // diff.
+    expression diff(const std::string &s) const final
+    {
+        if constexpr (func_has_diff_v<T>) {
+            return m_value.diff(s);
+        } else {
+            throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name()
+                                        + "'");
+        }
+    }
+
+    // eval.
+    double eval_dbl(const std::unordered_map<std::string, double> &m) const final
+    {
+        if constexpr (func_has_eval_dbl_v<T>) {
+            return m_value.eval_dbl(m);
+        } else {
+            throw not_implemented_error("double eval is not implemented for the function '" + get_display_name() + "'");
+        }
+    }
+    void eval_batch_dbl(std::vector<double> &out,
+                        const std::unordered_map<std::string, std::vector<double>> &m) const final
+    {
+        if constexpr (func_has_eval_batch_dbl_v<T>) {
+            m_value.eval_batch_dbl(out, m);
+        } else {
+            throw not_implemented_error("double batch eval is not implemented for the function '" + get_display_name()
+                                        + "'");
+        }
+    }
+    double eval_num_dbl(const std::vector<double> &v) const final
+    {
+        if constexpr (func_has_eval_num_dbl_v<T>) {
+            return m_value.eval_num_dbl(v);
+        } else {
+            throw not_implemented_error("double numerical eval is not implemented for the function '"
+                                        + get_display_name() + "'");
+        }
+    }
 };
 
 template <typename T>
@@ -223,6 +303,12 @@ public:
 #if defined(HEYOKA_HAVE_REAL128)
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
+
+    expression diff(const std::string &) const;
+
+    double eval_dbl(const std::unordered_map<std::string, double> &) const;
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
+    double eval_num_dbl(const std::vector<double> &) const;
 };
 
 } // namespace heyoka

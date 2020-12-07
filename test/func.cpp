@@ -7,8 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <string>
 #include <type_traits>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -48,6 +50,19 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr}), std::invalid_argument,
                            Message("Inconsistent number of arguments supplied to the double codegen for the function "
                                    "'f': 2 arguments were expected, but 1 arguments were provided instead"));
+    REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
+                           Message("The derivative is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}), not_implemented_error,
+                           Message("double eval is not implemented for the function 'f'"));
+    std::vector<double> tmp;
+    REQUIRE_THROWS_MATCHES(f.eval_batch_dbl(tmp, {{}}), not_implemented_error,
+                           Message("double batch eval is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.eval_num_dbl({1., 1.}), not_implemented_error,
+                           Message("double numerical eval is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.eval_num_dbl({}), std::invalid_argument,
+        Message("Inconsistent number of arguments supplied to the double numerical evaluation of the function 'f': 2 "
+                "arguments were expected, but 0 arguments were provided instead"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
@@ -139,4 +154,70 @@ TEST_CASE("func codegen")
     REQUIRE_THROWS_MATCHES(f.codegen_ldbl(s, {}), not_implemented_error,
                            Message("long double codegen is not implemented for the function 'f'"));
 #endif
+}
+
+struct func_05 : func_base {
+    func_05() : func_base("f", {}) {}
+    explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    expression diff(const std::string &) const
+    {
+        return 42_dbl;
+    }
+};
+
+TEST_CASE("func diff")
+{
+    auto f = func(func_05{});
+
+    REQUIRE(f.diff("x") == 42_dbl);
+}
+
+struct func_06 : func_base {
+    func_06() : func_base("f", {}) {}
+    explicit func_06(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    double eval_dbl(const std::unordered_map<std::string, double> &) const
+    {
+        return 42;
+    }
+};
+
+TEST_CASE("func eval_dbl")
+{
+    auto f = func(func_06{});
+
+    REQUIRE(f.eval_dbl({{}}) == 42);
+}
+
+struct func_07 : func_base {
+    func_07() : func_base("f", {}) {}
+    explicit func_07(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const {}
+};
+
+TEST_CASE("func eval_batch_dbl")
+{
+    auto f = func(func_07{});
+
+    std::vector<double> tmp;
+    REQUIRE_NOTHROW(f.eval_batch_dbl(tmp, {{}}));
+}
+
+struct func_08 : func_base {
+    func_08() : func_base("f", {}) {}
+    explicit func_08(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    double eval_num_dbl(const std::vector<double> &) const
+    {
+        return 42;
+    }
+};
+
+TEST_CASE("func eval_num_dbl")
+{
+    auto f = func(func_08{{"x"_var}});
+
+    REQUIRE(f.eval_num_dbl({1.}) == 42);
 }

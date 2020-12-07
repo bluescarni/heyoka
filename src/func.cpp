@@ -192,4 +192,32 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
 #endif
 
+expression func::diff(const std::string &s) const
+{
+    return ptr()->diff(s);
+}
+
+double func::eval_dbl(const std::unordered_map<std::string, double> &m) const
+{
+    return ptr()->eval_dbl(m);
+}
+
+void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m) const
+{
+    ptr()->eval_batch_dbl(out, m);
+}
+
+double func::eval_num_dbl(const std::vector<double> &v) const
+{
+    if (v.size() != get_args().size()) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Inconsistent number of arguments supplied to the double numerical evaluation of the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
+                get_display_name(), get_args().size(), v.size()));
+    }
+
+    return ptr()->eval_num_dbl(v);
+}
+
 } // namespace heyoka
