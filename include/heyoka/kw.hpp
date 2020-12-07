@@ -17,11 +17,10 @@ namespace heyoka
 namespace kw
 {
 
-IGOR_MAKE_NAMED_ARGUMENT(mascon_masses);
-IGOR_MAKE_NAMED_ARGUMENT(mascon_points);
+IGOR_MAKE_NAMED_ARGUMENT(masses);
+IGOR_MAKE_NAMED_ARGUMENT(points);
 IGOR_MAKE_NAMED_ARGUMENT(omega);
 IGOR_MAKE_NAMED_ARGUMENT(state);
-IGOR_MAKE_NAMED_ARGUMENT(masses);
 IGOR_MAKE_NAMED_ARGUMENT(Gconst);
 
 } // namespace kw

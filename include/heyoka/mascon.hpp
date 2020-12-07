@@ -60,8 +60,8 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
 
         // mascon_points (no default)
         std::vector<std::vector<expression>> mascon_points;
-        if constexpr (p.has(kw::mascon_points)) {
-            for (const auto &point : p(kw::mascon_points)) {
+        if constexpr (p.has(kw::points)) {
+            for (const auto &point : p(kw::points)) {
                 if (std::size(point) == 3) {
                     mascon_points.emplace_back(std::vector<expression>{
                         expression{point[0]}, expression{point[1]}, expression{point[2]}});
@@ -77,8 +77,8 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
 
         // mascon_masses (no default)
         std::vector<expression> mascon_masses;
-        if constexpr (p.has(kw::mascon_masses)) {
-            for (const auto &mass : p(kw::mascon_masses)) {
+        if constexpr (p.has(kw::masses)) {
+            for (const auto &mass : p(kw::masses)) {
                 mascon_masses.emplace_back(mass);
             }
         } else {
@@ -138,8 +138,8 @@ expression energy_mascon_system(KwArgs &&... kw_args)
         };
         // mascon_points (no default)
         std::vector<std::vector<expression>> mascon_points;
-        if constexpr (p.has(kw::mascon_points)) {
-            for (const auto &point : p(kw::mascon_points)) {
+        if constexpr (p.has(kw::points)) {
+            for (const auto &point : p(kw::points)) {
                 if (std::size(point) == 3) {
                     mascon_points.emplace_back(std::vector<expression>{
                         expression{point[0]}, expression{point[1]}, expression{point[2]}});
@@ -155,8 +155,8 @@ expression energy_mascon_system(KwArgs &&... kw_args)
 
         // mascon_masses (no default)
         std::vector<expression> mascon_masses;
-        if constexpr (p.has(kw::mascon_masses)) {
-            for (const auto &mass : p(kw::mascon_masses)) {
+        if constexpr (p.has(kw::masses)) {
+            for (const auto &mass : p(kw::masses)) {
                 mascon_masses.emplace_back(mass);
             }
         } else {

@@ -137,7 +137,7 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     auto v0z = std::sin(incl / 360 * 6.28) * std::sqrt(1. / r0);
     std::vector<double> ic = {r0, 0., 0., 0., v0y, v0z};
     // Constructing the integrator.
-    auto eom = make_mascon_system(kw::mascon_points = mascon_points, kw::mascon_masses = mascon_masses,
+    auto eom = make_mascon_system(kw::points = mascon_points, kw::masses = mascon_masses,
                                   kw::omega = std::vector<double>{0., 0., wz}, kw::Gconst = G);
     auto start = high_resolution_clock::now();
     taylor_adaptive<double> taylor{eom, ic, kw::compact_mode = true, kw::tol = 1e-14};
@@ -152,7 +152,7 @@ double compute_energy(const std::vector<double> x, const P &mascon_points, const
                       double r, double G)
 {
     auto energy
-        = energy_mascon_system(kw::state = x, kw::mascon_points = mascon_points, kw::mascon_masses = mascon_masses,
+        = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
                                kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
     return eval_dbl(energy, std::unordered_map<std::string, double>());
 }
