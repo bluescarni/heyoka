@@ -53,7 +53,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
                 mascon_points.emplace_back(std::vector<number>{number{point[0]}, number{point[1]}, number{point[2]}});
             }
         } else {
-            throw std::invalid_argument("mascon_points is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "mascon_points is missing from the kwarg list!");
         };
 
         // mascon_masses (no default)
@@ -63,7 +63,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
                 mascon_masses.emplace_back(mass);
             }
         } else {
-            throw std::invalid_argument("mascon_masses is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "mascon_masses is missing from the kwarg list!");
         };
 
         // omega (no default)
@@ -73,7 +73,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
             qn = number{p(kw::omega)[1]};
             rn = number{p(kw::omega)[2]};
         } else {
-            throw std::invalid_argument("omega is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "omega is missing from the kwarg list!");
         };
 
         // 3 - Create the return value.
@@ -159,17 +159,17 @@ expression energy_mascon_system(KwArgs &&... kw_args)
                 x.emplace_back(number{component});
             }
         } else {
-            throw std::invalid_argument("state is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "state is missing from the kwarg list!");
         };
         // mascon_points (no default)
         std::vector<std::vector<expression>> mascon_points;
         if constexpr (p.has(kw::mascon_points)) {
             for (const auto &point : p(kw::mascon_points)) {
-                mascon_points.emplace_back(
-                    std::vector<expression>{expression{number{point[0]}}, expression{number{point[1]}}, expression{number{point[2]}}});
+                mascon_points.emplace_back(std::vector<expression>{
+                    expression{number{point[0]}}, expression{number{point[1]}}, expression{number{point[2]}}});
             }
         } else {
-            throw std::invalid_argument("mascon_points is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "mascon_points is missing from the kwarg list!");
         };
 
         // mascon_masses (no default)
@@ -179,7 +179,7 @@ expression energy_mascon_system(KwArgs &&... kw_args)
                 mascon_masses.emplace_back(number{mass});
             }
         } else {
-            throw std::invalid_argument("mascon_masses is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "mascon_masses is missing from the kwarg list!");
         };
 
         // omega (no default)
@@ -189,7 +189,7 @@ expression energy_mascon_system(KwArgs &&... kw_args)
             qe = expression{number{p(kw::omega)[1]}};
             re = expression{number{p(kw::omega)[2]}};
         } else {
-            throw std::invalid_argument("omega is missing from the kwarg list!");
+            static_assert(detail::always_false_v<KwArgs...>, "omega is missing from the kwarg list!");
         };
 
         expression kinetic = expression{(x[3] * x[3] + x[4] * x[4] + x[5] * x[5]) / expression{number{2.}}};
