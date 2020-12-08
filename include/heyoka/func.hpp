@@ -46,10 +46,13 @@ public:
 
     const std::string &get_display_name() const;
     const std::vector<expression> &get_args() const;
+    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
 
 namespace detail
 {
+
+HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &, std::vector<expression> &);
 
 struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual ~func_inner_base();
@@ -61,6 +64,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     virtual const std::string &get_display_name() const = 0;
     virtual const std::vector<expression> &get_args() const = 0;
+    virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
     virtual llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
     virtual llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
@@ -75,6 +79,8 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
                                 const std::unordered_map<std::string, std::vector<double>> &) const = 0;
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
+
+    virtual std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) && = 0;
 };
 
 template <typename T>
@@ -139,6 +145,14 @@ template <typename T>
 inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_deval_num_dbl_t, T>, double>;
 
 template <typename T>
+using func_taylor_decompose_t = decltype(
+    std::declval<std::add_rvalue_reference_t<T>>().taylor_decompose(std::declval<std::vector<expression> &>()));
+
+template <typename T>
+inline constexpr bool func_has_taylor_decompose_v
+    = std::is_same_v<detected_t<func_taylor_decompose_t, T>, std::vector<expression>::size_type>;
+
+template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     T m_value;
 
@@ -184,6 +198,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     const std::vector<expression> &get_args() const final
     {
         return static_cast<const func_base *>(&m_value)->get_args();
+    }
+    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() final
+    {
+        return static_cast<func_base *>(&m_value)->get_mutable_args_it();
     }
 
     // codegen.
@@ -265,6 +283,21 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
                                         + get_display_name() + "'");
         }
     }
+
+    // Taylor.
+    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &u_vars_defs) && final
+    {
+        if constexpr (func_has_taylor_decompose_v<T>) {
+            return std::move(m_value).taylor_decompose(u_vars_defs);
+        } else {
+            func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
+
+            // TODO
+            // u_vars_defs.emplace_back(std::move(m_value));
+
+            return u_vars_defs.size() - 1u;
+        }
+    }
 };
 
 template <typename T>
@@ -327,6 +360,8 @@ public:
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+
+    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) &&;
 };
 
 } // namespace heyoka

@@ -247,3 +247,24 @@ TEST_CASE("func deval_num_dbl")
 
     REQUIRE(f.deval_num_dbl({1.}, 0) == 43);
 }
+
+struct func_10 : func_base {
+    func_10() : func_base("f", {}) {}
+    explicit func_10(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &u_vars_defs) &&
+    {
+        u_vars_defs.emplace_back("foo");
+
+        return u_vars_defs.size() - 1u;
+    }
+};
+
+TEST_CASE("func taylor_decompose")
+{
+    auto f = func(func_10{{"x"_var}});
+
+    std::vector<expression> u_vars_defs;
+    REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 0u);
+    REQUIRE(u_vars_defs == std::vector{"foo"_var});
+}

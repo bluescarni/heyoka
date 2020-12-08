@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <initializer_list>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -19,8 +20,10 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -65,12 +68,31 @@ const std::vector<expression> &func_base::get_args() const
     return *m_args;
 }
 
+std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func_base::get_mutable_args_it()
+{
+    assert(m_args);
+
+    return {m_args->begin(), m_args->end()};
+}
+
 namespace detail
 {
 
+// Default implementation of Taylor decomposition for a function.
+// NOTE: this is a generalisation of the implementation
+// for the binary operators.
+void func_default_td_impl(func_base &fb, std::vector<expression> &u_vars_defs)
+{
+    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
+        if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
+            *r.first = expression{variable{"u_" + li_to_string(dres)}};
+        }
+    }
+}
+
 func_inner_base::~func_inner_base() = default;
 
-}
+} // namespace detail
 
 func::func(const func &f) : m_ptr(f.ptr()->clone()) {}
 
@@ -237,6 +259,12 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     }
 
     return ptr()->deval_num_dbl(v, i);
+}
+
+std::vector<expression>::size_type func::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+{
+    // TODO check on the return value? In test as well.
+    return std::move(*ptr()).taylor_decompose(u_vars_defs);
 }
 
 } // namespace heyoka
