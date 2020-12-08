@@ -63,6 +63,15 @@ TEST_CASE("func minimal")
         f.eval_num_dbl({}), std::invalid_argument,
         Message("Inconsistent number of arguments supplied to the double numerical evaluation of the function 'f': 2 "
                 "arguments were expected, but 0 arguments were provided instead"));
+    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 0), not_implemented_error,
+                           Message("double numerical eval of the derivative is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1.}, 0), std::invalid_argument,
+                           Message("Inconsistent number of arguments supplied to the double numerical evaluation of "
+                                   "the derivative of function 'f': 2 "
+                                   "arguments were expected, but 1 arguments were provided instead"));
+    REQUIRE_THROWS_MATCHES(f.deval_num_dbl({1., 1.}, 2), std::invalid_argument,
+                           Message("Invalid index supplied to the double numerical evaluation of the derivative of "
+                                   "function 'f': index 2 was supplied, but the number of arguments is only 2"));
 
     REQUIRE(!std::is_constructible_v<func, func_01>);
 
@@ -220,4 +229,21 @@ TEST_CASE("func eval_num_dbl")
     auto f = func(func_08{{"x"_var}});
 
     REQUIRE(f.eval_num_dbl({1.}) == 42);
+}
+
+struct func_09 : func_base {
+    func_09() : func_base("f", {}) {}
+    explicit func_09(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const
+    {
+        return 43;
+    }
+};
+
+TEST_CASE("func deval_num_dbl")
+{
+    auto f = func(func_09{{"x"_var}});
+
+    REQUIRE(f.deval_num_dbl({1.}, 0) == 43);
 }

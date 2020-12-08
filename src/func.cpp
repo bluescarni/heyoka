@@ -220,4 +220,23 @@ double func::eval_num_dbl(const std::vector<double> &v) const
     return ptr()->eval_num_dbl(v);
 }
 
+double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const
+{
+    using namespace fmt::literals;
+
+    if (v.size() != get_args().size()) {
+        throw std::invalid_argument(
+            "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
+                get_display_name(), get_args().size(), v.size()));
+    }
+
+    if (i >= v.size()) {
+        throw std::invalid_argument(
+            "Invalid index supplied to the double numerical evaluation of the derivative of function '{}': index {} was supplied, but the number of arguments is only {}"_format(
+                get_display_name(), get_args().size(), v.size()));
+    }
+
+    return ptr()->deval_num_dbl(v, i);
+}
+
 } // namespace heyoka

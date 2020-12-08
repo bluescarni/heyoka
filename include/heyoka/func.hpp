@@ -74,6 +74,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual void eval_batch_dbl(std::vector<double> &,
                                 const std::unordered_map<std::string, std::vector<double>> &) const = 0;
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
+    virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 };
 
 template <typename T>
@@ -129,6 +130,13 @@ using func_eval_num_dbl_t = decltype(
 
 template <typename T>
 inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
+
+template <typename T>
+using func_deval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().deval_num_dbl(
+    std::declval<const std::vector<double> &>(), std::declval<std::vector<double>::size_type>()));
+
+template <typename T>
+inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_deval_num_dbl_t, T>, double>;
 
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
@@ -248,6 +256,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
                                         + get_display_name() + "'");
         }
     }
+    double deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const final
+    {
+        if constexpr (func_has_deval_num_dbl_v<T>) {
+            return m_value.deval_num_dbl(v, i);
+        } else {
+            throw not_implemented_error("double numerical eval of the derivative is not implemented for the function '"
+                                        + get_display_name() + "'");
+        }
+    }
 };
 
 template <typename T>
@@ -309,6 +326,7 @@ public:
     double eval_dbl(const std::unordered_map<std::string, double> &) const;
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
+    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 };
 
 } // namespace heyoka
