@@ -505,9 +505,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // The batch size.
     std::uint32_t m_batch_size;
     // State vectors.
-    std::vector<T> m_states;
+    std::vector<T> m_state;
     // Times.
-    std::vector<T> m_times;
+    std::vector<T> m_time;
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
@@ -542,7 +542,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     template <typename U>
     HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
     template <typename U, typename... KwArgs>
-    void finalise_ctor(U sys, std::vector<T> states, std::uint32_t batch_size, KwArgs &&...kw_args)
+    void finalise_ctor(U sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -552,7 +552,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
                           "unnamed arguments.");
         } else {
             // Initial times (defaults to a vector of zeroes).
-            auto times = [&p, batch_size]() -> std::vector<T> {
+            auto time = [&p, batch_size]() -> std::vector<T> {
                 if constexpr (p.has(kw::time)) {
                     return std::forward<decltype(p(kw::time))>(p(kw::time));
                 } else {
@@ -563,25 +563,25 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
             const auto [high_accuracy, tol, compact_mode]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
-            finalise_ctor_impl(std::move(sys), std::move(states), batch_size, std::move(times), tol, high_accuracy,
+            finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(time), tol, high_accuracy,
                                compact_mode);
         }
     }
 
 public:
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> states, std::uint32_t batch_size,
+    explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> state, std::uint32_t batch_size,
                                         KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
-        finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
+        finalise_ctor(std::move(sys), std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> states,
+    explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
                                         std::uint32_t batch_size, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
-        finalise_ctor(std::move(sys), std::move(states), batch_size, std::forward<KwArgs>(kw_args)...);
+        finalise_ctor(std::move(sys), std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
 
     taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &);
@@ -599,30 +599,30 @@ public:
     std::uint32_t get_order() const;
     std::uint32_t get_dim() const;
 
-    const std::vector<T> &get_times() const
+    const std::vector<T> &get_time() const
     {
-        return m_times;
+        return m_time;
     }
-    const T *get_times_data() const
+    const T *get_time_data() const
     {
-        return m_times.data();
+        return m_time.data();
     }
-    T *get_times_data()
+    T *get_time_data()
     {
-        return m_times.data();
+        return m_time.data();
     }
 
-    const std::vector<T> &get_states() const
+    const std::vector<T> &get_state() const
     {
-        return m_states;
+        return m_state;
     }
-    const T *get_states_data() const
+    const T *get_state_data() const
     {
-        return m_states.data();
+        return m_state.data();
     }
-    T *get_states_data()
+    T *get_state_data()
     {
-        return m_states.data();
+        return m_state.data();
     }
 
     const std::vector<std::tuple<taylor_outcome, T>> &step();

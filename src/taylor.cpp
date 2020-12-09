@@ -953,47 +953,47 @@ namespace detail
 
 template <typename T>
 template <typename U>
-void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> states, std::uint32_t batch_size,
-                                                       std::vector<T> times, T tol, bool high_accuracy,
+void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, std::uint32_t batch_size,
+                                                       std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode)
 {
     // Init the data members.
     m_batch_size = batch_size;
-    m_states = std::move(states);
-    m_times = std::move(times);
+    m_state = std::move(state);
+    m_time = std::move(time);
 
     // Check input params.
     if (m_batch_size == 0u) {
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
     }
 
-    if (std::any_of(m_states.begin(), m_states.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
         throw std::invalid_argument(
-            "A non-finite value was detected in the initial states of an adaptive Taylor integrator");
+            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
     }
 
-    if (m_states.size() % m_batch_size != 0u) {
+    if (m_state.size() % m_batch_size != 0u) {
         throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the states vector has a size of "
-                                    + std::to_string(m_states.size()) + ", which is not a multiple of the batch size ("
+                                    "integrator: the state vector has a size of "
+                                    + std::to_string(m_state.size()) + ", which is not a multiple of the batch size ("
                                     + std::to_string(m_batch_size) + ")");
     }
 
-    if (m_states.size() / m_batch_size != sys.size()) {
+    if (m_state.size() / m_batch_size != sys.size()) {
         throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the states vector has a dimension of "
-                                    + std::to_string(m_states.size() / m_batch_size)
+                                    "integrator: the state vector has a dimension of "
+                                    + std::to_string(m_state.size() / m_batch_size)
                                     + ", while the number of equations is " + std::to_string(sys.size()));
     }
 
-    if (m_times.size() != m_batch_size) {
+    if (m_time.size() != m_batch_size) {
         throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the times vector has a size of "
-                                    + std::to_string(m_times.size()) + ", which is not equal to the batch size ("
+                                    "integrator: the time vector has a size of "
+                                    + std::to_string(m_time.size()) + ", which is not equal to the batch size ("
                                     + std::to_string(m_batch_size) + ")");
     }
 
-    if (std::any_of(m_times.begin(), m_times.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !detail::isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
@@ -1036,7 +1036,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_batch_size(other.m_batch_size), m_states(other.m_states), m_times(other.m_times), m_llvm(other.m_llvm),
+    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
       m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
@@ -1094,13 +1094,13 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    m_step_f(m_states.data(), m_delta_ts.data());
+    m_step_f(m_state.data(), m_delta_ts.data());
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
     auto check_nf_batch = [this](std::uint32_t batch_idx) {
         for (std::uint32_t i = 0; i < m_dim; ++i) {
-            if (!detail::isfinite(m_states[i * m_batch_size + batch_idx])) {
+            if (!detail::isfinite(m_state[i * m_batch_size + batch_idx])) {
                 return true;
             }
         }
@@ -1112,9 +1112,9 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
         // The timestep that was actually used for
         // this batch element.
         const auto h = m_delta_ts[i];
-        m_times[i] += h;
+        m_time[i] += h;
 
-        if (!detail::isfinite(m_times[i]) || check_nf_batch(i)) {
+        if (!detail::isfinite(m_time[i]) || check_nf_batch(i)) {
             // Either the new time or state contain non-finite values,
             // return an error condition.
             m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
@@ -1176,7 +1176,7 @@ taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = m_times[i] + delta_ts[i];
+        m_pfor_ts[i] = m_time[i] + delta_ts[i];
     }
 
     return propagate_until(m_pfor_ts, max_steps);
@@ -1195,7 +1195,7 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
     }
 
     // Check the current times.
-    if (std::any_of(m_times.begin(), m_times.end(), [](const auto &t) { return !detail::isfinite(t); })) {
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !detail::isfinite(t); })) {
         throw std::invalid_argument(
             "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
             "one of the current times is not finite");
@@ -1217,12 +1217,12 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
 
     while (true) {
         // Compute the max integration times for this timestep.
-        // NOTE: ts[i] - m_times[i] is guaranteed not to be nan: ts[i] is never non-finite,
-        // and at the first iteration we have checked above the value of m_times.
-        // At successive iterations, we know that m_times[i] must be finite because
+        // NOTE: ts[i] - m_time[i] is guaranteed not to be nan: ts[i] is never non-finite,
+        // and at the first iteration we have checked above the value of m_time.
+        // At successive iterations, we know that m_time[i] must be finite because
         // otherwise we would have exited the loop when checking m_step_res.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_cur_max_delta_ts[i] = ts[i] - m_times[i];
+            m_cur_max_delta_ts[i] = ts[i] - m_time[i];
         }
 
         // Run the integration timestep.
@@ -3211,7 +3211,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     h = builder.CreateFMul(h_fac, h);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_states_var
+    auto new_state_var
         = high_accuracy
               ? taylor_run_ceval<T>(s, diff_variant, h, n_eq, n_uvars, order, batch_size, high_accuracy, compact_mode)
               : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
@@ -3220,24 +3220,24 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // NOTE: no need to perform overflow check on n_eq * batch_size,
     // as in taylor_compute_jet() we already checked.
     if (compact_mode) {
-        auto new_states = std::get<llvm::Value *>(new_states_var);
+        auto new_state = std::get<llvm::Value *>(new_state_var);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(new_states, {cur_var_idx}));
+            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(new_state, {cur_var_idx}));
             store_vector_to_memory(
                 builder,
                 builder.CreateInBoundsGEP(state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
                 val);
         });
     } else {
-        const auto &new_states = std::get<std::vector<llvm::Value *>>(new_states_var);
+        const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
 
-        assert(new_states.size() == n_eq);
+        assert(new_state.size() == n_eq);
 
         for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
             store_vector_to_memory(builder,
                                    builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
-                                   new_states[var_idx]);
+                                   new_state[var_idx]);
         }
     }
 
