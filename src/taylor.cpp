@@ -1312,6 +1312,12 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
 }
 
 template <typename T>
+std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
+{
+    return m_batch_size;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
 {
     return m_dim;
@@ -3536,6 +3542,39 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     return os << oss.str();
 }
 
+// Implementation of the streaming operator for the batch integrators.
+template <typename T>
+std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_adaptive_batch_impl<T> &ta)
+{
+    std::ostringstream oss;
+    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    oss.imbue(std::locale::classic());
+    oss << std::showpoint;
+    oss.precision(std::numeric_limits<T>::max_digits10);
+
+    oss << "Taylor order: " << ta.get_order() << '\n';
+    oss << "Dimension   : " << ta.get_dim() << '\n';
+    oss << "Batch size  : " << ta.get_batch_size() << '\n';
+    oss << "Time        : [";
+    for (decltype(ta.get_time().size()) i = 0; i < ta.get_time().size(); ++i) {
+        oss << ta.get_time()[i];
+        if (i != ta.get_time().size() - 1u) {
+            oss << ", ";
+        }
+    }
+    oss << "]\n";
+    oss << "State       : [";
+    for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
+        oss << ta.get_state()[i];
+        if (i != ta.get_state().size() - 1u) {
+            oss << ", ";
+        }
+    }
+    oss << "]\n";
+
+    return os << oss.str();
+}
+
 } // namespace
 
 template <>
@@ -3556,6 +3595,28 @@ template <>
 std::ostream &operator<<(std::ostream &os, const taylor_adaptive_impl<mppp::real128> &ta)
 {
     return taylor_adaptive_stream_impl(os, ta);
+}
+
+#endif
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<double> &ta)
+{
+    return taylor_adaptive_batch_stream_impl(os, ta);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<long double> &ta)
+{
+    return taylor_adaptive_batch_stream_impl(os, ta);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp::real128> &ta)
+{
+    return taylor_adaptive_batch_stream_impl(os, ta);
 }
 
 #endif
