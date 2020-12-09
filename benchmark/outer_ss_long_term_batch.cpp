@@ -119,7 +119,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
 
     // Create xtensor views on the the state and mass vectors
     // for ease of indexing.
-    auto s_array = xt::adapt(ta.get_states_data(), {6, 6, boost::numeric_cast<int>(batch_size)});
+    auto s_array = xt::adapt(ta.get_state_data(), {6, 6, boost::numeric_cast<int>(batch_size)});
     auto m_array = xt::adapt(masses.data(), {6, boost::numeric_cast<int>(batch_size)});
 
     // Cache the total mass.
@@ -261,7 +261,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
     }
 
     // Fetch a reference to the vector of times in the simulation.
-    const auto &times_v = ta.get_times();
+    const auto &times_v = ta.get_time();
     const auto t_begin = times_v.begin();
     const auto t_end = times_v.end();
 
