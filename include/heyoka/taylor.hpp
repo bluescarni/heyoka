@@ -596,6 +596,7 @@ public:
 
     const std::vector<expression> &get_decomposition() const;
 
+    std::uint32_t get_batch_size() const;
     std::uint32_t get_order() const;
     std::uint32_t get_dim() const;
 
@@ -715,6 +716,27 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_impl<mppp::real128> &);
+
+#endif
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<T> &)
+{
+    static_assert(always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive_batch_impl<mppp::real128> &);
 
 #endif
 
