@@ -39,9 +39,6 @@ public:
     func_base(const func_base &);
     func_base(func_base &&) noexcept;
 
-    func_base &operator=(const func_base &);
-    func_base &operator=(func_base &&) noexcept;
-
     ~func_base();
 
     const std::string &get_display_name() const;
@@ -81,6 +78,11 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
     virtual std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) && = 0;
+    virtual llvm::Value *taylor_u_init_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const = 0;
+    virtual llvm::Value *taylor_u_init_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const = 0;
+#if defined(HEYOKA_HAVE_REAL128)
+    virtual llvm::Value *taylor_u_init_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const = 0;
+#endif
 };
 
 template <typename T>
@@ -151,6 +153,34 @@ using func_taylor_decompose_t = decltype(
 template <typename T>
 inline constexpr bool func_has_taylor_decompose_v
     = std::is_same_v<detected_t<func_taylor_decompose_t, T>, std::vector<expression>::size_type>;
+
+template <typename T>
+using func_taylor_u_init_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().taylor_u_init_dbl(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<std::uint32_t>()));
+
+template <typename T>
+inline constexpr bool func_has_taylor_u_init_dbl_v
+    = std::is_same_v<detected_t<func_taylor_u_init_dbl_t, T>, llvm::Value *>;
+
+template <typename T>
+using func_taylor_u_init_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().taylor_u_init_ldbl(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<std::uint32_t>()));
+
+template <typename T>
+inline constexpr bool func_has_taylor_u_init_ldbl_v
+    = std::is_same_v<detected_t<func_taylor_u_init_ldbl_t, T>, llvm::Value *>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <typename T>
+using func_taylor_u_init_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().taylor_u_init_f128(
+    std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>(), std::declval<std::uint32_t>()));
+
+template <typename T>
+inline constexpr bool func_has_taylor_u_init_f128_v
+    = std::is_same_v<detected_t<func_taylor_u_init_f128_t, T>, llvm::Value *>;
+
+#endif
 
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
@@ -229,7 +259,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_codegen_f128_v<T>) {
             return m_value.codegen_f128(s, v);
         } else {
-            throw not_implemented_error("real128 codegen is not implemented for the function '" + get_display_name()
+            throw not_implemented_error("float128 codegen is not implemented for the function '" + get_display_name()
                                         + "'");
         }
     }
@@ -298,6 +328,38 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return u_vars_defs.size() - 1u;
         }
     }
+    llvm::Value *taylor_u_init_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                   std::uint32_t batch_size) const final
+    {
+        if constexpr (func_has_taylor_u_init_dbl_v<T>) {
+            return m_value.taylor_u_init_dbl(s, arr, batch_size);
+        } else {
+            throw not_implemented_error("double Taylor u init is not implemented for the function '"
+                                        + get_display_name() + "'");
+        }
+    }
+    llvm::Value *taylor_u_init_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                    std::uint32_t batch_size) const final
+    {
+        if constexpr (func_has_taylor_u_init_ldbl_v<T>) {
+            return m_value.taylor_u_init_ldbl(s, arr, batch_size);
+        } else {
+            throw not_implemented_error("long double Taylor u init is not implemented for the function '"
+                                        + get_display_name() + "'");
+        }
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_u_init_f128(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                    std::uint32_t batch_size) const final
+    {
+        if constexpr (func_has_taylor_u_init_f128_v<T>) {
+            return m_value.taylor_u_init_f128(s, arr, batch_size);
+        } else {
+            throw not_implemented_error("float128 Taylor u init is not implemented for the function '"
+                                        + get_display_name() + "'");
+        }
+    }
+#endif
 };
 
 template <typename T>
@@ -347,6 +409,7 @@ public:
 
     const std::string &get_display_name() const;
     const std::vector<expression> &get_args() const;
+    std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -362,6 +425,11 @@ public:
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
     std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) &&;
+    llvm::Value *taylor_u_init_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const;
+    llvm::Value *taylor_u_init_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_u_init_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const;
+#endif
 };
 
 } // namespace heyoka

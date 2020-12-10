@@ -20,6 +20,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -42,17 +43,6 @@ func_base::func_base(const func_base &other)
 }
 
 func_base::func_base(func_base &&) noexcept = default;
-
-func_base &func_base::operator=(const func_base &other)
-{
-    if (this != &other) {
-        *this = func_base(other);
-    }
-
-    return *this;
-}
-
-func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
 
@@ -150,6 +140,11 @@ const std::vector<expression> &func::get_args() const
     return ptr()->get_args();
 }
 
+std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func::get_mutable_args_it()
+{
+    return ptr()->get_mutable_args_it();
+}
+
 llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
     using namespace fmt::literals;
@@ -158,6 +153,10 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_display_name(), get_args().size(), v.size()));
+    }
+
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument("Null pointer detected in the array of values passed to func::codegen_dbl()");
     }
 
     auto ret = ptr()->codegen_dbl(s, v);
@@ -180,6 +179,10 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
                 get_display_name(), get_args().size(), v.size()));
     }
 
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument("Null pointer detected in the array of values passed to func::codegen_ldbl()");
+    }
+
     auto ret = ptr()->codegen_ldbl(s, v);
 
     if (ret == nullptr) {
@@ -198,15 +201,19 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
     if (v.size() != get_args().size()) {
         throw std::invalid_argument(
-            "Inconsistent number of arguments supplied to the real128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
+            "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_display_name(), get_args().size(), v.size()));
+    }
+
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument("Null pointer detected in the array of values passed to func::codegen_f128()");
     }
 
     auto ret = ptr()->codegen_f128(s, v);
 
     if (ret == nullptr) {
         throw std::invalid_argument(
-            "The real128 codegen for the function '{}' returned a null pointer"_format(get_display_name()));
+            "The float128 codegen for the function '{}' returned a null pointer"_format(get_display_name()));
     }
 
     return ret;
@@ -266,5 +273,71 @@ std::vector<expression>::size_type func::taylor_decompose(std::vector<expression
     // TODO check on the return value? In test as well.
     return std::move(*ptr()).taylor_decompose(u_vars_defs);
 }
+
+llvm::Value *func::taylor_u_init_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                     std::uint32_t batch_size) const
+{
+    if (batch_size == 0u) {
+        throw std::invalid_argument("Zero batch size detected in func::taylor_u_init_dbl()");
+    }
+
+    if (detail::llvm_valvec_has_null(arr)) {
+        throw std::invalid_argument("Null pointer detected in the array of values passed to func::taylor_u_init_dbl()");
+    }
+
+    auto retval = ptr()->taylor_u_init_dbl(s, arr, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument("Null return value detected in func::taylor_u_init_dbl()");
+    }
+
+    return retval;
+}
+
+llvm::Value *func::taylor_u_init_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                      std::uint32_t batch_size) const
+{
+    if (batch_size == 0u) {
+        throw std::invalid_argument("Zero batch size detected in func::taylor_u_init_ldbl()");
+    }
+
+    if (detail::llvm_valvec_has_null(arr)) {
+        throw std::invalid_argument(
+            "Null pointer detected in the array of values passed to func::taylor_u_init_ldbl()");
+    }
+
+    auto retval = ptr()->taylor_u_init_ldbl(s, arr, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument("Null return value detected in func::taylor_u_init_ldbl()");
+    }
+
+    return retval;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *func::taylor_u_init_f128(llvm_state &s, const std::vector<llvm::Value *> &arr,
+                                      std::uint32_t batch_size) const
+{
+    if (batch_size == 0u) {
+        throw std::invalid_argument("Zero batch size detected in func::taylor_u_init_f128()");
+    }
+
+    if (detail::llvm_valvec_has_null(arr)) {
+        throw std::invalid_argument(
+            "Null pointer detected in the array of values passed to func::taylor_u_init_f128()");
+    }
+
+    auto retval = ptr()->taylor_u_init_f128(s, arr, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument("Null return value detected in func::taylor_u_init_f128()");
+    }
+
+    return retval;
+}
+
+#endif
 
 } // namespace heyoka

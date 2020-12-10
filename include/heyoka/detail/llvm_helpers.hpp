@@ -16,10 +16,9 @@
 #include <typeinfo>
 #include <vector>
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
 
 namespace heyoka::detail
 {
@@ -83,6 +82,8 @@ HEYOKA_DLL_PUBLIC std::string llvm_type_name(llvm::Type *);
 HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *, const std::vector<llvm::Type *> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
+
+bool llvm_valvec_has_null(const std::vector<llvm::Value *> &);
 
 } // namespace heyoka::detail
 

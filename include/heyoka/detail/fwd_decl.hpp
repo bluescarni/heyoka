@@ -17,6 +17,8 @@ class expression;
 class variable;
 class number;
 
+class llvm_state;
+
 } // namespace heyoka
 
 #endif

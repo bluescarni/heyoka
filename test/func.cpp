@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -27,6 +28,7 @@ using namespace heyoka;
 
 struct func_00 : func_base {
     func_00() : func_base("f", {}) {}
+    func_00(const std::string &name) : func_base(name, {}) {}
     explicit func_00(std::vector<expression> args) : func_base("f", std::move(args)) {}
 };
 
@@ -42,14 +44,13 @@ TEST_CASE("func minimal")
     REQUIRE(f.get_display_name() == "f");
     REQUIRE(f.get_args() == std::vector{"x"_var, "y"_var});
 
-    REQUIRE(!detail::func_has_codegen_dbl_v<func_00>);
+    REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument,
+                           Message("Cannot create a function with no display name"));
 
     llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr, nullptr}), not_implemented_error,
+    auto fake_val = reinterpret_cast<llvm::Value *>(&s);
+    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {fake_val, fake_val}), not_implemented_error,
                            Message("double codegen is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr}), std::invalid_argument,
-                           Message("Inconsistent number of arguments supplied to the double codegen for the function "
-                                   "'f': 2 arguments were expected, but 1 arguments were provided instead"));
     REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}), not_implemented_error,
@@ -92,6 +93,16 @@ TEST_CASE("func minimal")
 
     f = std::move(f3);
     REQUIRE(f.get_ptr() == orig_ptr);
+
+    f = func{func_00{{"x"_var, "y"_var}}};
+    auto [b, e] = f.get_mutable_args_it();
+    *b = "z"_var;
+    REQUIRE(f.get_args() == std::vector{"z"_var, "y"_var});
+
+    // TODO better test down the line.
+    std::vector<expression> empty;
+    f = func{func_00{{"x"_var, "y"_var}}};
+    std::move(f).taylor_decompose(empty);
 }
 
 struct func_02 : func_base {
@@ -137,11 +148,21 @@ TEST_CASE("func codegen")
     llvm_state s;
     REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {}), std::invalid_argument,
                            Message("The double codegen for the function 'f' returned a null pointer"));
+    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr}), std::invalid_argument,
+                           Message("Inconsistent number of arguments supplied to the double codegen for the function "
+                                   "'f': 0 arguments were expected, but 1 arguments were provided instead"));
     REQUIRE_THROWS_MATCHES(f.codegen_ldbl(s, {}), not_implemented_error,
                            Message("long double codegen is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.codegen_ldbl(s, {nullptr}), std::invalid_argument,
+        Message("Inconsistent number of arguments supplied to the long double codegen for the function "
+                "'f': 0 arguments were expected, but 1 arguments were provided instead"));
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE_THROWS_MATCHES(f.codegen_f128(s, {}), not_implemented_error,
-                           Message("real128 codegen is not implemented for the function 'f'"));
+                           Message("float128 codegen is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.codegen_f128(s, {nullptr}), std::invalid_argument,
+                           Message("Inconsistent number of arguments supplied to the float128 codegen for the function "
+                                   "'f': 0 arguments were expected, but 1 arguments were provided instead"));
 #endif
 
     f = func(func_03{{}});
@@ -151,17 +172,27 @@ TEST_CASE("func codegen")
                            Message("double codegen is not implemented for the function 'f'"));
 #if defined(HEYOKA_HAVE_REAL128)
     REQUIRE_THROWS_MATCHES(f.codegen_f128(s, {}), not_implemented_error,
-                           Message("real128 codegen is not implemented for the function 'f'"));
+                           Message("float128 codegen is not implemented for the function 'f'"));
 #endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     f = func(func_04{{}});
     REQUIRE_THROWS_MATCHES(f.codegen_f128(s, {}), std::invalid_argument,
-                           Message("The real128 codegen for the function 'f' returned a null pointer"));
+                           Message("The float128 codegen for the function 'f' returned a null pointer"));
     REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {}), not_implemented_error,
                            Message("double codegen is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.codegen_ldbl(s, {}), not_implemented_error,
                            Message("long double codegen is not implemented for the function 'f'"));
+#endif
+
+    f = func(func_02{{"x"_var}});
+    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr}), std::invalid_argument,
+                           Message("Null pointer detected in the array of values passed to func::codegen_dbl()"));
+    REQUIRE_THROWS_MATCHES(f.codegen_ldbl(s, {nullptr}), std::invalid_argument,
+                           Message("Null pointer detected in the array of values passed to func::codegen_ldbl()"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(f.codegen_f128(s, {nullptr}), std::invalid_argument,
+                           Message("Null pointer detected in the array of values passed to func::codegen_f128()"));
 #endif
 }
 
@@ -267,4 +298,71 @@ TEST_CASE("func taylor_decompose")
     std::vector<expression> u_vars_defs;
     REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 0u);
     REQUIRE(u_vars_defs == std::vector{"foo"_var});
+}
+
+struct func_11 : func_base {
+    func_11() : func_base("f", {}) {}
+    explicit func_11(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    llvm::Value *taylor_u_init_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
+    {
+        return nullptr;
+    }
+    llvm::Value *taylor_u_init_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
+    {
+        return nullptr;
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_u_init_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
+    {
+        return nullptr;
+    }
+#endif
+};
+
+TEST_CASE("func taylor u init")
+{
+    using Catch::Matchers::Message;
+
+    auto f = func(func_00{});
+
+    llvm_state s;
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 1), not_implemented_error,
+                           Message("double Taylor u init is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 1), not_implemented_error,
+                           Message("long double Taylor u init is not implemented for the function 'f'"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 1), not_implemented_error,
+                           Message("float128 Taylor u init is not implemented for the function 'f'"));
+#endif
+
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_u_init_dbl()"));
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_u_init_ldbl()"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_u_init_f128()"));
+#endif
+
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {nullptr}, 1), std::invalid_argument,
+                           Message("Null pointer detected in the array of values passed to func::taylor_u_init_dbl()"));
+    REQUIRE_THROWS_MATCHES(
+        f.taylor_u_init_ldbl(s, {nullptr}, 1), std::invalid_argument,
+        Message("Null pointer detected in the array of values passed to func::taylor_u_init_ldbl()"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(
+        f.taylor_u_init_f128(s, {nullptr}, 1), std::invalid_argument,
+        Message("Null pointer detected in the array of values passed to func::taylor_u_init_f128()"));
+#endif
+
+    f = func(func_11{});
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 1), std::invalid_argument,
+                           Message("Null return value detected in func::taylor_u_init_dbl()"));
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 1), std::invalid_argument,
+                           Message("Null return value detected in func::taylor_u_init_ldbl()"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 1), std::invalid_argument,
+                           Message("Null return value detected in func::taylor_u_init_f128()"));
+#endif
 }
