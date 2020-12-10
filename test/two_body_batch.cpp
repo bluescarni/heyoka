@@ -118,14 +118,14 @@ TEST_CASE("two body batch")
                                         kw::high_accuracy = ha,
                                         kw::compact_mode = cm};
 
-        const auto &bst = tab.get_states();
+        const auto &bst = tab.get_state();
         auto bst_copy(bst);
-        auto times_copy(tab.get_times());
+        auto times_copy(tab.get_time());
 
         for (auto _ = 0; _ < 200; ++_) {
             // Copy the batch state/times before propagation.
             bst_copy = bst;
-            times_copy = tab.get_times();
+            times_copy = tab.get_time();
 
             const auto &res = tab.step();
 

@@ -167,6 +167,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/function.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/square.cpp"
