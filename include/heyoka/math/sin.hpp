@@ -9,6 +9,8 @@
 #ifndef HEYOKA_MATH_SIN_HPP
 #define HEYOKA_MATH_SIN_HPP
 
+#include <vector>
+
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
