@@ -40,6 +40,7 @@ sin_impl::sin_impl() : sin_impl(0_dbl) {}
 llvm::Value *sin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
+    assert(args[0] != nullptr);
 
     if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "sin", vec_t->getElementType(),
@@ -61,6 +62,7 @@ llvm::Value *sin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
 llvm::Value *sin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
+    assert(args[0] != nullptr);
 
     return llvm_invoke_intrinsic(s, "llvm.sin", {args[0]->getType()}, args);
 }
@@ -70,6 +72,7 @@ llvm::Value *sin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value
 llvm::Value *sin_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
+    assert(args[0] != nullptr);
 
     auto &builder = s.builder();
 
