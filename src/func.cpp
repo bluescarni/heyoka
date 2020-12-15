@@ -428,4 +428,85 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
+llvm::Function *func::taylor_c_diff_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+{
+    using namespace fmt::literals;
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument(
+            "Zero batch size detected in func::taylor_c_diff_dbl() for the function '{}'"_format(get_display_name()));
+    }
+
+    if (n_uvars == 0u) {
+        throw std::invalid_argument(
+            "Zero number of u variables detected in func::taylor_c_diff_dbl() for the function '{}'"_format(
+                get_display_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_dbl(s, n_uvars, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument(
+            "Null return value detected in func::taylor_c_diff_dbl() for the function '{}'"_format(get_display_name()));
+    }
+
+    return retval;
+}
+
+llvm::Function *func::taylor_c_diff_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+{
+    using namespace fmt::literals;
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument(
+            "Zero batch size detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(get_display_name()));
+    }
+
+    if (n_uvars == 0u) {
+        throw std::invalid_argument(
+            "Zero number of u variables detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(
+                get_display_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_ldbl(s, n_uvars, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument(
+            "Null return value detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(
+                get_display_name()));
+    }
+
+    return retval;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *func::taylor_c_diff_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+{
+    using namespace fmt::literals;
+
+    if (batch_size == 0u) {
+        throw std::invalid_argument(
+            "Zero batch size detected in func::taylor_c_diff_f128() for the function '{}'"_format(get_display_name()));
+    }
+
+    if (n_uvars == 0u) {
+        throw std::invalid_argument(
+            "Zero number of u variables detected in func::taylor_c_diff_f128() for the function '{}'"_format(
+                get_display_name()));
+    }
+
+    auto retval = ptr()->taylor_c_diff_f128(s, n_uvars, batch_size);
+
+    if (retval == nullptr) {
+        throw std::invalid_argument(
+            "Null return value detected in func::taylor_c_diff_f128() for the function '{}'"_format(
+                get_display_name()));
+    }
+
+    return retval;
+}
+
+#endif
+
 } // namespace heyoka
