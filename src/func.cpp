@@ -11,11 +11,13 @@
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <typeindex>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -44,7 +46,7 @@ func_base::func_base(std::string display_name, std::vector<expression> args)
 }
 
 func_base::func_base(const func_base &other)
-    : m_display_name(other.m_display_name), m_args(std::make_unique<std::vector<expression>>(other.get_args()))
+    : m_display_name(other.m_display_name), m_args(std::make_unique<std::vector<expression>>(other.args()))
 {
 }
 
@@ -57,7 +59,7 @@ const std::string &func_base::get_display_name() const
     return m_display_name;
 }
 
-const std::vector<expression> &func_base::get_args() const
+const std::vector<expression> &func_base::args() const
 {
     assert(m_args);
 
@@ -153,9 +155,9 @@ const std::string &func::get_display_name() const
     return ptr()->get_display_name();
 }
 
-const std::vector<expression> &func::get_args() const
+const std::vector<expression> &func::args() const
 {
-    return ptr()->get_args();
+    return ptr()->args();
 }
 
 std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func::get_mutable_args_it()
@@ -167,10 +169,10 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
 {
     using namespace fmt::literals;
 
-    if (v.size() != get_args().size()) {
+    if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
@@ -193,10 +195,10 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
 {
     using namespace fmt::literals;
 
-    if (v.size() != get_args().size()) {
+    if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
@@ -221,10 +223,10 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 {
     using namespace fmt::literals;
 
-    if (v.size() != get_args().size()) {
+    if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
@@ -262,12 +264,12 @@ void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std
 
 double func::eval_num_dbl(const std::vector<double> &v) const
 {
-    if (v.size() != get_args().size()) {
+    if (v.size() != args().size()) {
         using namespace fmt::literals;
 
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     return ptr()->eval_num_dbl(v);
@@ -277,16 +279,16 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
 {
     using namespace fmt::literals;
 
-    if (v.size() != get_args().size()) {
+    if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     if (i >= v.size()) {
         throw std::invalid_argument(
             "Invalid index supplied to the double numerical evaluation of the derivative of function '{}': index {} was supplied, but the number of arguments is only {}"_format(
-                get_display_name(), get_args().size(), v.size()));
+                get_display_name(), args().size(), v.size()));
     }
 
     return ptr()->deval_num_dbl(v, i);
@@ -554,7 +556,7 @@ std::ostream &operator<<(std::ostream &os, const func &f)
 {
     os << f.get_display_name() << '(';
 
-    const auto &args = f.get_args();
+    const auto &args = f.args();
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
         os << args[i];
         if (i != args.size() - 1u) {
@@ -575,7 +577,7 @@ std::size_t hash(const func &f)
 
     boost::hash_combine(seed, f.get_type_index());
 
-    for (const auto &arg : f.get_args()) {
+    for (const auto &arg : f.args()) {
         boost::hash_combine(seed, hash(arg));
     }
 
@@ -585,12 +587,52 @@ std::size_t hash(const func &f)
 bool operator==(const func &a, const func &b)
 {
     return a.get_display_name() == b.get_display_name() && a.get_type_index() == b.get_type_index()
-           && a.get_args() == b.get_args();
+           && a.args() == b.args();
 }
 
 bool operator!=(const func &a, const func &b)
 {
     return !(a == b);
+}
+
+std::vector<std::string> get_variables(const func &f)
+{
+    std::vector<std::string> ret;
+
+    for (const auto &arg : f.args()) {
+        auto tmp = get_variables(arg);
+        ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
+        std::sort(ret.begin(), ret.end());
+        ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+    }
+
+    return ret;
+}
+
+void rename_variables(func &f, const std::unordered_map<std::string, std::string> &repl_map)
+{
+    for (auto [b, e] = f.get_mutable_args_it(); b != e; ++b) {
+        rename_variables(*b, repl_map);
+    }
+}
+
+// NOTE: implementing this in-place would perform better.
+expression subs(const func &f, const std::unordered_map<std::string, expression> &smap)
+{
+    auto tmp = f;
+
+    for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
+        *b = subs(*b, smap);
+    }
+
+    // TODO fix and test.
+    // return expression{std::move(tmp)};
+    return expression{};
+}
+
+expression diff(const func &f, const std::string &s)
+{
+    return f.diff(s);
 }
 
 } // namespace heyoka

@@ -45,7 +45,7 @@ public:
     ~func_base();
 
     const std::string &get_display_name() const;
-    const std::vector<expression> &get_args() const;
+    const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
 
@@ -63,7 +63,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual void *get_ptr() = 0;
 
     virtual const std::string &get_display_name() const = 0;
-    virtual const std::vector<expression> &get_args() const = 0;
+    virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
     virtual llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
@@ -299,9 +299,9 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         // in the derived class).
         return static_cast<const func_base *>(&m_value)->get_display_name();
     }
-    const std::vector<expression> &get_args() const final
+    const std::vector<expression> &args() const final
     {
-        return static_cast<const func_base *>(&m_value)->get_args();
+        return static_cast<const func_base *>(&m_value)->args();
     }
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() final
     {
@@ -547,7 +547,7 @@ public:
     void *get_ptr();
 
     const std::string &get_display_name() const;
-    const std::vector<expression> &get_args() const;
+    const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -590,6 +590,13 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
 
 HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
+
+HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const func &);
+HEYOKA_DLL_PUBLIC void rename_variables(func &, const std::unordered_map<std::string, std::string> &);
+
+HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::string, expression> &);
+
+HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 
 } // namespace heyoka
 

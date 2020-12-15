@@ -44,7 +44,7 @@ TEST_CASE("func minimal")
     func f(func_00{{"x"_var, "y"_var}});
     REQUIRE(f.get_type_index() == typeid(func_00));
     REQUIRE(f.get_display_name() == "f");
-    REQUIRE(f.get_args() == std::vector{"x"_var, "y"_var});
+    REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument,
                            Message("Cannot create a function with no display name"));
@@ -96,7 +96,7 @@ TEST_CASE("func minimal")
     REQUIRE(orig_ptr != f2.get_ptr());
     REQUIRE(f2.get_type_index() == typeid(func_00));
     REQUIRE(f2.get_display_name() == "f");
-    REQUIRE(f2.get_args() == std::vector{"x"_var, "y"_var});
+    REQUIRE(f2.args() == std::vector{"x"_var, "y"_var});
 
     auto f3(std::move(f));
     REQUIRE(orig_ptr == f3.get_ptr());
@@ -110,7 +110,7 @@ TEST_CASE("func minimal")
     f = func{func_00{{"x"_var, "y"_var}}};
     auto [b, e] = f.get_mutable_args_it();
     *b = "z"_var;
-    REQUIRE(f.get_args() == std::vector{"z"_var, "y"_var});
+    REQUIRE(f.args() == std::vector{"z"_var, "y"_var});
 
     REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 2, 2, 0), std::invalid_argument,
                            Message("Zero batch size detected in func::taylor_diff_dbl() for the function 'f'"));
@@ -508,8 +508,8 @@ TEST_CASE("func swap")
 
     REQUIRE(f1.get_type_index() == typeid(func_11));
     REQUIRE(f2.get_type_index() == typeid(func_10));
-    REQUIRE(f1.get_args() == std::vector{"y"_var});
-    REQUIRE(f2.get_args() == std::vector{"x"_var});
+    REQUIRE(f1.args() == std::vector{"y"_var});
+    REQUIRE(f2.args() == std::vector{"x"_var});
 
     REQUIRE(std::is_nothrow_swappable_v<func>);
 }
@@ -575,4 +575,58 @@ TEST_CASE("func eq ineq")
 
     REQUIRE(f3 != f4);
     REQUIRE(!(f3 == f4));
+}
+
+TEST_CASE("func get_variables")
+{
+    auto f1 = func(func_10{{}});
+    REQUIRE(get_variables(f1).empty());
+
+    f1 = func(func_10{{0_dbl}});
+    REQUIRE(get_variables(f1).empty());
+
+    f1 = func(func_10{{0_dbl, "x"_var}});
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"x"});
+
+    f1 = func(func_10{{0_dbl, "y"_var, "x"_var}});
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y"});
+    f1 = func(func_10{{0_dbl, "y"_var, "x"_var, 1_dbl, "x"_var, "y"_var, "z"_var}});
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y", "z"});
+}
+
+TEST_CASE("func rename_variables")
+{
+    auto f1 = func(func_10{{}});
+    auto f2 = f1;
+    rename_variables(f1, {{}});
+    REQUIRE(f2 == f1);
+
+    f1 = func(func_10{{0_dbl, "x"_var}});
+    f2 = f1;
+    rename_variables(f1, {{}});
+    REQUIRE(f2 == f1);
+
+    rename_variables(f1, {{"x", "y"}});
+    REQUIRE(f2 != f1);
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+    rename_variables(f1, {{"x", "y"}});
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+
+    f1 = func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}});
+    rename_variables(f1, {{"x", "y"}});
+    REQUIRE(f2 != f1);
+    REQUIRE(get_variables(f1) == std::vector<std::string>{"y", "z"});
+}
+
+TEST_CASE("func diff free func")
+{
+    using Catch::Matchers::Message;
+
+    auto f1 = func(func_05{{}});
+
+    REQUIRE(diff(f1, "x") == 42_dbl);
+
+    f1 = func(func_00{});
+    REQUIRE_THROWS_MATCHES(diff(f1, ""), not_implemented_error,
+                           Message("The derivative is not implemented for the function 'f'"));
 }
