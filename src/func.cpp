@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <cassert>
 #include <initializer_list>
 #include <memory>
@@ -67,6 +68,18 @@ std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> 
 
 namespace detail
 {
+
+namespace
+{
+
+// Helper to check if a vector of llvm values contains
+// a nullptr.
+bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
+{
+    return std::any_of(v.begin(), v.end(), [](llvm::Value *p) { return p == nullptr; });
+}
+
+} // namespace
 
 // Default implementation of Taylor decomposition for a function.
 // NOTE: this is a generalisation of the implementation
@@ -155,6 +168,12 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
                 get_display_name(), get_args().size(), v.size()));
     }
 
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument(
+            "Null pointer detected in the array of values passed to func::codegen_dbl() for the function '{}'"_format(
+                get_display_name()));
+    }
+
     auto ret = ptr()->codegen_dbl(s, v);
 
     if (ret == nullptr) {
@@ -173,6 +192,12 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_display_name(), get_args().size(), v.size()));
+    }
+
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument(
+            "Null pointer detected in the array of values passed to func::codegen_ldbl() for the function '{}'"_format(
+                get_display_name()));
     }
 
     auto ret = ptr()->codegen_ldbl(s, v);
@@ -195,6 +220,12 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_display_name(), get_args().size(), v.size()));
+    }
+
+    if (detail::llvm_valvec_has_null(v)) {
+        throw std::invalid_argument(
+            "Null pointer detected in the array of values passed to func::codegen_f128() for the function '{}'"_format(
+                get_display_name()));
     }
 
     auto ret = ptr()->codegen_f128(s, v);

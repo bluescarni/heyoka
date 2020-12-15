@@ -48,8 +48,20 @@ TEST_CASE("func minimal")
                            Message("Cannot create a function with no display name"));
 
     llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {nullptr, nullptr}), not_implemented_error,
+    auto fake_val = reinterpret_cast<llvm::Value *>(&s);
+    REQUIRE_THROWS_MATCHES(f.codegen_dbl(s, {fake_val, fake_val}), not_implemented_error,
                            Message("double codegen is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.codegen_dbl(s, {nullptr, nullptr}), std::invalid_argument,
+        Message("Null pointer detected in the array of values passed to func::codegen_dbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.codegen_ldbl(s, {nullptr, nullptr}), std::invalid_argument,
+        Message("Null pointer detected in the array of values passed to func::codegen_ldbl() for the function 'f'"));
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE_THROWS_MATCHES(
+        f.codegen_f128(s, {nullptr, nullptr}), std::invalid_argument,
+        Message("Null pointer detected in the array of values passed to func::codegen_f128() for the function 'f'"));
+#endif
     REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}), not_implemented_error,
