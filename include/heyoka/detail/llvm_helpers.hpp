@@ -83,8 +83,6 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
-bool llvm_valvec_has_null(const std::vector<llvm::Value *> &);
-
 } // namespace heyoka::detail
 
 #endif

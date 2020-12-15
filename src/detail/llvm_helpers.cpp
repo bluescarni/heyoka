@@ -646,11 +646,4 @@ llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
     return gl_arr;
 }
 
-// Helper to check if a vector of llvm values contains
-// a nullptr.
-bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
-{
-    return std::any_of(v.begin(), v.end(), [](llvm::Value *p) { return p == nullptr; });
-}
-
 } // namespace heyoka::detail
