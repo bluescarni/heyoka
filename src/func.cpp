@@ -8,13 +8,18 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <memory>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <typeindex>
 #include <utility>
 #include <vector>
+
+#include <boost/container_hash/hash.hpp>
 
 #include <fmt/format.h>
 
@@ -539,5 +544,53 @@ llvm::Function *func::taylor_c_diff_f128(llvm_state &s, std::uint32_t n_uvars, s
 }
 
 #endif
+
+void swap(func &a, func &b) noexcept
+{
+    std::swap(a.m_ptr, b.m_ptr);
+}
+
+std::ostream &operator<<(std::ostream &os, const func &f)
+{
+    os << f.get_display_name() << '(';
+
+    const auto &args = f.get_args();
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        os << args[i];
+        if (i != args.size() - 1u) {
+            os << ", ";
+        }
+    }
+
+    return os << ')';
+}
+
+std::size_t hash(const func &f)
+{
+    // NOTE: the hash value is computed by combining the hash values of:
+    // - the function name,
+    // - the function inner type index,
+    // - the arguments' hashes.
+    std::size_t seed = std::hash<std::string>{}(f.get_display_name());
+
+    boost::hash_combine(seed, f.get_type_index());
+
+    for (const auto &arg : f.get_args()) {
+        boost::hash_combine(seed, hash(arg));
+    }
+
+    return seed;
+}
+
+bool operator==(const func &a, const func &b)
+{
+    return a.get_display_name() == b.get_display_name() && a.get_type_index() == b.get_type_index()
+           && a.get_args() == b.get_args();
+}
+
+bool operator!=(const func &a, const func &b)
+{
+    return !(a == b);
+}
 
 } // namespace heyoka

@@ -16,6 +16,7 @@ namespace heyoka
 class expression;
 class variable;
 class number;
+class func;
 
 class llvm_state;
 

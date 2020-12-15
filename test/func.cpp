@@ -7,6 +7,8 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -493,4 +495,84 @@ TEST_CASE("func taylor c_diff")
     REQUIRE_THROWS_MATCHES(f.taylor_c_diff_f128(s, 2, 4), std::invalid_argument,
                            Message("Null return value detected in func::taylor_c_diff_f128() for the function 'f'"));
 #endif
+}
+
+TEST_CASE("func swap")
+{
+    using std::swap;
+
+    auto f1 = func(func_10{{"x"_var}});
+    auto f2 = func(func_11{{"y"_var}});
+
+    swap(f1, f2);
+
+    REQUIRE(f1.get_type_index() == typeid(func_11));
+    REQUIRE(f2.get_type_index() == typeid(func_10));
+    REQUIRE(f1.get_args() == std::vector{"y"_var});
+    REQUIRE(f2.get_args() == std::vector{"x"_var});
+
+    REQUIRE(std::is_nothrow_swappable_v<func>);
+}
+
+TEST_CASE("func ostream")
+{
+    auto f1 = func(func_10{{"x"_var, "y"_var}});
+
+    std::ostringstream oss;
+    oss << f1;
+
+    REQUIRE(oss.str() == "f(x, y)");
+
+    oss.str("");
+
+    f1 = func(func_10{{"y"_var}});
+
+    oss << f1;
+
+    REQUIRE(oss.str() == "f(y)");
+}
+
+TEST_CASE("func hash")
+{
+    auto f1 = func(func_10{{"x"_var, "y"_var}});
+
+    REQUIRE_NOTHROW(hash(f1));
+
+    std::cout << "Hash value for f1: " << hash(f1) << '\n';
+}
+
+struct func_14 : func_base {
+    func_14(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_14(std::vector<expression> args) : func_base("f", std::move(args)) {}
+};
+
+TEST_CASE("func eq ineq")
+{
+    auto f1 = func(func_10{{"x"_var, "y"_var}});
+
+    REQUIRE(f1 == f1);
+    REQUIRE(!(f1 != f1));
+    REQUIRE(hash(f1) == hash(f1));
+
+    // Differring arguments.
+    auto f2 = func(func_10{{"y"_var, "x"_var}});
+
+    REQUIRE(f1 != f2);
+    REQUIRE(!(f1 == f2));
+
+    auto f3 = func(func_14{{"x"_var, "y"_var}});
+    auto f4 = func(func_14{"g", {"x"_var, "y"_var}});
+
+    // Differring names.
+    REQUIRE(f3 != f4);
+    REQUIRE(!(f3 == f4));
+
+    // Differring underlying types.
+    f3 = func(func_10{{"x"_var, "y"_var}});
+    f4 = func(func_14{{"x"_var, "y"_var}});
+
+    REQUIRE(f3 != f4);
+    REQUIRE(!(f3 == f4));
 }

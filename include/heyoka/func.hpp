@@ -9,8 +9,10 @@
 #ifndef HEYOKA_FUNC_HPP
 #define HEYOKA_FUNC_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <type_traits>
 #include <typeindex>
@@ -506,8 +508,12 @@ using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_
 
 } // namespace detail
 
+HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
+
 class HEYOKA_DLL_PUBLIC func
 {
+    friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
+
     // Pointer to the inner base.
     std::unique_ptr<detail::func_inner_base> m_ptr;
 
@@ -577,6 +583,13 @@ public:
     llvm::Function *taylor_c_diff_f128(llvm_state &, std::uint32_t, std::uint32_t) const;
 #endif
 };
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
+
+HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
+
+HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
+HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
 
 } // namespace heyoka
 
