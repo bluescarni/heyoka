@@ -556,7 +556,7 @@ TEST_CASE("func eq ineq")
     REQUIRE(!(f1 != f1));
     REQUIRE(hash(f1) == hash(f1));
 
-    // Differring arguments.
+    // Differing arguments.
     auto f2 = func(func_10{{"y"_var, "x"_var}});
 
     REQUIRE(f1 != f2);
@@ -565,11 +565,11 @@ TEST_CASE("func eq ineq")
     auto f3 = func(func_14{{"x"_var, "y"_var}});
     auto f4 = func(func_14{"g", {"x"_var, "y"_var}});
 
-    // Differring names.
+    // Differing names.
     REQUIRE(f3 != f4);
     REQUIRE(!(f3 == f4));
 
-    // Differring underlying types.
+    // Differing underlying types.
     f3 = func(func_10{{"x"_var, "y"_var}});
     f4 = func(func_14{{"x"_var, "y"_var}});
 
