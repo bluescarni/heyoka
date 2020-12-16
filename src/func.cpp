@@ -466,51 +466,54 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
-llvm::Function *func::taylor_c_diff_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
+                get_display_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_c_diff_dbl() for the function '{}'"_format(
+            "Zero number of u variables detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_dbl(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Null return value detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
+                get_display_name()));
     }
 
     return retval;
 }
 
-llvm::Function *func::taylor_c_diff_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
+                get_display_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(
+            "Zero number of u variables detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_ldbl(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_ldbl() for the function '{}'"_format(
+            "Null return value detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
                 get_display_name()));
     }
 
@@ -519,26 +522,27 @@ llvm::Function *func::taylor_c_diff_ldbl(llvm_state &s, std::uint32_t n_uvars, s
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *func::taylor_c_diff_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_f128() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
+                get_display_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_c_diff_f128() for the function '{}'"_format(
+            "Zero number of u variables detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_f128(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_f128() for the function '{}'"_format(
+            "Null return value detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
                 get_display_name()));
     }
 
@@ -741,6 +745,77 @@ llvm::Value *codegen_ldbl(llvm_state &s, const func &f)
 llvm::Value *codegen_f128(llvm_state &s, const func &f)
 {
     return detail::function_codegen_impl<mppp::real128>(s, f);
+}
+
+#endif
+
+std::vector<expression>::size_type taylor_decompose_in_place(func &&f, std::vector<expression> &dc)
+{
+    return std::move(f).taylor_decompose(dc);
+}
+
+llvm::Value *taylor_u_init_dbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
+                               std::uint32_t batch_size)
+{
+    return f.taylor_u_init_dbl(s, arr, batch_size);
+}
+
+llvm::Value *taylor_u_init_ldbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
+{
+    return f.taylor_u_init_ldbl(s, arr, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_u_init_f128(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
+                                std::uint32_t batch_size)
+{
+    return f.taylor_u_init_f128(s, arr, batch_size);
+}
+
+#endif
+
+llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return f.taylor_diff_dbl(s, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *taylor_diff_ldbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return f.taylor_diff_ldbl(s, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_diff_f128(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    return f.taylor_diff_f128(s, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
+
+llvm::Function *taylor_c_diff_func_func_dbl(llvm_state &s, const func &f, std::uint32_t n_uvars,
+                                            std::uint32_t batch_size)
+{
+    return f.taylor_c_diff_func_dbl(s, n_uvars, batch_size);
+}
+
+llvm::Function *taylor_c_diff_func_func_ldbl(llvm_state &s, const func &f, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size)
+{
+    return f.taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *taylor_c_diff_func_func_f128(llvm_state &s, const func &f, std::uint32_t n_uvars,
+                                             std::uint32_t batch_size)
+{
+    return f.taylor_c_diff_func_f128(s, n_uvars, batch_size);
 }
 
 #endif

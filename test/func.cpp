@@ -147,29 +147,29 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff is not implemented for the function 'f'"));
 #endif
 
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_dbl(s, 2, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_c_diff_dbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_dbl(s, 2, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_c_diff_func_dbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_c_diff_dbl(s, 0, 2), std::invalid_argument,
-        Message("Zero number of u variables detected in func::taylor_c_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_dbl(s, 2, 1), not_implemented_error,
+        f.taylor_c_diff_func_dbl(s, 0, 2), std::invalid_argument,
+        Message("Zero number of u variables detected in func::taylor_c_diff_func_dbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_dbl(s, 2, 1), not_implemented_error,
                            Message("double Taylor diff in compact mode is not implemented for the function 'f'"));
 
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_ldbl(s, 2, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_c_diff_ldbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_ldbl(s, 2, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_c_diff_ldbl(s, 0, 2), std::invalid_argument,
-        Message("Zero number of u variables detected in func::taylor_c_diff_ldbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_ldbl(s, 2, 1), not_implemented_error,
+        f.taylor_c_diff_func_ldbl(s, 0, 2), std::invalid_argument,
+        Message("Zero number of u variables detected in func::taylor_c_diff_func_ldbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_ldbl(s, 2, 1), not_implemented_error,
                            Message("long double Taylor diff in compact mode is not implemented for the function 'f'"));
 
 #if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_f128(s, 2, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_c_diff_f128() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_f128(s, 2, 0), std::invalid_argument,
+                           Message("Zero batch size detected in func::taylor_c_diff_func_f128() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_c_diff_f128(s, 0, 2), std::invalid_argument,
-        Message("Zero number of u variables detected in func::taylor_c_diff_f128() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_f128(s, 2, 1), not_implemented_error,
+        f.taylor_c_diff_func_f128(s, 0, 2), std::invalid_argument,
+        Message("Zero number of u variables detected in func::taylor_c_diff_func_f128() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_func_f128(s, 2, 1), not_implemented_error,
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
@@ -464,16 +464,16 @@ struct func_13 : func_base {
     func_13() : func_base("f", {}) {}
     explicit func_13(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    llvm::Function *taylor_c_diff_dbl(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
-    llvm::Function *taylor_c_diff_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Function *taylor_c_diff_f128(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
@@ -487,13 +487,16 @@ TEST_CASE("func taylor c_diff")
     auto f = func(func_13{});
 
     llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_dbl(s, 3, 4), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_c_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_ldbl(s, 2, 3), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_c_diff_ldbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.taylor_c_diff_func_dbl(s, 3, 4), std::invalid_argument,
+        Message("Null return value detected in func::taylor_c_diff_func_dbl() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.taylor_c_diff_func_ldbl(s, 2, 3), std::invalid_argument,
+        Message("Null return value detected in func::taylor_c_diff_func_ldbl() for the function 'f'"));
 #if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_c_diff_f128(s, 2, 4), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_c_diff_f128() for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(
+        f.taylor_c_diff_func_f128(s, 2, 4), std::invalid_argument,
+        Message("Null return value detected in func::taylor_c_diff_func_f128() for the function 'f'"));
 #endif
 }
 
