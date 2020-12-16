@@ -111,6 +111,18 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 #endif
 };
 
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl_default(llvm_state &, const func_inner_base &,
+                                                         const std::vector<llvm::Value *> &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_ldbl_default(llvm_state &, const func_inner_base &,
+                                                          const std::vector<llvm::Value *> &, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_f128_default(llvm_state &, const func_inner_base &,
+                                                          const std::vector<llvm::Value *> &, std::uint32_t);
+
+#endif
+
 template <typename T>
 using func_codegen_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_dbl(
     std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
@@ -421,8 +433,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_u_init_dbl_v<T>) {
             return m_value.taylor_u_init_dbl(s, arr, batch_size);
         } else {
-            throw not_implemented_error("double Taylor u init is not implemented for the function '"
-                                        + get_display_name() + "'");
+            return taylor_u_init_dbl_default(s, *this, arr, batch_size);
         }
     }
     llvm::Value *taylor_u_init_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
@@ -431,8 +442,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_u_init_ldbl_v<T>) {
             return m_value.taylor_u_init_ldbl(s, arr, batch_size);
         } else {
-            throw not_implemented_error("long double Taylor u init is not implemented for the function '"
-                                        + get_display_name() + "'");
+            return taylor_u_init_ldbl_default(s, *this, arr, batch_size);
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
@@ -442,8 +452,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_u_init_f128_v<T>) {
             return m_value.taylor_u_init_f128(s, arr, batch_size);
         } else {
-            throw not_implemented_error("float128 Taylor u init is not implemented for the function '"
-                                        + get_display_name() + "'");
+            return taylor_u_init_f128_default(s, *this, arr, batch_size);
         }
     }
 #endif

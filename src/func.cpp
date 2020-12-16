@@ -6,15 +6,19 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <typeindex>
 #include <unordered_map>
 #include <utility>
@@ -24,11 +28,17 @@
 
 #include <fmt/format.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/variable.hpp>
@@ -82,6 +92,30 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
     return std::any_of(v.begin(), v.end(), [](llvm::Value *p) { return p == nullptr; });
 }
 
+// Default implementation of u_init for a function.
+template <typename T>
+llvm::Value *taylor_u_init_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
+                                   std::uint32_t batch_size)
+{
+    // Do the initialisation for the function arguments.
+    std::vector<llvm::Value *> args_v;
+    for (const auto &arg : f.args()) {
+        args_v.push_back(taylor_u_init<T>(s, arg, arr, batch_size));
+    }
+
+    if constexpr (std::is_same_v<T, double>) {
+        return f.codegen_dbl(s, args_v);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.codegen_ldbl(s, args_v);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.codegen_f128(s, args_v);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
 } // namespace
 
 // Default implementation of Taylor decomposition for a function.
@@ -95,6 +129,28 @@ void func_default_td_impl(func_base &fb, std::vector<expression> &u_vars_defs)
         }
     }
 }
+
+llvm::Value *taylor_u_init_dbl_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
+                                       std::uint32_t batch_size)
+{
+    return taylor_u_init_default<double>(s, f, arr, batch_size);
+}
+
+llvm::Value *taylor_u_init_ldbl_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
+                                        std::uint32_t batch_size)
+{
+    return taylor_u_init_default<long double>(s, f, arr, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_u_init_f128_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
+                                        std::uint32_t batch_size)
+{
+    return taylor_u_init_default<mppp::real128>(s, f, arr, batch_size);
+}
+
+#endif
 
 func_inner_base::~func_inner_base() = default;
 
