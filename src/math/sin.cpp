@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -14,6 +16,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -22,16 +25,26 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/sleef.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -143,6 +156,105 @@ double sin_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
 
     return std::cos(a[0]);
 }
+
+namespace
+{
+
+// Derivative of sin(number).
+template <typename T>
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of sin(variable).
+template <typename T>
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                  std::uint32_t batch_size)
+{
+    // NOTE: pairwise summation requires order 1 at least.
+    // NOTE: also not much use in allowing zero-order
+    // derivatives, which in general might complicate
+    // the implementation.
+    if (order == 0u) {
+        throw std::invalid_argument(
+            "Cannot compute the Taylor derivative of order 0 of sin() (the order must be at least one)");
+    }
+
+    // Fetch the index of the variable.
+    const auto u_idx = uname_to_index(var.name());
+
+    // NOTE: iteration in the [1, order] range
+    // (i.e., order included).
+    std::vector<llvm::Value *> sum;
+    auto &builder = s.builder();
+    for (std::uint32_t j = 1; j <= order; ++j) {
+        // NOTE: the +1 is because we are accessing the cosine
+        // of the u var, which is conventionally placed
+        // right after the sine in the decomposition.
+        auto v0 = taylor_fetch_diff(arr, idx + 1u, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+
+        // Add j*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+    }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = pairwise_sum(builder, sum);
+
+    // Compute and return the result: ret_acc / order
+    auto div = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+
+    return builder.CreateFDiv(ret_acc, div);
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_diff_sin_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a sine");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_sin(llvm_state &s, const sin_impl &f, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    assert(f.args().size() == 1u);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_diff_sin_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        f.args()[0].value());
+}
+
+} // namespace
+
+llvm::Value *sin_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                       std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sin<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *sin_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sin<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *sin_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sin<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
 
 } // namespace detail
 
