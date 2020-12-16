@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SIN_HPP
-#define HEYOKA_MATH_SIN_HPP
+#ifndef HEYOKA_MATH_COS_HPP
+#define HEYOKA_MATH_COS_HPP
 
 #include <string>
 #include <unordered_map>
@@ -25,11 +25,11 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC sin_impl : public func_base
+class HEYOKA_DLL_PUBLIC cos_impl : public func_base
 {
 public:
-    sin_impl();
-    explicit sin_impl(expression);
+    cos_impl();
+    explicit cos_impl(expression);
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
