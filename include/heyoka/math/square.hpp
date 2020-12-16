@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MATH_SQUARE_HPP
 #define HEYOKA_MATH_SQUARE_HPP
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -35,6 +36,15 @@ public:
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
+#endif
+
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                 std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t) const;
 #endif
 };
 

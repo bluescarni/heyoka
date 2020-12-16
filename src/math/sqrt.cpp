@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <initializer_list>
@@ -13,6 +15,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <fmt/format.h>
@@ -20,12 +23,20 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sqrt.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -124,6 +135,70 @@ double sqrt_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double
 
     return 1. / (2. * std::sqrt(a[0]));
 }
+
+namespace
+{
+
+// Derivative of sqrt(number).
+template <typename T>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of sqrt(variable).
+template <typename T>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
+                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                   std::uint32_t batch_size)
+{
+    return taylor_diff_pow_impl_det<T>(s, var, number{T(1) / 2}, arr, n_uvars, order, idx, batch_size);
+}
+
+// All the other cases.
+template <typename T, typename U>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
+                                   std::uint32_t, std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a square root");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_sqrt(llvm_state &s, const sqrt_impl &f, const std::vector<llvm::Value *> &arr,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    assert(f.args().size() == 1u);
+
+    return std::visit(
+        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        f.args()[0].value());
+}
+
+} // namespace
+
+llvm::Value *sqrt_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sqrt<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *sqrt_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sqrt<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *sqrt_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_sqrt<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
 
 } // namespace detail
 

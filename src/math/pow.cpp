@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -14,6 +16,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -26,13 +29,20 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/sleef.hpp>
+#include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/number.hpp>
 
 namespace heyoka
 {
@@ -185,6 +195,72 @@ double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
 
     return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
 }
+
+namespace
+{
+
+// Derivative of pow(number, number).
+template <typename T>
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+}
+
+// Derivative of pow(variable, number).
+template <typename T>
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num,
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                  std::uint32_t idx, std::uint32_t batch_size)
+{
+    return taylor_diff_pow_impl_det<T>(s, var, num, arr, n_uvars, order, idx, batch_size);
+}
+
+// All the other cases.
+template <typename T, typename U1, typename U2>
+llvm::Value *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector<llvm::Value *> &arr,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    assert(f.args().size() == 2u);
+
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return taylor_diff_pow_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
+        },
+        f.args()[0].value(), f.args()[1].value());
+}
+
+} // namespace
+
+llvm::Value *pow_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                       std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_pow<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *pow_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_pow<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *pow_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_pow<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
 
 } // namespace detail
 

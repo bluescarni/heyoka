@@ -9,6 +9,7 @@
 #ifndef HEYOKA_MATH_SQRT_HPP
 #define HEYOKA_MATH_SQRT_HPP
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -41,6 +42,15 @@ public:
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                 std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t) const;
+#endif
 };
 
 } // namespace detail
