@@ -37,8 +37,6 @@
 namespace heyoka
 {
 
-class binary_operator;
-
 HEYOKA_DLL_PUBLIC void swap(binary_operator &, binary_operator &) noexcept;
 
 class HEYOKA_DLL_PUBLIC binary_operator
