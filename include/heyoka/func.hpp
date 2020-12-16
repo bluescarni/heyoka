@@ -637,10 +637,10 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 namespace detail
 {
 
-// Helper to run the codegen of a function with the arguments
+// Helper to run the codegen of a function-like object with the arguments
 // represented as a vector of LLVM values.
-template <typename T>
-inline llvm::Value *codegen_from_values(llvm_state &s, const func &f, const std::vector<llvm::Value *> &args_v)
+template <typename T, typename F>
+inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::vector<llvm::Value *> &args_v)
 {
     if constexpr (std::is_same_v<T, double>) {
         return f.codegen_dbl(s, args_v);

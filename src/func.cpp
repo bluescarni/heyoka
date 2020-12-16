@@ -103,17 +103,7 @@ llvm::Value *taylor_u_init_default(llvm_state &s, const func_inner_base &f, cons
         args_v.push_back(taylor_u_init<T>(s, arg, arr, batch_size));
     }
 
-    if constexpr (std::is_same_v<T, double>) {
-        return f.codegen_dbl(s, args_v);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return f.codegen_ldbl(s, args_v);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return f.codegen_f128(s, args_v);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
+    return codegen_from_values<T>(s, f, args_v);
 }
 
 } // namespace
