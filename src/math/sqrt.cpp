@@ -7,9 +7,15 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <cmath>
 #include <initializer_list>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/Value.h>
@@ -77,6 +83,47 @@ llvm::Value *sqrt_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 }
 
 #endif
+
+double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+{
+    assert(args().size() == 1u);
+
+    return std::sqrt(heyoka::eval_dbl(args()[0], map));
+}
+
+void sqrt_impl::eval_batch_dbl(std::vector<double> &out,
+                               const std::unordered_map<std::string, std::vector<double>> &map) const
+{
+    assert(args().size() == 1u);
+
+    heyoka::eval_batch_dbl(out, args()[0], map);
+    for (auto &el : out) {
+        el = std::sqrt(el);
+    }
+}
+
+double sqrt_impl::eval_num_dbl(const std::vector<double> &a) const
+{
+    if (a.size() != 1u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Inconsistent number of arguments when computing the numerical value of the "
+            "square root over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
+    }
+
+    return std::sqrt(a[0]);
+}
+
+double sqrt_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
+{
+    if (a.size() != 1u || i != 0u) {
+        throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
+                                    "numerical derivative of the square root");
+    }
+
+    return 1. / (2. * std::sqrt(a[0]));
+}
 
 } // namespace detail
 

@@ -7,12 +7,18 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/format.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -136,6 +142,49 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 }
 
 #endif
+
+double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+{
+    assert(args().size() == 2u);
+
+    return std::pow(heyoka::eval_dbl(args()[0], map), heyoka::eval_dbl(args()[1], map));
+}
+
+void pow_impl::eval_batch_dbl(std::vector<double> &out,
+                              const std::unordered_map<std::string, std::vector<double>> &map) const
+{
+    assert(args().size() == 2u);
+
+    auto out0 = out; // is this allocation needed?
+    heyoka::eval_batch_dbl(out0, args()[0], map);
+    heyoka::eval_batch_dbl(out, args()[1], map);
+    for (decltype(out.size()) i = 0; i < out.size(); ++i) {
+        out[i] = std::pow(out0[i], out[i]);
+    }
+}
+
+double pow_impl::eval_num_dbl(const std::vector<double> &a) const
+{
+    if (a.size() != 2u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Inconsistent number of arguments when computing the numerical value of the "
+            "exponentiation over doubles (2 arguments were expected, but {} arguments were provided"_format(a.size()));
+    }
+
+    return std::pow(a[0], a[1]);
+}
+
+double pow_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
+{
+    if (a.size() != 2u || i != 0u) {
+        throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
+                                    "numerical derivative of the exponentiation");
+    }
+
+    return a[1] * std::pow(a[0], a[1] - 1.) + std::log(a[0]) * std::pow(a[0], a[1]);
+}
 
 } // namespace detail
 

@@ -7,12 +7,18 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
+
+#include <fmt/format.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -96,6 +102,47 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 }
 
 #endif
+
+double log_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+{
+    assert(args().size() == 1u);
+
+    return std::log(heyoka::eval_dbl(args()[0], map));
+}
+
+void log_impl::eval_batch_dbl(std::vector<double> &out,
+                              const std::unordered_map<std::string, std::vector<double>> &map) const
+{
+    assert(args().size() == 1u);
+
+    heyoka::eval_batch_dbl(out, args()[0], map);
+    for (auto &el : out) {
+        el = std::log(el);
+    }
+}
+
+double log_impl::eval_num_dbl(const std::vector<double> &a) const
+{
+    if (a.size() != 1u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Inconsistent number of arguments when computing the numerical value of the "
+            "logarithm over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
+    }
+
+    return std::log(a[0]);
+}
+
+double log_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
+{
+    if (a.size() != 1u || i != 0u) {
+        throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
+                                    "numerical derivative of the logarithm");
+    }
+
+    return 1. / a[0];
+}
 
 } // namespace detail
 
