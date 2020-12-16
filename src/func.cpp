@@ -635,4 +635,114 @@ expression diff(const func &f, const std::string &s)
     return f.diff(s);
 }
 
+double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map)
+{
+    return f.eval_dbl(map);
+}
+
+void eval_batch_dbl(std::vector<double> &out_values, const func &f,
+                    const std::unordered_map<std::string, std::vector<double>> &map)
+{
+    f.eval_batch_dbl(out_values, map);
+}
+
+double eval_num_dbl(const func &f, const std::vector<double> &in)
+{
+    return f.eval_num_dbl(in);
+}
+
+double deval_num_dbl(const func &f, const std::vector<double> &in, std::vector<double>::size_type d)
+{
+    return f.deval_num_dbl(in, d);
+}
+
+void update_node_values_dbl(std::vector<double> &node_values, const func &f,
+                            const std::unordered_map<std::string, double> &map,
+                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
+{
+    const auto node_id = node_counter;
+    node_counter++;
+    // We have to recurse first as to make sure node_values is filled before being accessed later.
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        update_node_values_dbl(node_values, f.args()[i], map, node_connections, node_counter);
+    }
+    // Then we compute
+    std::vector<double> in_values(f.args().size());
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    node_values[node_id] = eval_num_dbl(f, in_values);
+}
+
+void update_grad_dbl(std::unordered_map<std::string, double> &grad, const func &f,
+                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
+                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
+                     double acc)
+{
+    const auto node_id = node_counter;
+    node_counter++;
+    std::vector<double> in_values(f.args().size());
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        in_values[i] = node_values[node_connections[node_id][i]];
+    }
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        auto value = deval_num_dbl(f, in_values, i);
+        update_grad_dbl(grad, f.args()[i], map, node_values, node_connections, node_counter, acc * value);
+    }
+}
+
+void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const func &f,
+                        std::size_t &node_counter)
+{
+    const auto node_id = node_counter;
+    node_counter++;
+    node_connections.push_back(std::vector<std::size_t>(f.args().size()));
+    for (decltype(f.args().size()) i = 0u; i < f.args().size(); ++i) {
+        node_connections[node_id][i] = node_counter;
+        update_connections(node_connections, f.args()[i], node_counter);
+    };
+}
+
+namespace detail
+{
+
+namespace
+{
+
+template <typename T>
+llvm::Value *function_codegen_impl(llvm_state &s, const func &f)
+{
+    // Create the function arguments.
+    std::vector<llvm::Value *> args_v;
+    for (const auto &arg : f.args()) {
+        args_v.push_back(codegen<T>(s, arg));
+        assert(args_v.back() != nullptr);
+    }
+
+    return codegen_from_values<T>(s, f, args_v);
+}
+
+} // namespace
+
+} // namespace detail
+
+llvm::Value *codegen_dbl(llvm_state &s, const func &f)
+{
+    return detail::function_codegen_impl<double>(s, f);
+}
+
+llvm::Value *codegen_ldbl(llvm_state &s, const func &f)
+{
+    return detail::function_codegen_impl<long double>(s, f);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *codegen_f128(llvm_state &s, const func &f)
+{
+    return detail::function_codegen_impl<mppp::real128>(s, f);
+}
+
+#endif
+
 } // namespace heyoka

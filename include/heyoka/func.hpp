@@ -9,6 +9,8 @@
 #ifndef HEYOKA_FUNC_HPP
 #define HEYOKA_FUNC_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -21,7 +23,12 @@
 #include <utility>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -597,6 +604,68 @@ HEYOKA_DLL_PUBLIC void rename_variables(func &, const std::unordered_map<std::st
 HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::string, expression> &);
 
 HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
+
+HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &);
+HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const func &,
+                                      const std::unordered_map<std::string, std::vector<double>> &);
+HEYOKA_DLL_PUBLIC double eval_num_dbl(const func &, const std::vector<double> &);
+HEYOKA_DLL_PUBLIC double deval_num_dbl(const func &, const std::vector<double> &, std::vector<double>::size_type);
+
+HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const func &, std::size_t &);
+HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const func &,
+                                              const std::unordered_map<std::string, double> &,
+                                              const std::vector<std::vector<std::size_t>> &, std::size_t &);
+HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const func &,
+                                       const std::unordered_map<std::string, double> &, const std::vector<double> &,
+                                       const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
+
+namespace detail
+{
+
+// Helper to run the codegen of a function with the arguments
+// represented as a vector of LLVM values.
+template <typename T>
+inline llvm::Value *codegen_from_values(llvm_state &s, const func &f, const std::vector<llvm::Value *> &args_v)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return f.codegen_dbl(s, args_v);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return f.codegen_ldbl(s, args_v);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return f.codegen_f128(s, args_v);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+} // namespace detail
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const func &);
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const func &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const func &);
+
+#endif
+
+template <typename T>
+inline llvm::Value *codegen(llvm_state &s, const func &f)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return codegen_dbl(s, f);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return codegen_ldbl(s, f);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return codegen_f128(s, f);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 } // namespace heyoka
 
