@@ -41,13 +41,16 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_display_name;
-    std::unique_ptr<std::vector<expression>> m_args;
+    std::vector<expression> m_args;
 
 public:
     explicit func_base(std::string, std::vector<expression>);
 
     func_base(const func_base &);
     func_base(func_base &&) noexcept;
+
+    func_base &operator=(const func_base &);
+    func_base &operator=(func_base &&) noexcept;
 
     ~func_base();
 

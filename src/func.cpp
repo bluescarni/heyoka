@@ -12,7 +12,6 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
-#include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -38,19 +37,20 @@ namespace heyoka
 {
 
 func_base::func_base(std::string display_name, std::vector<expression> args)
-    : m_display_name(std::move(display_name)), m_args(std::make_unique<std::vector<expression>>(std::move(args)))
+    : m_display_name(std::move(display_name)), m_args(std::move(args))
 {
     if (m_display_name.empty()) {
         throw std::invalid_argument("Cannot create a function with no display name");
     }
 }
 
-func_base::func_base(const func_base &other)
-    : m_display_name(other.m_display_name), m_args(std::make_unique<std::vector<expression>>(other.args()))
-{
-}
+func_base::func_base(const func_base &) = default;
 
 func_base::func_base(func_base &&) noexcept = default;
+
+func_base &func_base::operator=(const func_base &) = default;
+
+func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
 
@@ -61,16 +61,12 @@ const std::string &func_base::get_display_name() const
 
 const std::vector<expression> &func_base::args() const
 {
-    assert(m_args);
-
-    return *m_args;
+    return m_args;
 }
 
 std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> func_base::get_mutable_args_it()
 {
-    assert(m_args);
-
-    return {m_args->begin(), m_args->end()};
+    return {m_args.begin(), m_args.end()};
 }
 
 namespace detail
