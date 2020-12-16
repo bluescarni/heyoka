@@ -391,15 +391,6 @@ TEST_CASE("func taylor u init")
     auto f = func(func_00{});
 
     llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 1), not_implemented_error,
-                           Message("double Taylor u init is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 1), not_implemented_error,
-                           Message("long double Taylor u init is not implemented for the function 'f'"));
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 1), not_implemented_error,
-                           Message("float128 Taylor u init is not implemented for the function 'f'"));
-#endif
-
     REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 0), std::invalid_argument,
                            Message("Zero batch size detected in func::taylor_u_init_dbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 0), std::invalid_argument,
