@@ -205,12 +205,11 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Let's setup the target C++ standard, but only if the user did not provide it manually.
-if(NOT CMAKE_CXX_STANDARD)
-    set_property(TARGET heyoka PROPERTY CXX_STANDARD 17)
-endif()
-set_property(TARGET heyoka PROPERTY CXX_STANDARD_REQUIRED YES)
+# Ensure that C++17 is employed when both compiling and consuming heyoka.
+target_compile_features(heyoka PUBLIC cxx_std_17)
+# Enforce vanilla C++17 when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
+
 target_include_directories(heyoka PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

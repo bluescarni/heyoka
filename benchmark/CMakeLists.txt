@@ -28,11 +28,8 @@ function(ADD_HEYOKA_BENCHMARK arg1)
     "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
-  # Let's setup the target C++ standard, but only if the user did not provide it manually.
-  if(NOT CMAKE_CXX_STANDARD)
-    set_property(TARGET ${arg1} PROPERTY CXX_STANDARD 17)
-  endif()
-  set_property(TARGET ${arg1} PROPERTY CXX_STANDARD_REQUIRED YES)
+  # Setup the C++ standard.
+  target_compile_features(${arg1} PRIVATE cxx_std_17)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
 endfunction()
 

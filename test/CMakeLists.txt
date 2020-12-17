@@ -10,11 +10,8 @@ target_compile_options(heyoka_test PRIVATE
   "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Let's setup the target C++ standard, but only if the user did not provide it manually.
-if(NOT CMAKE_CXX_STANDARD)
-  set_property(TARGET heyoka_test PROPERTY CXX_STANDARD 17)
-endif()
-set_property(TARGET heyoka_test PROPERTY CXX_STANDARD_REQUIRED YES)
+# Setup the C++ standard.
+target_compile_features(heyoka_test PRIVATE cxx_std_17)
 set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
 
 function(ADD_HEYOKA_TESTCASE arg1)
@@ -27,11 +24,8 @@ function(ADD_HEYOKA_TESTCASE arg1)
     "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
   )
-  # Let's setup the target C++ standard, but only if the user did not provide it manually.
-  if(NOT CMAKE_CXX_STANDARD)
-    set_property(TARGET ${arg1} PROPERTY CXX_STANDARD 17)
-  endif()
-  set_property(TARGET ${arg1} PROPERTY CXX_STANDARD_REQUIRED YES)
+  # Setup the C++ standard.
+  target_compile_features(${arg1} PRIVATE cxx_std_17)
   set_property(TARGET ${arg1} PROPERTY CXX_EXTENSIONS NO)
   add_test(${arg1} ${arg1})
 endfunction()
