@@ -1,2 +1,7 @@
 # Build dirs.
 build*
+
+# Documentation.
+docs/_build/
+# This is auto-generated.
+docs/conf.py

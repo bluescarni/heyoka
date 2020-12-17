@@ -321,6 +321,9 @@ endif()
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
 
+# Configure the doc files.
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/docs/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/docs/conf.py" @ONLY)
+
 # Installation of the header files.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" DESTINATION include/heyoka)
