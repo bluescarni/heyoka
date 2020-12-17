@@ -25,10 +25,9 @@
 
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/square.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka

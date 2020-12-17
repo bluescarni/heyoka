@@ -18,8 +18,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/mascon.hpp>
-#include <heyoka/math_functions.hpp>
-#include <heyoka/square.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "data/mascon_67p.hpp"
@@ -151,9 +150,8 @@ template <typename P, typename M>
 double compute_energy(const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
                       double r, double G)
 {
-    auto energy
-        = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
-                               kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
+    auto energy = energy_mascon_system(kw::state = x, kw::points = mascon_points, kw::masses = mascon_masses,
+                                       kw::omega = std::vector<double>{p, q, r}, kw::Gconst = G);
     return eval_dbl(energy, std::unordered_map<std::string, double>());
 }
 

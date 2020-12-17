@@ -19,7 +19,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 
 #include "catch.hpp"
 #include "test_utils.hpp"

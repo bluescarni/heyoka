@@ -6,20 +6,19 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_DETAIL_FWD_DECL_HPP
-#define HEYOKA_DETAIL_FWD_DECL_HPP
+#ifndef HEYOKA_EXCEPTIONS_HPP
+#define HEYOKA_EXCEPTIONS_HPP
+
+#include <stdexcept>
+
+#include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
 {
 
-// Fwd declaration of heyoka classes.
-class expression;
-class variable;
-class number;
-class binary_operator;
-class func;
-
-class llvm_state;
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS not_implemented_error final : std::runtime_error {
+    using std::runtime_error::runtime_error;
+};
 
 } // namespace heyoka
 

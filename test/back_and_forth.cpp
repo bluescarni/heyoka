@@ -21,7 +21,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 

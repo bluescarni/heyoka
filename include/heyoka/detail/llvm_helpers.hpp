@@ -16,10 +16,9 @@
 #include <typeinfo>
 #include <vector>
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
 
 namespace heyoka::detail
 {

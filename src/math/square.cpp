@@ -8,37 +8,70 @@
 
 #include <heyoka/config.hpp>
 
-#include <cstdint>
-#include <stdexcept>
-#include <string>
+#include <cassert>
+#include <initializer_list>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-#include <heyoka/detail/llvm_fwd.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
 
 namespace detail
 {
+
+square_impl::square_impl(expression e) : func_base("square", std::vector{std::move(e)}) {}
+
+square_impl::square_impl() : square_impl(0_dbl) {}
+
+llvm::Value *square_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
+{
+    assert(args.size() == 1u);
+    assert(args[0] != nullptr);
+
+    return s.builder().CreateFMul(args[0], args[0]);
+}
+
+llvm::Value *square_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
+{
+    // NOTE: codegen is identical as in dbl.
+    return codegen_dbl(s, args);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *square_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
+{
+    // NOTE: codegen is identical as in dbl.
+    return codegen_dbl(s, args);
+}
+
+#endif
 
 namespace
 {
@@ -108,34 +141,57 @@ llvm::Value *taylor_diff_square_impl(llvm_state &, const U &, const std::vector<
 }
 
 template <typename T>
-llvm::Value *taylor_diff_square(llvm_state &s, const function &func, const std::vector<llvm::Value *> &arr,
+llvm::Value *taylor_diff_square(llvm_state &s, const square_impl &f, const std::vector<llvm::Value *> &arr,
                                 std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    if (func.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
-                                    "the square (1 argument was expected, but "
-                                    + std::to_string(func.args().size()) + " arguments were provided");
-    }
+    assert(f.args().size() == 1u);
 
     return std::visit(
         [&](const auto &v) { return taylor_diff_square_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
-        func.args()[0].value());
+        f.args()[0].value());
 }
+
+} // namespace
+
+llvm::Value *square_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                          std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_square<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *square_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                           std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_square<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *square_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
+                                           std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+{
+    return taylor_diff_square<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+}
+
+#endif
+
+namespace
+{
 
 // Derivative of square(number).
 template <typename T>
-llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &func, const number &, std::uint32_t,
+llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl &fn, const number &, std::uint32_t,
                                                std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num<T>(s, func, batch_size,
-                                           "heyoka_taylor_diff_square_num_"
-                                               + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
-                                           "the square");
+    return taylor_c_diff_func_unary_num_det<T>(
+        s, fn, batch_size,
+        "heyoka_taylor_diff_square_num_" + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+        "the square");
 }
 
 // Derivative of square(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &func, const variable &,
+llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl &fn, const variable &,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -191,7 +247,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    codegen_from_values<T>(s, func,
+                    codegen_from_values<T>(s, fn,
                                            {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
                     retval);
             },
@@ -268,63 +324,59 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const function &fu
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Function *taylor_c_diff_func_square_impl(llvm_state &, const function &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_square_impl(llvm_state &, const square_impl &, const U &, std::uint32_t,
+                                               std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a square in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_square(llvm_state &s, const function &func, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_square(llvm_state &s, const square_impl &fn, std::uint32_t n_uvars,
                                           std::uint32_t batch_size)
 {
-    if (func.args().size() != 1u) {
-        throw std::invalid_argument("Inconsistent number of arguments in the Taylor derivative for "
-                                    "the square in compact mode (1 argument was expected, but "
-                                    + std::to_string(func.args().size()) + " arguments were provided");
-    }
+    assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_square_impl<T>(s, func, v, n_uvars, batch_size); },
-                      func.args()[0].value());
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_square_impl<T>(s, fn, v, n_uvars, batch_size); },
+                      fn.args()[0].value());
 }
 
 } // namespace
+
+llvm::Function *square_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars,
+                                                    std::uint32_t batch_size) const
+{
+    return taylor_c_diff_func_square<double>(s, *this, n_uvars, batch_size);
+}
+
+llvm::Function *square_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars,
+                                                     std::uint32_t batch_size) const
+{
+    return taylor_c_diff_func_square<long double>(s, *this, n_uvars, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *square_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars,
+                                                     std::uint32_t batch_size) const
+{
+    return taylor_c_diff_func_square<mppp::real128>(s, *this, n_uvars, batch_size);
+}
+
+#endif
+
+expression square_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return 2_dbl * args()[0] * heyoka::diff(args()[0], s);
+}
 
 } // namespace detail
 
 expression square(expression e)
 {
-    std::vector<expression> args;
-    args.push_back(std::move(e));
-
-    function fc{std::move(args)};
-    fc.display_name() = "square";
-
-    fc.codegen_dbl_f() = [](llvm_state &s, const std::vector<llvm::Value *> &args) {
-        if (args.size() != 1u) {
-            throw std::invalid_argument("Invalid number of arguments passed to the codegen of the square "
-                                        "function: 1 argument was expected, but "
-                                        + std::to_string(args.size()) + " arguments were passed instead");
-        }
-
-        return s.builder().CreateFMul(args[0], args[0]);
-    };
-    fc.codegen_ldbl_f() = fc.codegen_dbl_f();
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.codegen_f128_f() = fc.codegen_dbl_f();
-#endif
-    fc.taylor_diff_dbl_f() = detail::taylor_diff_square<double>;
-    fc.taylor_diff_ldbl_f() = detail::taylor_diff_square<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_diff_f128_f() = detail::taylor_diff_square<mppp::real128>;
-#endif
-    fc.taylor_c_diff_func_dbl_f() = detail::taylor_c_diff_func_square<double>;
-    fc.taylor_c_diff_func_ldbl_f() = detail::taylor_c_diff_func_square<long double>;
-#if defined(HEYOKA_HAVE_REAL128)
-    fc.taylor_c_diff_func_f128_f() = detail::taylor_c_diff_func_square<mppp::real128>;
-#endif
-
-    return expression{std::move(fc)};
+    return expression{func{detail::square_impl(std::move(e))}};
 }
 
 } // namespace heyoka

@@ -164,13 +164,18 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/function.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math_functions.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/square.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/square.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
@@ -200,12 +205,11 @@ target_compile_options(heyoka PRIVATE
     "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
 )
 
-# Let's setup the target C++ standard, but only if the user did not provide it manually.
-if(NOT CMAKE_CXX_STANDARD)
-    set_property(TARGET heyoka PROPERTY CXX_STANDARD 17)
-endif()
-set_property(TARGET heyoka PROPERTY CXX_STANDARD_REQUIRED YES)
+# Ensure that C++17 is employed when both compiling and consuming heyoka.
+target_compile_features(heyoka PUBLIC cxx_std_17)
+# Enforce vanilla C++17 when compiling heyoka.
 set_property(TARGET heyoka PROPERTY CXX_EXTENSIONS NO)
+
 target_include_directories(heyoka PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

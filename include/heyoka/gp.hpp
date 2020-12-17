@@ -17,7 +17,6 @@
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
 #include <heyoka/splitmix64.hpp>
 
 namespace heyoka
