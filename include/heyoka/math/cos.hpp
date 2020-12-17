@@ -38,11 +38,14 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
+    expression diff(const std::string &) const;
+
     double eval_dbl(const std::unordered_map<std::string, double> &) const;
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
+    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
                                  std::uint32_t, std::uint32_t) const;
     llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
@@ -59,6 +62,8 @@ public:
 };
 
 } // namespace detail
+
+HEYOKA_DLL_PUBLIC expression cos(expression);
 
 } // namespace heyoka
 

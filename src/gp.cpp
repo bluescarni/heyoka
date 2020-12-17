@@ -19,9 +19,9 @@
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/gp.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -51,9 +51,16 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
         std::visit(
             [node_id, &node_counter, &ret](auto &node) {
                 using type = detail::uncvref_t<decltype(node)>;
-                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                if constexpr (std::is_same_v<type, binary_operator>) {
                     for (auto &arg : node.args()) {
                         fetch_from_node_id_impl(arg, node_id, node_counter, ret);
+                        if (ret) {
+                            return;
+                        }
+                    }
+                } else if constexpr (std::is_same_v<type, func>) {
+                    for (auto [b, e] = node.get_mutable_args_it(); b != e; ++b) {
+                        fetch_from_node_id_impl(*b, node_id, node_counter, ret);
                         if (ret) {
                             return;
                         }
@@ -70,7 +77,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
     std::visit(
         [&node_counter](auto &node) {
             using type = detail::uncvref_t<decltype(node)>;
-            if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+            if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
                 for (auto &arg : node.args()) {
                     count_nodes_impl(arg, node_counter);
                 }
@@ -316,10 +323,13 @@ void mutate(expression &e, const expression_generator &generator, const double m
     } else {
         std::visit(
             [&generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
-                if constexpr (std::is_same_v<decltype(node),
-                                             function &> || std::is_same_v<decltype(node), binary_operator &>) {
+                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
                     for (auto &branch : node.args()) {
                         mutate(branch, generator, mut_p, engine, min_depth, max_depth, depth + 1);
+                    }
+                } else if constexpr (std::is_same_v<decltype(node), func &>) {
+                    for (auto [b, e] = node.get_mutable_args_it(); b != e; ++b) {
+                        mutate(*b, generator, mut_p, engine, min_depth, max_depth, depth + 1);
                     }
                 }
             },

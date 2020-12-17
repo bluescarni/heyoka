@@ -379,6 +379,18 @@ llvm::Function *sqrt_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t 
 
 #endif
 
+expression sqrt_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return heyoka::diff(args()[0], s) / (2_dbl * sqrt(args()[0]));
+}
+
 } // namespace detail
+
+expression sqrt(expression e)
+{
+    return expression{func{detail::sqrt_impl(std::move(e))}};
+}
 
 } // namespace heyoka

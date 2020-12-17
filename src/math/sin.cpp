@@ -45,6 +45,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -159,6 +160,32 @@ double sin_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     }
 
     return std::cos(a[0]);
+}
+
+std::vector<expression>::size_type sin_impl::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+{
+    assert(args().size() == 1u);
+
+    // Decompose the argument.
+    auto &arg = *get_mutable_args_it().first;
+    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+        arg = expression{variable{"u_" + li_to_string(dres)}};
+    }
+
+    // Save a copy of the decomposed argument.
+    auto f_arg = arg;
+
+    // Append the sine decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)});
+
+    // Compute the return value (pointing to the
+    // decomposed sine).
+    const auto retval = u_vars_defs.size() - 1u;
+
+    // Append the cosine decomposition.
+    u_vars_defs.push_back(cos(std::move(f_arg)));
+
+    return retval;
 }
 
 namespace
@@ -423,6 +450,18 @@ llvm::Function *sin_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
+expression sin_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return cos(args()[0]) * heyoka::diff(args()[0], s);
+}
+
 } // namespace detail
+
+expression sin(expression e)
+{
+    return expression{func{detail::sin_impl(std::move(e))}};
+}
 
 } // namespace heyoka

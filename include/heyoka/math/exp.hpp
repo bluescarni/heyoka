@@ -38,6 +38,8 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
+    expression diff(const std::string &) const;
+
     double eval_dbl(const std::unordered_map<std::string, double> &) const;
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
@@ -59,6 +61,8 @@ public:
 };
 
 } // namespace detail
+
+HEYOKA_DLL_PUBLIC expression exp(expression);
 
 } // namespace heyoka
 

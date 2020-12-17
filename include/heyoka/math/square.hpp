@@ -38,6 +38,8 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
+    expression diff(const std::string &) const;
+
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
                                  std::uint32_t, std::uint32_t) const;
     llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
@@ -54,6 +56,8 @@ public:
 };
 
 } // namespace detail
+
+HEYOKA_DLL_PUBLIC expression square(expression);
 
 } // namespace heyoka
 

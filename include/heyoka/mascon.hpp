@@ -12,8 +12,7 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
-#include <heyoka/math_functions.hpp>
-#include <heyoka/square.hpp>
+#include <heyoka/math.hpp>
 #include <vector>
 
 namespace heyoka
@@ -26,8 +25,9 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>>
     make_mascon_system_impl(expression, std::vector<std::vector<expression>>, std::vector<expression>, expression,
                             expression, expression);
 
-HEYOKA_DLL_PUBLIC expression energy_mascon_system_impl(expression, std::vector<expression>, std::vector<std::vector<expression>>,
-                                                       std::vector<expression>, expression, expression, expression);
+HEYOKA_DLL_PUBLIC expression energy_mascon_system_impl(expression, std::vector<expression>,
+                                                       std::vector<std::vector<expression>>, std::vector<expression>,
+                                                       expression, expression, expression);
 
 } // namespace detail
 
@@ -39,7 +39,7 @@ HEYOKA_DLL_PUBLIC expression energy_mascon_system_impl(expression, std::vector<e
 // Note, units must be consistent. Choosing L and M is done via the mascon model, T is derived by the value of G. The
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename... KwArgs>
-inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs &&... kw_args)
+inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs &&...kw_args)
 {
     // 1 - Check input consistency (TODO)
     // 2 - We parse the unnamed arguments
@@ -63,8 +63,8 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
         if constexpr (p.has(kw::points)) {
             for (const auto &point : p(kw::points)) {
                 if (std::size(point) == 3) {
-                    mascon_points.emplace_back(std::vector<expression>{
-                        expression{point[0]}, expression{point[1]}, expression{point[2]}});
+                    mascon_points.emplace_back(
+                        std::vector<expression>{expression{point[0]}, expression{point[1]}, expression{point[2]}});
                 } else {
                     throw std::invalid_argument("All mascon points must have a dimension of exactly 3. A dimension of "
                                                 + std::to_string(std::size(point))
@@ -109,7 +109,7 @@ inline std::vector<std::pair<expression, expression>> make_mascon_system(KwArgs 
 // Note, units must be consistent. Choosing L and M is done via the mascon model, T is derived by the value of G. The
 // angular velocity must be consequent (equivalently one can choose the units for w and induce them on the value of G).
 template <typename... KwArgs>
-expression energy_mascon_system(KwArgs &&... kw_args)
+expression energy_mascon_system(KwArgs &&...kw_args)
 // const std::vector<double> x, const P &mascon_points, const M &mascon_masses, double p, double q,
 // double r, double G)
 {
@@ -141,8 +141,8 @@ expression energy_mascon_system(KwArgs &&... kw_args)
         if constexpr (p.has(kw::points)) {
             for (const auto &point : p(kw::points)) {
                 if (std::size(point) == 3) {
-                    mascon_points.emplace_back(std::vector<expression>{
-                        expression{point[0]}, expression{point[1]}, expression{point[2]}});
+                    mascon_points.emplace_back(
+                        std::vector<expression>{expression{point[0]}, expression{point[1]}, expression{point[2]}});
                 } else {
                     throw std::invalid_argument("All mascon points must have a dimension of exactly 3. A dimension of "
                                                 + std::to_string(std::size(point))
@@ -173,7 +173,6 @@ expression energy_mascon_system(KwArgs &&... kw_args)
             static_assert(detail::always_false_v<KwArgs...>, "omega is missing from the kwarg list!");
         };
         return detail::energy_mascon_system_impl(Gconst, x, mascon_points, mascon_masses, pe, qe, re);
-       
     }
 }
 

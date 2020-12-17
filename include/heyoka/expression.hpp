@@ -34,7 +34,8 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/function.hpp>
+#include <heyoka/exceptions.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
@@ -45,7 +46,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC expression
 {
 public:
-    using value_type = std::variant<number, variable, binary_operator, function>;
+    using value_type = std::variant<number, variable, binary_operator, func>;
 
 private:
     value_type m_value;
@@ -63,7 +64,7 @@ public:
     explicit expression(number);
     explicit expression(variable);
     explicit expression(binary_operator);
-    explicit expression(function);
+    explicit expression(func);
 
     expression(const expression &);
     expression(expression &&) noexcept;
@@ -102,6 +103,19 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 
 namespace detail
 {
+
+// NOTE: this needs to go here because
+// the definition of expression must be visible
+// in order for this to be well-formed.
+template <typename T>
+inline expression func_inner<T>::diff(const std::string &s) const
+{
+    if constexpr (func_has_diff_v<T>) {
+        return m_value.diff(s);
+    } else {
+        throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name() + "'");
+    }
+}
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
     std::string m_str;

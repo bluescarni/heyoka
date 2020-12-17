@@ -44,6 +44,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
 
@@ -521,6 +522,38 @@ llvm::Function *pow_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
+expression pow_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 2u);
+
+    return args()[1] * pow(args()[0], args()[1] - 1_dbl) * heyoka::diff(args()[0], s)
+           + pow(args()[0], args()[1]) * log(args()[0]) * heyoka::diff(args()[1], s);
+}
+
 } // namespace detail
+
+expression pow(expression b, expression e)
+{
+    return expression{func{detail::pow_impl{std::move(b), std::move(e)}}};
+}
+
+expression pow(expression b, double e)
+{
+    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+}
+
+expression pow(expression b, long double e)
+{
+    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression pow(expression b, mppp::real128 e)
+{
+    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+}
+
+#endif
 
 } // namespace heyoka

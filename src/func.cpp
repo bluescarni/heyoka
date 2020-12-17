@@ -671,9 +671,8 @@ expression subs(const func &f, const std::unordered_map<std::string, expression>
         *b = subs(*b, smap);
     }
 
-    // TODO fix and test.
-    // return expression{std::move(tmp)};
-    return expression{};
+    // TODO test.
+    return expression{std::move(tmp)};
 }
 
 expression diff(const func &f, const std::string &s)
@@ -840,22 +839,19 @@ llvm::Value *taylor_diff_f128(llvm_state &s, const func &f, const std::vector<ll
 
 #endif
 
-llvm::Function *taylor_c_diff_func_func_dbl(llvm_state &s, const func &f, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return f.taylor_c_diff_func_dbl(s, n_uvars, batch_size);
 }
 
-llvm::Function *taylor_c_diff_func_func_ldbl(llvm_state &s, const func &f, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return f.taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *taylor_c_diff_func_func_f128(llvm_state &s, const func &f, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     return f.taylor_c_diff_func_f128(s, n_uvars, batch_size);
 }

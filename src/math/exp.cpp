@@ -421,6 +421,18 @@ llvm::Function *exp_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
+expression exp_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return exp(args()[0]) * heyoka::diff(args()[0], s);
+}
+
 } // namespace detail
+
+expression exp(expression e)
+{
+    return expression{func{detail::exp_impl(std::move(e))}};
+}
 
 } // namespace heyoka

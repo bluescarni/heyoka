@@ -63,7 +63,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -370,7 +370,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
             [i](const auto &v) {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
                     auto check_arg = [i](const auto &arg) {
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
@@ -1470,7 +1470,7 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
             [](const auto &v) -> std::vector<std::uint32_t> {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+                if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
                     std::vector<std::uint32_t> retval;
 
                     for (const auto &arg : v.args()) {
@@ -1698,7 +1698,7 @@ auto taylor_udef_to_variants(const expression &ex)
         [](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, function> || std::is_same_v<type, binary_operator>) {
+            if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
                 std::vector<std::variant<std::uint32_t, number>> retval;
 
                 for (const auto &arg : v.args()) {

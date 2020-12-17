@@ -10,8 +10,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/mascon.hpp>
-#include <heyoka/math_functions.hpp>
-#include <heyoka/square.hpp>
+#include <heyoka/math.hpp>
 
 namespace heyoka
 {
@@ -69,15 +68,16 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
     return retval;
 }
 
-expression energy_mascon_system_impl(expression Gconst, std::vector<expression> x, std::vector<std::vector<expression>> mascon_points,
-                          std::vector<expression> mascon_masses, expression pe, expression qe, expression re)
+expression energy_mascon_system_impl(expression Gconst, std::vector<expression> x,
+                                     std::vector<std::vector<expression>> mascon_points,
+                                     std::vector<expression> mascon_masses, expression pe, expression qe, expression re)
 {
     auto kinetic = expression{(x[3] * x[3] + x[4] * x[4] + x[5] * x[5]) / expression{2.}};
     auto potential_g = expression{0.};
     for (decltype(mascon_masses.size()) i = 0u; i < mascon_masses.size(); ++i) {
         auto distance = expression{sqrt((x[0] - mascon_points[i][0]) * (x[0] - mascon_points[i][0])
-                                              + (x[1] - mascon_points[i][1]) * (x[1] - mascon_points[i][1])
-                                              + (x[2] - mascon_points[i][2]) * (x[2] - mascon_points[i][2]))};
+                                        + (x[1] - mascon_points[i][1]) * (x[1] - mascon_points[i][1])
+                                        + (x[2] - mascon_points[i][2]) * (x[2] - mascon_points[i][2]))};
         potential_g -= Gconst * mascon_masses[i] / distance;
     }
     auto potential_c

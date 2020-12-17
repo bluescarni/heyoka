@@ -14,7 +14,7 @@
 #include <vector>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"

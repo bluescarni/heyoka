@@ -9,12 +9,19 @@
 #ifndef HEYOKA_MATH_POW_HPP
 #define HEYOKA_MATH_POW_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -38,6 +45,8 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
+    expression diff(const std::string &) const;
+
     double eval_dbl(const std::unordered_map<std::string, double> &) const;
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
@@ -59,6 +68,16 @@ public:
 };
 
 } // namespace detail
+
+HEYOKA_DLL_PUBLIC expression pow(expression, expression);
+HEYOKA_DLL_PUBLIC expression pow(expression, double);
+HEYOKA_DLL_PUBLIC expression pow(expression, long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
+
+#endif
 
 } // namespace heyoka
 

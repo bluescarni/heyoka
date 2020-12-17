@@ -35,7 +35,7 @@
 #include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/function.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
@@ -63,7 +63,7 @@ expression::expression(variable var) : m_value(std::move(var)) {}
 
 expression::expression(binary_operator bo) : m_value(std::move(bo)) {}
 
-expression::expression(function f) : m_value(std::move(f)) {}
+expression::expression(func f) : m_value(std::move(f)) {}
 
 expression::expression(const expression &) = default;
 
@@ -804,7 +804,7 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
         [&](const auto &v) -> llvm::Value * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
                 return taylor_diff<T>(s, v, arr, n_uvars, order, idx, batch_size);
             } else {
                 throw std::invalid_argument(
@@ -855,7 +855,7 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
         [&](const auto &v) -> llvm::Function * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, function>) {
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
                 return taylor_c_diff_func<T>(s, v, n_uvars, batch_size);
             } else {
                 throw std::invalid_argument(

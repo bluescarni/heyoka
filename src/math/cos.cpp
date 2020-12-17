@@ -46,6 +46,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -159,6 +160,25 @@ double cos_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     }
 
     return -std::sin(a[0]);
+}
+
+std::vector<expression>::size_type cos_impl::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+{
+    assert(args().size() == 1u);
+
+    // Decompose the argument.
+    auto &arg = *get_mutable_args_it().first;
+    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
+        arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+    }
+
+    // Append the sine decomposition.
+    u_vars_defs.push_back(sin(arg));
+
+    // Append the cosine decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)});
+
+    return u_vars_defs.size() - 1u;
 }
 
 namespace
@@ -275,7 +295,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
 // Derivative of cos(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const function &fn, const variable &, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const variable &, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -422,6 +442,18 @@ llvm::Function *cos_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
+expression cos_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return -sin(args()[0]) * heyoka::diff(args()[0], s);
+}
+
 } // namespace detail
+
+expression cos(expression e)
+{
+    return expression{func{detail::cos_impl(std::move(e))}};
+}
 
 } // namespace heyoka

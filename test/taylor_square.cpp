@@ -22,8 +22,8 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/square.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"

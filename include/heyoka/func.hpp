@@ -365,15 +365,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #endif
 
     // diff.
-    expression diff(const std::string &s) const final
-    {
-        if constexpr (func_has_diff_v<T>) {
-            return m_value.diff(s);
-        } else {
-            throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name()
-                                        + "'");
-        }
-    }
+    expression diff(const std::string &) const final;
 
     // eval.
     double eval_dbl(const std::unordered_map<std::string, double> &m) const final
@@ -421,8 +413,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         } else {
             func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
 
-            // TODO
-            // u_vars_defs.emplace_back(std::move(m_value));
+            u_vars_defs.emplace_back(func{std::move(m_value)});
 
             return u_vars_defs.size() - 1u;
         }

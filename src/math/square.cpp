@@ -365,6 +365,18 @@ llvm::Function *square_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_
 
 #endif
 
+expression square_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return 2_dbl * args()[0] * heyoka::diff(args()[0], s);
+}
+
 } // namespace detail
+
+expression square(expression e)
+{
+    return expression{func{detail::square_impl(std::move(e))}};
+}
 
 } // namespace heyoka
