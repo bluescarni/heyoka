@@ -13,7 +13,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/gp.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math_functions.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/variable.hpp>
