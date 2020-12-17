@@ -338,8 +338,18 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
 
 std::vector<expression>::size_type func::taylor_decompose(std::vector<expression> &u_vars_defs) &&
 {
-    // TODO check on the return value? In test as well.
-    return std::move(*ptr()).taylor_decompose(u_vars_defs);
+    auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
+
+    if (ret >= u_vars_defs.size()) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid value returned by the Taylor decomposition function for the function '{}': "
+            "the return value is {}, which is not less than the current size of the decomposition "
+            "({})"_format(get_display_name(), ret, u_vars_defs.size()));
+    }
+
+    return ret;
 }
 
 llvm::Value *func::taylor_u_init_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
@@ -671,7 +681,6 @@ expression subs(const func &f, const std::unordered_map<std::string, expression>
         *b = subs(*b, smap);
     }
 
-    // TODO test.
     return expression{std::move(tmp)};
 }
 

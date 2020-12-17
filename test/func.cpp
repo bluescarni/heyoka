@@ -173,7 +173,6 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
-    // TODO better test down the line.
     std::vector<expression> empty;
     f = func{func_00{{"x"_var, "y"_var}}};
     std::move(f).taylor_decompose(empty);
@@ -355,13 +354,35 @@ struct func_10 : func_base {
     }
 };
 
+struct func_10a : func_base {
+    func_10a() : func_base("f", {}) {}
+    explicit func_10a(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &u_vars_defs) &&
+    {
+        u_vars_defs.emplace_back("foo");
+
+        return u_vars_defs.size();
+    }
+};
+
 TEST_CASE("func taylor_decompose")
 {
+    using Catch::Matchers::Message;
+
     auto f = func(func_10{{"x"_var}});
 
     std::vector<expression> u_vars_defs;
     REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 0u);
     REQUIRE(u_vars_defs == std::vector{"foo"_var});
+
+    f = func(func_10a{{"x"_var}});
+
+    REQUIRE_THROWS_MATCHES(
+        std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+        Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
+                "the return value is 2, which is not less than the current size of the decomposition "
+                "(2)"));
 }
 
 struct func_11 : func_base {
@@ -623,4 +644,25 @@ TEST_CASE("func diff free func")
     f1 = func(func_00{});
     REQUIRE_THROWS_MATCHES(diff(f1, ""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
+}
+
+struct func_15 : func_base {
+    func_15(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_15(std::vector<expression> args) : func_base("f", std::move(args)) {}
+};
+
+TEST_CASE("func subs")
+{
+    auto f1 = func(func_15{{"x"_var, "y"_var}});
+
+    auto f2 = subs(expression{f1}, {{}});
+    REQUIRE(f2 == expression{f1});
+
+    f2 = subs(expression{f1}, {{"x", "z"_var}});
+    REQUIRE(f2 == expression{func(func_15{{"z"_var, "y"_var}})});
+
+    f2 = subs(expression{f1}, {{"x", "z"_var}, {"y", 42_dbl}});
+    REQUIRE(f2 == expression{func(func_15{{"z"_var, 42_dbl}})});
 }
