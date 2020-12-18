@@ -19,3 +19,12 @@ heyoka has the following **mandatory** dependencies:
 * the `LLVM <https://llvm.org/>`__ compiler infrastructure library, version 10 or 11,
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >= 1.60),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library.
+
+Additionally, heyoka has the following **optional** dependencies:
+
+* the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library
+  (provides support for quadruple-precision integrations),
+* the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
+  of integrations in batch mode),
+* the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
+  libraries (used in the tests and benchmarks).
