@@ -61,6 +61,7 @@ Contents
    :maxdepth: 2
 
    install.rst
+   changelog.rst
 
 Authors
 -------
