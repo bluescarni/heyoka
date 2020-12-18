@@ -54,6 +54,14 @@ in heyoka:
    :language: c++
    :lines: 9-
 
+Contents
+--------
+
+.. toctree::
+   :maxdepth: 2
+
+   install.rst
+
 Authors
 -------
 
@@ -65,15 +73,3 @@ License
 
 Heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`__
 license.
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   install.rst
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`search`
