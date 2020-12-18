@@ -29,6 +29,7 @@ include(YACMACompilerLinkerSettings)
 # The build options.
 option(HEYOKA_BUILD_TESTS "Build unit tests." OFF)
 option(HEYOKA_BUILD_BENCHMARKS "Build benchmarks." OFF)
+option(HEYOKA_BUILD_TUTORIALS "Build tutorials." OFF)
 option(HEYOKA_WITH_MPPP "Enable features relying on mp++." OFF)
 option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
@@ -322,7 +323,7 @@ endif()
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
 
 # Configure the doc files.
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/docs/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/docs/conf.py" @ONLY)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py" @ONLY)
 
 # Installation of the header files.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)
@@ -362,4 +363,8 @@ endif()
 
 if(HEYOKA_BUILD_BENCHMARKS)
     add_subdirectory(benchmark)
+endif()
+
+if(HEYOKA_BUILD_TUTORIALS)
+    add_subdirectory(tutorial)
 endif()

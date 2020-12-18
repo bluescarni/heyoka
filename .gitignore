@@ -2,6 +2,6 @@
 build*
 
 # Documentation.
-docs/_build/
+doc/_build/
 # This is auto-generated.
-docs/conf.py
+doc/conf.py
