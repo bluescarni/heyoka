@@ -6,7 +6,7 @@
 heyoka
 ======
 
-    The `heyókȟa <https://en.wikipedia.org/wiki/Heyoka>`_ [...] is a kind of
+    The `heyókȟa <https://en.wikipedia.org/wiki/Heyoka>`__ [...] is a kind of
     sacred clown in the culture of the Sioux (Lakota and Dakota people)
     of the Great Plains of North America. The heyoka is a contrarian, jester,
     and satirist, who speaks, moves and reacts in an opposite fashion to the
@@ -20,16 +20,16 @@ Heyoka is a C++ library for the integration of ordinary differential equations
 * the ability to maintain machine precision accuracy over
   tens of billions of timesteps,
 * batch mode integration to harness the power of modern
-  `SIMD <https://en.wikipedia.org/wiki/SIMD>`_ instruction sets,
+  `SIMD <https://en.wikipedia.org/wiki/SIMD>`__ instruction sets,
 * a high-performance implementation of Taylor's method based
   on automatic differentiation techniques and aggressive just-in-time
-  compilation via `LLVM <https://llvm.org/>`_.
+  compilation via `LLVM <https://llvm.org/>`__.
 
 Quick example
 -------------
 
 As a simple example, consider the ODE system
-corresponding to the `pendulum <https://en.wikipedia.org/wiki/Pendulum_(mathematics)>`_,
+corresponding to the `pendulum <https://en.wikipedia.org/wiki/Pendulum_(mathematics)>`__,
 
 .. math::
 
@@ -63,18 +63,17 @@ Authors
 License
 -------
 
-Heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`_
+Heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`__
 license.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-
+   install.rst
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`

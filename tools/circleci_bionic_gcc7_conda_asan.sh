@@ -31,7 +31,7 @@ ctest -V -j2
 
 # Build the docs.
 cd ../doc
-export SPHINX_OUTPUT=`make html linkcheck 2>&1`;
+export SPHINX_OUTPUT=`make html linkcheck 2>&1 >/dev/null`;
 if [[ "${SPHINX_OUTPUT}" != "" ]]; then
     echo "Sphinx encountered some problem:";
     echo "${SPHINX_OUTPUT}";
