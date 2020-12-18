@@ -64,6 +64,11 @@ int main()
 }
 ```
 
+Documentation
+-------------
+
+The full documentation can be found [here](https://bluescarni.github.io/heyoka/).
+
 Authors
 -------
 
