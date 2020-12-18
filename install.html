@@ -1,0 +1,316 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Installation &#8212; heyoka 0.1.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.40e2e510f6b7d1648584402491bb10fe.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.3da636dd464baa7582d2.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="heyoka" href="index.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.1.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <p class="caption collapsible-parent">
+ <span class="caption-text">
+  Contents:
+ </span>
+</p>
+<ul class="current nav sidenav_l1">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Installation
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/install.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+        <!-- Source interaction buttons -->
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#introduction">
+   Introduction
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#installation-from-source">
+   Installation from source
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#including-heyoka-in-your-project-via-cmake">
+   Including heyoka in your project via CMake
+  </a>
+ </li>
+</ul>
+
+        </nav>
+        
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="installation">
+<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>heyoka is written in modern C++, and it requires a compiler able to understand
+at least C++17. The library is regularly tested on
+a comprehensive continuous integration pipeline, which includes:</p>
+<ul class="simple">
+<li><p>various versions of the three major compilers (GCC, Clang and MSVC),</p></li>
+<li><p>various versions of the three major operating systems
+(Linux, Windows and OSX).</p></li>
+</ul>
+<p>heyoka has the following <strong>mandatory</strong> dependencies:</p>
+<ul class="simple">
+<li><p>the <a class="reference external" href="https://llvm.org/">LLVM</a> compiler infrastructure library, version 10 or 11,</p></li>
+<li><p>the <a class="reference external" href="https://www.boost.org/">Boost</a> C++ libraries (version &gt;= 1.60),</p></li>
+<li><p>the <a class="reference external" href="https://fmt.dev/latest/index.html">{fmt}</a> library.</p></li>
+</ul>
+<p>Additionally, heyoka has the following <strong>optional</strong> dependencies:</p>
+<ul class="simple">
+<li><p>the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> multiprecision library
+(provides support for quadruple-precision integrations),</p></li>
+<li><p>the <a class="reference external" href="https://sleef.org/">SLEEF</a> vectorized math library (improves the performance
+of integrations in batch mode),</p></li>
+<li><p>the <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor and xtensor-blas</a>
+libraries (used in the tests and benchmarks).</p></li>
+</ul>
+<p><a class="reference external" href="https://cmake.org/">CMake</a> is the build system used by heyoka and it must also be available when
+installing from source (the minimum required version is 3.8).</p>
+</div>
+<div class="section" id="installation-from-source">
+<h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this headline">¶</a></h2>
+<p>Source releases of heyoka can be downloaded from
+<a class="reference external" href="https://github.com/bluescarni/heyoka/releases">github</a>.
+Once in the source tree
+of heyoka, you can use <code class="docutils literal notranslate"><span class="pre">cmake</span></code> to configure the build to your liking
+(e.g., enabling optional features, customizing the installation
+path, etc.). The available configuration options are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code>: enable features relying on the mp++ library (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_SLEEF</span></code>: enable features relying on the SLEEF library (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TESTS</span></code>: build the test suite (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_BENCHMARKS</span></code>: build the benchmarking suite (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TUTORIALS</span></code>: build the tutorials (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_STATIC_LIBRARY</span></code>: build heyoka as a static library, instead
+of a dynamic library (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_ENABLE_IPO</span></code>: enable link-time optimisations when building
+the heyoka library (requires CMake &gt;= 3.9 and compiler support,
+off by default).</p></li>
+</ul>
+<p>In order to build heyoka, you can run the following CMake command from the
+build directory:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cmake --build .
+</pre></div>
+</div>
+<p>To install heyoka, you can use the following CMake command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cmake  --build . --target install
+</pre></div>
+</div>
+<p>The installation command will copy the heyoka headers and library to the
+<code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX</span></code> directory.</p>
+<p>If you enabled the <code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TESTS</span></code> option, you can run the test suite
+with the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cmake  --build . --target <span class="nb">test</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On Windows, and if heyoka is built as a shared library (the default),
+in order to execute the test or the benchmark suite you have to ensure that the
+<code class="docutils literal notranslate"><span class="pre">PATH</span></code> variable includes the directory that contains the heyoka
+DLL (otherwise the tests will fail to run).</p>
+</div>
+</div>
+<div class="section" id="including-heyoka-in-your-project-via-cmake">
+<h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this headline">¶</a></h2>
+<p>As a part of the heyoka installation, a group of CMake files is installed into
+<code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX/lib/cmake/heyoka</span></code>.
+This bundle, which is known in the CMake lingo as a <a class="reference external" href="https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html">config-file package</a>,
+facilitates the detection and use of heyoka from other CMake-based projects.
+heyoka’s config-file package, once loaded, provides
+an imported target called <code class="docutils literal notranslate"><span class="pre">heyoka::heyoka</span></code> which encapsulates all the information
+necessary to use heyoka. That is, linking to
+<code class="docutils literal notranslate"><span class="pre">heyoka::heyoka</span></code> ensures that heyoka’s include directories are added to the include
+path of the compiler, and that the libraries
+on which heyoka depends are brought into the link chain.</p>
+<p>For instance, a <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> file for a project using heyoka
+may look like this:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="c"># The name of our project.</span>
+<span class="nb">project</span><span class="p">(</span><span class="s">sample_project</span><span class="p">)</span>
+
+<span class="c"># Look for an installation of heyoka in the system.</span>
+<span class="nb">find_package</span><span class="p">(</span><span class="s">heyoka</span> <span class="s">REQUIRED</span><span class="p">)</span>
+
+<span class="c"># Create an executable, and link it to the heyoka::heyoka imported target.</span>
+<span class="c"># This ensures that, in the compilation of &#39;main&#39;, heyoka&#39;s include</span>
+<span class="c"># dirs are added to the include path of the compiler and that heyoka&#39;s</span>
+<span class="c"># dependencies are transitively linked to &#39;main&#39;.</span>
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">main</span> <span class="s">main.cpp</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">main</span> <span class="s">heyoka::heyoka</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="index.html" title="previous page">heyoka</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.3da636dd464baa7582d2.js"></script>
+
+
+    
+  </body>
+</html>
