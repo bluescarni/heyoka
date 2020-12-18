@@ -33,7 +33,7 @@ jobs:
           conda activate heyoka
           mkdir build
           cd build
-          cmake ../ -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes
+          cmake ../ -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH=%CONDA_PREFIX_PATH% -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON -DHEYOKA_WITH_SLEEF=yes
           cmake --build . --config Release
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
