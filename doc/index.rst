@@ -54,6 +54,18 @@ in heyoka:
    :language: c++
    :lines: 9-
 
+Authors
+-------
+
+* Francesco Biscani (Max Planck Institute for Astronomy)
+* Dario Izzo (European Space Agency)
+
+License
+-------
+
+Heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`_
+license.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

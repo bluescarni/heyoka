@@ -63,3 +63,15 @@ int main()
     std::cout << "v(10) = " << ta.get_state()[1] << '\n';
 }
 ```
+
+Authors
+-------
+
+* Francesco Biscani (Max Planck Institute for Astronomy)
+* Dario Izzo (European Space Agency)
+
+License
+-------
+
+Heyoka is released under the [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/FAQ/)
+license.
