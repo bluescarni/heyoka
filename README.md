@@ -12,7 +12,7 @@ heyoka
 > and satirist, who speaks, moves and reacts in an opposite fashion to the
 > people around them.
 
-Heyoka is a C++ library for the integration of ordinary differential equations
+heyoka is a C++ library for the integration of ordinary differential equations
 (ODEs) via Taylor's method. Notable features include:
 
 * support for both double-precision and extended-precision floating-point types
@@ -78,5 +78,5 @@ Authors
 License
 -------
 
-Heyoka is released under the [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/FAQ/)
+heyoka is released under the [MPL-2.0](https://www.mozilla.org/en-US/MPL/2.0/FAQ/)
 license.
