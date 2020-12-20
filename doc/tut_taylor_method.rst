@@ -26,9 +26,9 @@ expansion of :math:`\boldsymbol{x}\left( t \right)` around :math:`t=t_0`:
    :label: tts_00
 
    \boldsymbol{x}\left( t_1 \right) = \boldsymbol{x}_0 + \boldsymbol{x}'\left(t_0\right)h 
-   +\frac{1}{2}\boldsymbol{x}''\left(t_0\right)h^2+\ldots+\frac{\boldsymbol{x}^{\left( p \right)}\left(t_0\right)}{p!}h^p,
+   +\frac{1}{2}\boldsymbol{x}''\left(t_0\right)h^2+\ldots+\frac{\boldsymbol{x}^{\left( p \right)}\left(t_0\right)}{p!}h^p.
 
-where :math:`h=t_1-t_0` is the integration timestep and :math:`p` is the order of the Taylor method. Eq. :eq:`tts_00`
+Here :math:`h=t_1-t_0` is the integration timestep and :math:`p` is the order of the Taylor method. Eq. :eq:`tts_00`
 can be rewritten in more compact form as
 
 .. math::
@@ -43,7 +43,7 @@ where we have defined
 
    \boldsymbol{x}^{\left[ n \right]}\left( t \right) = \frac{1}{n!}\boldsymbol{x}^{\left( n \right)}\left( t \right)
 
-as the normalised derivative of :math:`\boldsymbol{x}\left( t \right)` of order :math:`n`.
+as the *normalised derivative* of order :math:`n` of :math:`\boldsymbol{x}\left( t \right)`.
 
 The derivatives appearing in the Taylor polynomial :eq:`tts_01` can be computed from the
 initial conditions :eq:`ic_00` and the right-hand side of the ODE system :eq:`ode_sys_00`.

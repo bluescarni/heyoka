@@ -3,6 +3,9 @@
 Tutorial
 ========
 
+TODO: assumptions (using heyoka)
+TODO: availability in the tutorials subdir.
+
 .. toctree::
   :maxdepth: 1
 

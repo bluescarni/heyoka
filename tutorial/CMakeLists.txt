@@ -13,3 +13,4 @@ function(ADD_HEYOKA_TUTORIAL arg1)
 endfunction()
 
 ADD_HEYOKA_TUTORIAL(pendulum)
+ADD_HEYOKA_TUTORIAL(ex_system)
