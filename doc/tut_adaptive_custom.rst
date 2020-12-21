@@ -19,8 +19,7 @@ epsilon of the floating-point type in use. E.g., when using the
 
 The :math:`\varepsilon` value is used by the ``taylor_adaptive``
 class to control the error arising from truncating the (infinite)
-Taylor series representing the solution of the ODE system
-to a finite number of terms.
+Taylor series representing the solution of the ODE system.
 In other words, ``taylor_adaptive`` strives to ensure that the
 magnitude of the remainders of the Taylor series is
 not greater than :math:`\varepsilon`,
