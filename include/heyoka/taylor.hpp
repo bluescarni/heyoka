@@ -261,6 +261,8 @@ enum class taylor_outcome {
     err_nf_state // Non-finite state detected at the end of the timestep.
 };
 
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
+
 namespace kw
 {
 

@@ -11,3 +11,4 @@ TODO: availability in the tutorials subdir.
 
   tut_taylor_method
   tut_expression_system
+  tut_adaptive
