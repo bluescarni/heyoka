@@ -1,7 +1,7 @@
 .. _tut_adaptive:
 
-The adaptive integrator class
-=============================
+The adaptive integrator
+=======================
 
 The ``taylor_adaptive`` class provides an easy-to-use interface to heyoka's
 main capabilities. Objects of this class can be constructed from a system
