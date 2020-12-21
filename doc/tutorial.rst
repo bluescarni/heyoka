@@ -3,8 +3,19 @@
 Tutorial
 ========
 
-TODO: assumptions (using heyoka)
-TODO: availability in the tutorials subdir.
+The code snippets in this tutorial assume the inclusion of the
+global header ``heyoka/heyoka.hpp``, and the use of
+
+.. code-block:: c++
+
+   using namespace heyoka;
+
+to import all names from the ``heyoka`` namespace.
+
+The tutorials' code is available in the ``tutorials/`` subdirectory
+of the source tree. The tutorials can be compiled by enabling the
+``HEYOKA_BUILD_TUTORIALS`` option when
+:ref:`compiling from source <installation_from_source>`.
 
 .. toctree::
   :maxdepth: 1

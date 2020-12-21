@@ -80,7 +80,8 @@ int main()
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
     std::cout << "Max. timestep: " << max_h << '\n';
-    std::cout << "Num. of steps: " << nsteps << "\n\n";
+    std::cout << "Num. of steps: " << nsteps << '\n';
+    std::cout << "Current time : " << ta.get_time() << "\n\n";
 
     // Propagate until t = 20.
     std::tie(status, min_h, max_h, nsteps) = ta.propagate_until(20.);
@@ -88,5 +89,17 @@ int main()
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
     std::cout << "Max. timestep: " << max_h << '\n';
-    std::cout << "Num. of steps: " << nsteps << "\n\n";
+    std::cout << "Num. of steps: " << nsteps << '\n';
+    std::cout << "Current time : " << ta.get_time() << "\n\n";
+
+    // Propagate back to t = 0.
+    std::tie(status, min_h, max_h, nsteps) = ta.propagate_until(0.);
+
+    std::cout << "Outcome      : " << status << '\n';
+    std::cout << "Min. timestep: " << min_h << '\n';
+    std::cout << "Max. timestep: " << max_h << '\n';
+    std::cout << "Num. of steps: " << nsteps << '\n';
+    std::cout << "Current time : " << ta.get_time() << "\n\n";
+
+    std::cout << ta << '\n';
 }

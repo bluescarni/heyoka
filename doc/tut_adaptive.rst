@@ -142,7 +142,7 @@ can be used to access the state data:
 
 Note that ``get_state()`` returns a const reference to the ``std::vector``
 holding the integrator state, while ``get_state_data()`` returns a naked pointer
-to the state data.
+to the state data. Only ``get_state_data()`` can be used to mutate the state.
 
 Time-limited propagation
 ------------------------
@@ -151,7 +151,7 @@ In addition to the step-by-step integration functions,
 ``taylor_adaptive`` also provides functions to propagate
 the state of the system for a specified amount of time.
 These functions are called ``propagate_for()`` and
-``propagate_until()``: the first one integrates
+``propagate_until()``: the former integrates
 the system for a specified amount of time, the latter
 propagates the state up to a specified epoch.
 
@@ -159,7 +159,7 @@ Let's see a couple of usage examples:
 
 .. literalinclude:: ../tutorial/adaptive_basic.cpp
    :language: c++
-   :lines: 77-91
+   :lines: 77-93
 
 .. code-block:: console
 
@@ -167,8 +167,46 @@ Let's see a couple of usage examples:
    Min. timestep: 0.202133
    Max. timestep: 0.218136
    Num. of steps: 24
+   Current time : 5
 
    Outcome      : time_limit
    Min. timestep: 0.202122
    Max. timestep: 0.218139
    Num. of steps: 72
+   Current time : 20
+
+The time-limited propagation functions return
+a tuple of 4 values, which represent, respectively:
+
+* the outcome of the integration (which will always be
+  ``time_limit``, unless error conditions arise),
+* the minimum and maximum integration timesteps
+  that were used in the propagation,
+* the total number of steps that were taken.
+
+The time-limited propagation functions can be used
+to propagate both forward and backward in time:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 95-104
+
+.. code-block:: console
+
+   Outcome      : time_limit
+   Min. timestep: 0.202078
+   Max. timestep: 0.21819
+   Num. of steps: 97
+   Current time : 0
+
+   Taylor order: 20
+   Dimension   : 2
+   Time        : 0.0000000000000000
+   State       : [0.049999999999999843, 0.025000000000002819]
+
+Full code listing
+-----------------
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 9-
