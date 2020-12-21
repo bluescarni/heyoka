@@ -32,6 +32,35 @@ Additionally, heyoka has the following **optional** dependencies:
 `CMake <https://cmake.org/>`__ is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.8).
 
+.. _ep_support:
+
+Support for extended precision
+``````````````````````````````
+
+Whereas in heyoka double-precision computations are always supported, support for extended-precision
+computations varies depending on the software/hardware platform.
+
+80-bit precision
+^^^^^^^^^^^^^^^^
+
+80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
+type must be available in C++ as the ``long double`` type. This is case for most compilers,
+with the notable exception of Microsoft Visual C++, in which ``long double`` is a synonym for ``double``.
+Thus, on Windows heyoka (and all its dependencies) must be compiled with a non-MSVC compiler
+in order to enable 80-bit computations.
+
+128-bit precision
+^^^^^^^^^^^^^^^^^
+
+Currently quadruple-precision support in heyoka has the following prerequisites:
+
+* either GCC or Clang must be used,
+* the nonstandard ``__float128`` floating-point type must be
+  `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__,
+* heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+
+.. _installation_from_source:
+
 Installation from source
 ------------------------
 

@@ -3623,4 +3623,24 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 } // namespace detail
 
+std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
+{
+    switch (oc) {
+        case taylor_outcome::success:
+            os << "success";
+            break;
+        case taylor_outcome::step_limit:
+            os << "step_limit";
+            break;
+        case taylor_outcome::time_limit:
+            os << "time_limit";
+            break;
+        case taylor_outcome::err_nf_state:
+            os << "err_nf_state";
+            break;
+    }
+
+    return os;
+}
+
 } // namespace heyoka
