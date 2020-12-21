@@ -39,4 +39,54 @@ int main()
 
     // Print again the integrator object to screen.
     std::cout << ta << '\n';
+
+    // Perform a step backward.
+    std::tie(oc, h) = ta.step_backward();
+
+    // Print the outcome flag and the timestep used.
+    std::cout << "Outcome : " << oc << '\n';
+    std::cout << "Timestep: " << h << "\n\n";
+
+    // Perform a step forward in time, clamping
+    // the timestep size to 0.01.
+    std::tie(oc, h) = ta.step(0.01);
+
+    // Print the outcome flag and the timestep used.
+    std::cout << "Outcome : " << oc << '\n';
+    std::cout << "Timestep: " << h << "\n\n";
+
+    // Perform a step backward in time, clamping
+    // the timestep size to 0.02.
+    std::tie(oc, h) = ta.step(-0.02);
+
+    // Print the outcome flag and the timestep used.
+    std::cout << "Outcome : " << oc << '\n';
+    std::cout << "Timestep: " << h << "\n\n";
+
+    // Print the current time.
+    std::cout << "Current time: " << ta.get_time() << '\n';
+
+    // Print out the current value of the x variable.
+    std::cout << "Current x value: " << ta.get_state()[0] << "\n\n";
+
+    // Reset the time and state to the initial values.
+    ta.set_time(0.);
+    ta.get_state_data()[0] = 0.05;
+    ta.get_state_data()[1] = 0.025;
+
+    // Propagate for 5 time units.
+    auto [status, min_h, max_h, nsteps] = ta.propagate_for(5.);
+
+    std::cout << "Outcome      : " << status << '\n';
+    std::cout << "Min. timestep: " << min_h << '\n';
+    std::cout << "Max. timestep: " << max_h << '\n';
+    std::cout << "Num. of steps: " << nsteps << "\n\n";
+
+    // Propagate until t = 20.
+    std::tie(status, min_h, max_h, nsteps) = ta.propagate_until(20.);
+
+    std::cout << "Outcome      : " << status << '\n';
+    std::cout << "Min. timestep: " << min_h << '\n';
+    std::cout << "Max. timestep: " << max_h << '\n';
+    std::cout << "Num. of steps: " << nsteps << "\n\n";
 }

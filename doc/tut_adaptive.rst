@@ -97,10 +97,78 @@ The screen output will look something like this:
    Time        : 0.21605277478009474
    State       : [0.043996448369926382, -0.078442455470687983]
 
+It is also possible to perform a single timestep backward in time
+via the ``step_backward()`` function:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 43-48
+
+.. code-block:: console
+
+   Outcome : success
+   Timestep: -0.213123
+
+The ``step()`` function can also be called with an argument representing
+the maximum step size ``max_delta_t``: if the adaptive timestep
+selected by heyoka is larger (in absolute value) than ``max_delta_t``,
+then the timestep will be clamped to ``max_delta_t``:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 50-64
+
+.. code-block:: console
+
+   Outcome : time_limit
+   Timestep: 0.01
+
+   Outcome : time_limit
+   Timestep: -0.02
+
+Note that the integration outcome is now ``time_limit``, instead of ``success``.
+
 Accessing state and time
 ------------------------
 
 It is possible to read from and write to both the time variable and the state
 vector. The ``get_time()``/``set_time()`` functions can be used to access
 the time variable, while the ``get_state()`` and ``get_state_data()``
-can be used to access the state data.
+can be used to access the state data:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 66-75
+
+Note that ``get_state()`` returns a const reference to the ``std::vector``
+holding the integrator state, while ``get_state_data()`` returns a naked pointer
+to the state data.
+
+Time-limited propagation
+------------------------
+
+In addition to the step-by-step integration functions,
+``taylor_adaptive`` also provides functions to propagate
+the state of the system for a specified amount of time.
+These functions are called ``propagate_for()`` and
+``propagate_until()``: the first one integrates
+the system for a specified amount of time, the latter
+propagates the state up to a specified epoch.
+
+Let's see a couple of usage examples:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 77-91
+
+.. code-block:: console
+
+   Outcome      : time_limit
+   Min. timestep: 0.202133
+   Max. timestep: 0.218136
+   Num. of steps: 24
+
+   Outcome      : time_limit
+   Min. timestep: 0.202122
+   Max. timestep: 0.218139
+   Num. of steps: 72
