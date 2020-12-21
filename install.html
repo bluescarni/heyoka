@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Installation &#8212; heyoka 0.1.0 documentation</title>
+    <title>Installation &#8212; heyoka 0.2.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
 
@@ -34,12 +34,11 @@
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/language_data.js"></script>
     <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Changelog" href="changelog.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" />
     <link rel="prev" title="heyoka" href="index.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -60,7 +59,7 @@
 <a class="navbar-brand text-wrap" href="index.html">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.1.0 documentation</h1>
+  <h1 class="site-logo" id="site-title">heyoka 0.2.0 documentation</h1>
   
 </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -73,6 +72,30 @@
   <a class="current reference internal" href="#">
    Installation
   </a>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator class
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
  </li>
  <li class="toctree-l1">
   <a class="reference internal" href="changelog.html">
@@ -153,6 +176,25 @@
   <a class="reference internal nav-link" href="#introduction">
    Introduction
   </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#support-for-extended-precision">
+     Support for extended precision
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#bit-precision">
+       80-bit precision
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id2">
+       128-bit precision
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#installation-from-source">
@@ -204,9 +246,32 @@ libraries (used in the tests and benchmarks).</p></li>
 </ul>
 <p><a class="reference external" href="https://cmake.org/">CMake</a> is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.8).</p>
+<div class="section" id="support-for-extended-precision">
+<span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this headline">¶</a></h3>
+<p>Whereas in heyoka double-precision computations are always supported, support for extended-precision
+computations varies depending on the software/hardware platform.</p>
+<div class="section" id="bit-precision">
+<h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this headline">¶</a></h4>
+<p>80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
+type must be available in C++ as the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type. This is case for most compilers,
+with the notable exception of Microsoft Visual C++, in which <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a synonym for <code class="docutils literal notranslate"><span class="pre">double</span></code>.
+Thus, on Windows heyoka (and all its dependencies) must be compiled with a non-MSVC compiler
+in order to enable 80-bit computations.</p>
+</div>
+<div class="section" id="id2">
+<h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<p>Currently quadruple-precision support in heyoka has the following prerequisites:</p>
+<ul class="simple">
+<li><p>either GCC or Clang must be used,</p></li>
+<li><p>the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type must be
+<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>,</p></li>
+<li><p>heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p></li>
+</ul>
+</div>
+</div>
 </div>
 <div class="section" id="installation-from-source">
-<h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this headline">¶</a></h2>
+<span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this headline">¶</a></h2>
 <p>Source releases of heyoka can be downloaded from
 <a class="reference external" href="https://github.com/bluescarni/heyoka/releases">github</a>.
 Once in the source tree
@@ -290,7 +355,7 @@ may look like this:</p>
     <div class='prev-next-bottom'>
         
     <a class='left-prev' id="prev-link" href="index.html" title="previous page">heyoka</a>
-    <a class='right-next' id="next-link" href="changelog.html" title="next page">Changelog</a>
+    <a class='right-next' id="next-link" href="tutorial.html" title="next page">Tutorial</a>
 
     </div>
     <footer class="footer mt-5 mt-md-0">

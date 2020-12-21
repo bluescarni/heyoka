@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Index &#8212; heyoka 0.2.0 documentation</title>
+    <title>Tutorial &#8212; heyoka 0.2.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
 
@@ -36,8 +36,10 @@
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    <link rel="index" title="Index" href="#" />
+    <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Taylor’s method" href="tut_taylor_method.html" />
+    <link rel="prev" title="Installation" href="install.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
@@ -65,14 +67,14 @@
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
 </form>
 <nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="nav sidenav_l1">
+    <ul class="current nav sidenav_l1">
  <li class="toctree-l1">
   <a class="reference internal" href="install.html">
    Installation
   </a>
  </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="tutorial.html">
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="current reference internal" href="#">
    Tutorial
   </a>
   <ul class="collapse-ul">
@@ -132,6 +134,23 @@
         </button>
         
         
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tutorial.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
         <!-- Source interaction buttons -->
 
 
@@ -155,11 +174,25 @@
         
               <div>
                 
-
-<h1 id="index">Index</h1>
-
-<div class="genindex-jumpbox">
- 
+  <div class="section" id="tutorial">
+<span id="id1"></span><h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
+<p>The code snippets in this tutorial assume the inclusion of the
+global header <code class="docutils literal notranslate"><span class="pre">heyoka/heyoka.hpp</span></code>, and the use of</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>to import all names from the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace.</p>
+<p>The tutorials’ code is available in the <code class="docutils literal notranslate"><span class="pre">tutorials/</span></code> subdirectory
+of the source tree. The tutorials can be compiled by enabling the
+<code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TUTORIALS</span></code> option when
+<a class="reference internal" href="install.html#installation-from-source"><span class="std std-ref">compiling from source</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator class</a></li>
+</ul>
+</div>
 </div>
 
 
@@ -171,6 +204,8 @@
     
     <div class='prev-next-bottom'>
         
+    <a class='left-prev' id="prev-link" href="install.html" title="previous page">Installation</a>
+    <a class='right-next' id="next-link" href="tut_taylor_method.html" title="next page">Taylor’s method</a>
 
     </div>
     <footer class="footer mt-5 mt-md-0">

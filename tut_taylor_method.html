@@ -1,0 +1,269 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Taylor’s method &#8212; heyoka 0.2.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.40e2e510f6b7d1648584402491bb10fe.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.3da636dd464baa7582d2.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The expression system" href="tut_expression_system.html" />
+    <link rel="prev" title="Tutorial" href="tutorial.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.2.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="current collapse-ul">
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator class
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_taylor_method.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+        <!-- Source interaction buttons -->
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="taylor-s-method">
+<span id="tut-taylor-method"></span><h1>Taylor’s method<a class="headerlink" href="#taylor-s-method" title="Permalink to this headline">¶</a></h1>
+<p>Taylor’s method for solving systems of ordinary differential equations
+(ODEs) is conceptually simple. Given an ODE system in the general
+explicit from</p>
+<div class="math notranslate nohighlight" id="equation-ode-sys-00">
+<span class="eqno">(1)<a class="headerlink" href="#equation-ode-sys-00" title="Permalink to this equation">¶</a></span>\[\frac{d \boldsymbol{x}\left( t \right)}{dt}=\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right),\]</div>
+<p>with initial conditions at <span class="math notranslate nohighlight">\(t=t_0\)</span></p>
+<div class="math notranslate nohighlight" id="equation-ic-00">
+<span class="eqno">(2)<a class="headerlink" href="#equation-ic-00" title="Permalink to this equation">¶</a></span>\[\boldsymbol{x}_0=\boldsymbol{x}\left(t_0\right),\]</div>
+<p>Taylor’s method approximates the value of the solution at <span class="math notranslate nohighlight">\(t=t_1\)</span> as the truncated Taylor series
+expansion of <span class="math notranslate nohighlight">\(\boldsymbol{x}\left( t \right)\)</span> around <span class="math notranslate nohighlight">\(t=t_0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-tts-00">
+<span class="eqno">(3)<a class="headerlink" href="#equation-tts-00" title="Permalink to this equation">¶</a></span>\[\boldsymbol{x}\left( t_1 \right) = \boldsymbol{x}_0 + \boldsymbol{x}'\left(t_0\right)h
++\frac{1}{2}\boldsymbol{x}''\left(t_0\right)h^2+\ldots+\frac{\boldsymbol{x}^{\left( p \right)}\left(t_0\right)}{p!}h^p.\]</div>
+<p>Here <span class="math notranslate nohighlight">\(h=t_1-t_0\)</span> is the integration timestep and <span class="math notranslate nohighlight">\(p\)</span> is the order of the Taylor method. Eq. <a class="reference internal" href="#equation-tts-00">(3)</a>
+can be rewritten in more compact form as</p>
+<div class="math notranslate nohighlight" id="equation-tts-01">
+<span class="eqno">(4)<a class="headerlink" href="#equation-tts-01" title="Permalink to this equation">¶</a></span>\[\boldsymbol{x}\left( t_1 \right) = \sum_{n=0}^p \boldsymbol{x}^{\left[ n \right]} \left(t_0\right) h^n,\]</div>
+<p>where we have defined</p>
+<div class="math notranslate nohighlight" id="equation-norm-d-00">
+<span class="eqno">(5)<a class="headerlink" href="#equation-norm-d-00" title="Permalink to this equation">¶</a></span>\[\boldsymbol{x}^{\left[ n \right]}\left( t \right) = \frac{1}{n!}\boldsymbol{x}^{\left( n \right)}\left( t \right)\]</div>
+<p>as the <em>normalised derivative</em> of order <span class="math notranslate nohighlight">\(n\)</span> of <span class="math notranslate nohighlight">\(\boldsymbol{x}\left( t \right)\)</span>.</p>
+<p>The derivatives appearing in the Taylor polynomial <a class="reference internal" href="#equation-tts-01">(4)</a> can be computed from the
+initial conditions <a class="reference internal" href="#equation-ic-00">(2)</a> and the right-hand side of the ODE system <a class="reference internal" href="#equation-ode-sys-00">(1)</a>.
+Thus, <a class="reference internal" href="#equation-tts-01">(4)</a> effectively can be used as a time stepper
+whose precision and performance characteristics depend on the choice of the step size <span class="math notranslate nohighlight">\(h\)</span> and
+the Taylor order <span class="math notranslate nohighlight">\(p\)</span>.</p>
+<p>Taylor integrators need to be… tailored to the specific expression of <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>.
+That is, unlike other popular numerical integration methods (e.g., <a class="reference external" href="https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods">Runge-Kutta methods</a>),
+Taylor’s method requires the user not only to provide <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>,
+but also to implement all the derivatives necessary to construct the Taylor polynomial <a class="reference internal" href="#equation-tts-01">(4)</a>.
+This task, if done by hand, can be extremely cumbersome, inefficient and error-prone, especially for large ODE
+systems and/or high-accuracy applications.</p>
+<p>The main functionality provided by heyoka is the ability to automatically synthesise a complete Taylor integrator starting
+only from a
+symbolic representation of <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span> and a set of initial
+conditions. Specifically,
+given a differentiable symbolic expression for <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>,
+heyoka takes care of:</p>
+<ul class="simple">
+<li><p>the computation of the high-order derivatives necessary to implement the time stepper <a class="reference internal" href="#equation-tts-01">(4)</a>
+via a process of automatic differentiation,</p></li>
+<li><p>the deduction of optimal values for the Taylor order <span class="math notranslate nohighlight">\(p\)</span> and the (adaptive) step size <span class="math notranslate nohighlight">\(h\)</span>,</p></li>
+<li><p>the propagation of the state of the system via the evaluation of the Taylor polynomial <a class="reference internal" href="#equation-tts-01">(4)</a>.</p></li>
+</ul>
+<p>In order to represent symbolically <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>, heyoka
+relies on a small, self-contained symbolic expression system (similar to an extremely trimmed-down,
+bare-bones <a class="reference external" href="https://en.wikipedia.org/wiki/Computer_algebra_system">computer algebra system</a>).
+The expression system is used to decompose <span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>
+into a sequence of elementary subexpression on which automatic differentiation rules are applied.
+The sequence of operations necessary to compute the high-order derivatives of
+<span class="math notranslate nohighlight">\(\boldsymbol{F}\left(t, \boldsymbol{x}\left( t \right) \right)\)</span>
+is then assembled and compiled just-in-time (via <a class="reference external" href="https://llvm.org/">LLVM</a>) to
+produce a time stepper function usable from regular C++ code.</p>
+</div>
+
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="tutorial.html" title="previous page">Tutorial</a>
+    <a class='right-next' id="next-link" href="tut_expression_system.html" title="next page">The expression system</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.3da636dd464baa7582d2.js"></script>
+
+
+    
+  </body>
+</html>

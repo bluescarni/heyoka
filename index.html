@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>heyoka &#8212; heyoka 0.1.0 documentation</title>
+    <title>heyoka &#8212; heyoka 0.2.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
 
@@ -34,7 +34,6 @@
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/language_data.js"></script>
     <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -59,7 +58,7 @@
 <a class="navbar-brand text-wrap" href="#">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.1.0 documentation</h1>
+  <h1 class="site-logo" id="site-title">heyoka 0.2.0 documentation</h1>
   
 </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -72,6 +71,30 @@
   <a class="reference internal" href="install.html">
    Installation
   </a>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator class
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
  </li>
  <li class="toctree-l1">
   <a class="reference internal" href="changelog.html">
@@ -188,7 +211,7 @@ of the Great Plains of North America. The heyoka is a contrarian, jester,
 and satirist, who speaks, moves and reacts in an opposite fashion to the
 people around them.</p>
 </div></blockquote>
-<p>Heyoka is a C++ library for the integration of ordinary differential equations
+<p>heyoka is a C++ library for the integration of ordinary differential equations
 (ODEs) via Taylor’s method. Notable features include:</p>
 <ul class="simple">
 <li><p>support for both double-precision and extended-precision floating-point types
@@ -259,7 +282,14 @@ in heyoka:</p>
 <li class="toctree-l2"><a class="reference internal" href="install.html#including-heyoka-in-your-project-via-cmake">Including heyoka in your project via CMake</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator class</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="changelog.html#unreleased">0.2.0 (unreleased)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="changelog.html#id1">0.1.0 (2020-12-18)</a></li>
 </ul>
 </li>
@@ -275,7 +305,7 @@ in heyoka:</p>
 </div>
 <div class="section" id="license">
 <h2>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h2>
-<p>Heyoka is released under the <a class="reference external" href="https://www.mozilla.org/en-US/MPL/2.0/FAQ/">MPL-2.0</a>
+<p>heyoka is released under the <a class="reference external" href="https://www.mozilla.org/en-US/MPL/2.0/FAQ/">MPL-2.0</a>
 license.</p>
 </div>
 </div>

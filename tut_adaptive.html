@@ -1,0 +1,588 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The adaptive integrator class &#8212; heyoka 0.2.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.40e2e510f6b7d1648584402491bb10fe.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.3da636dd464baa7582d2.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Changelog" href="changelog.html" />
+    <link rel="prev" title="The expression system" href="tut_expression_system.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.2.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="current collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     The adaptive integrator class
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_adaptive.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+        <!-- Source interaction buttons -->
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#construction">
+   Construction
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#single-timestep">
+   Single timestep
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#accessing-state-and-time">
+   Accessing state and time
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#time-limited-propagation">
+   Time-limited propagation
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#full-code-listing">
+   Full code listing
+  </a>
+ </li>
+</ul>
+
+        </nav>
+        
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="the-adaptive-integrator-class">
+<span id="tut-adaptive"></span><h1>The adaptive integrator class<a class="headerlink" href="#the-adaptive-integrator-class" title="Permalink to this headline">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class provides an easy-to-use interface to heyoka’s
+main capabilities. Objects of this class can be constructed from a system
+of ODEs and a set of initial conditions (plus a number of optional parameters
+with - hopefully - sensible defaults). Member functions are provided to
+propagate in time the state of the system, either step-by-step or by specifying
+time limits.</p>
+<p>Let’s see how we can use <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> to integrate the ODE
+system of the simple pendulum,</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = -9.8 \sin x
+\end{cases}\end{split}\]</div>
+<p>with initial conditions</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x\left( 0 \right) = 0.05 \\
+v\left( 0 \right) = 0.025
+\end{cases}\end{split}\]</div>
+<div class="section" id="construction">
+<h2>Construction<a class="headerlink" href="#construction" title="Permalink to this headline">¶</a></h2>
+<p>Here’s the code:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>After creating the symbolic variables <code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code>, we
+construct an instance of <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;double&gt;</span></code> called <code class="docutils literal notranslate"><span class="pre">ta</span></code>.
+<code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> is a class template parametrised over
+the floating-point type which we want to use for the integration.
+In this case, we use the <code class="docutils literal notranslate"><span class="pre">double</span></code> type, meaning that the integration
+will be carried out in double precision.</p>
+<p>As (mandatory) construction arguments, we pass in the system of
+differential equations using the syntax <code class="docutils literal notranslate"><span class="pre">prime(x)</span> <span class="pre">=</span> <span class="pre">...</span></code>, and a set
+of initial conditions for <code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code> respectively.</p>
+<p>Let’s try to print to screen the integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>This will produce the following output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 0.0000000000000000</span>
+<span class="go">State       : [0.050000000000000003, 0.025000000000000001]</span>
+</pre></div>
+</div>
+<p>By default, the error tolerance of an adaptive integrator is set to the
+machine epsilon, which, for <code class="docutils literal notranslate"><span class="pre">double</span></code>, is <span class="math notranslate nohighlight">\(\sim 2.2\times10^{-16}\)</span>.
+From this value, heyoka deduces an optimal Taylor order of 20, as indicated
+by the screen output. <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> manages its own copy of the state vector and the time variable.
+Both the state vector and the time variable are updated automatically by the timestepping
+functions. Note also how, by default, the time variable is initially set to zero.</p>
+</div>
+<div class="section" id="single-timestep">
+<h2>Single timestep<a class="headerlink" href="#single-timestep" title="Permalink to this headline">¶</a></h2>
+<p>Let’s now try to perform a single integration timestep:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Perform a single step.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Print again the integrator object to screen.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>First, we invoke the <code class="docutils literal notranslate"><span class="pre">step()</span></code> member function, which returns a pair of values.
+The first value is a status flag indicating the outcome of the integration timestep,
+while the second value is the step size that was selected by heyoka in order
+to respect the desired error tolerance. We print both to screen, and we also
+print again the <code class="docutils literal notranslate"><span class="pre">ta</span></code> object in order to inspect how state and time have changed.
+The screen output will look something like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : success</span>
+<span class="go">Timestep: 0.216053</span>
+
+<span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 0.21605277478009474</span>
+<span class="go">State       : [0.043996448369926382, -0.078442455470687983]</span>
+</pre></div>
+</div>
+<p>It is also possible to perform a single timestep backward in time
+via the <code class="docutils literal notranslate"><span class="pre">step_backward()</span></code> function:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Perform a step backward.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step_backward</span><span class="p">();</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : success</span>
+<span class="go">Timestep: -0.213123</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">step()</span></code> function can also be called with an argument representing
+the maximum step size <code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: if the adaptive timestep
+selected by heyoka is larger (in absolute value) than <code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>,
+then the timestep will be clamped to <code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Perform a step forward in time, clamping</span>
+    <span class="c1">// the timestep size to 0.01.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="mf">0.01</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a step backward in time, clamping</span>
+    <span class="c1">// the timestep size to 0.02.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="mf">-0.02</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : time_limit</span>
+<span class="go">Timestep: 0.01</span>
+
+<span class="go">Outcome : time_limit</span>
+<span class="go">Timestep: -0.02</span>
+</pre></div>
+</div>
+<p>Note that the integration outcome is now <code class="docutils literal notranslate"><span class="pre">time_limit</span></code>, instead of <code class="docutils literal notranslate"><span class="pre">success</span></code>.</p>
+</div>
+<div class="section" id="accessing-state-and-time">
+<h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Permalink to this headline">¶</a></h2>
+<p>It is possible to read from and write to both the time variable and the state
+vector. The <code class="docutils literal notranslate"><span class="pre">get_time()</span></code>/<code class="docutils literal notranslate"><span class="pre">set_time()</span></code> functions can be used to access
+the time variable, while the <code class="docutils literal notranslate"><span class="pre">get_state()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code>
+can be used to access the state data:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Print the current time.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Print out the current value of the x variable.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current x value: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Reset the time and state to the initial values.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">;</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.025</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">get_state()</span></code> returns a const reference to the <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>
+holding the integrator state, while <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> returns a naked pointer
+to the state data. Only <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> can be used to mutate the state.</p>
+</div>
+<div class="section" id="time-limited-propagation">
+<h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h2>
+<p>In addition to the step-by-step integration functions,
+<code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> also provides functions to propagate
+the state of the system for a specified amount of time.
+These functions are called <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code>: the former integrates
+the system for a specified amount of time, the latter
+propagates the state up to a specified epoch.</p>
+<p>Let’s see a couple of usage examples:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for 5 time units.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate until t = 20.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : time_limit</span>
+<span class="go">Min. timestep: 0.202133</span>
+<span class="go">Max. timestep: 0.218136</span>
+<span class="go">Num. of steps: 24</span>
+<span class="go">Current time : 5</span>
+
+<span class="go">Outcome      : time_limit</span>
+<span class="go">Min. timestep: 0.202122</span>
+<span class="go">Max. timestep: 0.218139</span>
+<span class="go">Num. of steps: 72</span>
+<span class="go">Current time : 20</span>
+</pre></div>
+</div>
+<p>The time-limited propagation functions return
+a tuple of 4 values, which represent, respectively:</p>
+<ul class="simple">
+<li><p>the outcome of the integration (which will always be
+<code class="docutils literal notranslate"><span class="pre">time_limit</span></code>, unless error conditions arise),</p></li>
+<li><p>the minimum and maximum integration timesteps
+that were used in the propagation,</p></li>
+<li><p>the total number of steps that were taken.</p></li>
+</ul>
+<p>The time-limited propagation functions can be used
+to propagate both forward and backward in time:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate back to t = 0.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : time_limit</span>
+<span class="go">Min. timestep: 0.202078</span>
+<span class="go">Max. timestep: 0.21819</span>
+<span class="go">Num. of steps: 97</span>
+<span class="go">Current time : 0</span>
+
+<span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 0.0000000000000000</span>
+<span class="go">State       : [0.049999999999999843, 0.025000000000002819]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="full-code-listing">
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="c1">// Let&#39;s print to screen the integrator object.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a single step.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Print again the integrator object to screen.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a step backward.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step_backward</span><span class="p">();</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a step forward in time, clamping</span>
+    <span class="c1">// the timestep size to 0.01.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="mf">0.01</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a step backward in time, clamping</span>
+    <span class="c1">// the timestep size to 0.02.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="mf">-0.02</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome flag and the timestep used.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Print the current time.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Print out the current value of the x variable.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current x value: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Reset the time and state to the initial values.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">;</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.025</span><span class="p">;</span>
+
+    <span class="c1">// Propagate for 5 time units.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate until t = 20.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">20.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate back to t = 0.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">tie</span><span class="p">(</span><span class="n">status</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">)</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Outcome      : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">status</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Min. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Max. timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Num. of steps: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="tut_expression_system.html" title="previous page">The expression system</a>
+    <a class='right-next' id="next-link" href="changelog.html" title="next page">Changelog</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.3da636dd464baa7582d2.js"></script>
+
+
+    
+  </body>
+</html>
