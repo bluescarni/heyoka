@@ -59,6 +59,31 @@ Currently quadruple-precision support in heyoka has the following prerequisites:
   `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__,
 * heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
 
+Packages
+--------
+
+Conda
+`````
+
+heyoka is available via the `conda <https://conda.io/docs/>`__ package manager for Linux, OSX and Windows
+thanks to the infrastructure provided by `conda-forge <https://conda-forge.org/>`__.
+
+In order to install heyoka via conda, you just need to add ``conda-forge``
+to the channels, and then we can immediately install heyoka:
+
+.. code-block:: console
+
+   $ conda config --add channels conda-forge
+   $ conda config --set channel_priority strict
+   $ conda install heyoka
+
+The conda package for heyoka is maintained by the core development team,
+and it is regularly updated when new heyoka versions are released.
+
+Please refer to the `conda documentation <https://conda.io/docs/>`__ for instructions
+on how to setup and manage
+your conda installation.
+
 .. _installation_from_source:
 
 Installation from source
