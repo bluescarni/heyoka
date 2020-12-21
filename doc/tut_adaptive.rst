@@ -89,7 +89,7 @@ The screen output will look something like this:
 
 .. code-block:: console
 
-   Status  : success
+   Outcome : success
    Timestep: 0.216053
    
    Taylor order: 20
