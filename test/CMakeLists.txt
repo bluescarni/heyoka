@@ -31,7 +31,6 @@ function(ADD_HEYOKA_TESTCASE arg1)
 endfunction()
 
 ADD_HEYOKA_TESTCASE(llvm_state)
-ADD_HEYOKA_TESTCASE(add_expression)
 ADD_HEYOKA_TESTCASE(expression)
 ADD_HEYOKA_TESTCASE(math_functions)
 ADD_HEYOKA_TESTCASE(func)
