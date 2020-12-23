@@ -40,8 +40,9 @@ public:
 
     expression diff(const std::string &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &) const;
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                        const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 

@@ -294,14 +294,15 @@ expression func::diff(const std::string &s) const
     return ptr()->diff(s);
 }
 
-double func::eval_dbl(const std::unordered_map<std::string, double> &m) const
+double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const
 {
-    return ptr()->eval_dbl(m);
+    return ptr()->eval_dbl(m, pars);
 }
 
-void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m) const
+void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
+                          const std::vector<double> &pars) const
 {
-    ptr()->eval_batch_dbl(out, m);
+    ptr()->eval_batch_dbl(out, m, pars);
 }
 
 double func::eval_num_dbl(const std::vector<double> &v) const
@@ -689,15 +690,15 @@ expression diff(const func &f, const std::string &s)
     return f.diff(s);
 }
 
-double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)
 {
-    return f.eval_dbl(map);
+    return f.eval_dbl(map, pars);
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const func &f,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {
-    f.eval_batch_dbl(out_values, map);
+    f.eval_batch_dbl(out_values, map, pars);
 }
 
 double eval_num_dbl(const func &f, const std::vector<double> &in)

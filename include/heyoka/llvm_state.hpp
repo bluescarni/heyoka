@@ -70,6 +70,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
     std::unordered_map<std::string, llvm::Value *> m_named_values;
+    llvm::Value *m_par_ptr = nullptr;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_fast_math;
@@ -171,6 +172,7 @@ public:
     bool &fast_math();
     bool &inline_functions();
     std::unordered_map<std::string, llvm::Value *> &named_values();
+    llvm::Value *&par_ptr();
 
     const llvm::Module &module() const;
     const ir_builder &builder() const;
@@ -179,6 +181,7 @@ public:
     const bool &fast_math() const;
     const bool &inline_functions() const;
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
+    llvm::Value *const &par_ptr() const;
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;

@@ -316,6 +316,10 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
 // are set to their default values.
 llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
+// NOTE: we won't copy either m_named values of m_par_ptr, so that
+// the newly-created llvm_state has both members in the default-constructed
+// state. This is fine, as these data members are meant to be used only
+// as temporary data while adding a function to the module.
 llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
       m_module_name(other.m_module_name), m_save_object_code(other.m_save_object_code),
@@ -418,6 +422,11 @@ std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
     return m_named_values;
 }
 
+llvm::Value *&llvm_state::par_ptr()
+{
+    return m_par_ptr;
+}
+
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -453,6 +462,11 @@ const bool &llvm_state::inline_functions() const
 const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
 {
     return m_named_values;
+}
+
+llvm::Value *const &llvm_state::par_ptr() const
+{
+    return m_par_ptr;
 }
 
 void llvm_state::check_uncompiled(const char *f) const

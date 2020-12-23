@@ -157,21 +157,21 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
-double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 2u);
 
-    return std::pow(heyoka::eval_dbl(args()[0], map), heyoka::eval_dbl(args()[1], map));
+    return std::pow(heyoka::eval_dbl(args()[0], map, pars), heyoka::eval_dbl(args()[1], map, pars));
 }
 
-void pow_impl::eval_batch_dbl(std::vector<double> &out,
-                              const std::unordered_map<std::string, std::vector<double>> &map) const
+void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
+                              const std::vector<double> &pars) const
 {
     assert(args().size() == 2u);
 
     auto out0 = out; // is this allocation needed?
-    heyoka::eval_batch_dbl(out0, args()[0], map);
-    heyoka::eval_batch_dbl(out, args()[1], map);
+    heyoka::eval_batch_dbl(out0, args()[0], map, pars);
+    heyoka::eval_batch_dbl(out, args()[1], map, pars);
     for (decltype(out.size()) i = 0; i < out.size(); ++i) {
         out[i] = std::pow(out0[i], out[i]);
     }

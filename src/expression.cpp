@@ -38,6 +38,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -64,6 +65,8 @@ expression::expression(variable var) : m_value(std::move(var)) {}
 expression::expression(binary_operator bo) : m_value(std::move(bo)) {}
 
 expression::expression(func f) : m_value(std::move(f)) {}
+
+expression::expression(param p) : m_value(std::move(p)) {}
 
 expression::expression(const expression &) = default;
 
@@ -668,15 +671,16 @@ expression pairwise_sum(std::vector<expression> sum)
     return sum[0];
 }
 
-double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                const std::vector<double> &pars)
 {
-    return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
+    return std::visit([&](const auto &arg) { return eval_dbl(arg, map, pars); }, e.value());
 }
 
 void eval_batch_dbl(std::vector<double> &retval, const expression &e,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {
-    std::visit([&map, &retval](const auto &arg) { eval_batch_dbl(retval, arg, map); }, e.value());
+    std::visit([&](const auto &arg) { eval_batch_dbl(retval, arg, map, pars); }, e.value());
 }
 
 std::vector<std::vector<std::size_t>> compute_connections(const expression &e)

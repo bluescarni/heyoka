@@ -208,26 +208,27 @@ expression diff(const binary_operator &bo, const std::string &s)
     }
 }
 
-double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
+                const std::vector<double> &pars)
 {
     switch (bo.op()) {
         case binary_operator::type::add:
-            return eval_dbl(bo.lhs(), map) + eval_dbl(bo.rhs(), map);
+            return eval_dbl(bo.lhs(), map, pars) + eval_dbl(bo.rhs(), map, pars);
         case binary_operator::type::sub:
-            return eval_dbl(bo.lhs(), map) - eval_dbl(bo.rhs(), map);
+            return eval_dbl(bo.lhs(), map, pars) - eval_dbl(bo.rhs(), map, pars);
         case binary_operator::type::mul:
-            return eval_dbl(bo.lhs(), map) * eval_dbl(bo.rhs(), map);
+            return eval_dbl(bo.lhs(), map, pars) * eval_dbl(bo.rhs(), map, pars);
         default:
-            return eval_dbl(bo.lhs(), map) / eval_dbl(bo.rhs(), map);
+            return eval_dbl(bo.lhs(), map, pars) / eval_dbl(bo.rhs(), map, pars);
     }
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {
     auto tmp = out_values;
-    eval_batch_dbl(out_values, bo.lhs(), map);
-    eval_batch_dbl(tmp, bo.rhs(), map);
+    eval_batch_dbl(out_values, bo.lhs(), map, pars);
+    eval_batch_dbl(tmp, bo.rhs(), map, pars);
     switch (bo.op()) {
         case binary_operator::type::add:
             std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::plus<>());

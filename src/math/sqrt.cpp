@@ -99,19 +99,20 @@ llvm::Value *sqrt_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 
 #endif
 
-double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    return std::sqrt(heyoka::eval_dbl(args()[0], map));
+    return std::sqrt(heyoka::eval_dbl(args()[0], map, pars));
 }
 
 void sqrt_impl::eval_batch_dbl(std::vector<double> &out,
-                               const std::unordered_map<std::string, std::vector<double>> &map) const
+                               const std::unordered_map<std::string, std::vector<double>> &map,
+                               const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    heyoka::eval_batch_dbl(out, args()[0], map);
+    heyoka::eval_batch_dbl(out, args()[0], map, pars);
     for (auto &el : out) {
         el = std::sqrt(el);
     }

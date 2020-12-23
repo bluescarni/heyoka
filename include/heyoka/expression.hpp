@@ -38,6 +38,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -46,7 +47,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC expression
 {
 public:
-    using value_type = std::variant<number, variable, binary_operator, func>;
+    using value_type = std::variant<number, variable, binary_operator, func, param>;
 
 private:
     value_type m_value;
@@ -65,6 +66,7 @@ public:
     explicit expression(variable);
     explicit expression(binary_operator);
     explicit expression(func);
+    explicit expression(param);
 
     expression(const expression &);
     expression(expression &&) noexcept;
@@ -239,10 +241,12 @@ HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
 HEYOKA_DLL_PUBLIC expression pairwise_sum(std::vector<expression>);
 
-HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &);
+HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
+                                  const std::vector<double> & = {});
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const expression &,
-                                      const std::unordered_map<std::string, std::vector<double>> &);
+                                      const std::unordered_map<std::string, std::vector<double>> &,
+                                      const std::vector<double> & = {});
 
 // When traversing the expression tree with some recursive algorithm we may have to do some book-keeping and use
 // preallocated memory to store the result, in which case the corresponding function is called update_*. A corresponding

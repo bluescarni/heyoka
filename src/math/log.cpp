@@ -120,19 +120,19 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
-double log_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+double log_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    return std::log(heyoka::eval_dbl(args()[0], map));
+    return std::log(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-void log_impl::eval_batch_dbl(std::vector<double> &out,
-                              const std::unordered_map<std::string, std::vector<double>> &map) const
+void log_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
+                              const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    heyoka::eval_batch_dbl(out, args()[0], map);
+    heyoka::eval_batch_dbl(out, args()[0], map, pars);
     for (auto &el : out) {
         el = std::log(el);
     }

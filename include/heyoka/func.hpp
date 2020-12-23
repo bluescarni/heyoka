@@ -84,9 +84,9 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 
     virtual expression diff(const std::string &) const = 0;
 
-    virtual double eval_dbl(const std::unordered_map<std::string, double> &) const = 0;
-    virtual void eval_batch_dbl(std::vector<double> &,
-                                const std::unordered_map<std::string, std::vector<double>> &) const = 0;
+    virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
+    virtual void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                                const std::vector<double> &) const = 0;
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
@@ -157,15 +157,15 @@ inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T
 
 template <typename T>
 using func_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_dbl(
-    std::declval<const std::unordered_map<std::string, double> &>()));
+    std::declval<const std::unordered_map<std::string, double> &>(), std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_dbl_v = std::is_same_v<detected_t<func_eval_dbl_t, T>, double>;
 
 template <typename T>
 using func_eval_batch_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_batch_dbl(
-    std::declval<std::vector<double> &>(),
-    std::declval<const std::unordered_map<std::string, std::vector<double>> &>()));
+    std::declval<std::vector<double> &>(), std::declval<const std::unordered_map<std::string, std::vector<double>> &>(),
+    std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
@@ -368,19 +368,19 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     expression diff(const std::string &) const final;
 
     // eval.
-    double eval_dbl(const std::unordered_map<std::string, double> &m) const final
+    double eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const final
     {
         if constexpr (func_has_eval_dbl_v<T>) {
-            return m_value.eval_dbl(m);
+            return m_value.eval_dbl(m, pars);
         } else {
             throw not_implemented_error("double eval is not implemented for the function '" + get_display_name() + "'");
         }
     }
-    void eval_batch_dbl(std::vector<double> &out,
-                        const std::unordered_map<std::string, std::vector<double>> &m) const final
+    void eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
+                        const std::vector<double> &pars) const final
     {
         if constexpr (func_has_eval_batch_dbl_v<T>) {
-            m_value.eval_batch_dbl(out, m);
+            m_value.eval_batch_dbl(out, m, pars);
         } else {
             throw not_implemented_error("double batch eval is not implemented for the function '" + get_display_name()
                                         + "'");
@@ -571,8 +571,9 @@ public:
 
     expression diff(const std::string &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &) const;
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                        const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
@@ -611,9 +612,11 @@ HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::st
 
 HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 
-HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &);
+HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
+                                  const std::vector<double> &);
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const func &,
-                                      const std::unordered_map<std::string, std::vector<double>> &);
+                                      const std::unordered_map<std::string, std::vector<double>> &,
+                                      const std::vector<double> &);
 HEYOKA_DLL_PUBLIC double eval_num_dbl(const func &, const std::vector<double> &);
 HEYOKA_DLL_PUBLIC double deval_num_dbl(const func &, const std::vector<double> &, std::vector<double>::size_type);
 
