@@ -71,8 +71,6 @@ IGOR_MAKE_NAMED_ARGUMENT(inline_functions);
 
 } // namespace kw
 
-class llvm_state;
-
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
 
 class HEYOKA_DLL_PUBLIC llvm_state
