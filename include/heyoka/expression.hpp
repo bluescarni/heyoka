@@ -366,6 +366,21 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, s
     }
 }
 
+HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
+
+namespace detail
+{
+
+class HEYOKA_DLL_PUBLIC par_impl
+{
+public:
+    expression operator[](std::uint32_t) const;
+};
+
+} // namespace detail
+
+inline constexpr detail::par_impl par;
+
 namespace detail
 {
 

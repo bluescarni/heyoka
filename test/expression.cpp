@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <limits>
+#include <stdexcept>
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
@@ -366,4 +367,32 @@ TEST_CASE("is_integral")
     REQUIRE(detail::is_odd_integral_half(449281_dbl / 2_dbl));
     REQUIRE(!detail::is_odd_integral_half(-53222_dbl / 2_dbl));
     REQUIRE(!detail::is_odd_integral_half(449282_dbl / 2_dbl));
+}
+
+TEST_CASE("get_param_size")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE(get_param_size(0_dbl) == 0u);
+    REQUIRE(get_param_size(1_dbl) == 0u);
+
+    REQUIRE(get_param_size("x"_var) == 0u);
+    REQUIRE(get_param_size("y"_var) == 0u);
+
+    REQUIRE(get_param_size("x"_var + 1_dbl) == 0u);
+    REQUIRE(get_param_size(1_dbl + "y"_var) == 0u);
+    REQUIRE(get_param_size(cos(1_dbl + "y"_var)) == 0u);
+    REQUIRE(get_param_size(sin(cos(1_dbl + "y"_var))) == 0u);
+
+    REQUIRE(get_param_size(par[0]) == 1u);
+    REQUIRE(get_param_size(par[123]) == 124u);
+    REQUIRE_THROWS_MATCHES(get_param_size(par[std::numeric_limits<std::uint32_t>::max()]), std::overflow_error,
+                           Message("Overflow dected in get_n_param()"));
+    REQUIRE(get_param_size(par[123] + "x"_var) == 124u);
+    REQUIRE(get_param_size("x"_var + par[123]) == 124u);
+    REQUIRE(get_param_size(par[123] + 1_dbl) == 124u);
+    REQUIRE(get_param_size(2_dbl + par[123]) == 124u);
+    REQUIRE(get_param_size(par[123] + par[122]) == 124u);
+    REQUIRE(get_param_size(par[122] + par[123]) == 124u);
+    REQUIRE(get_param_size(par[500] - sin(cos(par[1] + "y"_var) + par[4])) == 501u);
 }

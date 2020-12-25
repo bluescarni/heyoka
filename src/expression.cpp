@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -934,6 +935,39 @@ bool is_odd_integral_half(const expression &ex)
         ex.value());
 }
 
+expression par_impl::operator[](std::uint32_t idx) const
+{
+    return expression{param{idx}};
+}
+
 } // namespace detail
+
+// Determine the size of the parameter vector from the highest
+// param index appearing in an expression. If the return value
+// is zero, no params appear in the expression.
+std::uint32_t get_param_size(const expression &ex)
+{
+    std::uint32_t retval = 0;
+
+    std::visit(
+        [&retval](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, param>) {
+                if (v.idx() == std::numeric_limits<std::uint32_t>::max()) {
+                    throw std::overflow_error("Overflow dected in get_n_param()");
+                }
+
+                retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
+            } else if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+                for (const auto &a : v.args()) {
+                    retval = std::max(get_param_size(a), retval);
+                }
+            }
+        },
+        ex.value());
+
+    return retval;
+}
 
 } // namespace heyoka
