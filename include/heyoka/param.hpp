@@ -18,7 +18,6 @@
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
@@ -72,14 +71,7 @@ HEYOKA_DLL_PUBLIC [[noreturn]] void update_grad_dbl(std::unordered_map<std::stri
                                                     const std::vector<std::vector<std::size_t>> &, std::size_t &,
                                                     double);
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const param &);
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const param &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const param &);
-
-#endif
+HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(param &&, std::vector<expression> &);
 
 } // namespace heyoka
 

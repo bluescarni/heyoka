@@ -20,10 +20,6 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Value.h>
-
-#include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/param.hpp>
@@ -126,31 +122,10 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
     throw not_implemented_error("update_grad_dbl() not implemented for param");
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const param &p)
+std::vector<expression>::size_type taylor_decompose_in_place(param &&, std::vector<expression> &)
 {
-    if (s.par_ptr() == nullptr) {
-        throw std::invalid_argument("Cannot run the codegen for a param if par_ptr() is null");
-    }
-
-    auto &builder = s.builder();
-
-    return builder.CreateLoad(builder.CreateInBoundsGEP(s.par_ptr(), {builder.getInt32(p.idx())}));
+    // NOTE: params do not require decomposition.
+    return 0;
 }
-
-llvm::Value *codegen_ldbl(llvm_state &s, const param &p)
-{
-    // NOTE: the codegen is identical as the LLVM interface
-    // is type-erased.
-    return codegen_dbl(s, p);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const param &p)
-{
-    return codegen_dbl(s, p);
-}
-
-#endif
 
 } // namespace heyoka
