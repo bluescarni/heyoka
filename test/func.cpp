@@ -66,10 +66,10 @@ TEST_CASE("func minimal")
 #endif
     REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
                            Message("double eval is not implemented for the function 'f'"));
     std::vector<double> tmp;
-    REQUIRE_THROWS_MATCHES(f.eval_batch_dbl(tmp, {{}}), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.eval_batch_dbl(tmp, {{}}, {}), not_implemented_error,
                            Message("double batch eval is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.eval_num_dbl({1., 1.}), not_implemented_error,
                            Message("double numerical eval is not implemented for the function 'f'"));
@@ -280,7 +280,7 @@ struct func_06 : func_base {
     func_06() : func_base("f", {}) {}
     explicit func_06(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    double eval_dbl(const std::unordered_map<std::string, double> &) const
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const
     {
         return 42;
     }
@@ -290,14 +290,17 @@ TEST_CASE("func eval_dbl")
 {
     auto f = func(func_06{});
 
-    REQUIRE(f.eval_dbl({{}}) == 42);
+    REQUIRE(f.eval_dbl({{}}, {}) == 42);
 }
 
 struct func_07 : func_base {
     func_07() : func_base("f", {}) {}
     explicit func_07(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const {}
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                        const std::vector<double> &) const
+    {
+    }
 };
 
 TEST_CASE("func eval_batch_dbl")
@@ -305,7 +308,7 @@ TEST_CASE("func eval_batch_dbl")
     auto f = func(func_07{});
 
     std::vector<double> tmp;
-    REQUIRE_NOTHROW(f.eval_batch_dbl(tmp, {{}}));
+    REQUIRE_NOTHROW(f.eval_batch_dbl(tmp, {{}}, {}));
 }
 
 struct func_08 : func_base {
