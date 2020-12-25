@@ -167,33 +167,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
     node_counter++;
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
-{
-    const auto &nv = s.named_values();
-
-    auto it = nv.find(var.name());
-    if (it == nv.end()) {
-        throw std::invalid_argument("Unknown variable name: " + var.name());
-    }
-
-    assert(it->second != nullptr);
-    return it->second;
-}
-
-llvm::Value *codegen_ldbl(llvm_state &s, const variable &var)
-{
-    return codegen_dbl(s, var);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const variable &var)
-{
-    return codegen_dbl(s, var);
-}
-
-#endif
-
 std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &)
 {
     // NOTE: variables do not require decomposition.
