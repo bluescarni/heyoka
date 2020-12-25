@@ -648,31 +648,6 @@ inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::ve
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const func &);
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const func &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const func &);
-
-#endif
-
-template <typename T>
-inline llvm::Value *codegen(llvm_state &s, const func &f)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, f);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, f);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return codegen_f128(s, f);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(func &&, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const func &, const std::vector<llvm::Value *> &,
