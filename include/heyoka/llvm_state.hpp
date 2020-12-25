@@ -169,11 +169,7 @@ public:
     unsigned &opt_level();
     bool &fast_math();
     bool &inline_functions();
-<<<<<<< HEAD
-    std::unordered_map<std::string, llvm::Value *> &named_values();
     llvm::Value *&par_ptr();
-=======
->>>>>>> pr/more_cleanup
 
     const llvm::Module &module() const;
     const ir_builder &builder() const;
@@ -181,11 +177,7 @@ public:
     const unsigned &opt_level() const;
     const bool &fast_math() const;
     const bool &inline_functions() const;
-<<<<<<< HEAD
-    const std::unordered_map<std::string, llvm::Value *> &named_values() const;
     llvm::Value *const &par_ptr() const;
-=======
->>>>>>> pr/more_cleanup
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;
