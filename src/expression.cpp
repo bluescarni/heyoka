@@ -740,25 +740,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
         e.value());
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
-}
-
-llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_f128(s, arg); }, e.value());
-}
-
-#endif
-
 // Transform in-place ex by decomposition, appending the
 // result of the decomposition to u_vars_defs.
 // The return value is the index, in u_vars_defs,

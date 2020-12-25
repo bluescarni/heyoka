@@ -82,31 +82,6 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const variable &);
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const variable &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const variable &);
-
-#endif
-
-template <typename T>
-inline llvm::Value *codegen(llvm_state &s, const variable &var)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, var);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, var);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return codegen_f128(s, var);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &, const std::vector<llvm::Value *> &,

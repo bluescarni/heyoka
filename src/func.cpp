@@ -758,48 +758,6 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
     };
 }
 
-namespace detail
-{
-
-namespace
-{
-
-template <typename T>
-llvm::Value *function_codegen_impl(llvm_state &s, const func &f)
-{
-    // Create the function arguments.
-    std::vector<llvm::Value *> args_v;
-    for (const auto &arg : f.args()) {
-        args_v.push_back(codegen<T>(s, arg));
-        assert(args_v.back() != nullptr);
-    }
-
-    return codegen_from_values<T>(s, f, args_v);
-}
-
-} // namespace
-
-} // namespace detail
-
-llvm::Value *codegen_dbl(llvm_state &s, const func &f)
-{
-    return detail::function_codegen_impl<double>(s, f);
-}
-
-llvm::Value *codegen_ldbl(llvm_state &s, const func &f)
-{
-    return detail::function_codegen_impl<long double>(s, f);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const func &f)
-{
-    return detail::function_codegen_impl<mppp::real128>(s, f);
-}
-
-#endif
-
 std::vector<expression>::size_type taylor_decompose_in_place(func &&f, std::vector<expression> &dc)
 {
     return std::move(f).taylor_decompose(dc);

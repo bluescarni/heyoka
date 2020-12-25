@@ -16,7 +16,6 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -69,7 +68,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
-    std::unordered_map<std::string, llvm::Value *> m_named_values;
     llvm::Value *m_par_ptr = nullptr;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
@@ -171,8 +169,11 @@ public:
     unsigned &opt_level();
     bool &fast_math();
     bool &inline_functions();
+<<<<<<< HEAD
     std::unordered_map<std::string, llvm::Value *> &named_values();
     llvm::Value *&par_ptr();
+=======
+>>>>>>> pr/more_cleanup
 
     const llvm::Module &module() const;
     const ir_builder &builder() const;
@@ -180,8 +181,11 @@ public:
     const unsigned &opt_level() const;
     const bool &fast_math() const;
     const bool &inline_functions() const;
+<<<<<<< HEAD
     const std::unordered_map<std::string, llvm::Value *> &named_values() const;
     llvm::Value *const &par_ptr() const;
+=======
+>>>>>>> pr/more_cleanup
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;

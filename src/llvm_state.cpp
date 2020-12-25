@@ -417,11 +417,6 @@ bool &llvm_state::inline_functions()
     return m_inline_functions;
 }
 
-std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
-{
-    return m_named_values;
-}
-
 llvm::Value *&llvm_state::par_ptr()
 {
     return m_par_ptr;
@@ -457,11 +452,6 @@ const bool &llvm_state::fast_math() const
 const bool &llvm_state::inline_functions() const
 {
     return m_inline_functions;
-}
-
-const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
-{
-    return m_named_values;
 }
 
 llvm::Value *const &llvm_state::par_ptr() const

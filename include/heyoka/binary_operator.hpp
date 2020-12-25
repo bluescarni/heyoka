@@ -100,31 +100,6 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_dbl(llvm_state &, const binary_operator &);
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_ldbl(llvm_state &, const binary_operator &);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *codegen_f128(llvm_state &, const binary_operator &);
-
-#endif
-
-template <typename T>
-inline llvm::Value *codegen(llvm_state &s, const binary_operator &bo)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return codegen_dbl(s, bo);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return codegen_ldbl(s, bo);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return codegen_f128(s, bo);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
                                                                                std::vector<expression> &);
 
