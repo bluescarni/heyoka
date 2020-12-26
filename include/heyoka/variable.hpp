@@ -82,35 +82,6 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 
 HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &, const std::vector<llvm::Value *> &,
-                                                 std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_ldbl(llvm_state &, const variable &, const std::vector<llvm::Value *> &,
-                                                  std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_u_init_f128(llvm_state &, const variable &, const std::vector<llvm::Value *> &,
-                                                  std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *taylor_u_init(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                  std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_u_init_dbl(s, var, arr, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_u_init_ldbl(s, var, arr, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_u_init_f128(s, var, arr, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 } // namespace heyoka
 
 #endif

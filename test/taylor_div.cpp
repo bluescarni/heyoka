@@ -23,6 +23,7 @@
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -92,9 +93,10 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y}, 1,
+                1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -114,9 +116,10 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 2, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y}, 2,
+                1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -138,9 +141,10 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y}, 1,
+                2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -167,9 +171,10 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 2, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y}, 2,
+                2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -202,9 +207,10 @@ TEST_CASE("taylor div")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y}, 3, 3,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y}, 3,
+                3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -249,8 +255,9 @@ TEST_CASE("taylor div")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::div, 1_dbl, 3_dbl}}, x + y},
-                                   opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>(
+            {expression{binary_operator{binary_operator::type::div, expression{number{fp_t(1)}}, 3_dbl}}, x + y},
+            opt_level, high_accuracy, compact_mode);
 
         // Variable-number tests.
         {

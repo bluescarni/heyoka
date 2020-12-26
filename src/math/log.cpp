@@ -166,30 +166,31 @@ namespace
 
 // Derivative of log(number).
 template <typename T>
-llvm::Value *taylor_diff_log_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const number &num,
+                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                  std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {vector_splat(s.builder(), codegen<T>(s, num), batch_size)});
+    } else {
+        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    }
 }
 
 // Derivative of log(variable).
 template <typename T>
-llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size)
+llvm::Value *taylor_diff_log_impl(llvm_state &s, const log_impl &f, const variable &var,
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                  std::uint32_t idx, std::uint32_t batch_size)
 {
-    // NOTE: not much use in allowing zero-order
-    // derivatives, which in general might complicate
-    // the implementation.
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute the Taylor derivative of order 0 of log() (the order must be at least one)");
-    }
+    auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
-    auto &builder = s.builder();
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+    }
 
     // The result of the summation.
     llvm::Value *ret_acc;
@@ -230,8 +231,8 @@ llvm::Value *taylor_diff_log_impl(llvm_state &s, const variable &var, const std:
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Value *taylor_diff_log_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_log_impl(llvm_state &, const log_impl &, const U &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a logarithm");
@@ -244,7 +245,7 @@ llvm::Value *taylor_diff_log(llvm_state &s, const log_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_log_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) { return taylor_diff_log_impl<T>(s, f, v, arr, n_uvars, order, idx, batch_size); },
         f.args()[0].value());
 }
 
