@@ -754,28 +754,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, st
         std::move(ex.value()));
 }
 
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_dbl(s, arg, arr, batch_size); }, e.value());
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_ldbl(s, arg, arr, batch_size); }, e.value());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_f128(s, arg, arr, batch_size); }, e.value());
-}
-
-#endif
-
 namespace detail
 {
 

@@ -358,91 +358,63 @@ namespace detail
 namespace
 {
 
-template <typename T>
-llvm::Value *taylor_u_init_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                   std::uint32_t batch_size)
-{
-    // Do the Taylor init for lhs and rhs.
-    auto l = taylor_u_init<T>(s, bo.lhs(), arr, batch_size);
-    auto r = taylor_u_init<T>(s, bo.rhs(), arr, batch_size);
-
-    // Do the codegen for the corresponding operation.
-    switch (bo.op()) {
-        case binary_operator::type::add:
-            return s.builder().CreateFAdd(l, r);
-        case binary_operator::type::sub:
-            return s.builder().CreateFSub(l, r);
-        case binary_operator::type::mul:
-            return s.builder().CreateFMul(l, r);
-        default:
-            return s.builder().CreateFDiv(l, r);
-    }
-}
-
-} // namespace
-
-} // namespace detail
-
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_bo_impl<double>(s, bo, arr, batch_size);
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_bo_impl<long double>(s, bo, arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_bo_impl<mppp::real128>(s, bo, arr, batch_size);
-}
-
-#endif
-
-namespace detail
-{
-
-namespace
-{
-
 // Derivative of number +- number.
-template <bool, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const number &,
-                                        const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                        std::uint32_t batch_size)
+template <bool AddOrSub, typename T>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &num0, const number &num1,
+                                        const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order,
+                                        std::uint32_t, std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    // NOTE: in these num0 op num1 implementations we contract two numbers into one before
+    // codegen. Note that this is slightly different from codegenning and then performing the operation.
+    // For instance, if num0 = 1_dbl and num1 = 3_dbl and T is long double, then the output
+    // of this function will be (long double)(1./3.), rather than 1.l/3.l.
+    return vector_splat(s.builder(),
+                        (order == 0u) ? codegen<T>(s, AddOrSub ? (num0 + num1) : (num0 - num1))
+                                      : codegen<T>(s, number{0.}),
+                        batch_size);
 }
 
 // Derivative of number +- var.
 template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &, const variable &var,
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &num, const variable &var,
                                         const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t, std::uint32_t)
+                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
+    auto &builder = s.builder();
+
     auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
-    if constexpr (AddOrSub) {
-        return ret;
+    if (order == 0u) {
+        auto n = vector_splat(builder, codegen<T>(s, num), batch_size);
+
+        return AddOrSub ? builder.CreateFAdd(n, ret) : builder.CreateFSub(n, ret);
     } else {
-        // Negate if we are doing a subtraction.
-        return s.builder().CreateFNeg(ret);
+        if constexpr (AddOrSub) {
+            return ret;
+        } else {
+            // Negate if we are doing a subtraction.
+            return builder.CreateFNeg(ret);
+        }
     }
 }
 
 // Derivative of var +- number.
 template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const variable &var, const number &,
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, const number &num,
                                         const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t, std::uint32_t)
+                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    return taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
+    auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
+
+    if (order == 0u) {
+        auto &builder = s.builder();
+
+        auto n = vector_splat(builder, codegen<T>(s, num), batch_size);
+
+        return AddOrSub ? builder.CreateFAdd(ret, n) : builder.CreateFSub(ret, n);
+    } else {
+        return ret;
+    }
 }
 
 // Derivative of var +- var.
@@ -495,10 +467,11 @@ llvm::Value *bo_taylor_diff_sub(llvm_state &s, const binary_operator &bo, const 
 
 // Derivative of number * number.
 template <typename T>
-llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
-                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const number &num0, const number &num1,
+                                     const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order,
+                                     std::uint32_t, std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, (order == 0u) ? num0 * num1 : number{0.}), batch_size);
 }
 
 // Derivative of var * number.
@@ -572,10 +545,11 @@ llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_operator &bo, const 
 
 // Derivative of number / number.
 template <typename T>
-llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
-                                     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const number &num0, const number &num1,
+                                     const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order,
+                                     std::uint32_t, std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    return vector_splat(s.builder(), codegen<T>(s, order == 0u ? num0 / num1 : number{0.}), batch_size);
 }
 
 // Derivative of variable / variable or number / variable. These two cases
@@ -584,14 +558,28 @@ template <typename T, typename U,
           std::enable_if_t<std::disjunction_v<std::is_same<U, number>, std::is_same<U, variable>>, int> = 0>
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const U &nv, const variable &var1,
                                      const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
-                                     std::uint32_t idx, std::uint32_t)
+                                     std::uint32_t idx, std::uint32_t batch_size)
 {
+    auto &builder = s.builder();
+
     // Fetch the index of var1.
     const auto u_idx1 = uname_to_index(var1.name());
 
+    if (order == 0u) {
+        // Special casing for zero order.
+        auto numerator = [&]() -> llvm::Value * {
+            if constexpr (std::is_same_v<U, number>) {
+                return vector_splat(builder, codegen<T>(s, nv), batch_size);
+            } else {
+                return taylor_fetch_diff(arr, uname_to_index(nv.name()), 0, n_uvars);
+            }
+        }();
+
+        return builder.CreateFDiv(numerator, taylor_fetch_diff(arr, u_idx1, 0, n_uvars));
+    }
+
     // NOTE: iteration in the [1, order] range
     // (i.e., order inclusive).
-    auto &builder = s.builder();
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
@@ -662,17 +650,6 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                  std::uint32_t batch_size)
 {
-    // NOTE: some of the implementations
-    // require order to be at least 1 in order
-    // to be able to do pairwise summation.
-    // NOTE: also not much use in allowing zero-order
-    // derivatives, which in general might complicate
-    // the implementation.
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute the Taylor derivative of order 0 of a binary operator (the order must be at least one)");
-    }
-
     // lhs and rhs must be u vars or numbers.
     auto check_arg = [](const expression &e) {
         std::visit(

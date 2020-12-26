@@ -186,33 +186,34 @@ namespace
 
 // Derivative of cos(number).
 template <typename T>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const number &num,
+                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                  std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {vector_splat(s.builder(), codegen<T>(s, num), batch_size)});
+    } else {
+        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    }
 }
 
 template <typename T>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const variable &var,
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                  std::uint32_t idx, std::uint32_t batch_size)
 {
-    // NOTE: pairwise summation requires order 1 at least.
-    // NOTE: also not much use in allowing zero-order
-    // derivatives, which in general might complicate
-    // the implementation.
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute the Taylor derivative of order 0 of cos() (the order must be at least one)");
-    }
+    auto &builder = s.builder();
 
     // Fetch the index of the variable.
     const auto u_idx = uname_to_index(var.name());
 
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+    }
+
     // NOTE: iteration in the [1, order] range
     // (i.e., order included).
     std::vector<llvm::Value *> sum;
-    auto &builder = s.builder();
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the -1 is because we are accessing the sine
         // of the u var, which is conventionally placed
@@ -237,8 +238,8 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const variable &var, const std:
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Value *taylor_diff_cos_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_cos_impl(llvm_state &, const cos_impl &, const U &, const std::vector<llvm::Value *> &,
+                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
@@ -251,7 +252,7 @@ llvm::Value *taylor_diff_cos(llvm_state &s, const cos_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_cos_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) { return taylor_diff_cos_impl<T>(s, f, v, arr, n_uvars, order, idx, batch_size); },
         f.args()[0].value());
 }
 

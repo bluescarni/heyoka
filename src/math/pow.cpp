@@ -40,6 +40,7 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/sleef.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -47,6 +48,8 @@
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -205,25 +208,71 @@ namespace
 
 // Derivative of pow(number, number).
 template <typename T>
-llvm::Value *taylor_diff_pow_impl(llvm_state &s, const number &, const number &, const std::vector<llvm::Value *> &,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const number &num0, const number &num1,
+                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                  std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    auto &builder = s.builder();
+
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f,
+                                      {vector_splat(builder, codegen<T>(s, num0), batch_size),
+                                       vector_splat(builder, codegen<T>(s, num1), batch_size)});
+    } else {
+        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+    }
 }
 
 // Derivative of pow(variable, number).
 template <typename T>
-llvm::Value *taylor_diff_pow_impl(llvm_state &s, const variable &var, const number &num,
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variable &var, const number &num,
                                   const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
                                   std::uint32_t idx, std::uint32_t batch_size)
 {
-    return taylor_diff_pow_impl_det<T>(s, var, num, arr, n_uvars, order, idx, batch_size);
+    auto &builder = s.builder();
+
+    // Fetch the index of the variable.
+    const auto u_idx = uname_to_index(var.name());
+
+    if (order == 0u) {
+        return codegen_from_values<T>(
+            s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), vector_splat(builder, codegen<T>(s, num), batch_size)});
+    }
+
+    // NOTE: iteration in the [0, order) range
+    // (i.e., order *not* included).
+    std::vector<llvm::Value *> sum;
+    for (std::uint32_t j = 0; j < order; ++j) {
+        auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+        auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+
+        // Compute the scalar factor: order * num - j * (num + 1).
+        auto scal_f = vector_splat(builder,
+                                   codegen<T>(s, number(static_cast<T>(order)) * num
+                                                     - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                   batch_size);
+
+        // Add scal_f*v0*v1 to the sum.
+        sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
+    }
+
+    // Init the return value as the result of the sum.
+    auto ret_acc = pairwise_sum(builder, sum);
+
+    // Compute the final divisor: order * (zero-th derivative of u_idx).
+    auto ord_f = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+    auto b0 = taylor_fetch_diff(arr, u_idx, 0, n_uvars);
+    auto div = builder.CreateFMul(ord_f, b0);
+
+    // Compute and return the result: ret_acc / div.
+    return builder.CreateFDiv(ret_acc, div);
 }
 
 // All the other cases.
 template <typename T, typename U1, typename U2>
-llvm::Value *taylor_diff_pow_impl(llvm_state &, const U1 &, const U2 &, const std::vector<llvm::Value *> &,
-                                  std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_pow_impl(llvm_state &, const pow_impl &, const U1 &, const U2 &,
+                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t, std::uint32_t,
+                                  std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
@@ -237,7 +286,7 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return taylor_diff_pow_impl<T>(s, v1, v2, arr, n_uvars, order, idx, batch_size);
+            return taylor_diff_pow_impl<T>(s, f, v1, v2, arr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value(), f.args()[1].value());
 }

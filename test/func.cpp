@@ -117,9 +117,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_dbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_dbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("double Taylor diff is not implemented for the function 'f'"));
 
@@ -128,9 +125,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_ldbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_ldbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_ldbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("long double Taylor diff is not implemented for the function 'f'"));
 
@@ -140,9 +134,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_f128(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_f128() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_f128() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("float128 Taylor diff is not implemented for the function 'f'"));
 #endif
@@ -388,53 +379,6 @@ TEST_CASE("func taylor_decompose")
                 "(2)"));
 }
 
-struct func_11 : func_base {
-    func_11() : func_base("f", {}) {}
-    explicit func_11(std::vector<expression> args) : func_base("f", std::move(args)) {}
-
-    llvm::Value *taylor_u_init_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
-    {
-        return nullptr;
-    }
-    llvm::Value *taylor_u_init_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
-    {
-        return nullptr;
-    }
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *taylor_u_init_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t) const
-    {
-        return nullptr;
-    }
-#endif
-};
-
-TEST_CASE("func taylor u init")
-{
-    using Catch::Matchers::Message;
-
-    auto f = func(func_00{});
-
-    llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_u_init_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_u_init_ldbl() for the function 'f'"));
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 0), std::invalid_argument,
-                           Message("Zero batch size detected in func::taylor_u_init_f128() for the function 'f'"));
-#endif
-
-    f = func(func_11{});
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_dbl(s, {}, 1), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_u_init_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_ldbl(s, {}, 1), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_u_init_ldbl() for the function 'f'"));
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_u_init_f128(s, {}, 1), std::invalid_argument,
-                           Message("Null return value detected in func::taylor_u_init_f128() for the function 'f'"));
-#endif
-}
-
 struct func_12 : func_base {
     func_12() : func_base("f", {}) {}
     explicit func_12(std::vector<expression> args) : func_base("f", std::move(args)) {}
@@ -520,11 +464,11 @@ TEST_CASE("func swap")
     using std::swap;
 
     auto f1 = func(func_10{{"x"_var}});
-    auto f2 = func(func_11{{"y"_var}});
+    auto f2 = func(func_12{{"y"_var}});
 
     swap(f1, f2);
 
-    REQUIRE(f1.get_type_index() == typeid(func_11));
+    REQUIRE(f1.get_type_index() == typeid(func_12));
     REQUIRE(f2.get_type_index() == typeid(func_10));
     REQUIRE(f1.args() == std::vector{"y"_var});
     REQUIRE(f2.args() == std::vector{"x"_var});

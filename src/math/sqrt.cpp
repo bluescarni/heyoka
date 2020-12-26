@@ -34,12 +34,14 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -146,25 +148,81 @@ namespace
 
 // Derivative of sqrt(number).
 template <typename T>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const number &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                   std::uint32_t, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const number &num,
+                                   const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order,
+                                   std::uint32_t, std::uint32_t batch_size)
 {
-    return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {vector_splat(s.builder(), codegen<T>(s, num), batch_size)});
+    } else {
+        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    }
 }
 
 // Derivative of sqrt(variable).
+// NOTE: this is derived by taking:
+// a = sqrt(b) -> a**2 = b -> (a**2)^[n] = b^[n]
+// and then using the squaring formula.
 template <typename T>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                   std::uint32_t batch_size)
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const variable &var,
+                                   const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                   std::uint32_t idx, std::uint32_t)
 {
-    return taylor_diff_pow_impl_det<T>(s, var, number{T(1) / 2}, arr, n_uvars, order, idx, batch_size);
+    auto &builder = s.builder();
+
+    // Fetch the index of the variable.
+    const auto u_idx = uname_to_index(var.name());
+
+    if (order == 0u) {
+        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+    }
+
+    // Compute the divisor: 2*a^[0].
+    auto div = taylor_fetch_diff(arr, idx, 0, n_uvars);
+    div = builder.CreateFAdd(div, div);
+
+    // Init the factor: b^[n].
+    auto fac = taylor_fetch_diff(arr, u_idx, order, n_uvars);
+
+    std::vector<llvm::Value *> sum;
+    if (order % 2u == 1u) {
+        // Odd order.
+        for (std::uint32_t j = 1; j <= (order - 1u) / 2u; ++j) {
+            auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+            auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+
+            sum.push_back(builder.CreateFMul(v0, v1));
+        }
+    } else {
+        // Even order.
+        for (std::uint32_t j = 1; j <= (order - 2u) / 2u; ++j) {
+            auto v0 = taylor_fetch_diff(arr, idx, order - j, n_uvars);
+            auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
+
+            sum.push_back(builder.CreateFMul(v0, v1));
+        }
+
+        auto tmp = taylor_fetch_diff(arr, idx, order / 2u, n_uvars);
+        tmp = builder.CreateFMul(tmp, tmp);
+
+        fac = builder.CreateFSub(fac, tmp);
+    }
+
+    // Avoid summing if the sum is empty.
+    if (!sum.empty()) {
+        auto tmp = pairwise_sum(builder, sum);
+        tmp = builder.CreateFAdd(tmp, tmp);
+
+        fac = builder.CreateFSub(fac, tmp);
+    }
+
+    return builder.CreateFDiv(fac, div);
 }
 
 // All the other cases.
 template <typename T, typename U>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const U &, const std::vector<llvm::Value *> &, std::uint32_t,
-                                   std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, const std::vector<llvm::Value *> &,
+                                   std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a square root");
@@ -177,7 +235,7 @@ llvm::Value *taylor_diff_sqrt(llvm_state &s, const sqrt_impl &f, const std::vect
     assert(f.args().size() == 1u);
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, v, arr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, f, v, arr, n_uvars, order, idx, batch_size); },
         f.args()[0].value());
 }
 
@@ -283,40 +341,48 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                     retval);
             },
             [&]() {
-                // NOTE: this is copy-pasted from the pow() implementation,
-                // and alpha_v hard-coded to 1/2. Perhaps we can avoid repetition
-                // with some refactoring.
-                // Create FP vector versions of exponent and order.
-                auto alpha_v = vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size);
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                // Compute the divisor: 2*a^[0].
+                auto div = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
+                div = builder.CreateFAdd(div, div);
 
-                // Init the accumulator.
+                // retval = b^[n].
+                builder.CreateStore(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx), retval);
+
+                // Determine the upper index of the summation: (ord - 1)/2 if ord is odd, (ord - 2)/2 otherwise.
+                auto ord_even = builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(0));
+                auto upper = builder.CreateUDiv(
+                    builder.CreateSub(ord, builder.CreateSelect(ord_even, builder.getInt32(2), builder.getInt32(1))),
+                    builder.getInt32(2));
+
+                // Perform the summation.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                llvm_loop_u32(
+                    s, builder.getInt32(1), builder.CreateAdd(upper, builder.getInt32(1)), [&](llvm::Value *j) {
+                        auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
+                        auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
 
-                // Run the loop.
-                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                        builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(a_nj, aj)),
+                                            acc);
+                    });
+                builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateLoad(acc)), acc);
 
-                    // Compute the factor n*alpha-j*(alpha+1).
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
-                    auto fac = builder.CreateFSub(
-                        builder.CreateFMul(ord_v, alpha_v),
-                        builder.CreateFMul(
-                            j_v,
-                            builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
+                llvm_if_then_else(
+                    s, ord_even,
+                    [&]() {
+                        // retval -= (a^[n/2])**2.
+                        auto tmp = taylor_c_load_diff(s, diff_ptr, n_uvars,
+                                                      builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
+                        tmp = builder.CreateFMul(tmp, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
-                                        acc);
-                });
+                        builder.CreateStore(builder.CreateFSub(builder.CreateLoad(retval), tmp), retval);
+                    },
+                    []() {});
 
-                // Finalize the result: acc / (n*b0).
-                builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateLoad(acc),
-                                       builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars,
-                                                                                    builder.getInt32(0), var_idx))),
-                    retval);
+                // retval -= acc.
+                builder.CreateStore(builder.CreateFSub(builder.CreateLoad(retval), builder.CreateLoad(acc)), retval);
+
+                // retval /= div.
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(retval), div), retval);
             });
 
         // Return the result.
