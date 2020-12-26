@@ -68,7 +68,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
-    llvm::Value *m_par_ptr = nullptr;
     unsigned m_opt_level;
     std::string m_ir_snapshot;
     bool m_fast_math;
