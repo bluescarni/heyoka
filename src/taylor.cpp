@@ -2146,14 +2146,15 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // n_uvars the total number of u variables in the decomposition.
 // order is the max derivative order desired, batch_size the batch size.
 // order0 is a pointer to an array of (at least) n_eq * batch_size scalar elements
-// containing the derivatives of order 0.
+// containing the derivatives of order 0. par_ptr is a pointer to an array containing
+// the numerical values of the parameters.
 //
 // The return value is a variant containing either:
 // - in compact mode, the array containing the derivatives of all u variables,
 // - otherwise, the jet of derivatives of the state variables up to order 'order'.
 template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *, const std::vector<expression> &dc,
+taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, const std::vector<expression> &dc,
                    std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
                    bool compact_mode)
 {
@@ -2184,7 +2185,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *, const std:
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, n_uvars, 0, i, batch_size));
+            diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, par_ptr, n_uvars, 0, i, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -2200,7 +2201,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *, const std:
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, n_uvars, cur_order, i, batch_size));
+                diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, par_ptr, n_uvars, cur_order, i, batch_size));
             }
         }
 

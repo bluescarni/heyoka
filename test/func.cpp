@@ -112,29 +112,29 @@ TEST_CASE("func minimal")
     *b = "z"_var;
     REQUIRE(f.args() == std::vector{"z"_var, "y"_var});
 
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 2, 2, 0), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, nullptr, 2, 2, 2, 0), std::invalid_argument,
                            Message("Zero batch size detected in func::taylor_diff_dbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_dbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
+        f.taylor_diff_dbl(s, {nullptr, nullptr}, nullptr, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, nullptr, 2, 1, 2, 1), not_implemented_error,
                            Message("double Taylor diff is not implemented for the function 'f'"));
 
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 2, 2, 0), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, nullptr, 2, 2, 2, 0), std::invalid_argument,
                            Message("Zero batch size detected in func::taylor_diff_ldbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_ldbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
+        f.taylor_diff_ldbl(s, {nullptr, nullptr}, nullptr, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_ldbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, nullptr, 2, 1, 2, 1), not_implemented_error,
                            Message("long double Taylor diff is not implemented for the function 'f'"));
 
 #if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 2, 2, 0), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, nullptr, 2, 2, 2, 0), std::invalid_argument,
                            Message("Zero batch size detected in func::taylor_diff_f128() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_f128(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
+        f.taylor_diff_f128(s, {nullptr, nullptr}, nullptr, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_f128() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, nullptr, 2, 1, 2, 1), not_implemented_error,
                            Message("float128 Taylor diff is not implemented for the function 'f'"));
 #endif
 
@@ -383,19 +383,19 @@ struct func_12 : func_base {
     func_12() : func_base("f", {}) {}
     explicit func_12(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                 std::uint32_t, std::uint32_t) const
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                 std::uint32_t, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
-    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, std::uint32_t) const
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, std::uint32_t) const
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t) const
     {
         return nullptr;
     }
@@ -409,12 +409,12 @@ TEST_CASE("func taylor diff")
     auto f = func(func_12{});
 
     llvm_state s;
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {}, 1, 2, 3, 4), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {}, nullptr, 1, 2, 3, 4), std::invalid_argument,
                            Message("Null return value detected in func::taylor_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {}, 1, 2, 3, 4), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {}, nullptr, 1, 2, 3, 4), std::invalid_argument,
                            Message("Null return value detected in func::taylor_diff_ldbl() for the function 'f'"));
 #if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {}, 1, 2, 3, 4), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {}, nullptr, 1, 2, 3, 4), std::invalid_argument,
                            Message("Null return value detected in func::taylor_diff_f128() for the function 'f'"));
 #endif
 }

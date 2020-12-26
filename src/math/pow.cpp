@@ -209,8 +209,8 @@ namespace
 // Derivative of pow(number, number).
 template <typename T>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const number &num0, const number &num1,
-                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                  std::uint32_t batch_size)
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t order,
+                                  std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -226,8 +226,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const number
 // Derivative of pow(variable, number).
 template <typename T>
 llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variable &var, const number &num,
-                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
-                                  std::uint32_t idx, std::uint32_t batch_size)
+                                  const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                  std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -271,8 +271,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 // All the other cases.
 template <typename T, typename U1, typename U2>
 llvm::Value *taylor_diff_pow_impl(llvm_state &, const pow_impl &, const U1 &, const U2 &,
-                                  const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t)
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a pow()");
@@ -280,37 +280,41 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &, const pow_impl &, const U1 &, co
 
 template <typename T>
 llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                             std::uint32_t batch_size)
 {
     assert(f.args().size() == 2u);
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return taylor_diff_pow_impl<T>(s, f, v1, v2, arr, n_uvars, order, idx, batch_size);
+            return taylor_diff_pow_impl<T>(s, f, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value(), f.args()[1].value());
 }
 
 } // namespace
 
-llvm::Value *pow_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                       std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *pow_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                       std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *pow_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *pow_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                        std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<long double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *pow_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *pow_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                        std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<mppp::real128>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif

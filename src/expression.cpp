@@ -762,14 +762,15 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
-                return taylor_diff<T>(s, v, arr, n_uvars, order, idx, batch_size);
+                return taylor_diff<T>(s, v, arr, par_ptr, n_uvars, order, idx, batch_size);
             } else {
                 throw std::invalid_argument(
                     "Taylor derivatives can be computed only for binary operators or functions");
@@ -783,24 +784,27 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
 } // namespace detail
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                             std::uint32_t batch_size)
 
 {
-    return detail::taylor_diff_impl<double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<double>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
-    return detail::taylor_diff_impl<long double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<long double>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
-    return detail::taylor_diff_impl<mppp::real128>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<mppp::real128>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
