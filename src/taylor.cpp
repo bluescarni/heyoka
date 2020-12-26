@@ -2183,7 +2183,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, const std::vector<express
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            diff_arr.push_back(taylor_u_init<T>(s, dc[i], diff_arr, batch_size));
+            diff_arr.push_back(taylor_diff<T>(s, dc[i], diff_arr, n_uvars, 0, i, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.

@@ -434,12 +434,6 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value 
                 get_display_name()));
     }
 
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute a derivative of order zero in func::taylor_diff_dbl() for the function '{}'"_format(
-                get_display_name()));
-    }
-
     auto retval = ptr()->taylor_diff_dbl(s, arr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
@@ -463,12 +457,6 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value
     if (n_uvars == 0u) {
         throw std::invalid_argument(
             "Zero number of u variables detected in func::taylor_diff_ldbl() for the function '{}'"_format(
-                get_display_name()));
-    }
-
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute a derivative of order zero in func::taylor_diff_ldbl() for the function '{}'"_format(
                 get_display_name()));
     }
 
@@ -497,12 +485,6 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value
     if (n_uvars == 0u) {
         throw std::invalid_argument(
             "Zero number of u variables detected in func::taylor_diff_f128() for the function '{}'"_format(
-                get_display_name()));
-    }
-
-    if (order == 0u) {
-        throw std::invalid_argument(
-            "Cannot compute a derivative of order zero in func::taylor_diff_f128() for the function '{}'"_format(
                 get_display_name()));
     }
 

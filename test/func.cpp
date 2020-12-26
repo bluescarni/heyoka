@@ -117,9 +117,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_dbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_dbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_dbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("double Taylor diff is not implemented for the function 'f'"));
 
@@ -128,9 +125,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_ldbl(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_ldbl() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_ldbl() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_ldbl(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("long double Taylor diff is not implemented for the function 'f'"));
 
@@ -140,9 +134,6 @@ TEST_CASE("func minimal")
     REQUIRE_THROWS_MATCHES(
         f.taylor_diff_f128(s, {nullptr, nullptr}, 0, 2, 2, 1), std::invalid_argument,
         Message("Zero number of u variables detected in func::taylor_diff_f128() for the function 'f'"));
-    REQUIRE_THROWS_MATCHES(
-        f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 0, 2, 1), std::invalid_argument,
-        Message("Cannot compute a derivative of order zero in func::taylor_diff_f128() for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.taylor_diff_f128(s, {nullptr, nullptr}, 2, 1, 2, 1), not_implemented_error,
                            Message("float128 Taylor diff is not implemented for the function 'f'"));
 #endif
