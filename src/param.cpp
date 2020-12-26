@@ -20,12 +20,21 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/exceptions.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/param.hpp>
 
 namespace heyoka
 {
 
 param::param(std::uint32_t idx) : m_index(idx) {}
+
+param::param(const param &) = default;
+
+param::param(param &&) noexcept = default;
+
+param &param::operator=(const param &) = default;
+
+param &param::operator=(param &&) noexcept = default;
 
 param::~param() = default;
 
@@ -71,6 +80,16 @@ bool operator==(const param &p0, const param &p1)
 bool operator!=(const param &p0, const param &p1)
 {
     return !(p0 == p1);
+}
+
+expression subs(const param &p, const std::unordered_map<std::string, expression> &)
+{
+    return expression{p};
+}
+
+expression diff(const param &, const std::string &)
+{
+    return 0_dbl;
 }
 
 double eval_dbl(const param &p, const std::unordered_map<std::string, double> &, const std::vector<double> &pars)

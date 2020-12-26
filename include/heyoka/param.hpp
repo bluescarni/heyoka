@@ -29,6 +29,12 @@ class HEYOKA_DLL_PUBLIC param
 public:
     explicit param(std::uint32_t);
 
+    param(const param &);
+    param(param &&) noexcept;
+
+    param &operator=(const param &);
+    param &operator=(param &&) noexcept;
+
     ~param();
 
     const std::uint32_t &idx() const;
@@ -60,11 +66,11 @@ HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const param &,
                                       const std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const param &, std::size_t &);
-HEYOKA_DLL_PUBLIC [[noreturn]] void update_node_values_dbl(std::vector<double> &, const param &,
+[[noreturn]] HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const param &,
                                                            const std::unordered_map<std::string, double> &,
                                                            const std::vector<std::vector<std::size_t>> &,
                                                            std::size_t &);
-HEYOKA_DLL_PUBLIC [[noreturn]] void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
+[[noreturn]] HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
                                                     const std::unordered_map<std::string, double> &,
                                                     const std::vector<double> &,
                                                     const std::vector<std::vector<std::size_t>> &, std::size_t &,
