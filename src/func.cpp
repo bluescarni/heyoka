@@ -92,20 +92,6 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
     return std::any_of(v.begin(), v.end(), [](llvm::Value *p) { return p == nullptr; });
 }
 
-// Default implementation of u_init for a function.
-template <typename T>
-llvm::Value *taylor_u_init_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
-                                   std::uint32_t batch_size)
-{
-    // Do the initialisation for the function arguments.
-    std::vector<llvm::Value *> args_v;
-    for (const auto &arg : f.args()) {
-        args_v.push_back(taylor_u_init<T>(s, arg, arr, batch_size));
-    }
-
-    return codegen_from_values<T>(s, f, args_v);
-}
-
 } // namespace
 
 // Default implementation of Taylor decomposition for a function.
@@ -119,28 +105,6 @@ void func_default_td_impl(func_base &fb, std::vector<expression> &u_vars_defs)
         }
     }
 }
-
-llvm::Value *taylor_u_init_dbl_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
-                                       std::uint32_t batch_size)
-{
-    return taylor_u_init_default<double>(s, f, arr, batch_size);
-}
-
-llvm::Value *taylor_u_init_ldbl_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
-                                        std::uint32_t batch_size)
-{
-    return taylor_u_init_default<long double>(s, f, arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128_default(llvm_state &s, const func_inner_base &f, const std::vector<llvm::Value *> &arr,
-                                        std::uint32_t batch_size)
-{
-    return taylor_u_init_default<mppp::real128>(s, f, arr, batch_size);
-}
-
-#endif
 
 func_inner_base::~func_inner_base() = default;
 
@@ -351,72 +315,6 @@ std::vector<expression>::size_type func::taylor_decompose(std::vector<expression
 
     return ret;
 }
-
-llvm::Value *func::taylor_u_init_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
-                                     std::uint32_t batch_size) const
-{
-    using namespace fmt::literals;
-
-    if (batch_size == 0u) {
-        throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_u_init_dbl() for the function '{}'"_format(get_display_name()));
-    }
-
-    auto retval = ptr()->taylor_u_init_dbl(s, arr, batch_size);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(
-            "Null return value detected in func::taylor_u_init_dbl() for the function '{}'"_format(get_display_name()));
-    }
-
-    return retval;
-}
-
-llvm::Value *func::taylor_u_init_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr,
-                                      std::uint32_t batch_size) const
-{
-    using namespace fmt::literals;
-
-    if (batch_size == 0u) {
-        throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_u_init_ldbl() for the function '{}'"_format(get_display_name()));
-    }
-
-    auto retval = ptr()->taylor_u_init_ldbl(s, arr, batch_size);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(
-            "Null return value detected in func::taylor_u_init_ldbl() for the function '{}'"_format(
-                get_display_name()));
-    }
-
-    return retval;
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *func::taylor_u_init_f128(llvm_state &s, const std::vector<llvm::Value *> &arr,
-                                      std::uint32_t batch_size) const
-{
-    using namespace fmt::literals;
-
-    if (batch_size == 0u) {
-        throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_u_init_f128() for the function '{}'"_format(get_display_name()));
-    }
-
-    auto retval = ptr()->taylor_u_init_f128(s, arr, batch_size);
-
-    if (retval == nullptr) {
-        throw std::invalid_argument(
-            "Null return value detected in func::taylor_u_init_f128() for the function '{}'"_format(
-                get_display_name()));
-    }
-
-    return retval;
-}
-
-#endif
 
 llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
@@ -743,28 +641,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(func &&f, std::vect
 {
     return std::move(f).taylor_decompose(dc);
 }
-
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    return f.taylor_u_init_dbl(s, arr, batch_size);
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return f.taylor_u_init_ldbl(s, arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return f.taylor_u_init_f128(s, arr, batch_size);
-}
-
-#endif
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
