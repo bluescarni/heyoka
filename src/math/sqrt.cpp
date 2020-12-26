@@ -24,7 +24,6 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
@@ -349,8 +348,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                 builder.CreateStore(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx), retval);
 
                 // Determine the upper index of the summation: (ord - 1)/2 if ord is odd, (ord - 2)/2 otherwise.
-                auto ord_even = builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
-                                                  builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(0));
+                auto ord_even = builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(0));
                 auto upper = builder.CreateUDiv(
                     builder.CreateSub(ord, builder.CreateSelect(ord_even, builder.getInt32(2), builder.getInt32(1))),
                     builder.getInt32(2));
