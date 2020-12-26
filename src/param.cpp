@@ -7,29 +7,19 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <initializer_list>
-#include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
 
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Value.h>
-
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/exceptions.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/param.hpp>
 
 namespace heyoka
@@ -135,55 +125,5 @@ std::vector<expression>::size_type taylor_decompose_in_place(param &&, std::vect
     // NOTE: params do not require decomposition.
     return 0;
 }
-
-namespace detail
-{
-
-namespace
-{
-
-template <typename T>
-llvm::Value *taylor_u_init_par(llvm_state &s, const param &p, std::uint32_t batch_size)
-{
-    assert(batch_size > 0u);
-
-    auto &builder = s.builder();
-
-    // NOTE: for the taylor init we need to load the data from the par
-    // pointer in s, taking into account the batch size for the indexing.
-    if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("Indexing overflow error in the implementation of taylor_u_init() for param");
-    }
-    const auto idx = static_cast<std::uint32_t>(p.idx() * batch_size);
-    auto ptr = builder.CreateInBoundsGEP(s.par_ptr(), {builder.getInt32(idx)});
-
-    return load_vector_from_memory(builder, ptr, batch_size);
-}
-
-} // namespace
-
-} // namespace detail
-
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const param &p, const std::vector<llvm::Value *> &,
-                               std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_par<double>(s, p, batch_size);
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const param &p, const std::vector<llvm::Value *> &,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_par<long double>(s, p, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const param &p, const std::vector<llvm::Value *> &,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_par<mppp::real128>(s, p, batch_size);
-}
-
-#endif
 
 } // namespace heyoka
