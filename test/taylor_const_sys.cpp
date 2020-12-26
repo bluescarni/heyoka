@@ -54,8 +54,8 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
     s.compile();
 
-    auto jptr_batch = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_batch"));
-    auto jptr_scalar = reinterpret_cast<void (*)(T *)>(s.jit_lookup("jet_scalar"));
+    auto jptr_batch = reinterpret_cast<void (*)(T *, const T *)>(s.jit_lookup("jet_batch"));
+    auto jptr_scalar = reinterpret_cast<void (*)(T *, const T *)>(s.jit_lookup("jet_scalar"));
 
     std::vector<T> jet_batch;
     jet_batch.resize(12 * batch_size);
@@ -65,7 +65,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     std::vector<T> jet_scalar;
     jet_scalar.resize(12);
 
-    jptr_batch(jet_batch.data());
+    jptr_batch(jet_batch.data(), nullptr);
 
     for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
         // Assign the initial values of x and y.
@@ -73,7 +73,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             jet_scalar[i] = jet_batch[i * batch_size + batch_idx];
         }
 
-        jptr_scalar(jet_scalar.data());
+        jptr_scalar(jet_scalar.data(), nullptr);
 
         for (auto i = 3u; i < 12u; ++i) {
             REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
@@ -98,12 +98,12 @@ TEST_CASE("taylor const sys")
 
             s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}, fp_t{4}};
             jet.resize(6);
 
-            jptr(jet.data());
+            jptr(jet.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -123,12 +123,12 @@ TEST_CASE("taylor const sys")
 
             s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}, fp_t{4}, fp_t{-4}};
             jet.resize(12);
 
-            jptr(jet.data());
+            jptr(jet.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -159,12 +159,12 @@ TEST_CASE("taylor const sys")
 
             s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}, fp_t{4}};
             jet.resize(9);
 
-            jptr(jet.data());
+            jptr(jet.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
@@ -187,12 +187,12 @@ TEST_CASE("taylor const sys")
 
             s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}, fp_t{4}, fp_t{-4}};
             jet.resize(18);
 
-            jptr(jet.data());
+            jptr(jet.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -232,12 +232,12 @@ TEST_CASE("taylor const sys")
 
             s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
             std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{0}, fp_t{3}, fp_t{-3}, fp_t{0}, fp_t{4}, fp_t{-4}, fp_t{0}};
             jet.resize(36);
 
-            jptr(jet.data());
+            jptr(jet.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -302,12 +302,12 @@ TEST_CASE("taylor end novars")
 
     s.compile();
 
-    auto jptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+    auto jptr = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet"));
 
     std::vector<double> jet{2., 3.};
     jet.resize(6);
 
-    jptr(jet.data());
+    jptr(jet.data(), nullptr);
 
     REQUIRE(jet[0] == 2);
     REQUIRE(jet[1] == 3);

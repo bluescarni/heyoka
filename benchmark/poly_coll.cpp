@@ -242,7 +242,7 @@ int main()
 
     s.compile();
 
-    auto jptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+    auto jptr = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet"));
 
     auto state = std::vector{// Sun.
                              -4.06428567034226e-3, -6.08813756435987e-3, -1.66162304225834e-6, +6.69048890636161e-6,
@@ -274,7 +274,7 @@ int main()
     const auto h = 180.;
 
     // Compute the jet of derivatives.
-    jptr(state.data());
+    jptr(state.data(), nullptr);
 
     // Compute the distance**2 between 2 bodies.
     poly_square(dx2, xt::view(s_array, xt::all(), 1, 0) - xt::view(s_array, xt::all(), 2, 0), order);
