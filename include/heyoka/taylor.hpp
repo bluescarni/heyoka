@@ -335,7 +335,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, T *);
+    using step_f_t = void (*)(T *, const T *, T *);
     step_f_t m_step_f;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
@@ -519,7 +519,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, T *);
+    using step_f_t = void (*)(T *, const T *, T *);
     step_f_t m_step_f;
     // Temporary vectors for use
     // in the timestepping functions.
