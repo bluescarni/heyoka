@@ -417,11 +417,6 @@ bool &llvm_state::inline_functions()
     return m_inline_functions;
 }
 
-llvm::Value *&llvm_state::par_ptr()
-{
-    return m_par_ptr;
-}
-
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -452,11 +447,6 @@ const bool &llvm_state::fast_math() const
 const bool &llvm_state::inline_functions() const
 {
     return m_inline_functions;
-}
-
-llvm::Value *const &llvm_state::par_ptr() const
-{
-    return m_par_ptr;
 }
 
 void llvm_state::check_uncompiled(const char *f) const
