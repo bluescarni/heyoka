@@ -1737,16 +1737,19 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
 // the indices/constants necessary for the computation.
 template <typename T>
 void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 6> &sv_diff_gl,
-                               llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                               llvm::Value *diff_arr, llvm::Value *par_ptr, std::uint32_t n_uvars, llvm::Value *order,
                                std::uint32_t batch_size)
 {
+    assert(batch_size > 0u);
+
     auto &builder = s.builder();
     auto &context = s.context();
 
     // Recover the number of state variables whose derivatives are given
-    // by u variables and numbers.
+    // by u variables, numbers and params.
     const auto n_vars = taylor_c_gl_arr_size(sv_diff_gl[0]);
     const auto n_nums = taylor_c_gl_arr_size(sv_diff_gl[2]);
+    const auto n_pars = taylor_c_gl_arr_size(sv_diff_gl[4]);
 
     // Handle the u variables definitions.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
@@ -1787,6 +1790,37 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
 
         // Store the derivative.
         taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+    });
+
+    // Handle the param definitions.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_pars), [&](llvm::Value *cur_idx) {
+        // Fetch the index of the state variable.
+        auto sv_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[4], {builder.getInt32(0), cur_idx}));
+
+        // Fetch the index of the param.
+        auto par_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[5], {builder.getInt32(0), cur_idx}));
+
+        // If the first-order derivative is being requested,
+        // do the codegen for the constant itself, otherwise
+        // return 0. No need for normalization as the only
+        // nonzero value that can be produced here is the first-order
+        // derivative.
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(order, builder.getInt32(1)),
+            [&]() {
+                // Derivative of order 1. Fetch the value from par_ptr.
+                // TODO overflow check here?
+                auto ptr
+                    = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(par_idx, builder.getInt32(batch_size))});
+
+                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
+                                    load_vector_from_memory(builder, ptr, batch_size));
+            },
+            [&]() {
+                // Derivative of order > 1, return 0.
+                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
+                                    vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+            });
     });
 }
 
@@ -2212,14 +2246,14 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute all derivatives up to order 'order - 1'.
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
         // State variables first.
-        taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, n_uvars, cur_order, batch_size);
+        taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
 
         // The other u variables.
         compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
-    taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, n_uvars, builder.getInt32(order), batch_size);
+    taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
 
     // Return the array of derivatives of the u variables.
     return diff_arr;
