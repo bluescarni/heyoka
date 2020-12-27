@@ -97,28 +97,28 @@ namespace
 {
 
 template <typename T>
-llvm::Value *taylor_codegen_constant_num(llvm_state &s, const number &num, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::uint32_t batch_size)
 {
     return vector_splat(s.builder(), codegen<T>(s, num), batch_size);
 }
 
 } // namespace
 
-llvm::Value *taylor_codegen_constant_dbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_num<double>(s, num, batch_size);
+    return taylor_codegen_numparam_num<double>(s, num, batch_size);
 }
 
-llvm::Value *taylor_codegen_constant_ldbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_num<long double>(s, num, batch_size);
+    return taylor_codegen_numparam_num<long double>(s, num, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_codegen_constant_f128(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_num<mppp::real128>(s, num, batch_size);
+    return taylor_codegen_numparam_num<mppp::real128>(s, num, batch_size);
 }
 
 #endif
@@ -126,7 +126,7 @@ llvm::Value *taylor_codegen_constant_f128(llvm_state &s, const number &num, llvm
 namespace
 {
 
-llvm::Value *taylor_codegen_constant_par(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -147,21 +147,21 @@ llvm::Value *taylor_codegen_constant_par(llvm_state &s, const param &p, llvm::Va
 
 } // namespace
 
-llvm::Value *taylor_codegen_constant_dbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_par(s, p, par_ptr, batch_size);
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
 }
 
-llvm::Value *taylor_codegen_constant_ldbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_par(s, p, par_ptr, batch_size);
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_codegen_constant_f128(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
-    return taylor_codegen_constant_par(s, p, par_ptr, batch_size);
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
 }
 
 #endif
@@ -1526,7 +1526,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 // nonzero value that can be produced here is the first-order
                 // derivative.
                 if (order == 1u) {
-                    return taylor_codegen_constant<T>(s, v, par_ptr, batch_size);
+                    return taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
                 } else {
                     return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
                 }

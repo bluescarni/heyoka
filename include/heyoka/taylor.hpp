@@ -42,13 +42,8 @@ namespace heyoka
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                                 std::uint32_t);
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
-                                                  llvm::Value *);
-
-HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
+// NOTE: these are various utilities useful when dealing in a generic
+// fashion with numbers/params in Taylor functions.
 
 // Helper to detect if T is a number or a param.
 template <typename T>
@@ -57,39 +52,52 @@ using is_num_param = std::disjunction<std::is_same<T, number>, std::is_same<T, p
 template <typename T>
 inline constexpr bool is_num_param_v = is_num_param<T>::value;
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t);
 
 #endif
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_dbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_ldbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_constant_f128(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const param &, llvm::Value *, std::uint32_t);
 
 #endif
 
 template <typename T, typename U>
-llvm::Value *taylor_codegen_constant(llvm_state &s, const U &n, llvm::Value *par_ptr, std::uint32_t batch_size)
+llvm::Value *taylor_codegen_numparam(llvm_state &s, const U &n, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_codegen_constant_dbl(s, n, par_ptr, batch_size);
+        return taylor_codegen_numparam_dbl(s, n, par_ptr, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_codegen_constant_ldbl(s, n, par_ptr, batch_size);
+        return taylor_codegen_numparam_ldbl(s, n, par_ptr, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_codegen_constant_f128(s, n, par_ptr, batch_size);
+        return taylor_codegen_numparam_f128(s, n, par_ptr, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
 }
+
+} // namespace detail
+
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
+                                                 std::uint32_t);
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, std::uint32_t, llvm::Value *,
+                                                  llvm::Value *);
+
+HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
 
 } // namespace detail
 
