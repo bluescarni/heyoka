@@ -47,9 +47,11 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array,
+    // - par ptr,
     // - number argument.
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)), to_llvm_type<T>(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -68,7 +70,7 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
-        auto num = f->args().begin() + 3;
+        auto num = f->args().begin() + 4;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

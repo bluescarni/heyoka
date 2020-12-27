@@ -218,9 +218,11 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array,
+    // - par ptr,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -240,7 +242,7 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 3;
+        auto var_idx = f->args().begin() + 4;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

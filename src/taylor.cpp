@@ -2112,7 +2112,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet() below.
 template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *,
+llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
                                              const std::vector<expression> &dc, std::uint32_t n_eq,
                                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -2185,11 +2185,13 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // Create the u variable index from the first generator.
                     auto u_idx = gens[0](cur_call_idx);
 
-                    // Initialise the vector of arguments with which func must be called:
+                    // Initialise the vector of arguments with which func must be called. The following
+                    // initial arguments are always present:
                     // - current Taylor order,
                     // - u index of the variable,
-                    // - array of derivatives.
-                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr};
+                    // - array of derivatives,
+                    // - pointer to the param values.
+                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr};
 
                     // Create the other arguments via the generators.
                     for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
