@@ -359,33 +359,35 @@ namespace
 {
 
 // Derivative of number +- number.
-template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &num0, const number &num1,
-                                        const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <bool AddOrSub, typename T, typename U, typename V,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num0, const V &num1, const std::vector<llvm::Value *> &,
+                                        llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size)
 {
-    // NOTE: in these num0 op num1 implementations we contract two numbers into one before
-    // codegen. Note that this is slightly different from codegenning and then performing the operation.
-    // For instance, if num0 = 1_dbl and num1 = 3_dbl and T is long double, then the output
-    // of this function will be (long double)(1./3.), rather than 1.l/3.l.
-    return vector_splat(s.builder(),
-                        (order == 0u) ? codegen<T>(s, AddOrSub ? (num0 + num1) : (num0 - num1))
-                                      : codegen<T>(s, number{0.}),
-                        batch_size);
+    if (order == 0u) {
+        auto n0 = taylor_codegen_constant<T>(s, num0, par_ptr, batch_size);
+        auto n1 = taylor_codegen_constant<T>(s, num1, par_ptr, batch_size);
+
+        return AddOrSub ? s.builder().CreateFAdd(n0, n1) : s.builder().CreateFSub(n0, n1);
+    } else {
+        return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
+    }
 }
 
 // Derivative of number +- var.
-template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &num, const variable &var,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const U &num, const variable &var,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
     auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
     if (order == 0u) {
-        auto n = vector_splat(builder, codegen<T>(s, num), batch_size);
+        auto n = taylor_codegen_constant<T>(s, num, par_ptr, batch_size);
 
         return AddOrSub ? builder.CreateFAdd(n, ret) : builder.CreateFSub(n, ret);
     } else {
@@ -399,17 +401,18 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const number &num, const 
 }
 
 // Derivative of var +- number.
-template <bool AddOrSub, typename T>
-llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, const number &num,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var, const U &num,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size)
 {
     auto ret = taylor_fetch_diff(arr, uname_to_index(var.name()), order, n_uvars);
 
     if (order == 0u) {
         auto &builder = s.builder();
 
-        auto n = vector_splat(builder, codegen<T>(s, num), batch_size);
+        auto n = taylor_codegen_constant<T>(s, num, par_ptr, batch_size);
 
         return AddOrSub ? builder.CreateFAdd(ret, n) : builder.CreateFSub(ret, n);
     } else {
@@ -434,7 +437,8 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, con
 }
 
 // All the other cases.
-template <bool, typename, typename V1, typename V2>
+template <bool, typename, typename V1, typename V2,
+          std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
                                         llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
