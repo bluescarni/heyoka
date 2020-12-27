@@ -674,11 +674,11 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
                             + "' encountered in the Taylor diff phase for a binary operator expression (the name "
                               "must be in the form 'u_n', where n is a non-negative integer)");
                     }
-                } else if constexpr (!std::is_same_v<type, number>) {
+                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
                     // Not a variable and not a number.
                     throw std::invalid_argument(
                         "An invalid expression type was passed to the Taylor diff phase of a binary operator (the "
-                        "expression must be either a variable or a number, but it is neither)");
+                        "expression must be either a variable or a number/param, but it is neither)");
                 }
             },
             e.value());

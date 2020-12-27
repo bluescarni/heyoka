@@ -438,7 +438,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
     // From n_eq to dc.size() - n_eq, the expressions
     // must be binary operators or functions whose arguments
     // are either variables in the u_n form,
-    // where n < i, or numbers.
+    // where n < i, or numbers/params.
     for (auto i = n_eq; i < dc.size() - n_eq; ++i) {
         std::visit(
             [i](const auto &v) {
@@ -449,7 +449,8 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
                             assert(uname_to_index(p_var->name()) < i);
-                        } else if (std::get_if<number>(&arg.value()) == nullptr) {
+                        } else if (std::get_if<number>(&arg.value()) == nullptr
+                                   && std::get_if<param>(&arg.value()) == nullptr) {
                             assert(false);
                         }
                     };
@@ -466,7 +467,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
 
     // From dc.size() - n_eq to dc.size(), the expressions
     // must be either variables in the u_n form, where n < i,
-    // or numbers.
+    // or numbers/params.
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
         std::visit(
             [i](const auto &v) {
@@ -475,7 +476,7 @@ void verify_taylor_dec(const std::vector<expression> &orig, const std::vector<ex
                 if constexpr (std::is_same_v<type, variable>) {
                     assert(v.name().rfind("u_", 0) == 0);
                     assert(uname_to_index(v.name()) < i);
-                } else if (!std::is_same_v<type, number>) {
+                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
                     assert(false);
                 }
             },
