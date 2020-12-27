@@ -2170,7 +2170,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 // derivative in compact mpde.
                 const auto &func = p.first;
 
-                // The number of func calss.
+                // The number of func calls.
                 const auto ncalls = p.second.first;
 
                 // The generators for the arguments of func.
