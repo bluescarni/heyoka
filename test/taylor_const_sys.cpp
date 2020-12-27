@@ -113,6 +113,33 @@ TEST_CASE("taylor const sys")
             REQUIRE(jet[5] == 0);
         }
 
+        if (!compact_mode) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {prime(x) = par[0], prime(y) = expression{number{fp_t{-2}}}, prime(z) = expression{number{fp_t{0}}}}, 1,
+                1, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}, fp_t{4}};
+            jet.resize(6);
+
+            std::vector<fp_t> pars{fp_t{1}};
+
+            jptr(jet.data(), pars.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == 4);
+            REQUIRE(jet[3] == 1);
+            REQUIRE(jet[4] == -2);
+            REQUIRE(jet[5] == 0);
+        }
+
         {
             llvm_state s{kw::opt_level = opt_level};
 
@@ -129,6 +156,44 @@ TEST_CASE("taylor const sys")
             jet.resize(12);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
+
+            REQUIRE(jet[4] == 4);
+            REQUIRE(jet[5] == -4);
+
+            REQUIRE(jet[6] == 1);
+            REQUIRE(jet[7] == 1);
+
+            REQUIRE(jet[8] == -2);
+            REQUIRE(jet[9] == -2);
+
+            REQUIRE(jet[10] == 0);
+            REQUIRE(jet[11] == 0);
+        }
+
+        if (!compact_mode) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(
+                s, "jet",
+                {prime(x) = expression{number{fp_t{1}}}, prime(y) = par[1], prime(z) = expression{number{fp_t{0}}}}, 1,
+                2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}, fp_t{4}, fp_t{-4}};
+            jet.resize(12);
+
+            std::vector<fp_t> pars{fp_t{1}, fp_t{1}, fp_t{-2}, fp_t{-2}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -238,6 +303,52 @@ TEST_CASE("taylor const sys")
             jet.resize(36);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == 0);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == -3);
+            REQUIRE(jet[5] == 0);
+
+            REQUIRE(jet[6] == 4);
+            REQUIRE(jet[7] == -4);
+            REQUIRE(jet[8] == 0);
+
+            REQUIRE(jet[9] == 1);
+            REQUIRE(jet[10] == 1);
+            REQUIRE(jet[11] == 1);
+
+            REQUIRE(jet[12] == -2);
+            REQUIRE(jet[13] == -2);
+            REQUIRE(jet[14] == -2);
+
+            REQUIRE(jet[15] == 0);
+            REQUIRE(jet[16] == 0);
+            REQUIRE(jet[17] == 0);
+
+            for (auto i = 18u; i < 36u; ++i) {
+                REQUIRE(jet[i] == 0);
+            }
+        }
+
+        if (!compact_mode) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = par[0], prime(y) = par[1], prime(z) = par[2]}, 3, 3,
+                                 high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{0}, fp_t{3}, fp_t{-3}, fp_t{0}, fp_t{4}, fp_t{-4}, fp_t{0}};
+            jet.resize(36);
+
+            std::vector<fp_t> pars{fp_t{1}, fp_t{1}, fp_t{1}, fp_t{-2}, fp_t{-2}, fp_t{-2}, fp_t{0}, fp_t{0}, fp_t{0}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
