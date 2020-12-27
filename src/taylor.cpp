@@ -1645,11 +1645,13 @@ std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
 
 // Helper to construct the global arrays needed for the computation of the
 // derivatives of the state variables. The return value is a set
-// of 4 arrays:
+// of 6 arrays:
 // - the indices of the state variables whose derivative is a u variable, paired to
 // - the indices of the u variables appearing in the derivatives, and
 // - the indices of the state variables whose derivative is a constant, paired to
-// - the values of said constants.
+// - the values of said constants, and
+// - the indices of the state variables whose derivative is a param, paired to
+// - the indices of the params.
 template <typename T>
 auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> &dc, std::uint32_t n_uvars)
 {
@@ -1658,7 +1660,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
     auto &module = s.module();
 
     // Build iteratively the output values as vectors of constants.
-    std::vector<llvm::Constant *> var_indices, vars, num_indices, nums;
+    std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
     // NOTE: the derivatives of the state variables are at the end of the decomposition.
     for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
@@ -1674,6 +1676,9 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
                 } else if constexpr (std::is_same_v<type, number>) {
                     num_indices.push_back(builder.getInt32(i - n_uvars));
                     nums.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, v)));
+                } else if constexpr (std::is_same_v<type, param>) {
+                    par_indices.push_back(builder.getInt32(i - n_uvars));
+                    pars.push_back(builder.getInt32(v.idx()));
                 } else {
                     assert(false);
                 }
@@ -1683,8 +1688,11 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
 
     assert(var_indices.size() == vars.size());
     assert(num_indices.size() == nums.size());
+    assert(par_indices.size() == pars.size());
 
     // Turn the vectors into global read-only LLVM arrays.
+
+    // Variables.
     auto var_arr_type
         = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(var_indices.size()));
 
@@ -1696,6 +1704,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
     auto g_vars
         = new llvm::GlobalVariable(module, vars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, vars_arr);
 
+    // Numbers.
     auto num_indices_arr_type
         = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(num_indices.size()));
     auto num_indices_arr = llvm::ConstantArray::get(num_indices_arr_type, num_indices);
@@ -1708,14 +1717,26 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const std::vector<expression> 
     auto g_nums
         = new llvm::GlobalVariable(module, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
 
-    return std::array{g_var_indices, g_vars, g_num_indices, g_nums};
+    // Params.
+    auto par_arr_type
+        = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), boost::numeric_cast<std::uint64_t>(par_indices.size()));
+
+    auto par_indices_arr = llvm::ConstantArray::get(par_arr_type, par_indices);
+    auto g_par_indices = new llvm::GlobalVariable(module, par_indices_arr->getType(), true,
+                                                  llvm::GlobalVariable::InternalLinkage, par_indices_arr);
+
+    auto pars_arr = llvm::ConstantArray::get(par_arr_type, pars);
+    auto g_pars
+        = new llvm::GlobalVariable(module, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
+
+    return std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars};
 }
 
 // Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
 // sv_diff_gl is the set of arrays produced by taylor_c_make_sv_diff_globals(), which contain
 // the indices/constants necessary for the computation.
 template <typename T>
-void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 4> &sv_diff_gl,
+void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 6> &sv_diff_gl,
                                llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
                                std::uint32_t batch_size)
 {
@@ -1771,7 +1792,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
 
 // Helper to convert the arguments of the definition of a u variable
 // into a vector of variants. u variables will be converted to their indices,
-// numbers will be unchanged.
+// numbers will be unchanged, parameters will be converted to their indices.
 auto taylor_udef_to_variants(const expression &ex)
 {
     return std::visit(
@@ -1786,6 +1807,8 @@ auto taylor_udef_to_variants(const expression &ex)
                         retval.emplace_back(uname_to_index(p_var->name()));
                     } else if (auto p_num = std::get_if<number>(&arg.value())) {
                         retval.emplace_back(*p_num);
+                    } else if (auto p_par = std::get_if<param>(&arg.value())) {
+                        retval.emplace_back(p_par->idx());
                     } else {
                         throw std::invalid_argument(
                             "Invalid argument encountered in an element of a Taylor decomposition: the "
@@ -2089,9 +2112,9 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<std::vector<exp
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet() below.
 template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, const std::vector<expression> &dc,
-                                             std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                                             std::uint32_t batch_size)
+llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *,
+                                             const std::vector<expression> &dc, std::uint32_t n_eq,
+                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -2258,7 +2281,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, con
     }
 
     if (compact_mode) {
-        return taylor_compute_jet_compact_mode<T>(s, order0, dc, n_eq, n_uvars, order, batch_size);
+        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
