@@ -79,6 +79,41 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+// Test issue when two different c_diff functions would end up mangled with the same name.
+TEST_CASE("multimangle")
+{
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s{kw::opt_level = 0u};
+
+    taylor_add_jet<double>(s, "jet0", {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 1,
+                           1, false, true);
+    taylor_add_jet<double>(s, "jet1", {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 1,
+                           1, false, true);
+
+    s.compile();
+
+    auto jptr0 = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet0"));
+    auto jptr1 = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet1"));
+
+    std::vector<double> jet{double{2}, double{3}};
+    jet.resize(4);
+
+    jptr0(jet.data(), nullptr);
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(double{5}));
+    REQUIRE(jet[3] == approximately(double{5}));
+
+    jptr1(jet.data(), nullptr);
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(double{-1}));
+    REQUIRE(jet[3] == approximately(double{5}));
+}
+
 TEST_CASE("taylor sub")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -111,7 +146,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[3] == approximately(fp_t{5}));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -161,7 +196,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[7] == -5);
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -285,7 +320,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[17])));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -354,7 +389,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[3] == approximately(jet[0] + 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y - par[0], x - -4_dbl}, 1, 1, high_accuracy, compact_mode);
@@ -403,7 +438,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[7] == approximately(jet[1] + 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y - 2_dbl, x - par[1]}, 1, 2, high_accuracy, compact_mode);
@@ -529,7 +564,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[23] == approximately(1 / fp_t{3} * jet[14]));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y - par[0], x - par[1]}, 3, 3, high_accuracy, compact_mode);
@@ -601,7 +636,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[3] == approximately(-4 - jet[0]));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {par[0] - y, -4_dbl - x}, 1, 1, high_accuracy, compact_mode);
@@ -650,7 +685,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[7] == approximately(-jet[1] - 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {2_dbl - y, par[1] - x}, 1, 2, high_accuracy, compact_mode);
@@ -776,7 +811,7 @@ TEST_CASE("taylor sub")
             REQUIRE(jet[23] == approximately(-1 / fp_t{3} * jet[14]));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {par[0] - y, par[1] - x}, 3, 3, high_accuracy, compact_mode);
@@ -1022,7 +1057,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[3] == approximately(fp_t{5}));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -1072,7 +1107,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[7] == -5);
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -1196,7 +1231,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[23] == approximately(1 / fp_t{6} * (2 * jet[17])));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
@@ -1265,7 +1300,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[3] == approximately(jet[0] - 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y + par[0], x + -4_dbl}, 1, 1, high_accuracy, compact_mode);
@@ -1314,7 +1349,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[7] == approximately(jet[1] - 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y + 2_dbl, x + par[1]}, 1, 2, high_accuracy, compact_mode);
@@ -1440,7 +1475,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[23] == approximately(1 / fp_t{3} * jet[14]));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {y + par[0], x + par[1]}, 3, 3, high_accuracy, compact_mode);
@@ -1512,7 +1547,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[3] == approximately(jet[0] - 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {par[0] + y, -4_dbl + x}, 1, 1, high_accuracy, compact_mode);
@@ -1561,7 +1596,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[7] == approximately(jet[1] - 4));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {2_dbl + y, par[1] + x}, 1, 2, high_accuracy, compact_mode);
@@ -1687,7 +1722,7 @@ TEST_CASE("taylor add")
             REQUIRE(jet[23] == approximately(1 / fp_t{3} * jet[14]));
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {par[0] + y, par[1] + x}, 3, 3, high_accuracy, compact_mode);

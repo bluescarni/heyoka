@@ -27,6 +27,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -165,6 +166,53 @@ llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const param &p, llvm::V
 }
 
 #endif
+
+// Return different name mangling strings for number and param.
+// For use in the c_diff implementations to generate unique
+// function names.
+std::string taylor_c_diff_numparam_mangle(const number &)
+{
+    return "num";
+}
+
+std::string taylor_c_diff_numparam_mangle(const param &)
+{
+    return "par";
+}
+
+// Deduce the c_diff function argument type for number/param
+// arguments.
+llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &ti, llvm_state &s, const number &)
+{
+    // NOTE: for number, the value of the constant is passed in as function argument.
+    // Thus, the argument type is the floating-point type of the constant.
+    return to_llvm_type_impl(s.context(), ti);
+}
+
+llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &s, const param &)
+{
+    // NOTE: for param, the index into the par_ptr array is passed as function argument.
+    return s.builder().getInt32Ty();
+}
+
+// Codegen helpers for number/param for use in the generic c_diff implementations.
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,
+                                            std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), n, batch_size);
+}
+
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
+                                            std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    // Fetch the pointer into par_ptr.
+    // TODO overflow check here?
+    auto ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
+
+    return load_vector_from_memory(builder, ptr, batch_size);
+}
 
 namespace
 {
@@ -1556,10 +1604,11 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
                     for (const auto &arg : v.args()) {
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             retval.push_back(uname_to_index(p_var->name()));
-                        } else if (!std::holds_alternative<number>(arg.value())) {
+                        } else if (!std::holds_alternative<number>(arg.value())
+                                   && !std::holds_alternative<param>(arg.value())) {
                             throw std::invalid_argument(
                                 "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                "argument is not a variable or a number");
+                                "argument is not a variable or a number/param");
                         }
                     }
 
@@ -1809,12 +1858,9 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
             s, builder.CreateICmpEQ(order, builder.getInt32(1)),
             [&]() {
                 // Derivative of order 1. Fetch the value from par_ptr.
-                // TODO overflow check here?
-                auto ptr
-                    = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(par_idx, builder.getInt32(batch_size))});
-
+                // NOTE: param{0} is unused, its only purpose is type tagging.
                 taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
-                                    load_vector_from_memory(builder, ptr, batch_size));
+                                    taylor_c_diff_numparam_codegen(s, param{0}, par_idx, par_ptr, batch_size));
             },
             [&]() {
                 // Derivative of order > 1, return 0.

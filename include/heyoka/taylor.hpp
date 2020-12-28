@@ -18,6 +18,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -85,6 +86,23 @@ llvm::Value *taylor_codegen_numparam(llvm_state &s, const U &n, llvm::Value *par
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
 }
+
+HEYOKA_DLL_PUBLIC std::string taylor_c_diff_numparam_mangle(const number &);
+HEYOKA_DLL_PUBLIC std::string taylor_c_diff_numparam_mangle(const param &);
+
+HEYOKA_DLL_PUBLIC llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &, const number &);
+HEYOKA_DLL_PUBLIC llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &, const param &);
+
+template <typename T, typename U>
+inline llvm::Type *taylor_c_diff_numparam_argtype(llvm_state &s, const U &x)
+{
+    return taylor_c_diff_numparam_argtype(typeid(T), s, x);
+}
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
+                                                              llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const param &, llvm::Value *, llvm::Value *,
+                                                              std::uint32_t);
 
 } // namespace detail
 
