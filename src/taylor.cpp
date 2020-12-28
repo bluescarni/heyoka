@@ -208,7 +208,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
     auto &builder = s.builder();
 
     // Fetch the pointer into par_ptr.
-    // TODO overflow check here?
+    // NOTE: the overflow check is done in taylor_compute_jet().
     auto ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
 
     return load_vector_from_memory(builder, ptr, batch_size);
@@ -2363,6 +2363,19 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, con
     }
 
     if (compact_mode) {
+        // In compact mode, let's ensure that we can index into par_ptr using std::uint32_t.
+        // NOTE: in default mode the check is done inside taylor_codegen_numparam_par().
+
+        // Deduce the size of the param array from the expressions in the decomposition.
+        std::uint32_t param_size = 0;
+        for (auto i = n_eq; i < dc.size(); ++i) {
+            param_size = std::max(param_size, get_param_size(dc[i]));
+        }
+        if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+            throw std::overflow_error(
+                "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
+        }
+
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
