@@ -208,26 +208,27 @@ namespace
 {
 
 // Derivative of pow(number, number).
-template <typename T>
-llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const number &num0, const number &num1,
-                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t order,
-                                  std::uint32_t, std::uint32_t batch_size)
+template <typename T, typename U, typename V,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const U &num0, const V &num1,
+                                  const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
     if (order == 0u) {
         return codegen_from_values<T>(s, f,
-                                      {vector_splat(builder, codegen<T>(s, num0), batch_size),
-                                       vector_splat(builder, codegen<T>(s, num1), batch_size)});
+                                      {taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size),
+                                       taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size)});
     } else {
         return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
     }
 }
 
 // Derivative of pow(variable, number).
-template <typename T>
-llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variable &var, const number &num,
-                                  const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variable &var, const U &num,
+                                  const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                   std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
@@ -237,7 +238,7 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 
     if (order == 0u) {
         return codegen_from_values<T>(
-            s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), vector_splat(builder, codegen<T>(s, num), batch_size)});
+            s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars), taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
     }
 
     // NOTE: iteration in the [0, order) range
@@ -248,10 +249,24 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
         auto v1 = taylor_fetch_diff(arr, idx, j, n_uvars);
 
         // Compute the scalar factor: order * num - j * (num + 1).
-        auto scal_f = vector_splat(builder,
-                                   codegen<T>(s, number(static_cast<T>(order)) * num
-                                                     - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
-                                   batch_size);
+        auto scal_f = [&]() -> llvm::Value * {
+            if constexpr (std::is_same_v<U, number>) {
+                return vector_splat(builder,
+                                    codegen<T>(s, number(static_cast<T>(order)) * num
+                                                      - number(static_cast<T>(j)) * (num + number(static_cast<T>(1)))),
+                                    batch_size);
+            } else {
+                auto pc = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+                auto jvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
+                auto ordvec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order))), batch_size);
+                auto onevec = vector_splat(builder, codegen<T>(s, number(static_cast<T>(1))), batch_size);
+
+                auto tmp1 = builder.CreateFMul(ordvec, pc);
+                auto tmp2 = builder.CreateFMul(jvec, builder.CreateFAdd(pc, onevec));
+
+                return builder.CreateFSub(tmp1, tmp2);
+            }
+        }();
 
         // Add scal_f*v0*v1 to the sum.
         sum.push_back(builder.CreateFMul(scal_f, builder.CreateFMul(v0, v1)));
@@ -270,7 +285,8 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &s, const pow_impl &f, const variab
 }
 
 // All the other cases.
-template <typename T, typename U1, typename U2>
+template <typename T, typename U1, typename U2,
+          std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Value *taylor_diff_pow_impl(llvm_state &, const pow_impl &, const U1 &, const U2 &,
                                   const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
                                   std::uint32_t, std::uint32_t)
@@ -324,10 +340,13 @@ namespace
 {
 
 // Derivative of pow(number, number).
-template <typename T>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const number &, const number &,
-                                            std::uint32_t, std::uint32_t batch_size)
+template <typename T, typename U, typename V,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1, std::uint32_t,
+                                            std::uint32_t batch_size)
 {
+    using namespace fmt::literals;
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -336,7 +355,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = "heyoka_taylor_diff_pow_num_num_" + taylor_mangle_suffix(val_t);
+    const auto fname = "heyoka_taylor_diff_pow_{}_{}_{}"_format(
+        taylor_c_diff_numparam_mangle(n0), taylor_c_diff_numparam_mangle(n1), taylor_mangle_suffix(val_t));
 
     // The function arguments:
     // - diff order,
@@ -345,12 +365,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     // - par ptr,
     // - base argument,
     // - exp argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    to_llvm_type<T>(context),
-                                    to_llvm_type<T>(context)};
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context),          llvm::Type::getInt32Ty(context),
+        llvm::PointerType::getUnqual(val_t),      llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+        taylor_c_diff_numparam_argtype<T>(s, n0), taylor_c_diff_numparam_argtype<T>(s, n1)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -369,6 +387,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
+        auto par_ptr = f->args().begin() + 3;
         auto num_base = f->args().begin() + 4;
         auto num_exp = f->args().begin() + 5;
 
@@ -382,10 +401,11 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, run the codegen.
-                builder.CreateStore(codegen_from_values<T>(s, fn,
-                                                           {vector_splat(builder, num_base, batch_size),
-                                                            vector_splat(builder, num_exp, batch_size)}),
-                                    retval);
+                builder.CreateStore(
+                    codegen_from_values<T>(s, fn,
+                                           {taylor_c_diff_numparam_codegen(s, n0, num_base, par_ptr, batch_size),
+                                            taylor_c_diff_numparam_codegen(s, n1, num_exp, par_ptr, batch_size)}),
+                    retval);
             },
             [&]() {
                 // Otherwise, return zero.
@@ -415,10 +435,12 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 }
 
 // Derivative of pow(variable, number).
-template <typename T>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &, const number &,
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &, const U &n,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    using namespace fmt::literals;
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -427,8 +449,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_pow_var_num_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(
+        taylor_c_diff_numparam_mangle(n), taylor_mangle_suffix(val_t), li_to_string(n_uvars));
 
     // The function arguments:
     // - diff order,
@@ -440,7 +462,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     std::vector<llvm::Type *> fargs{
         llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
         llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     to_llvm_type<T>(context)};
+        llvm::Type::getInt32Ty(context),     taylor_c_diff_numparam_argtype<T>(s, n)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -461,6 +483,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
         auto ord = f->args().begin();
         auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
+        auto par_ptr = f->args().begin() + 3;
         auto var_idx = f->args().begin() + 4;
         auto exponent = f->args().begin() + 5;
 
@@ -480,12 +503,12 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                 builder.CreateStore(
                     codegen_from_values<T>(s, fn,
                                            {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
-                                            vector_splat(builder, exponent, batch_size)}),
+                                            taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size)}),
                     retval);
             },
             [&]() {
                 // Create FP vector versions of exponent and order.
-                auto alpha_v = vector_splat(builder, exponent, batch_size);
+                auto alpha_v = taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size);
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Init the accumulator.
@@ -540,7 +563,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 }
 
 // All the other cases.
-template <typename T, typename U1, typename U2>
+template <typename T, typename U1, typename U2,
+          std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, const pow_impl &, const U1 &, const U2 &, std::uint32_t,
                                             std::uint32_t)
 {
