@@ -113,7 +113,7 @@ TEST_CASE("taylor const sys")
             REQUIRE(jet[5] == 0);
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(
@@ -176,7 +176,7 @@ TEST_CASE("taylor const sys")
             REQUIRE(jet[11] == 0);
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(
@@ -333,7 +333,7 @@ TEST_CASE("taylor const sys")
             }
         }
 
-        if (!compact_mode) {
+        {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {prime(x) = par[0], prime(y) = par[1], prime(z) = par[2]}, 3, 3,
