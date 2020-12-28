@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -288,13 +289,16 @@ namespace
 {
 
 // Derivative of cos(number).
-template <typename T>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const number &, std::uint32_t,
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const U &num, std::uint32_t,
                                             std::uint32_t batch_size)
 {
+    using namespace fmt::literals;
+
     return taylor_c_diff_func_unary_num_det<T>(
-        s, fn, batch_size,
-        "heyoka_taylor_diff_cos_num_" + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+        s, fn, num, batch_size,
+        "heyoka_taylor_diff_cos_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
+                                              taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
         "the cosine");
 }
 
@@ -411,7 +415,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 }
 
 // All the other cases.
-template <typename T, typename U>
+template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &, const cos_impl &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
