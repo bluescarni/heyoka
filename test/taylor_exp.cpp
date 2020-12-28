@@ -116,6 +116,28 @@ TEST_CASE("taylor exp")
         {
             llvm_state s{kw::opt_level = opt_level};
 
+            taylor_add_jet<fp_t>(s, "jet", {exp(par[0]), x + y}, 1, 1, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
+
+            std::vector<fp_t> pars{fp_t{2}};
+
+            jptr(jet.data(), pars.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[3] == 5);
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
             taylor_add_jet<fp_t>(s, "jet", {exp(expression{number{fp_t(2)}}), x + y}, 1, 2, high_accuracy,
                                  compact_mode);
 
@@ -127,6 +149,35 @@ TEST_CASE("taylor exp")
             jet.resize(8);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == -3);
+
+            REQUIRE(jet[4] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[5] == approximately(exp(fp_t{2})));
+
+            REQUIRE(jet[6] == 5);
+            REQUIRE(jet[7] == -5);
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {exp(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{3}, fp_t{-3}};
+            jet.resize(8);
+
+            std::vector<fp_t> pars{fp_t{0}, fp_t{0}, fp_t{2}, fp_t{2}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);
@@ -212,6 +263,55 @@ TEST_CASE("taylor exp")
             jet.resize(24);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -2);
+            REQUIRE(jet[2] == 1);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == -3);
+            REQUIRE(jet[5] == 0);
+
+            REQUIRE(jet[6] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[7] == approximately(exp(fp_t{2})));
+            REQUIRE(jet[8] == approximately(exp(fp_t{2})));
+
+            REQUIRE(jet[9] == 5);
+            REQUIRE(jet[10] == -5);
+            REQUIRE(jet[11] == 1);
+
+            REQUIRE(jet[12] == 0);
+            REQUIRE(jet[13] == 0);
+            REQUIRE(jet[14] == 0);
+
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + exp(fp_t{2}))));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + exp(fp_t{2}))));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[11] + exp(fp_t{2}))));
+
+            REQUIRE(jet[18] == 0);
+            REQUIRE(jet[19] == 0);
+            REQUIRE(jet[20] == 0);
+
+            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (2 * jet[15])));
+            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (2 * jet[16])));
+            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {exp(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-2}, fp_t{1}, fp_t{3}, fp_t{-3}, fp_t{0}};
+            jet.resize(24);
+
+            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -2);

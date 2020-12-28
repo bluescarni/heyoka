@@ -80,13 +80,13 @@ namespace
 {
 
 // Derivative of square(number).
-template <typename T>
-llvm::Value *taylor_diff_square_impl(llvm_state &s, const square_impl &f, const number &num,
-                                     const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_square_impl(llvm_state &s, const square_impl &f, const U &num,
+                                     const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
                                      std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {vector_splat(s.builder(), codegen<T>(s, num), batch_size)});
+        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
@@ -138,7 +138,7 @@ llvm::Value *taylor_diff_square_impl(llvm_state &s, const square_impl &f, const 
 }
 
 // All the other cases.
-template <typename T, typename U>
+template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_square_impl(llvm_state &, const square_impl &, const U &, const std::vector<llvm::Value *> &,
                                      llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {

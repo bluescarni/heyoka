@@ -117,6 +117,28 @@ TEST_CASE("taylor sincos")
         {
             llvm_state s{kw::opt_level = opt_level};
 
+            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 1, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+            jet.resize(4);
+
+            std::vector<fp_t> pars{fp_t{2}, fp_t{3}};
+
+            jptr(jet.data(), pars.data());
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == 3);
+            REQUIRE(jet[2] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
             taylor_add_jet<fp_t>(s, "jet", {sin(expression{number{fp_t{2}}}) + cos(expression{number{fp_t{3}}}), x + y},
                                  1, 2, high_accuracy, compact_mode);
 
@@ -128,6 +150,35 @@ TEST_CASE("taylor sincos")
             jet.resize(8);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -4);
+
+            REQUIRE(jet[2] == 3);
+            REQUIRE(jet[3] == 5);
+
+            REQUIRE(jet[4] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+
+            REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
+            REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{3}, fp_t{5}};
+            jet.resize(8);
+
+            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
@@ -213,6 +264,55 @@ TEST_CASE("taylor sincos")
             jet.resize(24);
 
             jptr(jet.data(), nullptr);
+
+            REQUIRE(jet[0] == 2);
+            REQUIRE(jet[1] == -4);
+            REQUIRE(jet[2] == -1);
+
+            REQUIRE(jet[3] == 3);
+            REQUIRE(jet[4] == 5);
+            REQUIRE(jet[5] == -2);
+
+            REQUIRE(jet[6] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[7] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+            REQUIRE(jet[8] == approximately(sin(fp_t{2}) + cos(fp_t{3})));
+
+            REQUIRE(jet[9] == approximately(jet[0] + jet[3]));
+            REQUIRE(jet[10] == approximately(jet[1] + jet[4]));
+            REQUIRE(jet[11] == approximately(jet[2] + jet[5]));
+
+            REQUIRE(jet[12] == 0);
+            REQUIRE(jet[13] == 0);
+            REQUIRE(jet[14] == 0);
+
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[6] + jet[9])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[7] + jet[10])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (jet[8] + jet[11])));
+
+            REQUIRE(jet[18] == 0);
+            REQUIRE(jet[19] == 0);
+            REQUIRE(jet[20] == 0);
+
+            REQUIRE(jet[21] == approximately(fp_t{1} / 6 * (2 * jet[15] + 2 * jet[18])));
+            REQUIRE(jet[22] == approximately(fp_t{1} / 6 * (2 * jet[16] + 2 * jet[19])));
+            REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {sin(par[0]) + cos(par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{2}, fp_t{-4}, fp_t{-1}, fp_t{3}, fp_t{5}, fp_t{-2}};
+            jet.resize(24);
+
+            std::vector<fp_t> pars{fp_t{2}, fp_t{2}, fp_t{2}, fp_t{3}, fp_t{3}, fp_t{3}};
+
+            jptr(jet.data(), pars.data());
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == -4);
