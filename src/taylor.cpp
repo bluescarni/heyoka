@@ -1642,14 +1642,19 @@ std::vector<std::vector<expression>> taylor_segment_dc(const std::vector<express
                     std::vector<std::uint32_t> retval;
 
                     for (const auto &arg : v.args()) {
-                        if (auto p_var = std::get_if<variable>(&arg.value())) {
-                            retval.push_back(uname_to_index(p_var->name()));
-                        } else if (!std::holds_alternative<number>(arg.value())
-                                   && !std::holds_alternative<param>(arg.value())) {
-                            throw std::invalid_argument(
-                                "Invalid argument encountered in an element of a Taylor decomposition: the "
-                                "argument is not a variable or a number/param");
-                        }
+                        std::visit(
+                            [&retval](const auto &x) {
+                                using tp = detail::uncvref_t<decltype(x)>;
+
+                                if constexpr (std::is_same_v<tp, variable>) {
+                                    retval.push_back(uname_to_index(x.name()));
+                                } else if constexpr (!std::is_same_v<tp, number> && !std::is_same_v<tp, param>) {
+                                    throw std::invalid_argument(
+                                        "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                        "argument is not a variable or a number/param");
+                                }
+                            },
+                            arg.value());
                     }
 
                     return retval;
@@ -1923,17 +1928,23 @@ auto taylor_udef_to_variants(const expression &ex)
                 std::vector<std::variant<std::uint32_t, number>> retval;
 
                 for (const auto &arg : v.args()) {
-                    if (auto p_var = std::get_if<variable>(&arg.value())) {
-                        retval.emplace_back(uname_to_index(p_var->name()));
-                    } else if (auto p_num = std::get_if<number>(&arg.value())) {
-                        retval.emplace_back(*p_num);
-                    } else if (auto p_par = std::get_if<param>(&arg.value())) {
-                        retval.emplace_back(p_par->idx());
-                    } else {
-                        throw std::invalid_argument(
-                            "Invalid argument encountered in an element of a Taylor decomposition: the "
-                            "argument is not a variable or a number");
-                    }
+                    std::visit(
+                        [&retval](const auto &x) {
+                            using tp = detail::uncvref_t<decltype(x)>;
+
+                            if constexpr (std::is_same_v<tp, variable>) {
+                                retval.emplace_back(uname_to_index(x.name()));
+                            } else if constexpr (std::is_same_v<tp, number>) {
+                                retval.emplace_back(x);
+                            } else if constexpr (std::is_same_v<tp, param>) {
+                                retval.emplace_back(x.idx());
+                            } else {
+                                throw std::invalid_argument(
+                                    "Invalid argument encountered in an element of a Taylor decomposition: the "
+                                    "argument is not a variable or a number");
+                            }
+                        },
+                        arg.value());
                 }
 
                 return retval;
