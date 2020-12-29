@@ -323,6 +323,11 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value 
 {
     using namespace fmt::literals;
 
+    if (par_ptr == nullptr) {
+        throw std::invalid_argument(
+            "Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
+    }
+
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
@@ -349,6 +354,11 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value
                                     std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
+
+    if (par_ptr == nullptr) {
+        throw std::invalid_argument(
+            "Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_display_name()));
+    }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -378,6 +388,11 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value
                                     std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
+
+    if (par_ptr == nullptr) {
+        throw std::invalid_argument(
+            "Null par_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_display_name()));
+    }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
