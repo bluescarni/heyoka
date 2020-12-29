@@ -20,6 +20,7 @@
 #include <heyoka/math.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
