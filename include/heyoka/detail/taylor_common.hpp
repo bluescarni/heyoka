@@ -25,6 +25,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
 {
@@ -32,9 +33,10 @@ namespace heyoka::detail
 // Helper to implement the function for the differentiation of
 // 'func(number)' in compact mode. The function will always return zero,
 // unless the order is 0 (in which case it will return the result of the codegen).
-template <typename T, typename F>
-inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &fn, std::uint32_t batch_size,
-                                                        const std::string &fname, const std::string &desc)
+template <typename T, typename F, typename U>
+inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &fn, const U &n,
+                                                        std::uint32_t batch_size, const std::string &fname,
+                                                        const std::string &desc)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -47,9 +49,11 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array,
-    // - number argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), to_llvm_type<T>(context)};
+    // - par ptr,
+    // - number/par idx argument.
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), taylor_c_diff_numparam_argtype<T>(s, n)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -68,7 +72,8 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
-        auto num = f->args().begin() + 3;
+        auto par_ptr = f->args().begin() + 3;
+        auto num = f->args().begin() + 4;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -80,7 +85,9 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // If the order is zero, run the codegen.
-                builder.CreateStore(codegen_from_values<T>(s, fn, {vector_splat(builder, num, batch_size)}), retval);
+                builder.CreateStore(
+                    codegen_from_values<T>(s, fn, {taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)}),
+                    retval);
             },
             [&]() {
                 // Otherwise, return zero.

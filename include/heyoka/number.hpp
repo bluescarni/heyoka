@@ -92,10 +92,12 @@ HEYOKA_DLL_PUBLIC expression subs(const number &, const std::unordered_map<std::
 
 HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
 
-HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &);
+HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
+                                  const std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const number &,
-                                      const std::unordered_map<std::string, std::vector<double>> &);
+                                      const std::unordered_map<std::string, std::vector<double>> &,
+                                      const std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const number &, std::size_t &);
 HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const number &,

@@ -18,6 +18,7 @@ class variable;
 class number;
 class binary_operator;
 class func;
+class param;
 
 class llvm_state;
 

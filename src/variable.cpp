@@ -118,7 +118,7 @@ expression diff(const variable &var, const std::string &s)
     }
 }
 
-double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
@@ -129,7 +129,7 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         out_values = it->second;

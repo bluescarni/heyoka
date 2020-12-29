@@ -84,10 +84,12 @@ HEYOKA_DLL_PUBLIC expression subs(const binary_operator &, const std::unordered_
 
 HEYOKA_DLL_PUBLIC expression diff(const binary_operator &, const std::string &);
 
-HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &);
+HEYOKA_DLL_PUBLIC double eval_dbl(const binary_operator &, const std::unordered_map<std::string, double> &,
+                                  const std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const binary_operator &,
-                                      const std::unordered_map<std::string, std::vector<double>> &);
+                                      const std::unordered_map<std::string, std::vector<double>> &,
+                                      const std::vector<double> &);
 
 HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> &, const binary_operator &,
                                           std::size_t &);
@@ -102,32 +104,33 @@ HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(b
                                                                                std::vector<expression> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const binary_operator &,
-                                               const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                               std::uint32_t, std::uint32_t);
+                                               const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                               std::uint32_t, std::uint32_t, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const binary_operator &,
-                                                const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                                std::uint32_t, std::uint32_t);
+                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                                std::uint32_t, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const binary_operator &,
-                                                const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                                std::uint32_t, std::uint32_t);
+                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                                std::uint32_t, std::uint32_t, std::uint32_t);
 
 #endif
 
 template <typename T>
 inline llvm::Value *taylor_diff(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, bo, arr, n_uvars, order, idx, batch_size);
+        return taylor_diff_dbl(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, bo, arr, n_uvars, order, idx, batch_size);
+        return taylor_diff_ldbl(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_diff_f128(s, bo, arr, n_uvars, order, idx, batch_size);
+        return taylor_diff_f128(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");

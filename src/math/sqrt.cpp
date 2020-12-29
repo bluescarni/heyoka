@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -101,19 +102,20 @@ llvm::Value *sqrt_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 
 #endif
 
-double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map) const
+double sqrt_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    return std::sqrt(heyoka::eval_dbl(args()[0], map));
+    return std::sqrt(heyoka::eval_dbl(args()[0], map, pars));
 }
 
 void sqrt_impl::eval_batch_dbl(std::vector<double> &out,
-                               const std::unordered_map<std::string, std::vector<double>> &map) const
+                               const std::unordered_map<std::string, std::vector<double>> &map,
+                               const std::vector<double> &pars) const
 {
     assert(args().size() == 1u);
 
-    heyoka::eval_batch_dbl(out, args()[0], map);
+    heyoka::eval_batch_dbl(out, args()[0], map, pars);
     for (auto &el : out) {
         el = std::sqrt(el);
     }
@@ -146,13 +148,13 @@ namespace
 {
 
 // Derivative of sqrt(number).
-template <typename T>
-llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const number &num,
-                                   const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t order,
-                                   std::uint32_t, std::uint32_t batch_size)
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const U &num, const std::vector<llvm::Value *> &,
+                                   llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
+                                   std::uint32_t batch_size)
 {
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {vector_splat(s.builder(), codegen<T>(s, num), batch_size)});
+        return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
     } else {
         return vector_splat(s.builder(), codegen<T>(s, number{0.}), batch_size);
     }
@@ -164,8 +166,8 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const numb
 // and then using the squaring formula.
 template <typename T>
 llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const variable &var,
-                                   const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
-                                   std::uint32_t idx, std::uint32_t)
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
+                                   std::uint32_t order, std::uint32_t idx, std::uint32_t)
 {
     auto &builder = s.builder();
 
@@ -219,9 +221,9 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &s, const sqrt_impl &f, const vari
 }
 
 // All the other cases.
-template <typename T, typename U>
+template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, const std::vector<llvm::Value *> &,
-                                   std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+                                   llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a square root");
@@ -229,35 +231,39 @@ llvm::Value *taylor_diff_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, c
 
 template <typename T>
 llvm::Value *taylor_diff_sqrt(llvm_state &s, const sqrt_impl &f, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
     return std::visit(
-        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, f, v, arr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) { return taylor_diff_sqrt_impl<T>(s, f, v, arr, par_ptr, n_uvars, order, idx, batch_size); },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *sqrt_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                        std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *sqrt_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                        std::uint32_t batch_size) const
 {
-    return taylor_diff_sqrt<double>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sqrt<double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *sqrt_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *sqrt_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_sqrt<long double>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sqrt<long double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *sqrt_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars,
-                                         std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
+llvm::Value *sqrt_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_sqrt<mppp::real128>(s, *this, arr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sqrt<mppp::real128>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
@@ -266,13 +272,16 @@ namespace
 {
 
 // Derivative of sqrt(number).
-template <typename T>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const number &, std::uint32_t,
+template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const U &num, std::uint32_t,
                                              std::uint32_t batch_size)
 {
+    using namespace fmt::literals;
+
     return taylor_c_diff_func_unary_num_det<T>(
-        s, fn, batch_size,
-        "heyoka_taylor_diff_sqrt_num_" + taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size)),
+        s, fn, num, batch_size,
+        "heyoka_taylor_diff_sqrt_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
+                                               taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
         "the square root");
 }
 
@@ -296,9 +305,11 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
     // - diff order,
     // - idx of the u variable whose diff is being computed,
     // - diff array,
+    // - par ptr,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -319,7 +330,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
         auto ord = f->args().begin();
         auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 3;
+        auto var_idx = f->args().begin() + 4;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -407,7 +418,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
 }
 
 // All the other cases.
-template <typename T, typename U>
+template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "

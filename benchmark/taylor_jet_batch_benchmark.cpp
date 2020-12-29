@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 
     s.compile();
 
-    auto jet_ptr = reinterpret_cast<void (*)(double *)>(s.jit_lookup("jet"));
+    auto jet_ptr = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet"));
 
     std::vector<double> jet(12u * (order + 1u) * batch_size);
     for (auto &v : jet) {
@@ -70,21 +70,21 @@ int main(int argc, char *argv[])
     auto ptr = jet.data();
 
     // Warm up.
-    jet_ptr(ptr);
+    jet_ptr(ptr, nullptr);
 
     auto start = std::chrono::high_resolution_clock::now();
 
     // Do 400 evaluations.
     for (auto i = 0; i < 40; ++i) {
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
-        jet_ptr(ptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
+        jet_ptr(ptr, nullptr);
     }
 
     const auto elapsed = static_cast<double>(

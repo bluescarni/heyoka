@@ -40,18 +40,19 @@ public:
 
     expression diff(const std::string &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &) const;
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &) const;
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                        const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
-    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                 std::uint32_t, std::uint32_t) const;
-    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                 std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, std::uint32_t, std::uint32_t,
-                                  std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
 #endif
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;

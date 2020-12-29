@@ -161,22 +161,23 @@ endif()
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/square.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
@@ -298,7 +299,10 @@ target_link_libraries(heyoka PRIVATE fmt::fmt)
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
 
-target_link_libraries(heyoka PRIVATE Boost::boost Boost::filesystem)
+# Public dependency on the headers, private dependency
+# on filesystem.
+target_link_libraries(heyoka PUBLIC Boost::boost)
+target_link_libraries(heyoka PRIVATE Boost::filesystem)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 

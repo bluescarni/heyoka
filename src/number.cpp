@@ -237,15 +237,15 @@ expression diff(const number &n, const std::string &)
     return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
 }
 
-double eval_dbl(const number &n, const std::unordered_map<std::string, double> &)
+double eval_dbl(const number &n, const std::unordered_map<std::string, double> &, const std::vector<double> &)
 {
     return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const number &n,
-                    const std::unordered_map<std::string, std::vector<double>> &)
+                    const std::unordered_map<std::string, std::vector<double>> &, const std::vector<double> &)
 {
-    return std::visit(
+    std::visit(
         [&out_values](const auto &v) {
             for (auto &el : out_values) {
                 el = static_cast<double>(v);
@@ -257,7 +257,7 @@ void eval_batch_dbl(std::vector<double> &out_values, const number &n,
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &,
                         std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<std::size_t>());
+    node_connections.emplace_back();
     node_counter++;
 }
 
@@ -265,7 +265,6 @@ void update_node_values_dbl(std::vector<double> &node_values, const number &n,
                             const std::unordered_map<std::string, double> &,
                             const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter)
 {
-
     std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },
                n.value());
     node_counter++;

@@ -68,7 +68,7 @@ TEST_CASE("outer solar system custom step")
             s.compile();
 
             // Fetch the functions.
-            auto jptr = reinterpret_cast<void (*)(fp_t *)>(s.jit_lookup("cstep_jet"));
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("cstep_jet"));
             auto uptr = reinterpret_cast<void (*)(fp_t *, const fp_t *)>(s.jit_lookup("cstep_updater"));
 
             // Prepare the buffer for the jet of derivatives and integration timesteps.
@@ -85,7 +85,7 @@ TEST_CASE("outer solar system custom step")
                 REQUIRE(ta_res == taylor_outcome::success);
 
                 // Compute the jet of derivatives.
-                jptr(jet_buffer.data());
+                jptr(jet_buffer.data(), nullptr);
 
                 // Apply Jorba's timestep heuristic.
                 // Step 1: norm infinity of the state vector.
