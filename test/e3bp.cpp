@@ -58,10 +58,11 @@ TEST_CASE("e3bp")
           + (pphi * pphi) / (2_dbl * a * a * (xi * xi - 1_dbl) * (1_dbl - eta * eta)) - mu1 / (a * (xi - eta))
           - mu2 / (a * (xi + eta));
 
-    llvm_state ham_llvm{kw::mname = "ham tracing"};
-    ham_llvm.add_nary_function_dbl("ham", ham);
-    ham_llvm.compile();
-    auto h_trace = ham_llvm.fetch_nary_function<double, 5>("ham");
+    auto h_trace = [a = 1., mu1 = 1., mu2 = 0.05](auto eta, auto peta, auto pphi, auto pxi, auto xi) {
+        return (pxi * pxi * (xi * xi - 1.) + peta * peta * (1. - eta * eta)) / (2. * a * a * (xi * xi - eta * eta))
+               + (pphi * pphi) / (2. * a * a * (xi * xi - 1.) * (1. - eta * eta)) - mu1 / (a * (xi - eta))
+               - mu2 / (a * (xi + eta));
+    };
 
     // NOTE: initial conditions for the periodic orbit from the paper.
     std::vector<double> init_state

@@ -17,6 +17,8 @@
 #include <ostream>
 #include <string>
 #include <tuple>
+#include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -33,9 +35,76 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 
 namespace heyoka
 {
+
+namespace detail
+{
+
+// NOTE: these are various utilities useful when dealing in a generic
+// fashion with numbers/params in Taylor functions.
+
+// Helper to detect if T is a number or a param.
+template <typename T>
+using is_num_param = std::disjunction<std::is_same<T, number>, std::is_same<T, param>>;
+
+template <typename T>
+inline constexpr bool is_num_param_v = is_num_param<T>::value;
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const number &, llvm::Value *, std::uint32_t);
+
+#endif
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_dbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_codegen_numparam_f128(llvm_state &, const param &, llvm::Value *, std::uint32_t);
+
+#endif
+
+template <typename T, typename U>
+llvm::Value *taylor_codegen_numparam(llvm_state &s, const U &n, llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return taylor_codegen_numparam_dbl(s, n, par_ptr, batch_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return taylor_codegen_numparam_ldbl(s, n, par_ptr, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return taylor_codegen_numparam_f128(s, n, par_ptr, batch_size);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC std::string taylor_c_diff_numparam_mangle(const number &);
+HEYOKA_DLL_PUBLIC std::string taylor_c_diff_numparam_mangle(const param &);
+
+HEYOKA_DLL_PUBLIC llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &, const number &);
+HEYOKA_DLL_PUBLIC llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &, const param &);
+
+template <typename T, typename U>
+inline llvm::Type *taylor_c_diff_numparam_argtype(llvm_state &s, const U &x)
+{
+    return taylor_c_diff_numparam_argtype(typeid(T), s, x);
+}
+
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const number &, llvm::Value *,
+                                                              llvm::Value *, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &, const param &, llvm::Value *, llvm::Value *,
+                                                              std::uint32_t);
+
+} // namespace detail
 
 namespace detail
 {
@@ -270,6 +339,7 @@ IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
+IGOR_MAKE_NAMED_ARGUMENT(pars);
 
 } // namespace kw
 
@@ -316,7 +386,16 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
         }
     }();
 
-    return std::tuple{high_accuracy, tol, compact_mode};
+    // Vector of parameters (defaults to empty vector).
+    auto pars = [&p]() -> std::vector<T> {
+        if constexpr (p.has(kw::pars)) {
+            return std::forward<decltype(p(kw::pars))>(p(kw::pars));
+        } else {
+            return {};
+        }
+    }();
+
+    return std::tuple{high_accuracy, tol, compact_mode, std::move(pars)};
 }
 
 template <typename T>
@@ -335,8 +414,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, T *);
+    using step_f_t = void (*)(T *, const T *, T *);
     step_f_t m_step_f;
+    // The vector of parameters.
+    std::vector<T> m_pars;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
 
@@ -344,7 +425,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -364,10 +445,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
                 }
             }();
 
-            const auto [high_accuracy, tol, compact_mode]
+            auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
-            finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy, compact_mode);
+            finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy, compact_mode,
+                               std::move(pars));
         }
     }
 
@@ -421,6 +503,19 @@ public:
     T *get_state_data()
     {
         return m_state.data();
+    }
+
+    const std::vector<T> &get_pars() const
+    {
+        return m_pars;
+    }
+    const T *get_pars_data() const
+    {
+        return m_pars.data();
+    }
+    T *get_pars_data()
+    {
+        return m_pars.data();
     }
 
     std::tuple<taylor_outcome, T> step();
@@ -519,8 +614,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, T *);
+    using step_f_t = void (*)(T *, const T *, T *);
     step_f_t m_step_f;
+    // The vector of parameters.
+    std::vector<T> m_pars;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,
@@ -542,7 +639,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
+                                              std::vector<T>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
@@ -562,11 +660,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
                 }
             }();
 
-            const auto [high_accuracy, tol, compact_mode]
+            auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
             finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(time), tol, high_accuracy,
-                               compact_mode);
+                               compact_mode, std::move(pars));
         }
     }
 
@@ -626,6 +724,19 @@ public:
     T *get_state_data()
     {
         return m_state.data();
+    }
+
+    const std::vector<T> &get_pars() const
+    {
+        return m_pars;
+    }
+    const T *get_pars_data() const
+    {
+        return m_pars.data();
+    }
+    T *get_pars_data()
+    {
+        return m_pars.data();
     }
 
     const std::vector<std::tuple<taylor_outcome, T>> &step();

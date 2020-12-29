@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -38,6 +39,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -64,6 +66,8 @@ expression::expression(variable var) : m_value(std::move(var)) {}
 expression::expression(binary_operator bo) : m_value(std::move(bo)) {}
 
 expression::expression(func f) : m_value(std::move(f)) {}
+
+expression::expression(param p) : m_value(std::move(p)) {}
 
 expression::expression(const expression &) = default;
 
@@ -668,15 +672,16 @@ expression pairwise_sum(std::vector<expression> sum)
     return sum[0];
 }
 
-double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
+                const std::vector<double> &pars)
 {
-    return std::visit([&map](const auto &arg) { return eval_dbl(arg, map); }, e.value());
+    return std::visit([&](const auto &arg) { return eval_dbl(arg, map, pars); }, e.value());
 }
 
 void eval_batch_dbl(std::vector<double> &retval, const expression &e,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {
-    std::visit([&map, &retval](const auto &arg) { eval_batch_dbl(retval, arg, map); }, e.value());
+    std::visit([&](const auto &arg) { eval_batch_dbl(retval, arg, map, pars); }, e.value());
 }
 
 std::vector<std::vector<std::size_t>> compute_connections(const expression &e)
@@ -736,25 +741,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
         e.value());
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_dbl(s, arg); }, e.value());
-}
-
-llvm::Value *codegen_ldbl(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_ldbl(s, arg); }, e.value());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const expression &e)
-{
-    return std::visit([&s](const auto &arg) { return codegen_f128(s, arg); }, e.value());
-}
-
-#endif
-
 // Transform in-place ex by decomposition, appending the
 // result of the decomposition to u_vars_defs.
 // The return value is the index, in u_vars_defs,
@@ -768,28 +754,6 @@ std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, st
         std::move(ex.value()));
 }
 
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_dbl(s, arg, arr, batch_size); }, e.value());
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_ldbl(s, arg, arr, batch_size); }, e.value());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const expression &e, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return std::visit([&](const auto &arg) { return taylor_u_init_f128(s, arg, arr, batch_size); }, e.value());
-}
-
-#endif
-
 namespace detail
 {
 
@@ -798,14 +762,15 @@ namespace
 
 template <typename T>
 llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
     return std::visit(
         [&](const auto &v) -> llvm::Value * {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
-                return taylor_diff<T>(s, v, arr, n_uvars, order, idx, batch_size);
+                return taylor_diff<T>(s, v, arr, par_ptr, n_uvars, order, idx, batch_size);
             } else {
                 throw std::invalid_argument(
                     "Taylor derivatives can be computed only for binary operators or functions");
@@ -819,24 +784,27 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
 } // namespace detail
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                             std::uint32_t batch_size)
 
 {
-    return detail::taylor_diff_impl<double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<double>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
-    return detail::taylor_diff_impl<long double>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<long double>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                              std::uint32_t batch_size)
 {
-    return detail::taylor_diff_impl<mppp::real128>(s, ex, arr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<mppp::real128>(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
@@ -949,6 +917,39 @@ bool is_odd_integral_half(const expression &ex)
         ex.value());
 }
 
+expression par_impl::operator[](std::uint32_t idx) const
+{
+    return expression{param{idx}};
+}
+
 } // namespace detail
+
+// Determine the size of the parameter vector from the highest
+// param index appearing in an expression. If the return value
+// is zero, no params appear in the expression.
+std::uint32_t get_param_size(const expression &ex)
+{
+    std::uint32_t retval = 0;
+
+    std::visit(
+        [&retval](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, param>) {
+                if (v.idx() == std::numeric_limits<std::uint32_t>::max()) {
+                    throw std::overflow_error("Overflow dected in get_n_param()");
+                }
+
+                retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
+            } else if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+                for (const auto &a : v.args()) {
+                    retval = std::max(get_param_size(a), retval);
+                }
+            }
+        },
+        ex.value());
+
+    return retval;
+}
 
 } // namespace heyoka

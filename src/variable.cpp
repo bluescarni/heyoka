@@ -118,7 +118,7 @@ expression diff(const variable &var, const std::string &s)
     }
 }
 
-double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map)
+double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
@@ -129,7 +129,7 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
-                    const std::unordered_map<std::string, std::vector<double>> &map)
+                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &)
 {
     if (auto it = map.find(var.name()); it != map.end()) {
         out_values = it->second;
@@ -167,72 +167,10 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
     node_counter++;
 }
 
-llvm::Value *codegen_dbl(llvm_state &s, const variable &var)
-{
-    const auto &nv = s.named_values();
-
-    auto it = nv.find(var.name());
-    if (it == nv.end()) {
-        throw std::invalid_argument("Unknown variable name: " + var.name());
-    }
-
-    assert(it->second != nullptr);
-    return it->second;
-}
-
-llvm::Value *codegen_ldbl(llvm_state &s, const variable &var)
-{
-    return codegen_dbl(s, var);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *codegen_f128(llvm_state &s, const variable &var)
-{
-    return codegen_dbl(s, var);
-}
-
-#endif
-
 std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &)
 {
     // NOTE: variables do not require decomposition.
     return 0;
 }
-
-llvm::Value *taylor_u_init_dbl(llvm_state &, const variable &var, const std::vector<llvm::Value *> &arr, std::uint32_t)
-{
-    // Check that var is a u variable and extract its index.
-    const auto &var_name = var.name();
-    if (var_name.rfind("u_", 0) != 0) {
-        throw std::invalid_argument("Invalid variable name '" + var_name
-                                    + "' encountered in the Taylor initialization phase (the name "
-                                      "must be in the form 'u_n', where n is a non-negative integer)");
-    }
-    const auto idx = detail::uname_to_index(var_name);
-
-    if (idx >= arr.size()) {
-        throw std::invalid_argument("Out of bounds access in the Taylor initialization phase of a variable");
-    }
-
-    return arr[boost::numeric_cast<decltype(arr.size())>(idx)];
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    // NOTE: no codegen differences between dbl and ldbl in this case.
-    return taylor_u_init_dbl(s, var, arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const variable &var, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return taylor_u_init_dbl(s, var, arr, batch_size);
-}
-
-#endif
 
 } // namespace heyoka

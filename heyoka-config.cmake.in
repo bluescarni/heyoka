@@ -1,3 +1,6 @@
+# Mandatory public dependency on the Boost headers.
+find_package(Boost 1.60 REQUIRED)
+
 if(@HEYOKA_WITH_MPPP@)
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS @_HEYOKA_MIN_MPPP_VERSION@)

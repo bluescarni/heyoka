@@ -43,7 +43,7 @@ int main()
         x.emplace_back(variable{"a" + std::to_string(i)});
     }
 
-    // Network paramterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to
+    // Network parameterers: weights and biases (w0001-w0002... guarantees correct alphabetical order up to
     // offset_w_names - 1) parameters)
     auto n_w = (n_in + 1) * n_neurons + (n_neurons + 1) * n_out;
     std::vector<expression> w;

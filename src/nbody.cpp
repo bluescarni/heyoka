@@ -224,6 +224,114 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     return retval;
 }
 
+std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::uint32_t n, number Gconst,
+                                                                         std::uint32_t n_massive)
+{
+    assert(n >= 2u);
+
+    if (n_massive > n) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("The number of massive bodies, {}, cannot be larger than the "
+                                    "total number of bodies, {}"_format(n_massive, n));
+    }
+
+    // Create the state variables.
+    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+        const auto i_str = li_to_string(i);
+
+        x_vars.emplace_back(variable("x_" + i_str));
+        y_vars.emplace_back(variable("y_" + i_str));
+        z_vars.emplace_back(variable("z_" + i_str));
+
+        vx_vars.emplace_back(variable("vx_" + i_str));
+        vy_vars.emplace_back(variable("vy_" + i_str));
+        vz_vars.emplace_back(variable("vz_" + i_str));
+    }
+
+    // Create the return value.
+    std::vector<std::pair<expression, expression>> retval;
+
+    // Accumulators for the accelerations on the bodies.
+    // The i-th element of x/y/z_acc contains the list of
+    // accelerations on body i due to all the other bodies.
+    std::vector<std::vector<expression>> x_acc;
+    x_acc.resize(boost::numeric_cast<decltype(x_acc.size())>(n));
+    auto y_acc = x_acc;
+    auto z_acc = x_acc;
+
+    // Compute the accelerations exerted by the massive particles
+    // on all particles.
+    for (std::uint32_t i = 0; i < n_massive; ++i) {
+        // r' = v.
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
+
+        // Compute the total acceleration on body i,
+        // accumulating the result in x/y/z_acc. Part of the
+        // calculation will be re-used to compute
+        // the contribution from i to the total acceleration
+        // on body j.
+        for (std::uint32_t j = i + 1u; j < n; ++j) {
+            auto diff_x = x_vars[j] - x_vars[i];
+            auto diff_y = y_vars[j] - y_vars[i];
+            auto diff_z = z_vars[j] - z_vars[i];
+
+            auto r_m3 = pow(square(diff_x) + square(diff_y) + square(diff_z), expression{-3. / 2});
+            if (j < n_massive) {
+                // Body j is massive and it interacts mutually with body i.
+                // NOTE: the idea here is that we want to help the CSE process
+                // when computing the Taylor decomposition. Thus, we try
+                // to maximise the re-use of an expression with the goal
+                // of having it simplified in the CSE.
+                auto fac_j = expression{Gconst} * par[j] * r_m3;
+                auto c_ij = -par[i] / par[j];
+
+                // Acceleration exerted by j on i.
+                x_acc[i].push_back(diff_x * fac_j);
+                y_acc[i].push_back(diff_y * fac_j);
+                z_acc[i].push_back(diff_z * fac_j);
+
+                // Acceleration exerted by i on j.
+                x_acc[j].push_back(diff_x * fac_j * c_ij);
+                y_acc[j].push_back(diff_y * fac_j * c_ij);
+                z_acc[j].push_back(diff_z * fac_j * c_ij);
+            } else {
+                // Body j is massless, add the acceleration
+                // on it due to the massive body i.
+                auto fac = expression{-Gconst} * par[i] * r_m3;
+
+                x_acc[j].push_back(diff_x * fac);
+                y_acc[j].push_back(diff_y * fac);
+                z_acc[j].push_back(diff_z * fac);
+            }
+        }
+
+        // Add the expressions of the accelerations to the system.
+        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+    }
+
+    // All the accelerations on the massless particles
+    // have already been accumulated in the loop above.
+    // We just need to perform the pairwise sums on x/y/z_acc.
+    for (std::uint32_t i = n_massive; i < n; ++i) {
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
+
+        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+    }
+
+    return retval;
+}
+
 namespace
 {
 

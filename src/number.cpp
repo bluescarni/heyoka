@@ -237,15 +237,15 @@ expression diff(const number &n, const std::string &)
     return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
 }
 
-double eval_dbl(const number &n, const std::unordered_map<std::string, double> &)
+double eval_dbl(const number &n, const std::unordered_map<std::string, double> &, const std::vector<double> &)
 {
     return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
 }
 
 void eval_batch_dbl(std::vector<double> &out_values, const number &n,
-                    const std::unordered_map<std::string, std::vector<double>> &)
+                    const std::unordered_map<std::string, std::vector<double>> &, const std::vector<double> &)
 {
-    return std::visit(
+    std::visit(
         [&out_values](const auto &v) {
             for (auto &el : out_values) {
                 el = static_cast<double>(v);
@@ -257,7 +257,7 @@ void eval_batch_dbl(std::vector<double> &out_values, const number &n,
 void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const number &,
                         std::size_t &node_counter)
 {
-    node_connections.push_back(std::vector<std::size_t>());
+    node_connections.emplace_back();
     node_counter++;
 }
 
@@ -265,7 +265,6 @@ void update_node_values_dbl(std::vector<double> &node_values, const number &n,
                             const std::unordered_map<std::string, double> &,
                             const std::vector<std::vector<std::size_t>> &, std::size_t &node_counter)
 {
-
     std::visit([&node_values, &node_counter](const auto &v) { node_values[node_counter] = static_cast<double>(v); },
                n.value());
     node_counter++;
@@ -324,46 +323,5 @@ std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vec
     // NOTE: numbers do not require decomposition.
     return 0;
 }
-
-namespace detail
-{
-
-namespace
-{
-
-// NOTE: for numbers, the Taylor init phase is
-// just the codegen.
-template <typename T>
-llvm::Value *taylor_u_init_number_impl(llvm_state &s, const number &n, const std::vector<llvm::Value *> &,
-                                       std::uint32_t batch_size)
-{
-    return vector_splat(s.builder(), codegen<T>(s, n), batch_size);
-}
-
-} // namespace
-
-} // namespace detail
-
-llvm::Value *taylor_u_init_dbl(llvm_state &s, const number &n, const std::vector<llvm::Value *> &arr,
-                               std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_number_impl<double>(s, n, arr, batch_size);
-}
-
-llvm::Value *taylor_u_init_ldbl(llvm_state &s, const number &n, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_number_impl<long double>(s, n, arr, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_u_init_f128(llvm_state &s, const number &n, const std::vector<llvm::Value *> &arr,
-                                std::uint32_t batch_size)
-{
-    return detail::taylor_u_init_number_impl<mppp::real128>(s, n, arr, batch_size);
-}
-
-#endif
 
 } // namespace heyoka

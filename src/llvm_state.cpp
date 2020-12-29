@@ -6,17 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <heyoka/config.hpp>
-
-#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
 #include <ios>
 #include <iostream>
-#include <iterator>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -26,8 +21,6 @@
 #include <system_error>
 #include <tuple>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -49,8 +42,6 @@
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Attributes.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
@@ -58,7 +49,6 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
-#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
@@ -81,16 +71,7 @@
 
 #endif
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
-#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
@@ -336,8 +317,8 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
 llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
-    : m_jitter(std::make_unique<jit>()), m_sig_map(other.m_sig_map), m_opt_level(other.m_opt_level),
-      m_fast_math(other.m_fast_math), m_module_name(other.m_module_name), m_save_object_code(other.m_save_object_code),
+    : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
+      m_module_name(other.m_module_name), m_save_object_code(other.m_save_object_code),
       m_object_code(other.m_object_code), m_inline_functions(other.m_inline_functions)
 {
     // Get the IR of other.
@@ -432,11 +413,6 @@ bool &llvm_state::inline_functions()
     return m_inline_functions;
 }
 
-std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values()
-{
-    return m_named_values;
-}
-
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -469,11 +445,6 @@ const bool &llvm_state::inline_functions() const
     return m_inline_functions;
 }
 
-const std::unordered_map<std::string, llvm::Value *> &llvm_state::named_values() const
-{
-    return m_named_values;
-}
-
 void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
@@ -487,19 +458,6 @@ void llvm_state::check_compiled(const char *f) const
     if (m_module) {
         throw std::invalid_argument(std::string{"The function '"} + f
                                     + "' can be invoked only after the module has been compiled");
-    }
-}
-
-void llvm_state::check_add_name(const std::string &name) const
-{
-    assert(m_module);
-
-    if (name.rfind("heyoka_", 0) == 0) {
-        throw std::invalid_argument("Names starting with 'heyoka_' are reserved");
-    }
-
-    if (m_module->getNamedValue(name) != nullptr) {
-        throw std::invalid_argument("The name '" + name + "' already exists in the module");
     }
 }
 
@@ -739,398 +697,6 @@ bool llvm_state::is_compiled() const
     return !m_module;
 }
 
-template <typename T>
-void llvm_state::add_varargs_expression(const std::string &name, const expression &e,
-                                        const std::vector<std::string> &vars)
-{
-    // Prepare the function prototype. First the function arguments.
-    std::vector<llvm::Type *> fargs(vars.size(), detail::to_llvm_type<T>(context()));
-    // Then the return type.
-    auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
-    assert(ft != nullptr);
-
-    // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    if (f == nullptr) {
-        throw std::invalid_argument("Could not create a varargs function called '" + name + "'");
-    }
-    // Set names for all arguments.
-    // NOTE: don't use the same name in vars
-    // as it's not clear to me if any name
-    // is allowed in the IR. Just use a simple
-    // arg_n format.
-    decltype(vars.size()) idx = 0;
-    for (auto &arg : f->args()) {
-        arg.setName("arg_" + detail::li_to_string(idx++));
-    }
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
-    assert(bb != nullptr);
-    m_builder->SetInsertPoint(bb);
-
-    // Record the function arguments in the m_named_values map.
-    idx = 0;
-    m_named_values.clear();
-    for (auto &arg : f->args()) {
-        m_named_values[vars[idx++]] = &arg;
-    }
-
-    // Run the codegen on the expression.
-    auto *ret_val = codegen<T>(*this, e);
-    assert(ret_val != nullptr);
-
-    // Finish off the function.
-    m_builder->CreateRet(ret_val);
-
-    // NOTE: it seems like the module-level
-    // optimizer is able to figure out on its
-    // own at least some useful attributes for
-    // functions. Additional attributes
-    // (e.g., speculatable, willreturn)
-    // will also depend on the attributes
-    // of function calls contained in the expression,
-    // so it may be tricky to "prove" that they
-    // can be added safely.
-
-    // Verify it.
-    verify_function(f);
-
-    // Add the function to m_sig_map.
-    std::vector<std::type_index> sig_args(vars.size(), std::type_index(typeid(T)));
-    auto sig = std::pair{std::type_index(typeid(T)), std::move(sig_args)};
-    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
-    assert(eret.second);
-}
-
-void llvm_state::add_nary_function_dbl(const std::string &name, const expression &e)
-{
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Fetch the sorted list of variables in the expression.
-    const auto vars = get_variables(e);
-
-    add_varargs_expression<double>(name, e, vars);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-void llvm_state::add_nary_function_ldbl(const std::string &name, const expression &e)
-{
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Fetch the sorted list of variables in the expression.
-    const auto vars = get_variables(e);
-
-    add_varargs_expression<long double>(name, e, vars);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-void llvm_state::add_nary_function_f128(const std::string &name, const expression &e)
-{
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Fetch the sorted list of variables in the expression.
-    const auto vars = get_variables(e);
-
-    add_varargs_expression<mppp::real128>(name, e, vars);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-#endif
-
-template <typename T>
-void llvm_state::add_vecargs_expression(const std::string &name, const expression &e)
-{
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Fetch the sorted list of variables in the expression.
-    const auto vars = get_variables(e);
-    if (vars.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("The number of variables in the expression passed to add_function() is too "
-                                  "large, and it results in an overflow condition");
-    }
-
-    // Setup the vecargs function. It takes in input a read-only pointer,
-    // and it returns in output the value of the evaluation.
-    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context()))};
-    auto *ft = llvm::FunctionType::get(detail::to_llvm_type<T>(context()), fargs, false);
-    assert(ft != nullptr);
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    if (f == nullptr) {
-        throw std::invalid_argument("Could not create a vecargs function called '" + name + "'");
-    }
-
-    // Setup the properties of the pointer argument.
-    auto in_ptr = f->args().begin();
-    in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::ReadOnly);
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
-    assert(bb != nullptr);
-    m_builder->SetInsertPoint(bb);
-
-    // Fill in the m_named_values map
-    // with values loaded from in_ptr.
-    m_named_values.clear();
-    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        [[maybe_unused]] const auto res = m_named_values.emplace(
-            vars[i], m_builder->CreateLoad(
-                         m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
-                                                      "in_ptr_" + detail::li_to_string(i)),
-                         "var_" + detail::li_to_string(i)));
-        assert(res.second);
-    }
-
-    // Create the return value from the codegen of the expression.
-    m_builder->CreateRet(codegen<T>(*this, e));
-
-    // Verify the function.
-    verify_function(f);
-
-    // Add the function to m_sig_map.
-    std::vector<std::type_index> sig_args{std::type_index(typeid(const T *))};
-    auto sig = std::pair{std::type_index(typeid(T)), std::move(sig_args)};
-    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
-    assert(eret.second);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-void llvm_state::add_function_dbl(const std::string &name, const expression &e)
-{
-    add_vecargs_expression<double>(name, e);
-}
-
-void llvm_state::add_function_ldbl(const std::string &name, const expression &e)
-{
-    add_vecargs_expression<long double>(name, e);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-void llvm_state::add_function_f128(const std::string &name, const expression &e)
-{
-    add_vecargs_expression<mppp::real128>(name, e);
-}
-
-#endif
-
-template <typename T>
-void llvm_state::add_vecargs_expressions(const std::string &name, const std::vector<expression> &es)
-{
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Build the global list of variables.
-    std::vector<std::string> vars;
-    for (const auto &e : es) {
-        auto e_vars = get_variables(e);
-
-        vars.insert(vars.end(), std::make_move_iterator(e_vars.begin()), std::make_move_iterator(e_vars.end()));
-        std::sort(vars.begin(), vars.end());
-        vars.erase(std::unique(vars.begin(), vars.end()), vars.end());
-    }
-
-    if (vars.size() > std::numeric_limits<std::uint32_t>::max()
-        || es.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::overflow_error("The number of variables/expressions passed to add_vector_function() is too "
-                                  "large, and it results in an overflow condition");
-    }
-
-    // Prepare the function prototype.
-    std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())));
-    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
-    assert(ft != nullptr);
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    if (f == nullptr) {
-        throw std::invalid_argument("Could not create a vecargs muiltifunction called '" + name + "'");
-    }
-
-    // Setup the properties of the pointer arguments.
-    auto out_ptr = f->args().begin();
-    out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
-    out_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    auto in_ptr = out_ptr + 1;
-    in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::ReadOnly);
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
-    in_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
-    assert(bb != nullptr);
-    m_builder->SetInsertPoint(bb);
-
-    // Fill in the m_named_values map
-    // with values loaded from in_ptr.
-    m_named_values.clear();
-    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        [[maybe_unused]] const auto res = m_named_values.emplace(
-            vars[i], m_builder->CreateLoad(
-                         m_builder->CreateInBoundsGEP(in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
-                                                      "in_ptr_" + detail::li_to_string(i)),
-                         "var_" + detail::li_to_string(i)));
-        assert(res.second);
-    }
-
-    // Run the codegen for each expression and
-    // store the result of the evaluation
-    // in out_ptr.
-    for (decltype(es.size()) i = 0; i < es.size(); ++i) {
-        m_builder->CreateStore(codegen<T>(*this, es[i]),
-                               m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i)),
-                                                            "out_ptr_" + detail::li_to_string(i)));
-    }
-
-    // Create the return value.
-    m_builder->CreateRetVoid();
-
-    // Verify the function.
-    verify_function(f);
-
-    // Add the function to m_sig_map.
-    std::vector<std::type_index> sig_args{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
-    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
-    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
-    assert(eret.second);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-void llvm_state::add_vector_function_dbl(const std::string &name, const std::vector<expression> &es)
-{
-    add_vecargs_expressions<double>(name, es);
-}
-
-void llvm_state::add_vector_function_ldbl(const std::string &name, const std::vector<expression> &es)
-{
-    add_vecargs_expressions<long double>(name, es);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-void llvm_state::add_vector_function_f128(const std::string &name, const std::vector<expression> &es)
-{
-    add_vecargs_expressions<mppp::real128>(name, es);
-}
-
-#endif
-
-template <typename T>
-void llvm_state::add_batch_expression_impl(const std::string &name, const expression &e, std::uint32_t batch_size)
-{
-    if (batch_size == 0u) {
-        throw std::invalid_argument("Cannot add an expression in batch mode if the batch size is zero");
-    }
-
-    check_uncompiled(__func__);
-    check_add_name(name);
-
-    // Fetch the sorted list of variables in the expression.
-    const auto vars = get_variables(e);
-    if (vars.size() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
-        throw std::overflow_error("The number of variables in the expression passed to add_function_batch() is too "
-                                  "large, and it results in an overflow condition");
-    }
-
-    // Setup the batch function. It takes in input a write-only pointer, a read-only pointer,
-    // and it returns nothing.
-    std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(detail::to_llvm_type<T>(context())));
-    auto *ft = llvm::FunctionType::get(m_builder->getVoidTy(), fargs, false);
-    assert(ft != nullptr);
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, m_module.get());
-    if (f == nullptr) {
-        throw std::invalid_argument("Could not create a batch function called '" + name + "'");
-    }
-
-    // Setup the properties of the pointer arguments.
-    auto out_ptr = f->args().begin();
-    out_ptr->setName("out_ptr");
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
-    out_ptr->addAttr(llvm::Attribute::NoCapture);
-    out_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    auto in_ptr = out_ptr + 1;
-    in_ptr->setName("in_ptr");
-    in_ptr->addAttr(llvm::Attribute::ReadOnly);
-    in_ptr->addAttr(llvm::Attribute::NoCapture);
-    in_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context(), "entry", f);
-    assert(bb != nullptr);
-    m_builder->SetInsertPoint(bb);
-
-    // Clear up the variables mapping.
-    m_named_values.clear();
-    for (std::uint32_t b_idx = 0; b_idx < batch_size; ++b_idx) {
-        // Map the variables to the values corresponding to the
-        // current batch.
-        for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-            m_named_values[vars[i]] = m_builder->CreateLoad(m_builder->CreateInBoundsGEP(
-                in_ptr, m_builder->getInt32(static_cast<std::uint32_t>(i) * batch_size + b_idx),
-                "in_ptr_" + detail::li_to_string(b_idx) + "_" + detail::li_to_string(i)));
-        }
-
-        // Do the expression codegen for the current batch, store the result
-        // of the evaluation in out_ptr.
-        m_builder->CreateStore(codegen<T>(*this, e), m_builder->CreateInBoundsGEP(out_ptr, m_builder->getInt32(b_idx)));
-    }
-
-    // Create the return value.
-    m_builder->CreateRetVoid();
-
-    // Verify the function.
-    verify_function(f);
-
-    // Add the function to m_sig_map.
-    auto sig_args = std::vector{std::type_index(typeid(T *)), std::type_index(typeid(const T *))};
-    auto sig = std::pair{std::type_index(typeid(void)), std::move(sig_args)};
-    [[maybe_unused]] const auto eret = m_sig_map.emplace(name, std::move(sig));
-    assert(eret.second);
-
-    // Run the optimization pass.
-    optimise();
-}
-
-void llvm_state::add_function_batch_dbl(const std::string &name, const expression &e, std::uint32_t batch_size)
-{
-    add_batch_expression_impl<double>(name, e, batch_size);
-}
-
-void llvm_state::add_function_batch_ldbl(const std::string &name, const expression &e, std::uint32_t batch_size)
-{
-    add_batch_expression_impl<long double>(name, e, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-void llvm_state::add_function_batch_f128(const std::string &name, const expression &e, std::uint32_t batch_size)
-{
-    add_batch_expression_impl<mppp::real128>(name, e, batch_size);
-}
-
-#endif
-
 // NOTE: this function will lookup symbol names,
 // so it does not necessarily return a function
 // pointer (could be, e.g., a global variable).
@@ -1200,65 +766,6 @@ void llvm_state::dump_object_code(const std::string &filename) const
         pass.run(*m_module);
     }
 }
-
-// NOTE: in the fetch_* functions, check_compiled() is run
-// by jit_lookup().
-llvm_state::sf_t<double> llvm_state::fetch_function_dbl(const std::string &name)
-{
-    return fetch_function<double>(name);
-}
-
-llvm_state::sf_t<long double> llvm_state::fetch_function_ldbl(const std::string &name)
-{
-    return fetch_function<long double>(name);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm_state::sf_t<mppp::real128> llvm_state::fetch_function_f128(const std::string &name)
-{
-    return fetch_function<mppp::real128>(name);
-}
-
-#endif
-
-llvm_state::vf_t<double> llvm_state::fetch_vector_function_dbl(const std::string &name)
-{
-    return fetch_vector_function<double>(name);
-}
-
-llvm_state::vf_t<long double> llvm_state::fetch_vector_function_ldbl(const std::string &name)
-{
-    return fetch_vector_function<long double>(name);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm_state::vf_t<mppp::real128> llvm_state::fetch_vector_function_f128(const std::string &name)
-{
-    return fetch_vector_function<mppp::real128>(name);
-}
-
-#endif
-
-llvm_state::sfb_t<double> llvm_state::fetch_function_batch_dbl(const std::string &name)
-{
-    return fetch_function_batch<double>(name);
-}
-
-llvm_state::sfb_t<long double> llvm_state::fetch_function_batch_ldbl(const std::string &name)
-{
-    return fetch_function_batch<long double>(name);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm_state::sfb_t<mppp::real128> llvm_state::fetch_function_batch_f128(const std::string &name)
-{
-    return fetch_function_batch<mppp::real128>(name);
-}
-
-#endif
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 {
