@@ -1162,8 +1162,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Fix m_pars' size, if necessary.
     const auto npars = n_pars_in_sys(sys);
-    if (m_pars.size() < npars) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
+        throw std::overflow_error(
+            "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
+    }
+    if (m_pars.size() < npars * m_batch_size) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     }
 
     // Store the dimension of the system.
@@ -3793,6 +3797,17 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     }
     oss << "]\n";
 
+    if (!ta.get_pars().empty()) {
+        oss << "Parameters  : [";
+        for (decltype(ta.get_pars().size()) i = 0; i < ta.get_pars().size(); ++i) {
+            oss << ta.get_pars()[i];
+            if (i != ta.get_pars().size() - 1u) {
+                oss << ", ";
+            }
+        }
+        oss << "]\n";
+    }
+
     return os << oss.str();
 }
 
@@ -3825,6 +3840,17 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
         }
     }
     oss << "]\n";
+
+    if (!ta.get_pars().empty()) {
+        oss << "Parameters  : [";
+        for (decltype(ta.get_pars().size()) i = 0; i < ta.get_pars().size(); ++i) {
+            oss << ta.get_pars()[i];
+            if (i != ta.get_pars().size() - 1u) {
+                oss << ", ";
+            }
+        }
+        oss << "]\n";
+    }
 
     return os << oss.str();
 }
