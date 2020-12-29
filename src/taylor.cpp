@@ -37,6 +37,8 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/format.h>
+
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constant.h>
@@ -867,6 +869,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     const auto npars = n_pars_in_sys(sys);
     if (m_pars.size() < npars) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    } else if (m_pars.size() > npars) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
+                m_pars.size(), npars));
     }
 
     // Store the dimension of the system.
@@ -1168,6 +1177,13 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     }
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
+    } else if (m_pars.size() > npars * m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
+            "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
     }
 
     // Store the dimension of the system.
