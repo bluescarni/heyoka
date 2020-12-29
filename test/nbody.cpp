@@ -30,6 +30,17 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+TEST_CASE("N-body param")
+{
+    for (const auto &[_, ex] : make_nbody_par_sys(2)) {
+        std::cout << ex << '\n';
+    }
+
+    for (const auto &[_, ex] : make_nbody_par_sys(20, kw::n_massive = 3)) {
+        std::cout << ex << '\n';
+    }
+}
+
 // Test case for an issue that arised when using
 // null masses.
 TEST_CASE("zero mass")

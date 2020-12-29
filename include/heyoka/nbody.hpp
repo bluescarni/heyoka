@@ -17,6 +17,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -32,6 +34,9 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::uint32_t, number,
                                                                                              std::vector<number>);
+
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::uint32_t, number,
+                                                                                           std::uint32_t);
 
 } // namespace detail
 
@@ -58,7 +63,7 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 // y_1' = ...
 // etc.
 template <typename... KwArgs>
-inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&... kw_args)
+inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32_t n, KwArgs &&...kw_args)
 {
     if (n < 2u) {
         throw std::invalid_argument("At least 2 bodies are needed to construct an N-body system");
@@ -92,6 +97,50 @@ inline std::vector<std::pair<expression, expression>> make_nbody_sys(std::uint32
         }
 
         return detail::make_nbody_sys_fixed_masses(n, std::move(G_const), std::move(masses_vec));
+    }
+}
+
+namespace kw
+{
+
+IGOR_MAKE_NAMED_ARGUMENT(n_massive);
+
+}
+
+template <typename... KwArgs>
+inline std::vector<std::pair<expression, expression>> make_nbody_par_sys(std::uint32_t n, KwArgs &&...kw_args)
+{
+    if (n < 2u) {
+        throw std::invalid_argument("At least 2 bodies are needed to construct an N-body system");
+    }
+
+    igor::parser p{kw_args...};
+
+    if constexpr (p.has_unnamed_arguments()) {
+        static_assert(detail::always_false_v<KwArgs...>,
+                      "The variadic arguments in the construction of an N-body system contain "
+                      "unnamed arguments.");
+    } else {
+        // G constant (defaults to 1).
+        auto G_const = [&p]() {
+            if constexpr (p.has(kw::Gconst)) {
+                return number{std::forward<decltype(p(kw::Gconst))>(p(kw::Gconst))};
+            } else {
+                return number{1.};
+            }
+        }();
+
+        if constexpr (p.has(kw::n_massive)) {
+            if constexpr (std::is_integral_v<detail::uncvref_t<decltype(p(kw::n_massive))>>) {
+                return detail::make_nbody_sys_par_masses(n, std::move(G_const),
+                                                         boost::numeric_cast<std::uint32_t>(p(kw::n_massive)));
+            } else {
+                static_assert(detail::always_false_v<KwArgs...>,
+                              "The n_massive keyword argument must be of integral type.");
+            }
+        } else {
+            return detail::make_nbody_sys_par_masses(n, std::move(G_const), n);
+        }
     }
 }
 
