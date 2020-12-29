@@ -33,7 +33,7 @@ In order to specify a non-default tolerance, the keyword argument
 
 .. literalinclude:: ../tutorial/adaptive_opt.cpp
    :language: c++
-   :lines: 17-34
+   :lines: 19-36
 
 .. code-block:: console
 
@@ -44,14 +44,14 @@ In order to specify a non-default tolerance, the keyword argument
 
 As you can see, the optimal Taylor order for a tolerance of :math:`10^{-9}`
 is 12 (compared to a Taylor order of 20 for a tolerance
-:math:`\sim 2.2\times 10^{-16}`).
+of :math:`\sim 2.2\times 10^{-16}`).
 
 Integrating the system back and forth shows how the accuracy of the
-integration is decreased with respect to the default tolerance value:
+integration is reduced with respect to the default tolerance value:
 
 .. literalinclude:: ../tutorial/adaptive_opt.cpp
    :language: c++
-   :lines: 36-40
+   :lines: 38-42
 
 .. code-block:: console
 
@@ -72,9 +72,53 @@ have been fully unrolled.
 This approach leads to highly optimised timestepper functions,
 but, on the other hand, it can result in long compilation times
 and high memory usage for large ODE systems. Thus, heyoka provides
-also a *compact mode* option in which the code generation uses
-more traditional idioms that greatly reduce compilation times
+also a *compact mode* option in which code generation employs
+more traditional programming idioms that greatly reduce compilation time
 and memory usage. Compact mode results in a performance degradation
 of :math:`\lesssim 2\times` with respect to the default code generation
 mode, but it renders heyoka usable with ODE systems consisting
 of thousands of terms.
+
+Let's try to quantify the performance difference in a concrete case.
+In this example, we first construct the ODE system corresponding
+to an N-body problem with 6 particles via the ``make_nbody_sys()``
+utility function:
+
+.. literalinclude:: ../tutorial/adaptive_opt.cpp
+   :language: c++
+   :lines: 46-47
+
+Next, we create an initial state vector for our system.
+The contents of the vector do not matter at this stage:
+
+.. literalinclude:: ../tutorial/adaptive_opt.cpp
+   :language: c++
+   :lines: 49-50
+
+Next, we time the creation of an integrator object in default
+code generation mode:
+
+.. literalinclude:: ../tutorial/adaptive_opt.cpp
+   :language: c++
+   :lines: 52-59
+
+.. code-block:: console
+
+   Default mode timing: 3807ms
+
+Finally, we time the creation of the same integrator object
+in compact mode (which can be activated via the ``compact_mode``
+keyword argument):
+
+.. literalinclude:: ../tutorial/adaptive_opt.cpp
+   :language: c++
+   :lines: 61-68
+
+.. code-block:: console
+
+   Default mode timing: 269ms
+
+That is, in this specific example compact mode is more than 10 times
+faster than the default
+code generation mode when it comes to the construction of the integrator
+object. For larger ODE systems, the gap will be even wider.
