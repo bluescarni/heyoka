@@ -44,10 +44,6 @@ also supports the following elementary functions (with more to come in the near 
 * exponentiation,
 * square root.
 
-.. literalinclude:: ../tutorial/ex_system.cpp
-   :language: c++
-   :lines: 40-41
-
 It must be emphasised that heyoka's expression system is not a full-fledged
 computer algebra system. In particular, its simplification capabilities
 are very limited. Because heyoka's performance is sensitive
