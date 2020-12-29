@@ -806,14 +806,38 @@ std::vector<expression> taylor_decompose(std::vector<std::pair<expression, expre
 namespace detail
 {
 
+namespace
+{
+
+// Small helper to deduce the number of parameters
+// present in the rhs of an ODE.
+template <typename T>
+std::uint32_t n_pars_in_sys(const T &sys)
+{
+    std::uint32_t retval = 0;
+
+    for (const auto &p : sys) {
+        if constexpr (std::is_same_v<uncvref_t<decltype(p)>, expression>) {
+            retval = std::max(retval, get_param_size(p));
+        } else {
+            retval = std::max(retval, get_param_size(p.second));
+        }
+    }
+
+    return retval;
+}
+
+} // namespace
+
 template <typename T>
 template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                                 bool compact_mode)
+                                                 bool compact_mode, std::vector<T> pars)
 {
     // Assign the data members.
     m_state = std::move(state);
     m_time = time;
+    m_pars = std::move(pars);
 
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
@@ -839,6 +863,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
             + " instead");
     }
 
+    // Fix m_pars' size, if necessary.
+    const auto npars = n_pars_in_sys(sys);
+    if (m_pars.size() < npars) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    }
+
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -857,7 +887,7 @@ template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointer.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order)
+      m_order(other.m_order), m_pars(other.m_pars)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -901,7 +931,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 
     // Invoke the stepper.
     auto h = max_delta_t;
-    m_step_f(m_state.data(), nullptr, &h);
+    m_step_f(m_state.data(), m_pars.data(), &h);
 
     // Update the time.
     m_time += h;
@@ -1041,19 +1071,20 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 template class taylor_adaptive_impl<double>;
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,
-                                                                                 bool, bool);
+                                                                                 bool, bool, std::vector<double>);
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
-                                                 double, double, bool, bool);
+                                                 double, double, bool, bool, std::vector<double>);
 
 template class taylor_adaptive_impl<long double>;
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>,
                                                                                       std::vector<long double>,
                                                                                       long double, long double, bool,
-                                                                                      bool);
+                                                                                      bool, std::vector<long double>);
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                      std::vector<long double>, long double, long double, bool, bool);
+                                                      std::vector<long double>, long double, long double, bool, bool,
+                                                      std::vector<long double>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1061,11 +1092,12 @@ template class taylor_adaptive_impl<mppp::real128>;
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
                                                                                         std::vector<mppp::real128>,
                                                                                         mppp::real128, mppp::real128,
-                                                                                        bool, bool);
+                                                                                        bool, bool,
+                                                                                        std::vector<mppp::real128>);
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                         std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
-                                                        bool);
+                                                        bool, std::vector<mppp::real128>);
 
 #endif
 
@@ -1078,12 +1110,13 @@ template <typename T>
 template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, std::uint32_t batch_size,
                                                        std::vector<T> time, T tol, bool high_accuracy,
-                                                       bool compact_mode)
+                                                       bool compact_mode, std::vector<T> pars)
 {
     // Init the data members.
     m_batch_size = batch_size;
     m_state = std::move(state);
     m_time = std::move(time);
+    m_pars = std::move(pars);
 
     // Check input params.
     if (m_batch_size == 0u) {
@@ -1127,6 +1160,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             + " instead");
     }
 
+    // Fix m_pars' size, if necessary.
+    const auto npars = n_pars_in_sys(sys);
+    if (m_pars.size() < npars) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    }
+
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -1160,8 +1199,8 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_pinf(other.m_pinf),
+      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts)
 {
@@ -1217,7 +1256,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    m_step_f(m_state.data(), nullptr, m_delta_ts.data());
+    m_step_f(m_state.data(), m_pars.data(), m_delta_ts.data());
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -1450,22 +1489,20 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
 template class taylor_adaptive_batch_impl<double>;
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, std::uint32_t,
-                                                       std::vector<double>, double, bool, bool);
+                                                       std::vector<double>, double, bool, bool, std::vector<double>);
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
                                                        std::vector<double>, std::uint32_t, std::vector<double>, double,
-                                                       bool, bool);
+                                                       bool, bool, std::vector<double>);
 
 template class taylor_adaptive_batch_impl<long double>;
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>,
-                                                                                            std::vector<long double>,
-                                                                                            std::uint32_t,
-                                                                                            std::vector<long double>,
-                                                                                            long double, bool, bool);
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                            std::vector<long double>, std::uint32_t,
-                                                            std::vector<long double>, long double, bool, bool);
+taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
+                                                            std::uint32_t, std::vector<long double>, long double, bool,
+                                                            bool, std::vector<long double>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<long double>, std::uint32_t, std::vector<long double>,
+    long double, bool, bool, std::vector<long double>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1473,11 +1510,10 @@ template class taylor_adaptive_batch_impl<mppp::real128>;
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>, std::vector<mppp::real128>,
                                                               std::uint32_t, std::vector<mppp::real128>, mppp::real128,
-                                                              bool, bool);
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                              std::vector<mppp::real128>, std::uint32_t,
-                                                              std::vector<mppp::real128>, mppp::real128, bool, bool);
+                                                              bool, bool, std::vector<mppp::real128>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, std::uint32_t,
+    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>);
 
 #endif
 
