@@ -191,12 +191,20 @@
   <div class="section" id="the-expression-system">
 <span id="tut-expression-system"></span><h1>The expression system<a class="headerlink" href="#the-expression-system" title="Permalink to this headline">¶</a></h1>
 <p>As we saw in the <a class="reference internal" href="tut_taylor_method.html#tut-taylor-method"><span class="std std-ref">previous section</span></a>, heyoka
-needs to be able to represent the righ-hand side of an ODE system in symbolic
+needs to be able to represent the right-hand side of an ODE system in symbolic
 form in order to be able to compute its high-order derivatives via automatic
 differentiation. heyoka represents generic mathematical expressions
 via a simple <a class="reference external" href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">abstract syntax tree (AST)</a>
 in which the internal nodes are either mathematical operators or n-ary functions,
-and the leaf nodes are either symbolic variables or numerical constants.</p>
+and the leaf nodes can be:</p>
+<ul class="simple">
+<li><p>symbolic variables,</p></li>
+<li><p>numerical constants,</p></li>
+<li><p>runtime parameters.</p></li>
+</ul>
+<p>Constants and parameters are mathematically equivalent, the only difference being
+that the value of a constant is determined when the expression is created, whereas
+the value of a parameter is loaded from a user-supplied data array at a later stage.</p>
 <p>As a simple example, here is a graphical representation of the
 AST for the expression <span class="math notranslate nohighlight">\(\left( 1 - x^2\right)y-x\)</span>:</p>
 <a class="reference internal image-reference" href="_images/ast.png"><img alt="Example of a symbolic tree in heyoka" class="align-center" src="_images/ast.png" style="width: 287.7px; height: 225.29999999999998px;" /></a>
@@ -237,10 +245,6 @@ also supports the following elementary functions (with more to come in the near 
 <li><p>exponentiation,</p></li>
 <li><p>square root.</p></li>
 </ul>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// An expression involving a few elementary functions.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">cos</span><span class="p">(</span><span class="n">x</span> <span class="o">+</span> <span class="mi">2</span><span class="n">_dbl</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="o">-</span> <span class="n">exp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-</pre></div>
-</div>
 <p>It must be emphasised that heyoka’s expression system is not a full-fledged
 computer algebra system. In particular, its simplification capabilities
 are very limited. Because heyoka’s performance is sensitive
