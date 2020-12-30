@@ -6,6 +6,8 @@ heyoka
 [![Build Status](https://img.shields.io/github/workflow/status/bluescarni/heyoka/GitHub%20CI?style=for-the-badge)](https://github.com/bluescarni/heyoka/actions?query=workflow%3A%22GitHub+CI%22)
 ![language](https://img.shields.io/badge/language-C%2B%2B17-red.svg?style=for-the-badge)
 
+[![Anaconda-Server Badge](https://img.shields.io/conda/vn/conda-forge/heyoka.svg?style=for-the-badge)](https://anaconda.org/conda-forge/heyoka)
+
 > The [heyókȟa](https://en.wikipedia.org/wiki/Heyoka>) [...] is a kind of
 > sacred clown in the culture of the Sioux (Lakota and Dakota people)
 > of the Great Plains of North America. The heyoka is a contrarian, jester,
