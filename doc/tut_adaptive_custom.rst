@@ -122,3 +122,23 @@ That is, in this specific example compact mode is more than 10 times
 faster than the default
 code generation mode when it comes to the construction of the integrator
 object. For larger ODE systems, the gap will be even wider.
+
+High-accuracy mode
+------------------
+
+For long-term integrations at very low error tolerances, heyoka offers
+an opt-in *high-accuracy* mode. In high-accuracy mode, heyoka
+employs techniques that minimise the numerical errors arising from
+the use of finite-precision floating-point numbers, at the cost
+of a slight runtime performance degradation.
+
+Currently, high-accuracy mode changes the way heyoka evaluates
+the Taylor polynomials used to update the state of the system
+at the end of an integration timestep. Specifically, polynomial evaluation
+via Horner's rule is replaced by
+`compensated summation <https://en.wikipedia.org/wiki/Kahan_summation_algorithm>`__,
+which prevents catastrophic cancellation issues and ultimately helps maintaining
+machine precision over very long integrations.
+
+High-accuracy mode can be enabled via the ``high_accuracy`` keyword
+argument.
