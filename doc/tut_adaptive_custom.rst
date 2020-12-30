@@ -12,17 +12,17 @@ Error tolerance
 ---------------
 
 As we mentioned earlier, by default the ``taylor_adaptive`` class
-uses an error tolerance :math:`\varepsilon` equal to the machine
+uses an error tolerance equal to the machine
 epsilon of the floating-point type in use. E.g., when using the
 ``double`` floating-point type, the tolerance is set to
 :math:`\sim 2.2\times 10^{-16}`.
 
-The :math:`\varepsilon` value is used by the ``taylor_adaptive``
+The tolerance value is used by the ``taylor_adaptive``
 class to control the error arising from truncating the (infinite)
 Taylor series representing the solution of the ODE system.
 In other words, ``taylor_adaptive`` strives to ensure that the
 magnitude of the remainders of the Taylor series is
-not greater than :math:`\varepsilon`,
+not greater than the tolerance,
 either in an absolute or relative sense. Absolute error control mode
 is activated when all elements of the state vector have a magnitude
 less than 1, while relative error control mode is activated when at least one
