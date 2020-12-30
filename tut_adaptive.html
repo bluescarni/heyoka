@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The adaptive integrator class &#8212; heyoka 0.2.0 documentation</title>
+    <title>The adaptive integrator &#8212; heyoka 0.2.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.73d71520a4ca3b99cfee5594769eaaae.css">
 
@@ -38,7 +38,7 @@
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Changelog" href="changelog.html" />
+    <link rel="next" title="Customising the adaptive integrator" href="tut_adaptive_custom.html" />
     <link rel="prev" title="The expression system" href="tut_expression_system.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -90,7 +90,12 @@
    </li>
    <li class="toctree-l2 current active">
     <a class="current reference internal" href="#">
-     The adaptive integrator class
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
     </a>
    </li>
   </ul>
@@ -208,8 +213,8 @@
         
               <div>
                 
-  <div class="section" id="the-adaptive-integrator-class">
-<span id="tut-adaptive"></span><h1>The adaptive integrator class<a class="headerlink" href="#the-adaptive-integrator-class" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="the-adaptive-integrator">
+<span id="tut-adaptive"></span><h1>The adaptive integrator<a class="headerlink" href="#the-adaptive-integrator" title="Permalink to this headline">¶</a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class provides an easy-to-use interface to heyoka’s
 main capabilities. Objects of this class can be constructed from a system
 of ODEs and a set of initial conditions (plus a number of optional parameters
@@ -445,6 +450,10 @@ to propagate both forward and backward in time:</p>
 <span class="go">State       : [0.049999999999999843, 0.025000000000002819]</span>
 </pre></div>
 </div>
+<p>Note also that the time-limited propagation functions will stop
+integrating if a non-finite value is detected in the state vector
+at the end of the timestep. In such case, the outcome of the
+integration will be <code class="docutils literal notranslate"><span class="pre">err_nf_state</span></code>.</p>
 </div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
@@ -560,7 +569,7 @@ to propagate both forward and backward in time:</p>
     <div class='prev-next-bottom'>
         
     <a class='left-prev' id="prev-link" href="tut_expression_system.html" title="previous page">The expression system</a>
-    <a class='right-next' id="next-link" href="changelog.html" title="next page">Changelog</a>
+    <a class='right-next' id="next-link" href="tut_adaptive_custom.html" title="next page">Customising the adaptive integrator</a>
 
     </div>
     <footer class="footer mt-5 mt-md-0">

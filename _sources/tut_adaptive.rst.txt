@@ -1,7 +1,7 @@
 .. _tut_adaptive:
 
-The adaptive integrator class
-=============================
+The adaptive integrator
+=======================
 
 The ``taylor_adaptive`` class provides an easy-to-use interface to heyoka's
 main capabilities. Objects of this class can be constructed from a system
@@ -203,6 +203,11 @@ to propagate both forward and backward in time:
    Dimension   : 2
    Time        : 0.0000000000000000
    State       : [0.049999999999999843, 0.025000000000002819]
+
+Note also that the time-limited propagation functions will stop
+integrating if a non-finite value is detected in the state vector
+at the end of the timestep. In such case, the outcome of the
+integration will be ``err_nf_state``.
 
 Full code listing
 -----------------

@@ -90,7 +90,12 @@
    </li>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_adaptive.html">
-     The adaptive integrator class
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
     </a>
    </li>
   </ul>
@@ -197,6 +202,18 @@
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#packages">
+   Packages
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#conda">
+     Conda
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#installation-from-source">
    Installation from source
   </a>
@@ -268,6 +285,26 @@ in order to enable 80-bit computations.</p>
 <li><p>heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p></li>
 </ul>
 </div>
+</div>
+</div>
+<div class="section" id="packages">
+<h2>Packages<a class="headerlink" href="#packages" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="conda">
+<h3>Conda<a class="headerlink" href="#conda" title="Permalink to this headline">¶</a></h3>
+<p>heyoka is available via the <a class="reference external" href="https://conda.io/docs/">conda</a> package manager for Linux, OSX and Windows
+thanks to the infrastructure provided by <a class="reference external" href="https://conda-forge.org/">conda-forge</a>.</p>
+<p>In order to install heyoka via conda, you just need to add <code class="docutils literal notranslate"><span class="pre">conda-forge</span></code>
+to the channels, and then we can immediately install heyoka:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> conda config --add channels conda-forge
+<span class="gp">$</span> conda config --set channel_priority strict
+<span class="gp">$</span> conda install heyoka
+</pre></div>
+</div>
+<p>The conda package for heyoka is maintained by the core development team,
+and it is regularly updated when new heyoka versions are released.</p>
+<p>Please refer to the <a class="reference external" href="https://conda.io/docs/">conda documentation</a> for instructions
+on how to setup and manage
+your conda installation.</p>
 </div>
 </div>
 <div class="section" id="installation-from-source">
