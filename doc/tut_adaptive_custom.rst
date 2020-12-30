@@ -116,7 +116,7 @@ keyword argument):
 
 .. code-block:: console
 
-   Default mode timing: 269ms
+   Compact mode timing: 269ms
 
 That is, in this specific example compact mode is more than 10 times
 faster than the default
