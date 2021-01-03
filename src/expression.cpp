@@ -873,6 +873,7 @@ bool is_integral(const expression &ex)
                 return std::visit(
                     [](const auto &x) {
                         using std::trunc;
+                        using std::isfinite;
 
                         return isfinite(x) && x == trunc(x);
                     },
@@ -897,6 +898,7 @@ bool is_odd_integral_half(const expression &ex)
                 return std::visit(
                     [](const auto &x) {
                         using std::trunc;
+                        using std::isfinite;
 
                         if (!isfinite(x) || x == trunc(x)) {
                             // x is not finite, or it is already

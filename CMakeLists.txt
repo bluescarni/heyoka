@@ -308,7 +308,7 @@ target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
 # Optional dependency on mp++.
 # NOTE: put this into a separate variable for reuse later.
-set(_HEYOKA_MIN_MPPP_VERSION "0.21")
+set(_HEYOKA_MIN_MPPP_VERSION "0.22")
 if(HEYOKA_WITH_MPPP)
     find_package(mp++ REQUIRED CONFIG)
     if(${mp++_VERSION} VERSION_LESS ${_HEYOKA_MIN_MPPP_VERSION})

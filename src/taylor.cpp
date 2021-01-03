@@ -836,13 +836,15 @@ template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
                                                  bool compact_mode, std::vector<T> pars)
 {
+    using std::isfinite;
+
     // Assign the data members.
     m_state = std::move(state);
     m_time = time;
     m_pars = std::move(pars);
 
     // Check input params.
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
     }
@@ -854,12 +856,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                     + std::to_string(sys.size()));
     }
 
-    if (!detail::isfinite(m_time)) {
+    if (!isfinite(m_time)) {
         throw std::invalid_argument("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of "
                                     + detail::li_to_string(m_time));
     }
 
-    if (!detail::isfinite(tol) || tol <= 0) {
+    if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
             + " instead");
@@ -932,6 +934,8 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 {
+    using std::isfinite;
+
 #if !defined(NDEBUG)
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
@@ -947,8 +951,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 
     // Check if the time or the state vector are non-finite at the
     // end of the timestep.
-    if (!detail::isfinite(m_time)
-        || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (!isfinite(m_time)
+        || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
         return std::tuple{taylor_outcome::err_nf_state, h};
     }
 
@@ -991,14 +995,16 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
 {
+    using std::isfinite;
+
     // Check the current time.
-    if (!detail::isfinite(m_time)) {
+    if (!isfinite(m_time)) {
         throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
                                     "the current time is not finite");
     }
 
     // Check the final time.
-    if (!detail::isfinite(t)) {
+    if (!isfinite(t)) {
         throw std::invalid_argument(
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
@@ -1121,6 +1127,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars)
 {
+    using std::isfinite;
+
     // Init the data members.
     m_batch_size = batch_size;
     m_state = std::move(state);
@@ -1132,7 +1140,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
         throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
     }
 
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
     }
@@ -1158,12 +1166,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                     + std::to_string(m_batch_size) + ")");
     }
 
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !detail::isfinite(x); })) {
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
 
-    if (!detail::isfinite(tol) || tol <= 0) {
+    if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
             + " instead");
@@ -1262,6 +1270,8 @@ template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
 taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
 {
+    using std::isfinite;
+
     // Check preconditions.
     assert(max_delta_ts.size() == m_batch_size);
     assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
@@ -1282,7 +1292,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
     // contains a non-finite value.
     auto check_nf_batch = [this](std::uint32_t batch_idx) {
         for (std::uint32_t i = 0; i < m_dim; ++i) {
-            if (!detail::isfinite(m_state[i * m_batch_size + batch_idx])) {
+            if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
                 return true;
             }
         }
@@ -1296,7 +1306,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
         const auto h = m_delta_ts[i];
         m_time[i] += h;
 
-        if (!detail::isfinite(m_time[i]) || check_nf_batch(i)) {
+        if (!isfinite(m_time[i]) || check_nf_batch(i)) {
             // Either the new time or state contain non-finite values,
             // return an error condition.
             m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
@@ -1368,6 +1378,8 @@ template <typename T>
 const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &
 taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
 {
+    using std::isfinite;
+
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
         throw std::invalid_argument(
@@ -1377,14 +1389,14 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
     }
 
     // Check the current times.
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !detail::isfinite(t); })) {
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !isfinite(t); })) {
         throw std::invalid_argument(
             "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
             "one of the current times is not finite");
     }
 
     // Check the final times.
-    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !detail::isfinite(t); })) {
+    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !isfinite(t); })) {
         throw std::invalid_argument("A non-finite time was passed to the propagate_until() function of an adaptive "
                                     "Taylor integrator in batch mode");
     }
@@ -3318,6 +3330,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 {
     using std::ceil;
     using std::exp;
+    using std::isfinite;
     using std::log;
 
     if (s.is_compiled()) {
@@ -3336,7 +3349,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Determine the order from the tolerance.
     auto order_f = ceil(-log(tol) / 2 + 1);
-    if (!detail::isfinite(order_f)) {
+    if (!isfinite(order_f)) {
         throw std::invalid_argument(
             "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
     }

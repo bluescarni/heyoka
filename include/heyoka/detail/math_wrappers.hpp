@@ -11,38 +11,9 @@
 
 #include <heyoka/config.hpp>
 
-#include <cmath>
-
 #if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
 
 #include <heyoka/detail/visibility.hpp>
-
-namespace heyoka::detail
-{
-
-template <typename T>
-inline bool isfinite(T x)
-{
-    return std::isfinite(x);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-inline bool isfinite<mppp::real128>(mppp::real128 x)
-{
-    return mppp::finite(x);
-}
-
-#endif
-
-} // namespace heyoka::detail
-
-#if defined(HEYOKA_HAVE_REAL128)
 
 // NOTE: these wrappers are needed as a replacement
 // for the LLVM builtins, which seem to have issues
