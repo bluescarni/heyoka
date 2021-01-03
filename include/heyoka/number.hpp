@@ -30,7 +30,6 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {

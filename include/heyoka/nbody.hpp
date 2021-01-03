@@ -19,10 +19,10 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/number.hpp>
 

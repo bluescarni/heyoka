@@ -9,27 +9,14 @@
 #ifndef HEYOKA_VARIABLE_HPP
 #define HEYOKA_VARIABLE_HPP
 
-#include <heyoka/config.hpp>
-
 #include <cstddef>
-#include <cstdint>
 #include <ostream>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
 #include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/llvm_state.hpp>
 
 namespace heyoka
 {

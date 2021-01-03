@@ -28,14 +28,13 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
 
 namespace heyoka
 {
