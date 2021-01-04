@@ -163,7 +163,8 @@ double cos_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return -std::sin(a[0]);
 }
 
-std::vector<expression>::size_type cos_impl::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+cos_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
@@ -174,10 +175,12 @@ std::vector<expression>::size_type cos_impl::taylor_decompose(std::vector<expres
     }
 
     // Append the sine decomposition.
-    u_vars_defs.push_back(sin(arg));
+    // TODO fix
+    u_vars_defs.emplace_back(sin(arg), std::vector<std::uint32_t>{});
 
     // Append the cosine decomposition.
-    u_vars_defs.emplace_back(func{std::move(*this)});
+    // TODO fix
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     return u_vars_defs.size() - 1u;
 }

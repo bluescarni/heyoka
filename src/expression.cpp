@@ -747,7 +747,8 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 // which corresponds to the decomposed version of ex.
 // If the return value is zero, ex was not decomposed.
 // NOTE: this will render ex unusable.
-std::vector<expression>::size_type taylor_decompose_in_place(expression &&ex, std::vector<expression> &u_vars_defs)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(expression &&ex, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
 {
     return std::visit(
         [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },

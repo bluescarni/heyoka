@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
@@ -144,7 +145,8 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
     throw not_implemented_error("update_grad_dbl() not implemented for param");
 }
 
-std::vector<expression>::size_type taylor_decompose_in_place(param &&, std::vector<expression> &)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(param &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
 {
     // NOTE: params do not require decomposition.
     return 0;

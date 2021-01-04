@@ -331,7 +331,9 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
     update_connections(node_connections, bo.rhs(), node_counter);
 }
 
-std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&bo, std::vector<expression> &u_vars_defs)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(binary_operator &&bo,
+                          std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
 {
     if (const auto dres_lhs = taylor_decompose_in_place(std::move(bo.lhs()), u_vars_defs)) {
         // The lhs required decomposition, and its decomposition
@@ -346,7 +348,8 @@ std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&b
 
     // Append the binary operator after decomposition
     // of lhs and rhs.
-    u_vars_defs.emplace_back(std::move(bo));
+    // NOTE: the binary operators have no hidden dependencies.
+    u_vars_defs.emplace_back(std::move(bo), std::vector<std::uint32_t>{});
 
     // The decomposition of binary operators
     // results in a new u variable, whose definition

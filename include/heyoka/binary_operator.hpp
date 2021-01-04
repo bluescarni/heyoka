@@ -19,6 +19,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -98,8 +99,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
-                                                                               std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(binary_operator &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const binary_operator &,
                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,

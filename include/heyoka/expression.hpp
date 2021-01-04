@@ -105,7 +105,7 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: this needs to go here because
+// NOTE: these need to go here because
 // the definition of expression must be visible
 // in order for this to be well-formed.
 template <typename T>
@@ -115,6 +115,21 @@ inline expression func_inner<T>::diff(const std::string &s) const
         return m_value.diff(s);
     } else {
         throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name() + "'");
+    }
+}
+
+template <typename T>
+inline std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+func_inner<T>::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+{
+    if constexpr (func_has_taylor_decompose_v<T>) {
+        return std::move(m_value).taylor_decompose(u_vars_defs);
+    } else {
+        func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
+
+        u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
+
+        return u_vars_defs.size() - 1u;
     }
 }
 
@@ -267,8 +282,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
-                                                                               std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(expression &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)

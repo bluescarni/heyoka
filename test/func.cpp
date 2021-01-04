@@ -172,7 +172,7 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
-    std::vector<expression> empty;
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>> empty;
     f = func{func_00{{"x"_var, "y"_var}}};
     std::move(f).taylor_decompose(empty);
 }
@@ -348,9 +348,10 @@ struct func_10 : func_base {
     func_10() : func_base("f", {}) {}
     explicit func_10(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &u_vars_defs) &&
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
     {
-        u_vars_defs.emplace_back("foo");
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
         return u_vars_defs.size() - 1u;
     }
@@ -360,9 +361,10 @@ struct func_10a : func_base {
     func_10a() : func_base("f", {}) {}
     explicit func_10a(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &u_vars_defs) &&
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
     {
-        u_vars_defs.emplace_back("foo");
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
         return u_vars_defs.size();
     }
@@ -374,9 +376,9 @@ TEST_CASE("func taylor_decompose")
 
     auto f = func(func_10{{"x"_var}});
 
-    std::vector<expression> u_vars_defs;
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 0u);
-    REQUIRE(u_vars_defs == std::vector{"foo"_var});
+    REQUIRE(u_vars_defs == std::vector{std::pair{"foo"_var, std::vector<std::uint32_t>{}}});
 
     f = func(func_10a{{"x"_var}});
 
