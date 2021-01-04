@@ -36,4 +36,13 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tan128(__float128);
 
 #endif
 
+#if defined(_MSC_VER)
+
+// NOTE: there seems issues when trying to invoke the tanl()
+// function on MSVC (LLVM complaining about missing symbol).
+// Let's create an ad-hoc wrapper.
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double);
+
+#endif
+
 #endif

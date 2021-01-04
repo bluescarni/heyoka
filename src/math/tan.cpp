@@ -113,7 +113,16 @@ llvm::Value *tan_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return tan_codegen_impl(s, args[0], "tanl");
+    return tan_codegen_impl(s, args[0],
+#if defined(_MSC_VER)
+                            // NOTE: it seems like the MSVC stdlib does not have a tanl function,
+                            // because LLVM complains about the symbol "tanl" not being
+                            // defined. Hence, use our own wrapper instead.
+                            "heyoka_tanl"
+#else
+                            "tanl"
+#endif
+    );
 }
 
 #if defined(HEYOKA_HAVE_REAL128)

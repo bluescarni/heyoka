@@ -86,3 +86,14 @@ __float128 heyoka_tan128(__float128 x)
 }
 
 #endif
+
+#if defined(_MSC_VER)
+
+#include <cmath>
+
+long double heyoka_tanl(long double x)
+{
+    return std::tan(x);
+}
+
+#endif
