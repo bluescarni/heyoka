@@ -316,7 +316,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
         s, fn, num, batch_size,
         "heyoka_taylor_diff_cos_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
                                               taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "the cosine");
+        "the cosine", 1);
 }
 
 // Derivative of cos(variable).
@@ -340,10 +340,12 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
-    // - idx of the var argument.
+    // - idx of the var argument,
+    // - idx of the uvar whose definition is sin(var).
     std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::Type::getInt32Ty(context)};
+        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
+        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -362,9 +364,9 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
-        auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
         auto var_idx = f->args().begin() + 4;
+        auto dep_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -390,11 +392,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    // NOTE: the -1 is because we are accessing the sine
-                    // of the u var, which is conventionally placed
-                    // right before the cosine in the decomposition.
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
-                                                   builder.CreateSub(u_idx, builder.getInt32(1)));
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
                     auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);

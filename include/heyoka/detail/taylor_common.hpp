@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -36,7 +38,7 @@ namespace heyoka::detail
 template <typename T, typename F, typename U>
 inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &fn, const U &n,
                                                         std::uint32_t batch_size, const std::string &fname,
-                                                        const std::string &desc)
+                                                        const std::string &desc, std::uint32_t n_deps = 0)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -54,6 +56,8 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
     std::vector<llvm::Type *> fargs{
         llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
         llvm::PointerType::getUnqual(to_llvm_type<T>(context)), taylor_c_diff_numparam_argtype<T>(s, n)};
+    // Add the hidden deps at the end.
+    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_deps), llvm::Type::getInt32Ty(context));
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);

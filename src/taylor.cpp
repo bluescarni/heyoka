@@ -1996,10 +1996,11 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
 // Helper to convert the arguments of the definition of a u variable
 // into a vector of variants. u variables will be converted to their indices,
 // numbers will be unchanged, parameters will be converted to their indices.
-auto taylor_udef_to_variants(const expression &ex)
+// The hidden deps will also be converted to indices.
+auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32_t> &deps)
 {
     return std::visit(
-        [](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
+        [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
@@ -2023,6 +2024,11 @@ auto taylor_udef_to_variants(const expression &ex)
                             }
                         },
                         arg.value());
+                }
+
+                // Handle the hidden deps.
+                for (auto idx : deps) {
+                    retval.emplace_back(idx);
                 }
 
                 return retval;
@@ -2232,7 +2238,7 @@ auto taylor_build_function_maps(llvm_state &s,
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = taylor_udef_to_variants(ex.first);
+            const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
