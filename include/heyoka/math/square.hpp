@@ -40,13 +40,13 @@ public:
 
     expression diff(const std::string &) const;
 
-    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                 std::uint32_t, std::uint32_t, std::uint32_t) const;
-    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
 #endif
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;

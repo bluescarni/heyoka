@@ -678,10 +678,17 @@ llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_operator &bo, const 
 }
 
 template <typename T>
-llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                 std::uint32_t batch_size)
+llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+                                 const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                 std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
+    if (!deps.empty()) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff phase for a binary operator "
+                                    "should be empty, but instead it has a size of {}"_format(deps.size()));
+    }
+
     // lhs and rhs must be u vars or numbers.
     auto check_arg = [](const expression &e) {
         std::visit(
@@ -727,27 +734,27 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
 
 } // namespace detail
 
-llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                             std::uint32_t batch_size)
+llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_bo_impl<double>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_bo_impl<double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                              std::uint32_t batch_size)
+llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_bo_impl<long double>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_bo_impl<long double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                              llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                              std::uint32_t batch_size)
+llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
