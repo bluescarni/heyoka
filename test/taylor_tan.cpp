@@ -22,6 +22,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -78,6 +79,38 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             }
         }
     }
+}
+
+// Test CSE involving hidden dependencies.
+TEST_CASE("taylor tan test simplifications")
+{
+    using std::tan;
+
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s{kw::opt_level = 0u};
+
+    taylor_add_jet<double>(s, "jet", {square(tan(x + y)) + tan(x + y), x}, 2, 1, false, false);
+
+    s.compile();
+
+    auto jptr = reinterpret_cast<void (*)(double *, const double *)>(s.jit_lookup("jet"));
+
+    std::vector<double> jet{double{2}, double{3}};
+    jet.resize(6);
+
+    jptr(jet.data(), nullptr);
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(tan(jet[0] + jet[1]) * tan(jet[0] + jet[1]) + tan(jet[0] + jet[1])));
+    REQUIRE(jet[3] == jet[0]);
+    REQUIRE(jet[4]
+            == approximately(
+                .5
+                * (2 * tan(jet[0] + jet[1]) * (1 + tan(jet[0] + jet[1]) * tan(jet[0] + jet[1])) * (jet[2] + jet[3])
+                   + (1 + tan(jet[0] + jet[1]) * tan(jet[0] + jet[1])) * (jet[2] + jet[3]))));
+    REQUIRE(jet[5] == approximately(.5 * jet[2]));
 }
 
 TEST_CASE("taylor tan")
