@@ -16,5 +16,6 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/tan.hpp>
 
 #endif

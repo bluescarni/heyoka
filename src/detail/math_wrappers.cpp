@@ -80,4 +80,9 @@ __float128 heyoka_abs128(__float128 x)
     return mppp::abs(mppp::real128{x}).m_value;
 }
 
+__float128 heyoka_tan128(__float128 x)
+{
+    return mppp::tan(mppp::real128{x}).m_value;
+}
+
 #endif
