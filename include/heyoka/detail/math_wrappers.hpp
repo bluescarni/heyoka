@@ -10,10 +10,9 @@
 #define HEYOKA_DETAIL_MATH_WRAPPERS_HPP
 
 #include <heyoka/config.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
-
-#include <heyoka/detail/visibility.hpp>
 
 // NOTE: these wrappers are needed as a replacement
 // for the LLVM builtins, which seem to have issues
