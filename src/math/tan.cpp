@@ -485,6 +485,8 @@ expression tan_impl::diff(const std::string &s) const
 {
     assert(args().size() == 1u);
 
+    // NOTE: if single-precision floats are implemented,
+    // should 1_dbl become 1_flt?
     return (1_dbl + square(tan(args()[0]))) * heyoka::diff(args()[0], s);
 }
 
