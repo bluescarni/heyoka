@@ -521,8 +521,7 @@ TEST_CASE("taylor tan")
         compare_batch_scalar<fp_t>({tan(y), tan(x)}, opt_level, high_accuracy, compact_mode);
     };
 
-    // TODO fix
-    for (auto cm : {false, false}) {
+    for (auto cm : {false, true}) {
         for (auto f : {false, true}) {
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
