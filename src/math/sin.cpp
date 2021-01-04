@@ -178,7 +178,6 @@ sin_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
     auto f_arg = arg;
 
     // Append the sine decomposition.
-    // TODO fix.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Compute the return value (pointing to the
@@ -186,8 +185,11 @@ sin_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
     const auto retval = u_vars_defs.size() - 1u;
 
     // Append the cosine decomposition.
-    // TODO fix.
     u_vars_defs.emplace_back(cos(std::move(f_arg)), std::vector<std::uint32_t>{});
+
+    // Add the hidden deps.
+    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
     return retval;
 }
@@ -210,10 +212,9 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const sin_impl &f, const std::v
 
 // Derivative of sin(variable).
 template <typename T>
-llvm::Value *taylor_diff_sin_impl(llvm_state &s, const sin_impl &f, const std::vector<std::uint32_t> &,
+llvm::Value *taylor_diff_sin_impl(llvm_state &s, const sin_impl &f, const std::vector<std::uint32_t> &deps,
                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                  std::uint32_t batch_size)
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -228,10 +229,9 @@ llvm::Value *taylor_diff_sin_impl(llvm_state &s, const sin_impl &f, const std::v
     // (i.e., order included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        // NOTE: the +1 is because we are accessing the cosine
-        // of the u var, which is conventionally placed
-        // right after the sine in the decomposition.
-        auto v0 = taylor_fetch_diff(arr, idx + 1u, order - j, n_uvars);
+        // NOTE: the only hidden dependency contains the index of the
+        // u variable whose definition is cos(var).
+        auto v0 = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
         auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
@@ -265,6 +265,14 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const sin_impl &f, const std::vector
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
+
+    if (deps.size() != 1u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+            "derivative of the sine, but a vector of size {} was passed instead"_format(deps.size()));
+    }
 
     return std::visit(
         [&](const auto &v) {
