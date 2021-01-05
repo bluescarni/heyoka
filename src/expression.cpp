@@ -33,7 +33,6 @@
 
 #include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/math_wrappers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
