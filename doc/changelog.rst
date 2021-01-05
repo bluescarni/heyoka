@@ -7,11 +7,15 @@ Changelog
 New
 ~~~
 
+- Extend the Taylor decomposition machinery to work
+  on more general classes of functions, and add
+  ``tan()``
+  (`#71 <https://github.com/bluescarni/heyoka/pull/71>`__).
 - Implement support for runtime parameters
   (`#68 <https://github.com/bluescarni/heyoka/pull/68>`__).
 - Initial tutorials and various documentation additions
   (`#63 <https://github.com/bluescarni/heyoka/pull/63>`__).
-- Add stream operator for the ``taylor_outcome`` enum
+- Add a stream operator for the ``taylor_outcome`` enum
   (`#63 <https://github.com/bluescarni/heyoka/pull/63>`__).
 
 Changes
