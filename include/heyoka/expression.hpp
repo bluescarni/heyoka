@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <functional>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -107,7 +108,7 @@ namespace detail
 
 // NOTE: these need to go here because
 // the definition of expression must be visible
-// in order for this to be well-formed.
+// in order for these to be well-formed.
 template <typename T>
 inline expression func_inner<T>::diff(const std::string &s) const
 {
