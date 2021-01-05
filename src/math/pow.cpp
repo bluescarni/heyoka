@@ -296,11 +296,19 @@ llvm::Value *taylor_diff_pow_impl(llvm_state &, const pow_impl &, const U1 &, co
 }
 
 template <typename T>
-llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector<llvm::Value *> &arr,
-                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                             std::uint32_t batch_size)
+llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector<std::uint32_t> &deps,
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 2u);
+
+    if (!deps.empty()) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
+                                    "derivative of the exponentiation, but a vector of size {} was passed "
+                                    "instead"_format(deps.size()));
+    }
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
@@ -311,27 +319,30 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector
 
 } // namespace
 
-llvm::Value *pow_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *pow_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                        std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *pow_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *pow_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<long double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *pow_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *pow_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_pow<mppp::real128>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_pow<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif

@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <functional>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -105,9 +106,9 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: this needs to go here because
+// NOTE: these need to go here because
 // the definition of expression must be visible
-// in order for this to be well-formed.
+// in order for these to be well-formed.
 template <typename T>
 inline expression func_inner<T>::diff(const std::string &s) const
 {
@@ -115,6 +116,21 @@ inline expression func_inner<T>::diff(const std::string &s) const
         return m_value.diff(s);
     } else {
         throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name() + "'");
+    }
+}
+
+template <typename T>
+inline std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+func_inner<T>::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+{
+    if constexpr (func_has_taylor_decompose_v<T>) {
+        return std::move(m_value).taylor_decompose(u_vars_defs);
+    } else {
+        func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
+
+        u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
+
+        return u_vars_defs.size() - 1u;
     }
 }
 
@@ -267,8 +283,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(expression &&,
-                                                                               std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(expression &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
@@ -276,34 +292,34 @@ inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
     return std::array{expression{variable{strs}}...};
 }
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
-                                               llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                               std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const expression &, const std::vector<std::uint32_t> &,
+                                               const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                               std::uint32_t, std::uint32_t, std::uint32_t);
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
-                                                llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const expression &, const std::vector<std::uint32_t> &,
+                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                                std::uint32_t, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const expression &, const std::vector<llvm::Value *> &,
-                                                llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                                std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const expression &, const std::vector<std::uint32_t> &,
+                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
+                                                std::uint32_t, std::uint32_t, std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+inline llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_dbl(s, ex, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_ldbl(s, ex, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_diff_f128(s, ex, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_f128(s, ex, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");

@@ -6,12 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SQUARE_HPP
-#define HEYOKA_MATH_SQUARE_HPP
+#ifndef HEYOKA_MATH_TAN_HPP
+#define HEYOKA_MATH_TAN_HPP
 
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -26,11 +27,11 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC square_impl : public func_base
+class HEYOKA_DLL_PUBLIC tan_impl : public func_base
 {
 public:
-    square_impl();
-    explicit square_impl(expression);
+    tan_impl();
+    explicit tan_impl(expression);
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -40,6 +41,14 @@ public:
 
     expression diff(const std::string &) const;
 
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
+                        const std::vector<double> &) const;
+    double eval_num_dbl(const std::vector<double> &) const;
+    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
     llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
@@ -57,7 +66,7 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression square(expression);
+HEYOKA_DLL_PUBLIC expression tan(expression);
 
 } // namespace heyoka
 

@@ -13,6 +13,7 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -69,7 +70,8 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(variable &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
 
 } // namespace heyoka
 

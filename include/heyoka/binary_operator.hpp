@@ -19,6 +19,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -98,37 +99,40 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
 
-HEYOKA_DLL_PUBLIC std::vector<expression>::size_type taylor_decompose_in_place(binary_operator &&,
-                                                                               std::vector<expression> &);
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(binary_operator &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const binary_operator &,
-                                               const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                               std::uint32_t, std::uint32_t, std::uint32_t);
+                                               const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                               llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                               std::uint32_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const binary_operator &,
-                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                                std::uint32_t, std::uint32_t, std::uint32_t);
+                                                const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                                llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                                std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const binary_operator &,
-                                                const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                                std::uint32_t, std::uint32_t, std::uint32_t);
+                                                const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                                llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                                std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Value *taylor_diff(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
-                                llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                std::uint32_t batch_size)
+inline llvm::Value *taylor_diff(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_dbl(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_ldbl(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_diff_f128(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
+        return taylor_diff_f128(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");

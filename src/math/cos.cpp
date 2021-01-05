@@ -163,7 +163,8 @@ double cos_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return -std::sin(a[0]);
 }
 
-std::vector<expression>::size_type cos_impl::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+cos_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
@@ -174,10 +175,13 @@ std::vector<expression>::size_type cos_impl::taylor_decompose(std::vector<expres
     }
 
     // Append the sine decomposition.
-    u_vars_defs.push_back(sin(arg));
-
+    u_vars_defs.emplace_back(sin(arg), std::vector<std::uint32_t>{});
     // Append the cosine decomposition.
-    u_vars_defs.emplace_back(func{std::move(*this)});
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+
+    // Add the hidden deps.
+    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
     return u_vars_defs.size() - 1u;
 }
@@ -187,9 +191,9 @@ namespace
 
 // Derivative of cos(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const U &num, const std::vector<llvm::Value *> &,
-                                  llvm::Value *par_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                  std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const std::vector<std::uint32_t> &, const U &num,
+                                  const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                  std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
         return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
@@ -199,9 +203,9 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const U &num
 }
 
 template <typename T>
-llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const variable &var,
-                                  const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
-                                  std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const std::vector<std::uint32_t> &deps,
+                                  const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
+                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -216,10 +220,9 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const variab
     // (i.e., order included).
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
-        // NOTE: the -1 is because we are accessing the sine
-        // of the u var, which is conventionally placed
-        // right before the cosine in the decomposition.
-        auto v0 = taylor_fetch_diff(arr, idx - 1u, order - j, n_uvars);
+        // NOTE: the only hidden dependency contains the index of the
+        // u variable whose definition is sin(var).
+        auto v0 = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
         auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
@@ -239,48 +242,62 @@ llvm::Value *taylor_diff_cos_impl(llvm_state &s, const cos_impl &f, const variab
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_cos_impl(llvm_state &, const cos_impl &, const U &, const std::vector<llvm::Value *> &,
-                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_cos_impl(llvm_state &, const cos_impl &, const std::vector<std::uint32_t> &, const U &,
+                                  const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                  std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of a cosine");
 }
 
 template <typename T>
-llvm::Value *taylor_diff_cos(llvm_state &s, const cos_impl &f, const std::vector<llvm::Value *> &arr,
-                             llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                             std::uint32_t batch_size)
+llvm::Value *taylor_diff_cos(llvm_state &s, const cos_impl &f, const std::vector<std::uint32_t> &deps,
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
+    if (deps.size() != 1u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+            "derivative of the cosine, but a vector of size {} was passed instead"_format(deps.size()));
+    }
+
     return std::visit(
-        [&](const auto &v) { return taylor_diff_cos_impl<T>(s, f, v, arr, par_ptr, n_uvars, order, idx, batch_size); },
+        [&](const auto &v) {
+            return taylor_diff_cos_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+        },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *cos_impl::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *cos_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                        std::uint32_t batch_size) const
 {
-    return taylor_diff_cos<double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_cos<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *cos_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *cos_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_cos<long double>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_cos<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *cos_impl::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+llvm::Value *cos_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
-    return taylor_diff_cos<mppp::real128>(s, *this, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_cos<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
@@ -299,7 +316,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
         s, fn, num, batch_size,
         "heyoka_taylor_diff_cos_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
                                               taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "the cosine");
+        "the cosine", 1);
 }
 
 // Derivative of cos(variable).
@@ -323,10 +340,12 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
-    // - idx of the var argument.
+    // - idx of the var argument,
+    // - idx of the uvar whose definition is sin(var).
     std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::Type::getInt32Ty(context)};
+        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
+        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -345,9 +364,9 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
-        auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
         auto var_idx = f->args().begin() + 4;
+        auto dep_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -373,11 +392,7 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    // NOTE: the -1 is because we are accessing the sine
-                    // of the u var, which is conventionally placed
-                    // right before the cosine in the decomposition.
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j),
-                                                   builder.CreateSub(u_idx, builder.getInt32(1)));
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
                     auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);

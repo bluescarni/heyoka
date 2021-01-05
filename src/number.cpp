@@ -318,7 +318,8 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
 
 #endif
 
-std::vector<expression>::size_type taylor_decompose_in_place(number &&, std::vector<expression> &)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(number &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
 {
     // NOTE: numbers do not require decomposition.
     return 0;

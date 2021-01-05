@@ -167,7 +167,8 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
     node_counter++;
 }
 
-std::vector<expression>::size_type taylor_decompose_in_place(variable &&, std::vector<expression> &)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(variable &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
 {
     // NOTE: variables do not require decomposition.
     return 0;

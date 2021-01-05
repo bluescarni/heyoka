@@ -97,7 +97,7 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 // Default implementation of Taylor decomposition for a function.
 // NOTE: this is a generalisation of the implementation
 // for the binary operators.
-void func_default_td_impl(func_base &fb, std::vector<expression> &u_vars_defs)
+void func_default_td_impl(func_base &fb, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
@@ -301,7 +301,8 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-std::vector<expression>::size_type func::taylor_decompose(std::vector<expression> &u_vars_defs) &&
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+func::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
 {
     auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
 
@@ -317,9 +318,9 @@ std::vector<expression>::size_type func::taylor_decompose(std::vector<expression
     return ret;
 }
 
-llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                   std::uint32_t batch_size) const
+llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                   const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                   std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
@@ -339,7 +340,7 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value 
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_diff_dbl(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    auto retval = ptr()->taylor_diff_dbl(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -349,9 +350,9 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<llvm::Value 
     return retval;
 }
 
-llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size) const
+llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
@@ -371,7 +372,7 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_diff_ldbl(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    auto retval = ptr()->taylor_diff_ldbl(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -383,9 +384,9 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<llvm::Value
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size) const
+llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                    std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size) const
 {
     using namespace fmt::literals;
 
@@ -405,7 +406,7 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<llvm::Value
                 get_display_name()));
     }
 
-    auto retval = ptr()->taylor_diff_f128(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    auto retval = ptr()->taylor_diff_f128(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -656,29 +657,33 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
     };
 }
 
-std::vector<expression>::size_type taylor_decompose_in_place(func &&f, std::vector<expression> &dc)
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+taylor_decompose_in_place(func &&f, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc)
 {
     return std::move(f).taylor_decompose(dc);
 }
 
-llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return f.taylor_diff_dbl(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return f.taylor_diff_dbl(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *taylor_diff_ldbl(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_ldbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return f.taylor_diff_ldbl(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return f.taylor_diff_ldbl(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_f128(llvm_state &s, const func &f, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_f128(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    return f.taylor_diff_f128(s, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return f.taylor_diff_f128(s, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif

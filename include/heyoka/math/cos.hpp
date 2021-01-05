@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -46,14 +47,15 @@ public:
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
-    std::vector<expression>::size_type taylor_decompose(std::vector<expression> &) &&;
-    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                 std::uint32_t, std::uint32_t, std::uint32_t) const;
-    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                 llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t,
-                                  std::uint32_t, std::uint32_t, std::uint32_t) const;
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const;
 #endif
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;
