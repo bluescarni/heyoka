@@ -43,7 +43,7 @@ TEST_CASE("pendulum")
     auto tester = [](auto fp_x, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
-        taylor_adaptive<fp_t> ta{{prime("th"_var) = "v"_var, prime("v"_var) = -9.8_dbl / 1.5_dbl * sin("th"_var)},
+        taylor_adaptive<fp_t> ta{{prime("th"_var) == "v"_var, prime("v"_var) == -9.8_dbl / 1.5_dbl * sin("th"_var)},
                                  {fp_t{0.05}, fp_t{0.025}},
                                  kw::high_accuracy = high_accuracy,
                                  kw::compact_mode = compact_mode};

@@ -25,7 +25,7 @@ int main()
     auto ta = taylor_adaptive<double>{// Definition of the ODE system:
                                       // x' = v
                                       // v' = -9.8 * sin(x)
-                                      {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                      {prime(x) == v, prime(v) == -9.8 * sin(x)},
                                       // Initial conditions
                                       // for x and v.
                                       {0.05, 0.025},

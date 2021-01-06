@@ -69,8 +69,9 @@ TEST_CASE("e3bp")
         = cart_to_ham_ec(std::vector{1.20793759666736, -0.493320558636725, 1.19760678594565, -0.498435147674914,
                                      0.548228167205306, 0.49662691628363});
 
-    taylor_adaptive_dbl tad{{prime(xi) = diff(ham, pxi), prime(eta) = diff(ham, peta), prime(phi) = diff(ham, pphi),
-                             prime(pxi) = -diff(ham, xi), prime(peta) = -diff(ham, eta), prime(pphi) = -diff(ham, phi)},
+    taylor_adaptive_dbl tad{{prime(xi) == diff(ham, pxi), prime(eta) == diff(ham, peta), prime(phi) == diff(ham, pphi),
+                             prime(pxi) == -diff(ham, xi), prime(peta) == -diff(ham, eta),
+                             prime(pphi) == -diff(ham, phi)},
                             init_state};
 
     const auto &st = tad.get_state();

@@ -22,7 +22,7 @@ TEST_CASE("basic")
 
     llvm_state s;
     auto [x, y] = make_vars("x", "y");
-    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 21, 1, true, false);
+    taylor_add_jet_dbl(s, "foo", {prime(x) == y, prime(y) == (1_dbl - x * x) * y - x}, 21, 1, true, false);
 
     std::cout << s.get_ir() << '\n';
 }

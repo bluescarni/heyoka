@@ -144,7 +144,7 @@ struct HEYOKA_DLL_PUBLIC prime_wrapper {
     prime_wrapper &operator=(prime_wrapper &&) noexcept;
     ~prime_wrapper();
 
-    std::pair<expression, expression> operator=(expression) &&;
+    std::pair<expression, expression> operator==(expression) const;
 };
 
 } // namespace detail

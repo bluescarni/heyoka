@@ -133,9 +133,9 @@ prime_wrapper &prime_wrapper::operator=(prime_wrapper &&) noexcept = default;
 
 prime_wrapper::~prime_wrapper() = default;
 
-std::pair<expression, expression> prime_wrapper::operator=(expression e) &&
+std::pair<expression, expression> prime_wrapper::operator==(expression e) const
 {
-    return std::pair{expression{variable{std::move(m_str)}}, std::move(e)};
+    return std::pair{expression{variable{m_str}}, std::move(e)};
 }
 
 } // namespace detail

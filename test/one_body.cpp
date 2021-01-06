@@ -29,8 +29,8 @@ TEST_CASE("one_body")
 
     auto [s_x, s_v] = kep_to_cart({1., .5, .0001, 0., 0., 0.}, 1.);
 
-    taylor_adaptive<double> ta{{prime(x) = vx, prime(y) = vy, prime(z) = vz, prime(vx) = -x * r_m3,
-                                prime(vy) = -y * r_m3, prime(vz) = -z * r_m3},
+    taylor_adaptive<double> ta{{prime(x) == vx, prime(y) == vy, prime(z) == vz, prime(vx) == -x * r_m3,
+                                prime(vy) == -y * r_m3, prime(vz) == -z * r_m3},
                                {s_x[0], s_x[1], s_x[2], s_v[0], s_v[1], s_v[2]},
                                kw::high_accuracy = true,
                                kw::tol = 1e-18};

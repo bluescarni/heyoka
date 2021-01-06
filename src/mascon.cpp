@@ -58,12 +58,12 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
 
     // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of pairwise_sum for
     // efficiency and to allow compact mode to do his job)
-    retval.push_back(prime(x) = vx);
-    retval.push_back(prime(y) = vy);
-    retval.push_back(prime(z) = vz);
-    retval.push_back(prime(vx) = pairwise_sum(x_acc) - centripetal_x - coriolis_x);
-    retval.push_back(prime(vy) = pairwise_sum(y_acc) - centripetal_y - coriolis_y);
-    retval.push_back(prime(vz) = pairwise_sum(z_acc) - centripetal_z - coriolis_z);
+    retval.push_back(prime(x) == vx);
+    retval.push_back(prime(y) == vy);
+    retval.push_back(prime(z) == vz);
+    retval.push_back(prime(vx) == pairwise_sum(x_acc) - centripetal_x - coriolis_x);
+    retval.push_back(prime(vy) == pairwise_sum(y_acc) - centripetal_y - coriolis_y);
+    retval.push_back(prime(vz) == pairwise_sum(z_acc) - centripetal_z - coriolis_z);
 
     return retval;
 }
