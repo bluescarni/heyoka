@@ -224,6 +224,10 @@ expression operator+(expression e1, expression e2)
                 // e1 + 0 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
             }
+            if (std::visit([](const auto &x) { return x < 0; }, v2.value())) {
+                // e1 + -x = e1 - x.
+                return expression{std::forward<decltype(v1)>(v1)} - expression{-std::forward<decltype(v2)>(v2)};
+            }
             // NOTE: fall through the standard case if e2 is not zero.
         }
 
@@ -256,6 +260,10 @@ expression operator-(expression e1, expression e2)
             if (is_zero(v2)) {
                 // e1 - 0 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
+            }
+            if (std::visit([](const auto &x) { return x < 0; }, v2.value())) {
+                // e1 - -x = e1 + x.
+                return expression{std::forward<decltype(v1)>(v1)} + expression{-std::forward<decltype(v2)>(v2)};
             }
             // NOTE: fall through the standard case if e2 is not zero.
         }
