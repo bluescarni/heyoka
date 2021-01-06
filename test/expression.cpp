@@ -396,3 +396,11 @@ TEST_CASE("get_param_size")
     REQUIRE(get_param_size(par[122] + par[123]) == 124u);
     REQUIRE(get_param_size(par[500] - sin(cos(par[1] + "y"_var) + par[4])) == 501u);
 }
+
+TEST_CASE("binary simpls")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(x + -1. == x - 1.);
+    REQUIRE(y - -1. == y + 1.);
+}
