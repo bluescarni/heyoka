@@ -32,7 +32,7 @@ int main()
 
     const auto x0 = 3.0;
 
-    taylor_adaptive<double> ta{{prime(x) == x * x}, {x0}, kw::high_accuracy = true, kw::tol = 1e-18};
+    taylor_adaptive<double> ta{{prime(x) = x * x}, {x0}, kw::high_accuracy = true, kw::tol = 1e-18};
 
     const auto final_time = 0.3333333329479479;
 

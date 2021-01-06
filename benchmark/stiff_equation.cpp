@@ -23,7 +23,7 @@ int main()
     for (unsigned i = 1u; i < 6; ++i) {
         // Van der pool stiff equation
         auto mu = expression{number{std::pow(10, i)}};
-        taylor_adaptive<double> taylor{{prime(y1) == y2, prime(y2) == mu * (1_dbl - y1 * y1) * y2 - y1}, {2., 0.}};
+        taylor_adaptive<double> taylor{{prime(y1) = y2, prime(y2) = mu * (1_dbl - y1 * y1) * y2 - y1}, {2., 0.}};
         std::cout << "Stiffness param " << mu << ": ";
 
         auto start = high_resolution_clock::now();

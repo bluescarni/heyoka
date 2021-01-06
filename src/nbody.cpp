@@ -106,9 +106,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
         // on all particles.
         for (std::uint32_t i = 0; i < n_fc_massive; ++i) {
             // r' = v.
-            retval.push_back(prime(x_vars[i]) == vx_vars[i]);
-            retval.push_back(prime(y_vars[i]) == vy_vars[i]);
-            retval.push_back(prime(z_vars[i]) == vz_vars[i]);
+            retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+            retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+            retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
             // Compute the total acceleration on body i,
             // accumulating the result in x/y/z_acc. Part of the
@@ -151,29 +151,29 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             }
 
             // Add the expressions of the accelerations to the system.
-            retval.push_back(prime(vx_vars[i]) == pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) == pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) == pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
         }
 
         // All the accelerations on the massless particles
         // have already been accumulated in the loop above.
         // We just need to perform the pairwise sums on x/y/z_acc.
         for (std::uint32_t i = n_fc_massive; i < n; ++i) {
-            retval.push_back(prime(x_vars[i]) == vx_vars[i]);
-            retval.push_back(prime(y_vars[i]) == vy_vars[i]);
-            retval.push_back(prime(z_vars[i]) == vz_vars[i]);
+            retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+            retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+            retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
-            retval.push_back(prime(vx_vars[i]) == pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) == pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) == pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
         }
     } else {
         for (std::uint32_t i = 0; i < n; ++i) {
             // r' = v.
-            retval.push_back(prime(x_vars[i]) == vx_vars[i]);
-            retval.push_back(prime(y_vars[i]) == vy_vars[i]);
-            retval.push_back(prime(z_vars[i]) == vz_vars[i]);
+            retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+            retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+            retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
             // Compute the total acceleration on body i,
             // accumulating the result in x/y/z_acc. Part of the
@@ -215,9 +215,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             }
 
             // Add the expressions of the accelerations to the system.
-            retval.push_back(prime(vx_vars[i]) == pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) == pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) == pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
         }
     }
 
@@ -266,9 +266,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
     // on all particles.
     for (std::uint32_t i = 0; i < n_massive; ++i) {
         // r' = v.
-        retval.push_back(prime(x_vars[i]) == vx_vars[i]);
-        retval.push_back(prime(y_vars[i]) == vy_vars[i]);
-        retval.push_back(prime(z_vars[i]) == vz_vars[i]);
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
         // Compute the total acceleration on body i,
         // accumulating the result in x/y/z_acc. Part of the
@@ -311,22 +311,22 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) == pairwise_sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) == pairwise_sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) == pairwise_sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
     }
 
     // All the accelerations on the massless particles
     // have already been accumulated in the loop above.
     // We just need to perform the pairwise sums on x/y/z_acc.
     for (std::uint32_t i = n_massive; i < n; ++i) {
-        retval.push_back(prime(x_vars[i]) == vx_vars[i]);
-        retval.push_back(prime(y_vars[i]) == vy_vars[i]);
-        retval.push_back(prime(z_vars[i]) == vz_vars[i]);
+        retval.push_back(prime(x_vars[i]) = vx_vars[i]);
+        retval.push_back(prime(y_vars[i]) = vy_vars[i]);
+        retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
-        retval.push_back(prime(vx_vars[i]) == pairwise_sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) == pairwise_sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) == pairwise_sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
     }
 
     return retval;

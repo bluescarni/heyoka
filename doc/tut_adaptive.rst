@@ -46,7 +46,7 @@ In this case, we use the ``double`` type, meaning that the integration
 will be carried out in double precision.
 
 As (mandatory) construction arguments, we pass in the system of
-differential equations using the syntax ``prime(x) == ...``, and a set
+differential equations using the syntax ``prime(x) = ...``, and a set
 of initial conditions for ``x`` and ``v`` respectively.
 
 Let's try to print to screen the integrator object:

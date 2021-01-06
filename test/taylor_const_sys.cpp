@@ -92,8 +92,8 @@ TEST_CASE("taylor const sys")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
-                                 {prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                  prime(z) == expression{number{fp_t{0}}}},
+                                 {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                  prime(z) = expression{number{fp_t{0}}}},
                                  1, 1, high_accuracy, compact_mode);
 
             s.compile();
@@ -118,8 +118,8 @@ TEST_CASE("taylor const sys")
 
             taylor_add_jet<fp_t>(
                 s, "jet",
-                {prime(x) == par[0], prime(y) == expression{number{fp_t{-2}}}, prime(z) == expression{number{fp_t{0}}}},
-                1, 1, high_accuracy, compact_mode);
+                {prime(x) = par[0], prime(y) = expression{number{fp_t{-2}}}, prime(z) = expression{number{fp_t{0}}}}, 1,
+                1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -144,8 +144,8 @@ TEST_CASE("taylor const sys")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
-                                 {prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                  prime(z) == expression{number{fp_t{0}}}},
+                                 {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                  prime(z) = expression{number{fp_t{0}}}},
                                  1, 2, high_accuracy, compact_mode);
 
             s.compile();
@@ -181,8 +181,8 @@ TEST_CASE("taylor const sys")
 
             taylor_add_jet<fp_t>(
                 s, "jet",
-                {prime(x) == expression{number{fp_t{1}}}, prime(y) == par[1], prime(z) == expression{number{fp_t{0}}}},
-                1, 2, high_accuracy, compact_mode);
+                {prime(x) = expression{number{fp_t{1}}}, prime(y) = par[1], prime(z) = expression{number{fp_t{0}}}}, 1,
+                2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -218,8 +218,8 @@ TEST_CASE("taylor const sys")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
-                                 {prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                  prime(z) == expression{number{fp_t{0}}}},
+                                 {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                  prime(z) = expression{number{fp_t{0}}}},
                                  2, 1, high_accuracy, compact_mode);
 
             s.compile();
@@ -246,8 +246,8 @@ TEST_CASE("taylor const sys")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
-                                 {prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                  prime(z) == expression{number{fp_t{0}}}},
+                                 {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                  prime(z) = expression{number{fp_t{0}}}},
                                  2, 2, high_accuracy, compact_mode);
 
             s.compile();
@@ -291,8 +291,8 @@ TEST_CASE("taylor const sys")
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet",
-                                 {prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                  prime(z) == expression{number{fp_t{0}}}},
+                                 {prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                  prime(z) = expression{number{fp_t{0}}}},
                                  3, 3, high_accuracy, compact_mode);
 
             s.compile();
@@ -336,7 +336,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == par[0], prime(y) == par[1], prime(z) == par[2]}, 3, 3,
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = par[0], prime(y) = par[1], prime(z) = par[2]}, 3, 3,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -380,8 +380,8 @@ TEST_CASE("taylor const sys")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({prime(x) == expression{number{fp_t{1}}}, prime(y) == expression{number{fp_t{-2}}},
-                                    prime(z) == expression{number{fp_t{0}}}},
+        compare_batch_scalar<fp_t>({prime(x) = expression{number{fp_t{1}}}, prime(y) = expression{number{fp_t{-2}}},
+                                    prime(z) = expression{number{fp_t{0}}}},
                                    opt_level, high_accuracy, compact_mode);
     };
 

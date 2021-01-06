@@ -90,7 +90,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == y, prime(y) == x}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -110,7 +110,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == y, prime(y) == x}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -137,7 +137,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == y, prime(y) == x}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -159,7 +159,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == y, prime(y) == x}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -192,7 +192,7 @@ TEST_CASE("taylor const sys")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {prime(x) == y, prime(y) == x}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -237,7 +237,7 @@ TEST_CASE("taylor const sys")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({prime(x) == y, prime(y) == x}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({prime(x) = y, prime(y) = x}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {true, false}) {
