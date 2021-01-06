@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
     auto counter = 0u;
     for (const auto &ex : ta.get_decomposition()) {
-        std::cout << "u_" << counter++ << " = " << ex << '\n';
+        std::cout << "u_" << counter++ << " = " << ex.first << '\n';
     }
 
     std::cout << "Construction time: " << elapsed << "ms\n";
