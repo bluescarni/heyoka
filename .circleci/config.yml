@@ -2,26 +2,26 @@
 version: 2.1
 
 jobs:
-  bionic_gcc7_conda_asan:
+  focal_gcc9_conda_asan:
     docker:
-    - image: circleci/buildpack-deps:bionic
+    - image: circleci/buildpack-deps:focal
     steps:
     - checkout
     - run:
         name: Build and test
-        command: bash ./tools/circleci_bionic_gcc7_conda_asan.sh
-  bionic_gcc7_llvm10_conda_asan:
+        command: bash ./tools/circleci_focal_gcc9_conda_asan.sh
+  focal_gcc9_llvm10_conda_asan:
     docker:
-    - image: circleci/buildpack-deps:bionic
+    - image: circleci/buildpack-deps:focal
     steps:
     - checkout
     - run:
         name: Build and test
-        command: bash ./tools/circleci_bionic_gcc7_llvm10_conda_asan.sh
+        command: bash ./tools/circleci_focal_gcc9_llvm10_conda_asan.sh
 
 workflows:
   version: 2.1
   all_builds:
     jobs:
-    - bionic_gcc7_conda_asan
-    - bionic_gcc7_llvm10_conda_asan
+    - focal_gcc9_conda_asan
+    - focal_gcc9_llvm10_conda_asan
