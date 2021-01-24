@@ -28,6 +28,8 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
+#include <fmt/format.h>
+
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
@@ -616,6 +618,19 @@ void llvm_state::optimise()
 void llvm_state::compile()
 {
     check_uncompiled(__func__);
+
+    // Run a verification on the module before compiling.
+    {
+        std::string out;
+        llvm::raw_string_ostream ostr(out);
+
+        if (llvm::verifyModule(*m_module, &ostr)) {
+            using namespace fmt::literals;
+
+            throw std::runtime_error(
+                "The verification of the module '{}' produced an error:\n{}"_format(m_module_name, ostr.str()));
+        }
+    }
 
     // Store a snapshot of the IR before compiling.
     m_ir_snapshot = get_ir();
