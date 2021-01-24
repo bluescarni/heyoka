@@ -46,7 +46,7 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression pi();
+HEYOKA_DLL_PUBLIC extern const expression pi;
 
 } // namespace heyoka
 

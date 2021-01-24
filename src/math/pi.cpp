@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
@@ -32,6 +33,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -52,16 +54,17 @@ namespace
 
 // Implementation of codegen for pi.
 template <typename T>
-auto pi_impl_codegen(llvm_state &s, std::uint32_t batch_size)
+llvm::Value *pi_impl_codegen(llvm_state &s, std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double> || std::is_same_v<T, long double>) {
         return vector_splat(s.builder(), codegen<T>(s, number{boost::math::constants::pi<T>()}), batch_size);
-    }
 #if defined(HEYOKA_HAVE_REAL128)
-    else if constexpr (std::is_same_v<T, mppp::real128>) {
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return vector_splat(s.builder(), codegen<mppp::real128>(s, number{mppp::pi_128}), batch_size);
-    }
 #endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
 }
 
 } // namespace
@@ -106,11 +109,12 @@ llvm::Value *pi_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uin
 namespace
 {
 
+// NOTE: perhaps later on this can become a generic implementation
+// for nullary functions, in the same mold as
+// taylor_c_diff_func_unary_num_det().
 template <typename T>
 auto taylor_c_diff_func_pi(llvm_state &s, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -119,8 +123,8 @@ auto taylor_c_diff_func_pi(llvm_state &s, std::uint32_t batch_size)
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Compose the function name.
-    const auto fname
-        = "heyoka_taylor_diff_pi_{}"_format(taylor_mangle_suffix(to_llvm_vector_type<T>(context, batch_size)));
+    using namespace fmt::literals;
+    const auto fname = "heyoka_taylor_diff_pi_{}"_format(taylor_mangle_suffix(val_t));
 
     // The function arguments:
     // - diff order,
@@ -211,9 +215,6 @@ llvm::Function *pi_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, s
 
 } // namespace detail
 
-expression pi()
-{
-    return expression{func{detail::pi_impl()}};
-}
+const expression pi{func{detail::pi_impl()}};
 
 } // namespace heyoka

@@ -102,7 +102,7 @@ TEST_CASE("taylor pi")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {pi(), x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {pi, x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -122,7 +122,7 @@ TEST_CASE("taylor pi")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {pi(), x + y}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {pi, x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -149,7 +149,7 @@ TEST_CASE("taylor pi")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {pi(), x + y}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {pi, x + y}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -171,7 +171,7 @@ TEST_CASE("taylor pi")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {pi() + x, x + y}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {pi + x, x + y}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -204,7 +204,7 @@ TEST_CASE("taylor pi")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x + pi(), x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {x + pi, x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -249,7 +249,7 @@ TEST_CASE("taylor pi")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({x + pi(), x + y}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({x + pi, x + y}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {false, true}) {
