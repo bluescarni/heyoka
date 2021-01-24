@@ -12,6 +12,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
+#include <heyoka/math/pi.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>

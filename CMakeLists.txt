@@ -179,6 +179,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sqrt.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/square.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tan.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pi.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
