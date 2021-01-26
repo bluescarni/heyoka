@@ -49,7 +49,7 @@ namespace heyoka
 func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
     if (m_name.empty()) {
-        throw std::invalid_argument("Cannot create a function with no display name");
+        throw std::invalid_argument("Cannot create a function with no name");
     }
 }
 

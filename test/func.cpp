@@ -46,8 +46,7 @@ TEST_CASE("func minimal")
     REQUIRE(f.get_name() == "f");
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
-    REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument,
-                           Message("Cannot create a function with no display name"));
+    REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
 
     llvm_state s;
     auto fake_val = reinterpret_cast<llvm::Value *>(&s);
