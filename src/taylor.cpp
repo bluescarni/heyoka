@@ -2600,8 +2600,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
-    // the second argument a const float pointer to the pars. These arrays cannot overlap.
-    std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    // the second argument a const float pointer to the pars, the third argument
+    // a float pointer to the time. These arrays cannot overlap.
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(s.builder().getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -2624,6 +2625,12 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     par_ptr->addAttr(llvm::Attribute::NoCapture);
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto time_ptr = par_ptr + 1;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
