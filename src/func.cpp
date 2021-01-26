@@ -176,11 +176,6 @@ const std::string &func::get_name() const
     return ptr()->get_name();
 }
 
-void func::to_stream(std::ostream &os) const
-{
-    ptr()->to_stream(os);
-}
-
 const std::vector<expression> &func::args() const
 {
     return ptr()->args();
@@ -539,7 +534,7 @@ void swap(func &a, func &b) noexcept
 
 std::ostream &operator<<(std::ostream &os, const func &f)
 {
-    f.to_stream(os);
+    f.ptr()->to_stream(os);
 
     return os;
 }

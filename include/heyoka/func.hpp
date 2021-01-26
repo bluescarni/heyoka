@@ -473,9 +473,12 @@ using is_func = std::conjunction<std::is_same<T, uncvref_t<T>>, std::is_default_
 
 HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
+
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
 
     // Pointer to the inner base.
     std::unique_ptr<detail::func_inner_base> m_ptr;
@@ -510,7 +513,6 @@ public:
     void *get_ptr();
 
     const std::string &get_name() const;
-    void to_stream(std::ostream &) const;
 
     const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
@@ -548,8 +550,6 @@ public:
     llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const;
 #endif
 };
-
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
 
 HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
 

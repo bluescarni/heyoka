@@ -10,6 +10,7 @@
 
 #include <initializer_list>
 #include <random>
+#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -82,6 +83,14 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             }
         }
     }
+}
+
+TEST_CASE("stream output")
+{
+    std::ostringstream oss;
+    oss << "x"_var + hy::time;
+
+    REQUIRE(oss.str() == "(x + t)");
 }
 
 TEST_CASE("taylor time")
