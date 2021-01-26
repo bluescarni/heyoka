@@ -43,11 +43,10 @@ TEST_CASE("func minimal")
 
     func f(func_00{{"x"_var, "y"_var}});
     REQUIRE(f.get_type_index() == typeid(func_00));
-    REQUIRE(f.get_display_name() == "f");
+    REQUIRE(f.get_name() == "f");
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
-    REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument,
-                           Message("Cannot create a function with no display name"));
+    REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument, Message("Cannot create a function with no name"));
 
     llvm_state s;
     auto fake_val = reinterpret_cast<llvm::Value *>(&s);
@@ -95,7 +94,7 @@ TEST_CASE("func minimal")
     auto f2(f);
     REQUIRE(orig_ptr != f2.get_ptr());
     REQUIRE(f2.get_type_index() == typeid(func_00));
-    REQUIRE(f2.get_display_name() == "f");
+    REQUIRE(f2.get_name() == "f");
     REQUIRE(f2.args() == std::vector{"x"_var, "y"_var});
 
     auto f3(std::move(f));
@@ -645,4 +644,29 @@ TEST_CASE("func subs")
 
     f2 = subs(expression{f1}, {{"x", "z"_var}, {"y", 42_dbl}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, 42_dbl}})});
+}
+
+struct func_16 : func_base {
+    func_16(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_16(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    void to_stream(std::ostream &os) const
+    {
+        os << "Custom to stream";
+    }
+};
+
+TEST_CASE("func to_stream")
+{
+    auto f1 = func(func_15{{"x"_var, "y"_var}});
+
+    std::cout << "Default stream: " << f1 << '\n';
+
+    auto f2 = func(func_16{{"x"_var, "y"_var}});
+
+    std::ostringstream oss;
+    oss << f2;
+    REQUIRE(oss.str() == "Custom to stream");
 }

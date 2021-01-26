@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_TIME_HPP
 
 #include <cstdint>
+#include <ostream>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -29,6 +30,8 @@ class HEYOKA_DLL_PUBLIC time_impl : public func_base
 {
 public:
     time_impl();
+
+    void to_stream(std::ostream &) const;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,

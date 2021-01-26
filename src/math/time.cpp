@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <ostream>
 #include <stdexcept>
 #include <vector>
 
@@ -45,6 +46,11 @@ namespace detail
 {
 
 time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
+
+void time_impl::to_stream(std::ostream &os) const
+{
+    os << 't';
+}
 
 namespace
 {
