@@ -645,3 +645,28 @@ TEST_CASE("func subs")
     f2 = subs(expression{f1}, {{"x", "z"_var}, {"y", 42_dbl}});
     REQUIRE(f2 == expression{func(func_15{{"z"_var, 42_dbl}})});
 }
+
+struct func_16 : func_base {
+    func_16(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_16(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    void to_stream(std::ostream &os) const
+    {
+        os << "Custom to stream";
+    }
+};
+
+TEST_CASE("func to_stream")
+{
+    auto f1 = func(func_15{{"x"_var, "y"_var}});
+
+    std::cout << "Default stream: " << f1 << '\n';
+
+    auto f2 = func(func_16{{"x"_var, "y"_var}});
+
+    std::ostringstream oss;
+    oss << f2;
+    REQUIRE(oss.str() == "Custom to stream");
+}

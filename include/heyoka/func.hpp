@@ -62,9 +62,6 @@ public:
 namespace detail
 {
 
-HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &,
-                                            std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
-
 struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual ~func_inner_base();
     virtual std::unique_ptr<func_inner_base> clone() const = 0;
@@ -74,6 +71,8 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual void *get_ptr() = 0;
 
     virtual const std::string &get_name() const = 0;
+    virtual void to_stream(std::ostream &) const = 0;
+
     virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
@@ -110,6 +109,13 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const = 0;
 #endif
 };
+
+template <typename T>
+using func_to_stream_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().to_stream(std::declval<std::ostream &>()));
+
+template <typename T>
+inline constexpr bool func_has_to_stream_v = std::is_same_v<detected_t<func_to_stream_t, T>, void>;
 
 template <typename T>
 using func_codegen_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_dbl(
@@ -248,6 +254,11 @@ inline constexpr bool func_has_taylor_c_diff_func_f128_v
 
 #endif
 
+HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &,
+                                            std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
+
+HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostream &, const func_base &);
+
 template <typename T>
 struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     T m_value;
@@ -291,6 +302,15 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         // in the derived class).
         return static_cast<const func_base *>(&m_value)->get_name();
     }
+    void to_stream(std::ostream &os) const final
+    {
+        if constexpr (func_has_to_stream_v<T>) {
+            m_value.to_stream(os);
+        } else {
+            func_default_to_stream_impl(os, static_cast<const func_base &>(m_value));
+        }
+    }
+
     const std::vector<expression> &args() const final
     {
         return static_cast<const func_base *>(&m_value)->args();
@@ -490,6 +510,8 @@ public:
     void *get_ptr();
 
     const std::string &get_name() const;
+    void to_stream(std::ostream &) const;
+
     const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 

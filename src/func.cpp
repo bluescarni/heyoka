@@ -105,6 +105,22 @@ void func_default_td_impl(func_base &fb, std::vector<std::pair<expression, std::
     }
 }
 
+// Default implementation of to_stream() for func.
+void func_default_to_stream_impl(std::ostream &os, const func_base &f)
+{
+    os << f.get_name() << '(';
+
+    const auto &args = f.args();
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        os << args[i];
+        if (i != args.size() - 1u) {
+            os << ", ";
+        }
+    }
+
+    os << ')';
+}
+
 func_inner_base::~func_inner_base() = default;
 
 } // namespace detail
@@ -158,6 +174,11 @@ void *func::get_ptr()
 const std::string &func::get_name() const
 {
     return ptr()->get_name();
+}
+
+void func::to_stream(std::ostream &os) const
+{
+    ptr()->to_stream(os);
 }
 
 const std::vector<expression> &func::args() const
@@ -518,17 +539,9 @@ void swap(func &a, func &b) noexcept
 
 std::ostream &operator<<(std::ostream &os, const func &f)
 {
-    os << f.get_name() << '(';
+    f.to_stream(os);
 
-    const auto &args = f.args();
-    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
-        os << args[i];
-        if (i != args.size() - 1u) {
-            os << ", ";
-        }
-    }
-
-    return os << ')';
+    return os;
 }
 
 std::size_t hash(const func &f)
