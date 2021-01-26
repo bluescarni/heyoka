@@ -43,7 +43,7 @@ TEST_CASE("func minimal")
 
     func f(func_00{{"x"_var, "y"_var}});
     REQUIRE(f.get_type_index() == typeid(func_00));
-    REQUIRE(f.get_display_name() == "f");
+    REQUIRE(f.get_name() == "f");
     REQUIRE(f.args() == std::vector{"x"_var, "y"_var});
 
     REQUIRE_THROWS_MATCHES(func{func_00{""}}, std::invalid_argument,
@@ -95,7 +95,7 @@ TEST_CASE("func minimal")
     auto f2(f);
     REQUIRE(orig_ptr != f2.get_ptr());
     REQUIRE(f2.get_type_index() == typeid(func_00));
-    REQUIRE(f2.get_display_name() == "f");
+    REQUIRE(f2.get_name() == "f");
     REQUIRE(f2.args() == std::vector{"x"_var, "y"_var});
 
     auto f3(std::move(f));

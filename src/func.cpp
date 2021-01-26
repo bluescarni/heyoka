@@ -46,10 +46,9 @@
 namespace heyoka
 {
 
-func_base::func_base(std::string display_name, std::vector<expression> args)
-    : m_display_name(std::move(display_name)), m_args(std::move(args))
+func_base::func_base(std::string name, std::vector<expression> args) : m_name(std::move(name)), m_args(std::move(args))
 {
-    if (m_display_name.empty()) {
+    if (m_name.empty()) {
         throw std::invalid_argument("Cannot create a function with no display name");
     }
 }
@@ -64,9 +63,9 @@ func_base &func_base::operator=(func_base &&) noexcept = default;
 
 func_base::~func_base() = default;
 
-const std::string &func_base::get_display_name() const
+const std::string &func_base::get_name() const
 {
-    return m_display_name;
+    return m_name;
 }
 
 const std::vector<expression> &func_base::args() const
@@ -156,9 +155,9 @@ void *func::get_ptr()
     return ptr()->get_ptr();
 }
 
-const std::string &func::get_display_name() const
+const std::string &func::get_name() const
 {
-    return ptr()->get_display_name();
+    return ptr()->get_name();
 }
 
 const std::vector<expression> &func::args() const
@@ -178,20 +177,20 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
         throw std::invalid_argument(
             "Null pointer detected in the array of values passed to func::codegen_dbl() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto ret = ptr()->codegen_dbl(s, v);
 
     if (ret == nullptr) {
         throw std::invalid_argument(
-            "The double codegen for the function '{}' returned a null pointer"_format(get_display_name()));
+            "The double codegen for the function '{}' returned a null pointer"_format(get_name()));
     }
 
     return ret;
@@ -204,20 +203,20 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
         throw std::invalid_argument(
             "Null pointer detected in the array of values passed to func::codegen_ldbl() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto ret = ptr()->codegen_ldbl(s, v);
 
     if (ret == nullptr) {
         throw std::invalid_argument(
-            "The long double codegen for the function '{}' returned a null pointer"_format(get_display_name()));
+            "The long double codegen for the function '{}' returned a null pointer"_format(get_name()));
     }
 
     return ret;
@@ -232,20 +231,20 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     if (detail::llvm_valvec_has_null(v)) {
         throw std::invalid_argument(
             "Null pointer detected in the array of values passed to func::codegen_f128() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto ret = ptr()->codegen_f128(s, v);
 
     if (ret == nullptr) {
         throw std::invalid_argument(
-            "The float128 codegen for the function '{}' returned a null pointer"_format(get_display_name()));
+            "The float128 codegen for the function '{}' returned a null pointer"_format(get_name()));
     }
 
     return ret;
@@ -276,7 +275,7 @@ double func::eval_num_dbl(const std::vector<double> &v) const
 
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     return ptr()->eval_num_dbl(v);
@@ -289,13 +288,13 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     if (i >= v.size()) {
         throw std::invalid_argument(
             "Invalid index supplied to the double numerical evaluation of the derivative of function '{}': index {} was supplied, but the number of arguments is only {}"_format(
-                get_display_name(), args().size(), v.size()));
+                get_name(), args().size(), v.size()));
     }
 
     return ptr()->deval_num_dbl(v, i);
@@ -312,7 +311,7 @@ func::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32
         throw std::invalid_argument(
             "Invalid value returned by the Taylor decomposition function for the function '{}': "
             "the return value is {}, which is not less than the current size of the decomposition "
-            "({})"_format(get_display_name(), ret, u_vars_defs.size()));
+            "({})"_format(get_name(), ret, u_vars_defs.size()));
     }
 
     return ret;
@@ -327,30 +326,29 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_
 
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
     if (time_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null time_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Null time_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_diff_dbl() for the function '{}'"_format(
-                get_display_name()));
+            "Zero number of u variables detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
     auto retval = ptr()->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_diff_dbl() for the function '{}'"_format(get_display_name()));
+            "Null return value detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -365,30 +363,29 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32
 
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_display_name()));
+            "Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
     if (time_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null time_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_display_name()));
+            "Null time_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_diff_ldbl() for the function '{}'"_format(
-                get_display_name()));
+            "Zero number of u variables detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
     auto retval = ptr()->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_display_name()));
+            "Null return value detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -405,30 +402,29 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
 
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null par_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_display_name()));
+            "Null par_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
     if (time_ptr == nullptr) {
         throw std::invalid_argument(
-            "Null time_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_display_name()));
+            "Null time_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_diff_f128() for the function '{}'"_format(get_display_name()));
+            "Zero batch size detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
-            "Zero number of u variables detected in func::taylor_diff_f128() for the function '{}'"_format(
-                get_display_name()));
+            "Zero number of u variables detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
     auto retval = ptr()->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_diff_f128() for the function '{}'"_format(get_display_name()));
+            "Null return value detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -442,22 +438,20 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
-                get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
             "Zero number of u variables detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(
-                get_display_name()));
+            "Null return value detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -469,22 +463,20 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
-                get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
             "Zero number of u variables detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(
-                get_display_name()));
+            "Null return value detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -498,22 +490,20 @@ llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uva
 
     if (batch_size == 0u) {
         throw std::invalid_argument(
-            "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
-                get_display_name()));
+            "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(get_name()));
     }
 
     if (n_uvars == 0u) {
         throw std::invalid_argument(
             "Zero number of u variables detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
-                get_display_name()));
+                get_name()));
     }
 
     auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
-            "Null return value detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(
-                get_display_name()));
+            "Null return value detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(get_name()));
     }
 
     return retval;
@@ -528,7 +518,7 @@ void swap(func &a, func &b) noexcept
 
 std::ostream &operator<<(std::ostream &os, const func &f)
 {
-    os << f.get_display_name() << '(';
+    os << f.get_name() << '(';
 
     const auto &args = f.args();
     for (decltype(args.size()) i = 0; i < args.size(); ++i) {
@@ -547,7 +537,7 @@ std::size_t hash(const func &f)
     // - the function name,
     // - the function inner type index,
     // - the arguments' hashes.
-    std::size_t seed = std::hash<std::string>{}(f.get_display_name());
+    std::size_t seed = std::hash<std::string>{}(f.get_name());
 
     boost::hash_combine(seed, f.get_type_index());
 
@@ -560,8 +550,7 @@ std::size_t hash(const func &f)
 
 bool operator==(const func &a, const func &b)
 {
-    return a.get_display_name() == b.get_display_name() && a.get_type_index() == b.get_type_index()
-           && a.args() == b.args();
+    return a.get_name() == b.get_name() && a.get_type_index() == b.get_type_index() && a.args() == b.args();
 }
 
 bool operator!=(const func &a, const func &b)

@@ -115,7 +115,7 @@ inline expression func_inner<T>::diff(const std::string &s) const
     if constexpr (func_has_diff_v<T>) {
         return m_value.diff(s);
     } else {
-        throw not_implemented_error("The derivative is not implemented for the function '" + get_display_name() + "'");
+        throw not_implemented_error("The derivative is not implemented for the function '" + get_name() + "'");
     }
 }
 

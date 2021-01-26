@@ -40,7 +40,7 @@ namespace heyoka
 
 class HEYOKA_DLL_PUBLIC func_base
 {
-    std::string m_display_name;
+    std::string m_name;
     std::vector<expression> m_args;
 
 public:
@@ -54,7 +54,7 @@ public:
 
     ~func_base();
 
-    const std::string &get_display_name() const;
+    const std::string &get_name() const;
     const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 };
@@ -73,7 +73,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual const void *get_ptr() const = 0;
     virtual void *get_ptr() = 0;
 
-    virtual const std::string &get_display_name() const = 0;
+    virtual const std::string &get_name() const = 0;
     virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
 
@@ -284,12 +284,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         return &m_value;
     }
 
-    const std::string &get_display_name() const final
+    const std::string &get_name() const final
     {
         // NOTE: make sure we are invoking the member functions
         // from func_base (these functions could have been overriden
         // in the derived class).
-        return static_cast<const func_base *>(&m_value)->get_display_name();
+        return static_cast<const func_base *>(&m_value)->get_name();
     }
     const std::vector<expression> &args() const final
     {
@@ -306,8 +306,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_codegen_dbl_v<T>) {
             return m_value.codegen_dbl(s, v);
         } else {
-            throw not_implemented_error("double codegen is not implemented for the function '" + get_display_name()
-                                        + "'");
+            throw not_implemented_error("double codegen is not implemented for the function '" + get_name() + "'");
         }
     }
     llvm::Value *codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &v) const final
@@ -315,8 +314,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_codegen_ldbl_v<T>) {
             return m_value.codegen_ldbl(s, v);
         } else {
-            throw not_implemented_error("long double codegen is not implemented for the function '" + get_display_name()
-                                        + "'");
+            throw not_implemented_error("long double codegen is not implemented for the function '" + get_name() + "'");
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
@@ -325,8 +323,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_codegen_f128_v<T>) {
             return m_value.codegen_f128(s, v);
         } else {
-            throw not_implemented_error("float128 codegen is not implemented for the function '" + get_display_name()
-                                        + "'");
+            throw not_implemented_error("float128 codegen is not implemented for the function '" + get_name() + "'");
         }
     }
 #endif
@@ -340,7 +337,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_eval_dbl_v<T>) {
             return m_value.eval_dbl(m, pars);
         } else {
-            throw not_implemented_error("double eval is not implemented for the function '" + get_display_name() + "'");
+            throw not_implemented_error("double eval is not implemented for the function '" + get_name() + "'");
         }
     }
     void eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
@@ -349,8 +346,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_eval_batch_dbl_v<T>) {
             m_value.eval_batch_dbl(out, m, pars);
         } else {
-            throw not_implemented_error("double batch eval is not implemented for the function '" + get_display_name()
-                                        + "'");
+            throw not_implemented_error("double batch eval is not implemented for the function '" + get_name() + "'");
         }
     }
     double eval_num_dbl(const std::vector<double> &v) const final
@@ -358,8 +354,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_eval_num_dbl_v<T>) {
             return m_value.eval_num_dbl(v);
         } else {
-            throw not_implemented_error("double numerical eval is not implemented for the function '"
-                                        + get_display_name() + "'");
+            throw not_implemented_error("double numerical eval is not implemented for the function '" + get_name()
+                                        + "'");
         }
     }
     double deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const final
@@ -368,7 +364,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return m_value.deval_num_dbl(v, i);
         } else {
             throw not_implemented_error("double numerical eval of the derivative is not implemented for the function '"
-                                        + get_display_name() + "'");
+                                        + get_name() + "'");
         }
     }
 
@@ -384,8 +380,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_diff_dbl_v<T>) {
             return m_value.taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
         } else {
-            throw not_implemented_error("double Taylor diff is not implemented for the function '" + get_display_name()
-                                        + "'");
+            throw not_implemented_error("double Taylor diff is not implemented for the function '" + get_name() + "'");
         }
     }
     llvm::Value *taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
@@ -396,8 +391,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_diff_ldbl_v<T>) {
             return m_value.taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
         } else {
-            throw not_implemented_error("long double Taylor diff is not implemented for the function '"
-                                        + get_display_name() + "'");
+            throw not_implemented_error("long double Taylor diff is not implemented for the function '" + get_name()
+                                        + "'");
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
@@ -409,8 +404,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         if constexpr (func_has_taylor_diff_f128_v<T>) {
             return m_value.taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
         } else {
-            throw not_implemented_error("float128 Taylor diff is not implemented for the function '"
-                                        + get_display_name() + "'");
+            throw not_implemented_error("float128 Taylor diff is not implemented for the function '" + get_name()
+                                        + "'");
         }
     }
 #endif
@@ -420,7 +415,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return m_value.taylor_c_diff_func_dbl(s, n_uvars, batch_size);
         } else {
             throw not_implemented_error("double Taylor diff in compact mode is not implemented for the function '"
-                                        + get_display_name() + "'");
+                                        + get_name() + "'");
         }
     }
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const final
@@ -429,7 +424,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return m_value.taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
         } else {
             throw not_implemented_error("long double Taylor diff in compact mode is not implemented for the function '"
-                                        + get_display_name() + "'");
+                                        + get_name() + "'");
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
@@ -439,7 +434,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             return m_value.taylor_c_diff_func_f128(s, n_uvars, batch_size);
         } else {
             throw not_implemented_error("float128 Taylor diff in compact mode is not implemented for the function '"
-                                        + get_display_name() + "'");
+                                        + get_name() + "'");
         }
     }
 #endif
@@ -494,7 +489,7 @@ public:
     const void *get_ptr() const;
     void *get_ptr();
 
-    const std::string &get_display_name() const;
+    const std::string &get_name() const;
     const std::vector<expression> &args() const;
     std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it();
 
