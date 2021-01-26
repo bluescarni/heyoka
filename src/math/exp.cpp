@@ -247,7 +247,7 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const exp_impl &f, const std::vector
 } // namespace
 
 llvm::Value *exp_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                        std::uint32_t batch_size) const
 {
@@ -255,7 +255,7 @@ llvm::Value *exp_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uin
 }
 
 llvm::Value *exp_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
@@ -265,7 +265,7 @@ llvm::Value *exp_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::ui
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *exp_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
@@ -312,10 +312,14 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -336,7 +340,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
         auto ord = f->args().begin();
         auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 4;
+        auto var_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

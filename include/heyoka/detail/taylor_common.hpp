@@ -52,10 +52,14 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time_ptr,
     // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), taylor_c_diff_numparam_argtype<T>(s, n)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    taylor_c_diff_numparam_argtype<T>(s, n)};
     // Add the hidden deps at the end.
     fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_deps), llvm::Type::getInt32Ty(context));
 
@@ -77,7 +81,7 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
         auto par_ptr = f->args().begin() + 3;
-        auto num = f->args().begin() + 4;
+        auto num = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

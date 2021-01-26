@@ -988,7 +988,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 
     // Invoke the stepper.
     auto h = max_delta_t;
-    m_step_f(m_state.data(), m_pars.data(), &h);
+    m_step_f(m_state.data(), m_pars.data(), &m_time, &h);
 
     // Update the time.
     m_time += h;
@@ -1330,7 +1330,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    m_step_f(m_state.data(), m_pars.data(), m_delta_ts.data());
+    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data());
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -2328,6 +2328,7 @@ auto taylor_build_function_maps(llvm_state &s,
 // used in taylor_compute_jet() below.
 template <typename T>
 llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
+                                             llvm::Value *time_ptr,
                                              const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
                                              std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
                                              std::uint32_t batch_size)
@@ -2406,8 +2407,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // - current Taylor order,
                     // - u index of the variable,
                     // - array of derivatives,
-                    // - pointer to the param values.
-                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr};
+                    // - pointer to the param values,
+                    // - pointer to the time value(s).
+                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
 
                     // Create the other arguments via the generators.
                     for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -2468,14 +2470,14 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // order is the max derivative order desired, batch_size the batch size.
 // order0 is a pointer to an array of (at least) n_eq * batch_size scalar elements
 // containing the derivatives of order 0. par_ptr is a pointer to an array containing
-// the numerical values of the parameters.
+// the numerical values of the parameters, time_ptr a pointer to the time value(s).
 //
 // The return value is a variant containing either:
 // - in compact mode, the array containing the derivatives of all u variables,
 // - otherwise, the jet of derivatives of the state variables up to order 'order'.
 template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
+taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
 {
@@ -2512,7 +2514,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
                 "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
         }
 
-        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, dc, n_eq, n_uvars, order, batch_size);
+        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
@@ -2520,7 +2522,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
             diff_arr.push_back(
-                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, n_uvars, 0, i, batch_size));
+                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -2537,8 +2539,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                diff_arr.push_back(
-                    taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, n_uvars, cur_order, i, batch_size));
+                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                                  cur_order, i, batch_size));
             }
         }
 
@@ -2600,8 +2602,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
-    // the second argument a const float pointer to the pars. These arrays cannot overlap.
-    std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    // the second argument a const float pointer to the pars, the third argument
+    // a float pointer to the time. These arrays cannot overlap.
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(s.builder().getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -2625,13 +2628,20 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
+    auto time_ptr = par_ptr + 1;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
     assert(bb != nullptr);
     s.builder().SetInsertPoint(bb);
 
     // Compute the jet of derivatives.
-    auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
+    auto diff_variant
+        = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array (size n_eq * (order + 1) * batch_size)
@@ -3440,9 +3450,10 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Prepare the function prototype. The arguments are:
     // - pointer to the current state vector (read & write),
     // - pointer to the parameters (read only),
+    // - pointer to the time value(s) (read only),
     // - pointer to the array of max timesteps (read & write).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -3465,7 +3476,13 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     par_ptr->addAttr(llvm::Attribute::NoAlias);
     par_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto h_ptr = par_ptr + 1;
+    auto time_ptr = par_ptr + 1;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = time_ptr + 1;
     h_ptr->setName("h_ptr");
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -3479,7 +3496,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // NOTE: in taylor_compute_jet() we ensure that n_uvars * order + n_eq
     // is representable as a 32-bit unsigned integer.
     auto diff_variant
-        = taylor_compute_jet<T>(s, state_ptr, par_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
+        = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
 
     llvm::Value *max_abs_state, *max_abs_diff_o, *max_abs_diff_om1;
 

@@ -17,5 +17,6 @@
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
+#include <heyoka/math/time.hpp>
 
 #endif

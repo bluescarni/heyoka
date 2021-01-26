@@ -735,15 +735,15 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
 } // namespace detail
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<long double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -751,8 +751,8 @@ llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const st
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -785,11 +785,15 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operat
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - number/par idx arguments.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),          llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t),      llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        taylor_c_diff_numparam_argtype<T>(s, n0), taylor_c_diff_numparam_argtype<T>(s, n1)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    taylor_c_diff_numparam_argtype<T>(s, n0),
+                                    taylor_c_diff_numparam_argtype<T>(s, n1)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -809,8 +813,8 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operat
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
         auto par_ptr = f->args().begin() + 3;
-        auto num0 = f->args().begin() + 4;
-        auto num1 = f->args().begin() + 5;
+        auto num0 = f->args().begin() + 5;
+        auto num1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -905,12 +909,16 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - number/par idx argument,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),         llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t),     llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        taylor_c_diff_numparam_argtype<T>(s, n), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    taylor_c_diff_numparam_argtype<T>(s, n),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -931,8 +939,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto num = f->args().begin() + 4;
-        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1007,12 +1015,16 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the var argument,
     // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     taylor_c_diff_numparam_argtype<T>(s, n)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    taylor_c_diff_numparam_argtype<T>(s, n)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1033,8 +1045,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto var_idx = f->args().begin() + 4;
-        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1100,12 +1112,16 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the first var argument,
     // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1125,8 +1141,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
         // Fetch the necessary function arguments.
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
-        auto var_idx0 = f->args().begin() + 4;
-        auto var_idx1 = f->args().begin() + 5;
+        auto var_idx0 = f->args().begin() + 5;
+        auto var_idx1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1232,12 +1248,16 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the var argument,
     // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     taylor_c_diff_numparam_argtype<T>(s, n)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    taylor_c_diff_numparam_argtype<T>(s, n)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1258,8 +1278,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto var_idx = f->args().begin() + 4;
-        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1312,12 +1332,16 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - number/par idx argument,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),         llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t),     llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        taylor_c_diff_numparam_argtype<T>(s, n), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    taylor_c_diff_numparam_argtype<T>(s, n),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1338,8 +1362,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto num = f->args().begin() + 4;
-        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1390,12 +1414,16 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the first var argument,
     // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1415,8 +1443,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
         auto diff_ptr = f->args().begin() + 2;
-        auto idx0 = f->args().begin() + 4;
-        auto idx1 = f->args().begin() + 5;
+        auto idx0 = f->args().begin() + 5;
+        auto idx1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1515,12 +1543,16 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the var argument,
     // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     taylor_c_diff_numparam_argtype<T>(s, n)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    taylor_c_diff_numparam_argtype<T>(s, n)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1541,8 +1573,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto var_idx = f->args().begin() + 4;
-        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1595,12 +1627,16 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - number/par idx argument,
     // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),         llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t),     llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        taylor_c_diff_numparam_argtype<T>(s, n), llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    taylor_c_diff_numparam_argtype<T>(s, n),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1625,8 +1661,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
         auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
-        auto num = f->args().begin() + 4;
-        auto var_idx = f->args().begin() + 5;
+        auto num = f->args().begin() + 5;
+        auto var_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -1709,12 +1745,16 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
     // - idx of the u variable whose diff is being computed,
     // - diff array,
     // - par ptr,
+    // - time ptr,
     // - idx of the first var argument,
     // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context),
-        llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::Type::getInt32Ty(context),     llvm::Type::getInt32Ty(context)};
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context)};
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1735,8 +1775,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
         auto ord = f->args().begin();
         auto u_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx0 = f->args().begin() + 4;
-        auto var_idx1 = f->args().begin() + 5;
+        auto var_idx0 = f->args().begin() + 5;
+        auto var_idx1 = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));

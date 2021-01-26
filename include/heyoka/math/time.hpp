@@ -6,18 +6,17 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_LOG_HPP
-#define HEYOKA_MATH_LOG_HPP
+#ifndef HEYOKA_MATH_TIME_HPP
+#define HEYOKA_MATH_TIME_HPP
 
 #include <cstdint>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 
 namespace heyoka
@@ -26,25 +25,10 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC log_impl : public func_base
+class HEYOKA_DLL_PUBLIC time_impl : public func_base
 {
 public:
-    log_impl();
-    explicit log_impl(expression);
-
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
-    expression diff(const std::string &) const;
-
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
+    time_impl();
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
@@ -66,7 +50,7 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression log(expression);
+HEYOKA_DLL_PUBLIC extern const expression time;
 
 } // namespace heyoka
 
