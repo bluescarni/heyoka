@@ -42,8 +42,8 @@ In order to specify a non-default tolerance, the keyword argument
    Time        : 0.0000000000000000
    State       : [0.050000000000000003, 0.025000000000000001]
 
-As you can see, the optimal Taylor order for a tolerance of :math:`10^{-9}`
-is 12 (compared to a Taylor order of 20 for a tolerance
+The optimal Taylor order for a tolerance of :math:`10^{-9}`
+is now 12 (instead of 20 for a tolerance
 of :math:`\sim 2.2\times 10^{-16}`).
 
 Integrating the system back and forth shows how the accuracy of the
