@@ -1,6 +1,24 @@
 Changelog
 =========
 
+0.3.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Add explicit support for non-autonomous systems
+  (`#77 <https://github.com/bluescarni/heyoka/pull/77>`__).
+- heyoka now has a logo
+  (`#73 <https://github.com/bluescarni/heyoka/pull/73>`__).
+
+Fix
+~~~
+
+- Various build system and doc fixes/improvements
+  (`#76 <https://github.com/bluescarni/heyoka/pull/76>`__,
+  `#74 <https://github.com/bluescarni/heyoka/pull/74>`__).
+
 0.2.0 (2021-01-13)
 ------------------
 
