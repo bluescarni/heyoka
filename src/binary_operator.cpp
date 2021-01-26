@@ -735,15 +735,15 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
 } // namespace detail
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<long double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -751,8 +751,8 @@ llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const st
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }

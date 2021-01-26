@@ -284,7 +284,7 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const sin_impl &f, const std::vector
 } // namespace
 
 llvm::Value *sin_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                        std::uint32_t batch_size) const
 {
@@ -292,7 +292,7 @@ llvm::Value *sin_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uin
 }
 
 llvm::Value *sin_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {
@@ -302,7 +302,7 @@ llvm::Value *sin_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::ui
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *sin_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                         std::uint32_t batch_size) const
 {

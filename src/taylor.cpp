@@ -2327,7 +2327,7 @@ auto taylor_build_function_maps(llvm_state &s,
 // Helper for the computation of a jet of derivatives in compact mode,
 // used in taylor_compute_jet() below.
 template <typename T>
-llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
+llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *,
                                              const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
                                              std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
                                              std::uint32_t batch_size)
@@ -2475,7 +2475,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // - otherwise, the jet of derivatives of the state variables up to order 'order'.
 template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *,
+taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
 {
@@ -2512,7 +2512,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
         }
 
-        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, dc, n_eq, n_uvars, order, batch_size);
+        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
@@ -2520,7 +2520,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
             diff_arr.push_back(
-                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, n_uvars, 0, i, batch_size));
+                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -2537,8 +2537,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                diff_arr.push_back(
-                    taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, n_uvars, cur_order, i, batch_size));
+                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                                  cur_order, i, batch_size));
             }
         }
 
