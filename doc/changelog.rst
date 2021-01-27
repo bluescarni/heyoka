@@ -18,6 +18,8 @@ New
 Changes
 ~~~~~~~
 
+- Update copyright dates
+  (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
 - Avoid using a temporary file when extracting the
   object code of a module
   (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
