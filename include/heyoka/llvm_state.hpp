@@ -1,4 +1,4 @@
-// Copyright 2020 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -178,6 +178,7 @@ public:
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;
+    const std::string &get_object_code() const;
 
     void verify_function(const std::string &);
     void verify_function(llvm::Function *);

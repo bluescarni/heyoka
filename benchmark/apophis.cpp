@@ -1,4 +1,4 @@
-// Copyright 2020 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -42,9 +42,9 @@ void to_screen(const taylor_adaptive<Fp_type> &taylor)
 double energy(const std::vector<double> &st, const std::vector<double> &masses, double G)
 {
     // Kinetic
-    auto kin = (st[3] * st[3] + st[4] * st[4] + st[5] * st[5])*masses[0];
-    kin += (st[9] * st[9] + st[10] * st[10] + st[11] * st[11])*masses[1];
-    kin += (st[15] * st[15] + st[16] * st[16] + st[17] * st[17])*masses[2];
+    auto kin = (st[3] * st[3] + st[4] * st[4] + st[5] * st[5]) * masses[0];
+    kin += (st[9] * st[9] + st[10] * st[10] + st[11] * st[11]) * masses[1];
+    kin += (st[15] * st[15] + st[16] * st[16] + st[17] * st[17]) * masses[2];
     kin *= 0.5;
     // Potential
     auto rSE
