@@ -650,7 +650,8 @@ void llvm_state::compile()
         pass.run(*m_module);
 
         // Copy over to m_object_code.
-        m_object_code = buf_stream.str();
+        auto str_ref = buf_stream.str();
+        m_object_code.assign(str_ref.begin(), str_ref.end());
     }
 
     m_jitter->add_module(std::move(m_module));
