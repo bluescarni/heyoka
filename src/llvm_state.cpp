@@ -8,9 +8,7 @@
 
 #include <cassert>
 #include <cstdint>
-#include <fstream>
 #include <initializer_list>
-#include <ios>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -31,6 +29,7 @@
 #include <fmt/format.h>
 
 #include <llvm/ADT/SmallString.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
@@ -56,7 +55,6 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/CodeGen.h>
-#include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetRegistry.h>
@@ -637,71 +635,22 @@ void llvm_state::compile()
 
     // Store also the object code, if requested.
     if (m_save_object_code) {
-        // Create a name model for the llvm temporary file machinery.
-        const auto model = (boost::filesystem::temp_directory_path() / "heyoka-%%-%%-%%-%%-%%.o").string();
-
-        // Create a unique file.
-        // NOTE: this will also open the file. fd is the file
-        // descriptor, res_path will be the full path to the file.
-        int fd;
-        llvm::SmallString<128> res_path;
-        const auto res = llvm::sys::fs::createUniqueFile(model, fd, res_path);
-
-        if (res) {
-            throw std::invalid_argument(
-                "The function to create a unique temporary file failed. The full error message:\n" + res.message());
-        }
-
-        // RAII helper to remove the unique file that was
-        // created above.
-        struct file_remover {
-            llvm::SmallString<128> &path;
-
-            ~file_remover()
-            {
-                boost::filesystem::remove(boost::filesystem::path{path.c_str()});
-            }
-        } fr{res_path};
-
-        // Create a stream from the file descriptor.
-        // The 'false' parameter indicates not to close
-        // the file upon destruction of dest (we will be
-        // closing the file manually).
-        llvm::raw_fd_ostream dest(fd, false);
+        // Setup a buffer+stream for dumping the object code.
+        llvm::SmallVector<char, 0> buffer;
+        llvm::raw_svector_ostream buf_stream(buffer);
 
         // Setup the machinery for dumping the object code.
         llvm::legacy::PassManager pass;
 
-        if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
-            // Make sure to close the file before throwing.
-            // NOTE: the file will be removed by the fr object
-            // destructor.
-            dest.close();
-
+        if (m_jitter->m_tm->addPassesToEmitFile(pass, buf_stream, nullptr, llvm::CGFT_ObjectFile)) {
             throw std::invalid_argument("The target machine can't emit a file of this type");
         }
 
         // Dump the object code.
         pass.run(*m_module);
 
-        // Close the file.
-        dest.close();
-
-        // Re-open it for reading in binary mode.
-        std::ifstream ifile(res_path.c_str(), std::ios::binary);
-        if (!ifile.good()) {
-            throw std::invalid_argument("Could not open the temporary file '" + std::string(res_path.c_str())
-                                        + "' for writing");
-        }
-        // Enable exceptions on ifile.
-        ifile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-        // Dump into a stringstream.
-        std::ostringstream oss;
-        oss << ifile.rdbuf();
-
-        // Assign the read data.
-        m_object_code = oss.str();
+        // Copy over to m_object_code.
+        m_object_code = buf_stream.str();
     }
 
     m_jitter->add_module(std::move(m_module));
@@ -780,6 +729,11 @@ void llvm_state::dump_object_code(const std::string &filename) const
 
         pass.run(*m_module);
     }
+}
+
+const std::string &llvm_state::get_object_code() const
+{
+    return m_object_code;
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)

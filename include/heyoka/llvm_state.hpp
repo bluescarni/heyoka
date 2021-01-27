@@ -178,6 +178,7 @@ public:
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;
+    const std::string &get_object_code() const;
 
     void verify_function(const std::string &);
     void verify_function(llvm::Function *);
