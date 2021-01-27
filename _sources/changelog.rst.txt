@@ -7,10 +7,22 @@ Changelog
 New
 ~~~
 
+- The stream operator of functions can now be customised
+  more extensively
+  (`#78 <https://github.com/bluescarni/heyoka/pull/78>`__).
 - Add explicit support for non-autonomous systems
   (`#77 <https://github.com/bluescarni/heyoka/pull/77>`__).
 - heyoka now has a logo
   (`#73 <https://github.com/bluescarni/heyoka/pull/73>`__).
+
+Changes
+~~~~~~~
+
+- Update copyright dates
+  (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
+- Avoid using a temporary file when extracting the
+  object code of a module
+  (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
 
 Fix
 ~~~
