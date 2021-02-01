@@ -120,7 +120,16 @@ llvm::Value *asin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return asin_codegen_impl(s, args[0], "asinl");
+    return asin_codegen_impl(s, args[0],
+#if defined(_MSC_VER)
+                             // NOTE: it seems like the MSVC stdlib does not have an asinl function,
+                             // because LLVM complains about the symbol "asinl" not being
+                             // defined. Hence, use our own wrapper instead.
+                             "heyoka_asinl"
+#else
+                             "asinl"
+#endif
+    );
 }
 
 #if defined(HEYOKA_HAVE_REAL128)

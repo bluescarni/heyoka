@@ -109,4 +109,10 @@ extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x)
     return std::tan(x);
 }
 
+// NOTE: same with asin.
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinl(long double x)
+{
+    return std::asin(x);
+}
+
 #endif
