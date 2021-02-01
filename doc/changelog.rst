@@ -27,7 +27,7 @@ Changes
 Fix
 ~~~
 
-- Fix build issue wit older Boost versions
+- Fix build issue with older Boost versions
   (`#80 <https://github.com/bluescarni/heyoka/pull/80>`__).
 - Various build system and doc fixes/improvements
   (`#76 <https://github.com/bluescarni/heyoka/pull/76>`__,
