@@ -90,6 +90,11 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tan128(__float128 x)
     return mppp::tan(mppp::real128{x}).m_value;
 }
 
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asin128(__float128 x)
+{
+    return mppp::asin(mppp::real128{x}).m_value;
+}
+
 #endif
 
 #if defined(_MSC_VER)
