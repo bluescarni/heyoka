@@ -160,17 +160,17 @@ endif()
 
 # List of source files.
 set(HEYOKA_SRC_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
