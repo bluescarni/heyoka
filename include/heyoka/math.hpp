@@ -9,6 +9,9 @@
 #ifndef HEYOKA_MATH_HPP
 #define HEYOKA_MATH_HPP
 
+#include <heyoka/math/acos.hpp>
+#include <heyoka/math/asin.hpp>
+#include <heyoka/math/atan.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>

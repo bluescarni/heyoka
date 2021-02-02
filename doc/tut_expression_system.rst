@@ -47,7 +47,7 @@ Note that support for extended-precision floating-point types
 In addition to the standard mathematical operators, heyoka's expression system
 also supports the following elementary functions (with more to come in the near future):
 
-* sine, cosine and tangent,
+* sine, cosine and tangent (and their inverse counterparts),
 * logarithm and exponential,
 * exponentiation,
 * square root.
