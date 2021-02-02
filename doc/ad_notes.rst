@@ -78,7 +78,7 @@ Inverse cosine
 ^^^^^^^^^^^^^^
 
 The derivation is identical to the :ref:`inverse sine <ad_asin>`. Given :math:`a\left( t \right) = \arccos b\left( t \right)`,
-the final result is:
+the final result is, for :math:`n > 0`:
 
 .. math::
    :label:
