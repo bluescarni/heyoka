@@ -181,6 +181,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tan.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acos.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
