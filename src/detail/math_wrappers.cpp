@@ -95,6 +95,11 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asin128(__float128 x)
     return mppp::asin(mppp::real128{x}).m_value;
 }
 
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acos128(__float128 x)
+{
+    return mppp::acos(mppp::real128{x}).m_value;
+}
+
 #endif
 
 #if defined(_MSC_VER)
@@ -113,6 +118,12 @@ extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x)
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinl(long double x)
 {
     return std::asin(x);
+}
+
+// NOTE: same with acos.
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acosl(long double x)
+{
+    return std::acos(x);
 }
 
 #endif
