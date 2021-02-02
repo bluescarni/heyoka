@@ -221,6 +221,9 @@ llvm::Value *taylor_diff_asin_impl(llvm_state &s, const asin_impl &f, const std:
     // Assemble the first part of the result: n*b^[n].
     auto ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
+    // Compute n*c^[0].
+    auto n_c0 = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars));
+
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j < order; ++j) {
@@ -239,7 +242,7 @@ llvm::Value *taylor_diff_asin_impl(llvm_state &s, const asin_impl &f, const std:
     ret = builder.CreateFSub(ret, pairwise_sum(builder, sum));
 
     // Divide by n*c^[0] and return.
-    return builder.CreateFDiv(ret, builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars)));
+    return builder.CreateFDiv(ret, n_c0);
 }
 
 // All the other cases.
