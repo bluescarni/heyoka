@@ -62,6 +62,7 @@ Contents
 
    install.rst
    tutorial.rst
+   ad_notes.rst
    changelog.rst
 
 Authors

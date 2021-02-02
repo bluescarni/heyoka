@@ -1,0 +1,368 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notes on automatic differentiation &#8212; heyoka 0.3.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.40e2e510f6b7d1648584402491bb10fe.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Changelog" href="changelog.html" />
+    <link rel="prev" title="Customising the adaptive integrator" href="tut_adaptive_custom.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  <img src="_static/white_logo.png" class="logo" alt="logo">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.3.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/ad_notes.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+        <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fad_notes.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#preliminaries">
+   Preliminaries
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#basic-arithmetic">
+   Basic arithmetic
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#addition-and-subtraction">
+     Addition and subtraction
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#inverse-trigonometric-functions">
+   Inverse trigonometric functions
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-sine">
+     Inverse sine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-cosine">
+     Inverse cosine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-tangent">
+     Inverse tangent
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+        </nav>
+        
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="notes-on-automatic-differentiation">
+<span id="ad-notes"></span><h1>Notes on automatic differentiation<a class="headerlink" href="#notes-on-automatic-differentiation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="preliminaries">
+<h2>Preliminaries<a class="headerlink" href="#preliminaries" title="Permalink to this headline">¶</a></h2>
+<p>Definition of normalised derivative:</p>
+<div class="math notranslate nohighlight" id="equation-eq-norm-der-00">
+<span class="eqno">(1)<a class="headerlink" href="#equation-eq-norm-der-00" title="Permalink to this equation">¶</a></span>\[x^{\left[ n\right]}\left( t \right) = \frac{1}{n!} x^{\left( n\right)}\left( t \right).\]</div>
+<p><a class="reference external" href="https://en.wikipedia.org/wiki/General_Leibniz_rule">General Leibniz rule</a>: given
+<span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) c\left( t \right)\)</span>, then</p>
+<div class="math notranslate nohighlight" id="equation-eq-leibniz-00">
+<span class="eqno">(2)<a class="headerlink" href="#equation-eq-leibniz-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n\right]}\left( t \right) = \sum_{j=0}^n b^{\left[ n - j\right]}\left( t \right) c^{\left[ j\right]}\left( t \right).\]</div>
+</div>
+<div class="section" id="basic-arithmetic">
+<h2>Basic arithmetic<a class="headerlink" href="#basic-arithmetic" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="addition-and-subtraction">
+<h3>Addition and subtraction<a class="headerlink" href="#addition-and-subtraction" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) \pm c\left( t \right)\)</span>, trivially</p>
+<div class="math notranslate nohighlight" id="equation-eq-ad-addsub-00">
+<span class="eqno">(3)<a class="headerlink" href="#equation-eq-ad-addsub-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).\]</div>
+</div>
+</div>
+<div class="section" id="inverse-trigonometric-functions">
+<h2>Inverse trigonometric functions<a class="headerlink" href="#inverse-trigonometric-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="inverse-sine">
+<span id="ad-asin"></span><h3>Inverse sine<a class="headerlink" href="#inverse-sine" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arcsin b\left( t \right)\)</span>, we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-0">
+<span class="eqno">(4)<a class="headerlink" href="#equation-ad-notes-0" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{\sqrt{1 - b^2\left( t \right) }},\]</div>
+<p>or, equivalently,</p>
+<div class="math notranslate nohighlight" id="equation-eq-ad-asin00">
+<span class="eqno">(5)<a class="headerlink" href="#equation-eq-ad-asin00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \sqrt{1 - b^2\left( t \right) } = b^\prime\left( t \right).\]</div>
+<p>We introduce the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-1">
+<span class="eqno">(6)<a class="headerlink" href="#equation-ad-notes-1" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) },\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-asin00">(5)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-2">
+<span class="eqno">(7)<a class="headerlink" href="#equation-ad-notes-2" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-3">
+<span class="eqno">(8)<a class="headerlink" href="#equation-ad-notes-3" title="Permalink to this equation">¶</a></span>\[\left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<p>We can now apply the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to the left-hand side and re-arrange
+the terms to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-4">
+<span class="eqno">(9)<a class="headerlink" href="#equation-ad-notes-4" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+<div class="section" id="inverse-cosine">
+<span id="ad-acos"></span><h3>Inverse cosine<a class="headerlink" href="#inverse-cosine" title="Permalink to this headline">¶</a></h3>
+<p>The derivation is identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change.
+Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arccos b\left( t \right)\)</span>,
+the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-5">
+<span class="eqno">(10)<a class="headerlink" href="#equation-ad-notes-5" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = -\frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right],\]</div>
+<p>with <span class="math notranslate nohighlight">\(c\left( t \right)\)</span> defined as:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-6">
+<span class="eqno">(11)<a class="headerlink" href="#equation-ad-notes-6" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
+</div>
+<div class="section" id="inverse-tangent">
+<h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arctan b\left( t \right)\)</span>, we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-7">
+<span class="eqno">(12)<a class="headerlink" href="#equation-ad-notes-7" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
+<p>or, equivalently,</p>
+<div class="math notranslate nohighlight" id="equation-eq-ad-atan00">
+<span class="eqno">(13)<a class="headerlink" href="#equation-eq-ad-atan00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \left[1 + b^2\left( t \right) \right] = b^\prime\left( t \right).\]</div>
+<p>We introduce the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-8">
+<span class="eqno">(14)<a class="headerlink" href="#equation-ad-notes-8" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-atan00">(13)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-9">
+<span class="eqno">(15)<a class="headerlink" href="#equation-ad-notes-9" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) + a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-10">
+<span class="eqno">(16)<a class="headerlink" href="#equation-ad-notes-10" title="Permalink to this equation">¶</a></span>\[n a^{\left[ n \right]} \left( t \right) + \left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<p>With the help of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, after re-arranging we obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-11">
+<span class="eqno">(17)<a class="headerlink" href="#equation-ad-notes-11" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="tut_adaptive_custom.html" title="previous page">Customising the adaptive integrator</a>
+    <a class='right-next' id="next-link" href="changelog.html" title="next page">Changelog</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
+
+
+    
+  </body>
+</html>
