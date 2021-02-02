@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement the inverse trigonometric functions
+  (`#81 <https://github.com/bluescarni/heyoka/pull/81>`__).
 - The stream operator of functions can now be customised
   more extensively
   (`#78 <https://github.com/bluescarni/heyoka/pull/78>`__).
