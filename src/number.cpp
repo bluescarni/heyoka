@@ -93,7 +93,7 @@ std::size_t hash(const number &n)
     return std::visit(
         [](const auto &v) -> std::size_t {
 #if defined(HEYOKA_HAVE_REAL128)
-            // NOTE: mppp::hash already ensures that
+            // NOTE: mppp::hash() already ensures that
             // all nans hash to the same value.
             return mppp::hash(static_cast<mppp::real128>(v));
 #else

@@ -9,7 +9,10 @@
 #include <heyoka/config.hpp>
 
 #include <functional>
+#include <initializer_list>
 #include <limits>
+
+#include <boost/algorithm/string/predicate.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -17,7 +20,10 @@
 
 #endif
 
+#include <heyoka/expression.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 
@@ -40,6 +46,8 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1.l} == number{1.});
     REQUIRE(number{0.} == number{-0.l});
     REQUIRE(number{0.l} == number{-0.});
+    REQUIRE(number{1.1} != number{1.2l});
+    REQUIRE(number{1.2l} != number{1.1});
     REQUIRE(hash_number(number{1.l}) == hash_number(number{1.}));
     REQUIRE(hash_number(number{0.l}) == hash_number(number{-0.}));
 
@@ -66,6 +74,8 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1._rq} == number{1.});
     REQUIRE(number{0.} == number{-0._rq});
     REQUIRE(number{0._rq} == number{-0.});
+    REQUIRE(number{1.1} != number{1.2_rq});
+    REQUIRE(number{1.2_rq} != number{1.1});
     REQUIRE(hash_number(number{1._rq}) == hash_number(number{1.}));
     REQUIRE(hash_number(number{0._rq}) == hash_number(number{-0.}));
 
@@ -91,4 +101,19 @@ TEST_CASE("number hash eq")
     REQUIRE(number{1.23_rq} != number{std::numeric_limits<double>::quiet_NaN()});
 
 #endif
+
+    // Verify that subexpressions which differ only
+    // by the type of the constants (but not their values)
+    // are correctly simplified.
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s{kw::opt_level = 0};
+
+    auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
+
+    REQUIRE(dc.size() == 6u);
+
+    // Make sure the vector of constants has been
+    // optimised out because both constants are 1.
+    REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
 }
