@@ -20,6 +20,9 @@ New
 Changes
 ~~~~~~~
 
+- Improve common subexpression simplification in presence of
+  constants of different types
+  (`#82 <https://github.com/bluescarni/heyoka/pull/82>`__).
 - Update copyright dates
   (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
 - Avoid using a temporary file when extracting the

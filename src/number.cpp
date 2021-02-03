@@ -84,7 +84,7 @@ void swap(number &n0, number &n1) noexcept
 // we want to ensure that:
 // - all nan values hash to the same value,
 // - two numbers with the same value hash to the same value,
-//   even if they are of different type.
+//   even if they are of different types.
 // The strategy is then to cast the value to the largest
 // floating-point type (which ensures that the original
 // value is preserved exactly) and then hash on that.
