@@ -107,7 +107,7 @@ TEST_CASE("number hash eq")
     // are correctly simplified.
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{kw::opt_level = 0};
+    llvm_state s{kw::opt_level = 0u};
 
     auto dc = taylor_add_jet<double>(s, "jet", {prime(x) = (y + 1.) + (y + 1.l), prime(y) = x}, 1, 1, false, true);
 
