@@ -62,7 +62,7 @@ becomes
    a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).
 
 After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`,
-:eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00`, re-arrange, and finally obtain, for :math:`n > 0`:
+:eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00` to obtain, for :math:`n > 0`:
 
 .. math::
    :label:
