@@ -81,6 +81,36 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+TEST_CASE("ode test")
+{
+    using std::abs;
+    using std::tan;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto [x, s] = make_vars("x", "s");
+
+                taylor_adaptive<double> ta0({prime(x) = tan(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
+                                            kw::compact_mode = cm, kw::opt_level = opt_level);
+                taylor_adaptive<double> ta1({prime(x) = s + x, prime(s) = (1. + s * s) * 1e-2 * (s + x)},
+                                            {.5, tan(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm,
+                                            kw::opt_level = opt_level);
+
+                ta0.propagate_until(5.);
+                ta1.propagate_until(5.);
+
+                REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
+
+                const auto v0 = tan(ta0.get_state()[0] * 1e-2);
+                const auto v1 = ta1.get_state()[1];
+
+                REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+            }
+        }
+    }
+}
+
 // Test CSE involving hidden dependencies.
 TEST_CASE("taylor tan test simplifications")
 {
