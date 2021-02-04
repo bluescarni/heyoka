@@ -32,6 +32,9 @@ Changes
 Fix
 ~~~
 
+- Ensure that ``pow(x ,0)`` always simplifies to 1,
+  rather than producing an expression with null exponent
+  (`#82 <https://github.com/bluescarni/heyoka/pull/82>`__).
 - Fix build issue with older Boost versions
   (`#80 <https://github.com/bluescarni/heyoka/pull/80>`__).
 - Various build system and doc fixes/improvements
