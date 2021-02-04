@@ -8,12 +8,6 @@
 
 #include <heyoka/config.hpp>
 
-// #include <functional>
-// #include <initializer_list>
-// #include <limits>
-
-// #include <boost/algorithm/string/predicate.hpp>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -21,9 +15,6 @@
 #endif
 
 #include <heyoka/expression.hpp>
-// #include <heyoka/llvm_state.hpp>
-// #include <heyoka/number.hpp>
-// #include <heyoka/taylor.hpp>
 #include <heyoka/math/pow.hpp>
 
 #include "catch.hpp"
