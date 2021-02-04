@@ -17,7 +17,7 @@ heyoka
   <p align="center">
     Modern Taylor's method via inline compilation
     <br />
-    <a href=https://bluescarni.github.io/heyoka/"><strong>Explore the docs »</strong></a>
+    <a href=https://bluescarni.github.io/heyoka"><strong>Explore the docs »</strong></a>
     <br />
     <br />
     <a href="https://github.com/bluescarni/heyoka/issues">Report Bug</a>
