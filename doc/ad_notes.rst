@@ -34,6 +34,34 @@ Given :math:`a\left( t \right) = b\left( t \right) \pm c\left( t \right)`, trivi
 
    a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).
 
+Exponentiation
+--------------
+
+Given :math:`a\left( t \right) = b\left( t \right)^\alpha`, with :math:`\alpha \neq 0`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right).
+
+By multiplying both sides by :math:`b\left( t \right)` we obtain
+
+.. math::
+   :label:
+
+   \begin{aligned}
+   b\left( t \right) a^\prime\left( t \right) & = b\left( t \right) \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right) \\
+   & = \alpha  b^\prime\left( t \right) a\left( t \right).
+   \end{aligned}
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_leibniz_00` and re-arrange to obtain,
+for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).
+
 Trigonometric functions
 -----------------------
 
