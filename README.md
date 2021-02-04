@@ -12,7 +12,7 @@ heyoka
 <br />
 <p align="center">
   <a href="https://github.com/bluescarni/heyoka">
-    <img src="doc/images/black_logo.png" alt="Logo" width="280">
+    <img src="doc/images/white_logo.png" alt="Logo" width="280">
   </a>
   <p align="center">
     Modern Taylor's method via inline compilation
