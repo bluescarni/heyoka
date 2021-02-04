@@ -40,12 +40,30 @@ TEST_CASE("pow expo 1")
 
 #endif
 
+    REQUIRE(heyoka::pow(x, 1.) != 1_dbl);
+    REQUIRE(heyoka::pow(x, 1.l) != 1_dbl);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, 1._rq) != 1_dbl);
+
+#endif
+
     REQUIRE(heyoka::pow(x, expression{0.}) == 1_dbl);
     REQUIRE(heyoka::pow(x, expression{0.l}) == 1_dbl);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, expression{0._rq}) == 1_dbl);
+
+#endif
+
+    REQUIRE(heyoka::pow(x, expression{1.}) != 1_dbl);
+    REQUIRE(heyoka::pow(x, expression{1.l}) != 1_dbl);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, expression{1._rq}) != 1_dbl);
 
 #endif
 }
