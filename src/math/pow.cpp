@@ -633,28 +633,53 @@ expression pow_impl::diff(const std::string &s) const
            + pow(args()[0], args()[1]) * log(args()[0]) * heyoka::diff(args()[1], s);
 }
 
+namespace
+{
+
+// Wrapper for the implementation of the top-level pow() function.
+// It will check if e is zero, and, if so, it will return 1.
+template <typename T>
+expression pow_wrapper_impl(expression b, T e)
+{
+    if constexpr (std::is_same_v<T, expression>) {
+        if (auto num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
+            return 1_dbl;
+        }
+
+        return expression{func{pow_impl{std::move(b), std::move(e)}}};
+    } else {
+        if (e == 0) {
+            return 1_dbl;
+        }
+
+        return expression{func{pow_impl{std::move(b), expression{e}}}};
+    }
+}
+
+} // namespace
+
 } // namespace detail
 
 expression pow(expression b, expression e)
 {
-    return expression{func{detail::pow_impl{std::move(b), std::move(e)}}};
+    return detail::pow_wrapper_impl(std::move(b), std::move(e));
 }
 
 expression pow(expression b, double e)
 {
-    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+    return detail::pow_wrapper_impl(std::move(b), e);
 }
 
 expression pow(expression b, long double e)
 {
-    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+    return detail::pow_wrapper_impl(std::move(b), e);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 expression pow(expression b, mppp::real128 e)
 {
-    return expression{func{detail::pow_impl{std::move(b), expression{e}}}};
+    return detail::pow_wrapper_impl(std::move(b), e);
 }
 
 #endif

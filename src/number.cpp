@@ -80,26 +80,29 @@ void swap(number &n0, number &n1) noexcept
     std::swap(n0.value(), n1.value());
 }
 
+// NOTE: for consistency with the equality operator,
+// we want to ensure that:
+// - all nan values hash to the same value,
+// - two numbers with the same value hash to the same value,
+//   even if they are of different types.
+// The strategy is then to cast the value to the largest
+// floating-point type (which ensures that the original
+// value is preserved exactly) and then hash on that.
 std::size_t hash(const number &n)
 {
     return std::visit(
-        [](const auto &v) {
+        [](const auto &v) -> std::size_t {
 #if defined(HEYOKA_HAVE_REAL128)
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, mppp::real128>) {
-                // NOTE: the real128 hash already guarantees
-                // that all nan values return the same hash.
-                return mppp::hash(v);
+            // NOTE: mppp::hash() already ensures that
+            // all nans hash to the same value.
+            return mppp::hash(static_cast<mppp::real128>(v));
+#else
+            if (std::isnan(v)) {
+                // Make sure all nan values
+                // have the same hash.
+                return 0;
             } else {
-#endif
-                if (std::isnan(v)) {
-                    // Make all nan return the same hash value.
-                    return std::size_t(0);
-                } else {
-                    return std::hash<detail::uncvref_t<decltype(v)>>{}(v);
-                }
-#if defined(HEYOKA_HAVE_REAL128)
+                return std::hash<long double>{}(static_cast<long double>(v));
             }
 #endif
         },
@@ -192,34 +195,23 @@ number operator/(number n1, number n2)
 
 bool operator==(const number &n1, const number &n2)
 {
-    auto visitor = [](const auto &v1, const auto &v2) {
-        using type1 = detail::uncvref_t<decltype(v1)>;
-        using type2 = detail::uncvref_t<decltype(v2)>;
+    return std::visit(
+        [](const auto &v1, const auto &v2) {
+            using std::isnan;
 
-        if constexpr (std::is_same_v<type1, type2>) {
-#if defined(HEYOKA_HAVE_REAL128)
-            if constexpr (std::is_same_v<type1, mppp::real128>) {
-                // NOTE: the real128_equal_to() function considers
-                // all nan equal.
-                return mppp::real128_equal_to(v1, v2);
-            } else {
-#endif
+            if (isnan(v1) && isnan(v2)) {
                 // NOTE: make nan compare equal, for consistency
                 // with hashing.
-                if (std::isnan(v1) && std::isnan(v2)) {
-                    return true;
-                } else {
-                    return v1 == v2;
-                }
-#if defined(HEYOKA_HAVE_REAL128)
+                return true;
+            } else {
+                // NOTE: this covers the following cases:
+                // - neither v1 nor v2 is nan,
+                // - v1 is nan and v2 is not,
+                // - v2 is nan and v1 is not.
+                return v1 == v2;
             }
-#endif
-        } else {
-            return false;
-        }
-    };
-
-    return std::visit(visitor, n1.value(), n2.value());
+        },
+        n1.value(), n2.value());
 }
 
 bool operator!=(const number &n1, const number &n2)

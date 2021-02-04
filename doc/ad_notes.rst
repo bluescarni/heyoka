@@ -34,6 +34,69 @@ Given :math:`a\left( t \right) = b\left( t \right) \pm c\left( t \right)`, trivi
 
    a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).
 
+Exponentiation
+--------------
+
+Given :math:`a\left( t \right) = b\left( t \right)^\alpha`, with :math:`\alpha \neq 0`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right).
+
+By multiplying both sides by :math:`b\left( t \right)` we obtain
+
+.. math::
+   :label:
+
+   \begin{aligned}
+   b\left( t \right) a^\prime\left( t \right) & = b\left( t \right) \alpha b\left( t \right)^{\alpha - 1} b^\prime\left( t \right) \\
+   & = \alpha  b^\prime\left( t \right) a\left( t \right).
+   \end{aligned}
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_leibniz_00` and re-arrange to obtain,
+for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).
+
+Trigonometric functions
+-----------------------
+
+Tangent
+^^^^^^^
+
+Given :math:`a\left( t \right) = \tan b\left( t \right)`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),
+
+which, after the introduction of the auxiliary function
+
+.. math::
+   :label:
+
+   c\left( t \right)  = a^2\left( t \right) ,
+
+becomes
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).
+
+After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`,
+:eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00` to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).
+
 Inverse trigonometric functions
 -------------------------------
 

@@ -20,6 +20,9 @@ New
 Changes
 ~~~~~~~
 
+- Improve common subexpression simplification in presence of
+  constants of different types
+  (`#82 <https://github.com/bluescarni/heyoka/pull/82>`__).
 - Update copyright dates
   (`#79 <https://github.com/bluescarni/heyoka/pull/79>`__).
 - Avoid using a temporary file when extracting the
@@ -29,10 +32,14 @@ Changes
 Fix
 ~~~
 
+- Ensure that ``pow(x ,0)`` always simplifies to 1,
+  rather than producing an expression with null exponent
+  (`#82 <https://github.com/bluescarni/heyoka/pull/82>`__).
 - Fix build issue with older Boost versions
   (`#80 <https://github.com/bluescarni/heyoka/pull/80>`__).
 - Various build system and doc fixes/improvements
-  (`#76 <https://github.com/bluescarni/heyoka/pull/76>`__,
+  (`#82 <https://github.com/bluescarni/heyoka/pull/82>`__,
+  `#76 <https://github.com/bluescarni/heyoka/pull/76>`__,
   `#74 <https://github.com/bluescarni/heyoka/pull/74>`__).
 
 0.2.0 (2021-01-13)

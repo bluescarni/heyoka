@@ -33,6 +33,9 @@ namespace heyoka
 namespace detail
 {
 
+// NOTE: when we implement serialization, we will
+// want to make sure that the deserialized exponent
+// is never 0.
 class HEYOKA_DLL_PUBLIC pow_impl : public func_base
 {
 public:

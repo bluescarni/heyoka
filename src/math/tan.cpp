@@ -240,19 +240,18 @@ llvm::Value *taylor_diff_tan_impl(llvm_state &s, const tan_impl &f, const std::v
         return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
     }
 
-    // NOTE: iteration in the [0, order) range
-    // (i.e., order excluded).
+    // NOTE: iteration in the [1, order] range.
     std::vector<llvm::Value *> sum;
-    for (std::uint32_t j = 0; j < order; ++j) {
+    for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is tan(var) * tan(var).
-        auto bnj = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
-        auto cj = taylor_fetch_diff(arr, deps[0], j, n_uvars);
+        auto bj = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+        auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
-        // Add (n-j)*bnj*cj to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(bnj, cj)));
+        // Add j*cnj*bj to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(cnj, bj)));
     }
 
     // Init the return value as the result of the sum.
@@ -421,15 +420,14 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &fn, c
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
-                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
-                    auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, dep_idx);
+                llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
-                    auto fac = vector_splat(
-                        builder, builder.CreateUIToFP(builder.CreateSub(ord, j), to_llvm_type<T>(context)), batch_size);
+                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(b_nj, cj))),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
                                         acc);
                 });
 
