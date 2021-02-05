@@ -34,6 +34,77 @@ Given :math:`a\left( t \right) = b\left( t \right) \pm c\left( t \right)`, trivi
 
    a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).
 
+Multiplication
+^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = b\left( t \right) c\left( t \right)`, the derivative :math:`a^{\left[ n \right]}\left( t \right)`
+is given directly by the application of the general Leibniz rule :eq:`eq_leibniz_00`.
+
+Division
+^^^^^^^^
+
+Given :math:`a\left( t \right) = \frac{b\left( t \right)}{c\left( t \right)}`, we can write
+
+.. math::
+   :label:
+
+   a\left( t \right) c\left( t \right) = b\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n` to both sides, use :eq:`eq_leibniz_00` and re-arrange to obtain:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{c^{\left[ 0 \right]}\left( t \right)}\left[ b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^n a^{\left[ n - j \right]}\left( t \right) c^{\left[ j \right]}\left( t \right)\right].
+
+Squaring
+--------
+
+Given :math:`a\left( t \right) = b\left( t \right)^2`, the computation of :math:`a^{\left[ n \right]}\left( t \right)` is a special
+case of :eq:`eq_leibniz_00` in which we take advantage of the summation's symmetry in order to halve the computational
+complexity:
+
+.. math::
+   :label: eq_ad_square_00
+
+   a^{\left[ n \right]}\left( t \right) =
+   \begin{cases}
+   2\sum_{j=0}^{\frac{n}{2}-1} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + \left( b^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \mbox{ if $n$ is even}, \\
+   2\sum_{j=0}^{\frac{n-1}{2}} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) \mbox{ if $n$ is odd}.
+   \end{cases}
+
+Square root
+-----------
+
+Given :math:`a\left( t \right) =\sqrt{b\left( t \right)}`, we can write
+
+.. math::
+   :label:
+
+   a\left( t \right)^2 = b\left( t \right).
+
+We can apply the normalised derivative of order :math:`n` to both sides, and, with the help of :eq:`eq_ad_square_00`, we obtain:
+
+.. math::
+   :label:
+
+   b^{\left[ n \right]}\left( t \right) =
+   \begin{cases}
+   2\sum_{j=0}^{\frac{n}{2}-1} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) + \left( a^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \mbox{ if $n$ is even}, \\
+   2\sum_{j=0}^{\frac{n-1}{2}} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \mbox{ if $n$ is odd}.
+   \end{cases}
+
+We can then isolate :math:`a^{\left[ n  \right]}\left( t \right)` to obtain:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) =
+   \begin{cases}
+   \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=1}^{\frac{n}{2}-1} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) - \left( a^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \right] \mbox{ if $n$ is even}, \\
+   \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=0}^{\frac{n-1}{2}} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right] \mbox{ if $n$ is odd}.
+   \end{cases}
+
 Exponentiation
 --------------
 
@@ -61,6 +132,55 @@ for :math:`n > 0`:
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).
+
+Exponentials
+------------
+
+Natural exponential
+^^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = e^{b\left( t \right)}`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = e^{b\left( t \right)}b^\prime\left( t \right) = a\left( t \right) b^\prime\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_norm_der_00` and :eq:`eq_leibniz_00`
+and obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
+Logarithms
+----------
+
+Natural logarithm
+^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \log b\left( t \right)`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},
+
+or, equivalently,
+
+.. math::
+   :label:
+
+   b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_norm_der_00` and :eq:`eq_leibniz_00`
+and re-arrange to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
 
 Trigonometric functions
 -----------------------
