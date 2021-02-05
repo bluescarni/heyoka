@@ -182,28 +182,27 @@ llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &f, const U &num
 template <typename T>
 llvm::Value *taylor_diff_exp_impl(llvm_state &s, const exp_impl &f, const variable &var,
                                   const std::vector<llvm::Value *> &arr, llvm::Value *, std::uint32_t n_uvars,
-                                  std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                                  std::uint32_t order, std::uint32_t a_idx, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
     // Fetch the index of the variable.
-    const auto u_idx = uname_to_index(var.name());
+    const auto b_idx = uname_to_index(var.name());
 
     if (order == 0u) {
-        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, u_idx, 0, n_uvars)});
+        return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, b_idx, 0, n_uvars)});
     }
 
-    // NOTE: iteration in the [0, order) range
-    // (i.e., order excluded).
+    // NOTE: iteration in the [1, order] range.
     std::vector<llvm::Value *> sum;
-    for (std::uint32_t j = 0; j < order; ++j) {
-        auto v0 = taylor_fetch_diff(arr, idx, j, n_uvars);
-        auto v1 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+    for (std::uint32_t j = 1; j <= order; ++j) {
+        auto anj = taylor_fetch_diff(arr, a_idx, order - j, n_uvars);
+        auto bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
 
-        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(order - j))), batch_size);
+        auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
-        // Add (order-j)*v0*v1 to the sum.
-        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(v0, v1)));
+        // Add j*anj*bj to the sum.
+        sum.push_back(builder.CreateFMul(fac, builder.CreateFMul(anj, bj)));
     }
 
     // Init the return value as the result of the sum.
@@ -338,9 +337,9 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
-        auto u_idx = f->args().begin() + 1;
+        auto a_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 5;
+        auto b_idx = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -354,35 +353,33 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
-                // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
-                    retval);
+                // For order 0, invoke the function on the order 0 of b_idx.
+                builder.CreateStore(codegen_from_values<T>(
+                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
+                                    retval);
             },
             [&]() {
                 // Create a vector version of ord.
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
 
                 // Run the loop.
-                llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), var_idx);
+                llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
+                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
 
-                    // Compute the factor n - j.
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
-                    auto fac = builder.CreateFSub(ord_v, j_v);
+                    // Compute the factor j.
+                    auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(aj, b_nj))),
+                                                           builder.CreateFMul(fac, builder.CreateFMul(anj, bj))),
                                         acc);
                 });
 
                 // Return acc / n.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_fp), retval);
             });
 
         // Return the result.

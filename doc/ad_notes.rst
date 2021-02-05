@@ -62,6 +62,27 @@ for :math:`n > 0`:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).
 
+Exponentials
+------------
+
+Natural exponential
+^^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = e^{b\left( t \right)}`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = e^{b\left( t \right)}b^\prime\left( t \right) = a\left( t \right) b^\prime\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_norm_der_00` and :eq:`eq_leibniz_00`
+and obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
 Logarithms
 ----------
 
