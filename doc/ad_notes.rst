@@ -62,6 +62,34 @@ for :math:`n > 0`:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).
 
+Logarithms
+----------
+
+Natural logarithm
+^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \log b\left( t \right)`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},
+
+or, equivalently,
+
+.. math::
+   :label:
+
+   b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, use :eq:`eq_norm_der_00` and :eq:`eq_leibniz_00`
+and re-arrange to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
+
 Trigonometric functions
 -----------------------
 
