@@ -136,10 +136,11 @@ TEST_CASE("taylor tanh test simplifications")
     REQUIRE(jet[2] == approximately(tanh(jet[0] + jet[1]) * tanh(jet[0] + jet[1]) + tanh(jet[0] + jet[1])));
     REQUIRE(jet[3] == jet[0]);
     REQUIRE(jet[4]
-            == approximately(
-                .5
-                * (2 * tanh(jet[0] + jet[1]) * (1 - tanh(jet[0] + jet[1]) * tanh(jet[0] + jet[1])) * (jet[2] + jet[3])
-                   + (1 - tanh(jet[0] + jet[1]) * tanh(jet[0] + jet[1])) * (jet[2] + jet[3]))));
+            == approximately(.5
+                                 * (2 * tanh(jet[0] + jet[1]) * (1 - tanh(jet[0] + jet[1]) * tanh(jet[0] + jet[1]))
+                                        * (jet[2] + jet[3])
+                                    + (1 - tanh(jet[0] + jet[1]) * tanh(jet[0] + jet[1])) * (jet[2] + jet[3])),
+                             10000.));
     REQUIRE(jet[5] == approximately(.5 * jet[2]));
 }
 
