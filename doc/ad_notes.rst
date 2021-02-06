@@ -185,6 +185,8 @@ and re-arrange to obtain, for :math:`n > 0`:
 Trigonometric functions
 -----------------------
 
+.. _ad_tan:
+
 Tangent
 ^^^^^^^
 
@@ -381,9 +383,27 @@ identical to the :ref:`hyperbolic sine <ad_sinh>`. After the definition of the a
 
    s\left( t \right) = \sinh b\left( t \right),
 
-the final result is
+the final result, for :math:`n > 0`, is:
 
 .. math::
    :label:
 
    a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
+Hyperbolic tangent
+^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \tanh b\left( t \right)`, the process of deriving of :math:`a^{\left[ n \right]}\left( t \right)` is
+identical to the :ref:`tangent <ad_tan>`, apart from a sign change. After the definition of the auxiliary function
+
+.. math::
+   :label:
+
+   c\left( t \right)  = a^2\left( t \right) ,
+
+the final result, for :math:`n > 0`, is:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).

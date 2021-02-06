@@ -225,6 +225,21 @@ auto make_sleef_map_dbl()
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse2";
     }
 
+    // tanh().
+    if (features.avx512f) {
+        retval[{"tanh", 8}] = "Sleef_tanhd8_u10avx512f";
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx2";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx2";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse2";
+    }
+
     return retval;
 }
 

@@ -185,6 +185,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cosh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sinh.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tanh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"

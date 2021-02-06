@@ -115,48 +115,53 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sinh128(__float128 x)
     return mppp::sinh(mppp::real128{x}).m_value;
 }
 
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tanh128(__float128 x)
+{
+    return mppp::tanh(mppp::real128{x}).m_value;
+}
+
 #endif
 
 #if defined(_MSC_VER)
 
 #include <cmath>
 
-// NOTE: there seems issues when trying to invoke the tanl()
-// function on MSVC (LLVM complaining about missing symbol).
-// Let's create an ad-hoc wrapper.
+// NOTE: there seems to be issues when trying to invoke long double
+// math functions on MSVC (LLVM complaining about missing symbol).
+// Let's create ad-hoc wrappers.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x)
 {
     return std::tan(x);
 }
 
-// NOTE: same with asin.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinl(long double x)
 {
     return std::asin(x);
 }
 
-// NOTE: same with acos.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acosl(long double x)
 {
     return std::acos(x);
 }
 
-// NOTE: same with atan.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanl(long double x)
 {
     return std::atan(x);
 }
 
-// NOTE: same with cosh.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_coshl(long double x)
 {
     return std::cosh(x);
 }
 
-// NOTE: same with sinh.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sinhl(long double x)
 {
     return std::sinh(x);
+}
+
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanhl(long double x)
+{
+    return std::tanh(x);
 }
 
 #endif
