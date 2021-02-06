@@ -333,3 +333,57 @@ With the help of the general Leibniz rule :eq:`eq_leibniz_00`, after re-arrangin
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
+
+Hyperbolic functions
+--------------------
+
+.. _ad_sinh:
+
+Hyperbolic sine
+^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \sinh b\left( t \right)`, we have
+
+.. math::
+   :label: eq_ad_sinh_00
+
+   a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).
+
+We introduce the auxiliary function
+
+.. math::
+   :label:
+
+   c\left( t \right) = \cosh b\left( t \right),
+
+so that :eq:`eq_ad_sinh_00` can be rewritten as
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, and, via :eq:`eq_leibniz_00`, obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
+Hyperbolic cosine
+^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \cosh b\left( t \right)`, the process of deriving of :math:`a^{\left[ n \right]}\left( t \right)` is
+identical to the :ref:`hyperbolic sine <ad_sinh>`. After the definition of the auxiliary function
+
+.. math::
+   :label:
+
+   s\left( t \right) = \sinh b\left( t \right),
+
+the final result is
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).

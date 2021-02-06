@@ -105,6 +105,16 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atan128(__float128 x)
     return mppp::atan(mppp::real128{x}).m_value;
 }
 
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cosh128(__float128 x)
+{
+    return mppp::cosh(mppp::real128{x}).m_value;
+}
+
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sinh128(__float128 x)
+{
+    return mppp::sinh(mppp::real128{x}).m_value;
+}
+
 #endif
 
 #if defined(_MSC_VER)
@@ -135,6 +145,18 @@ extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acosl(long double x)
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanl(long double x)
 {
     return std::atan(x);
+}
+
+// NOTE: same with cosh.
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_coshl(long double x)
+{
+    return std::cosh(x);
+}
+
+// NOTE: same with sinh.
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sinhl(long double x)
+{
+    return std::sinh(x);
 }
 
 #endif

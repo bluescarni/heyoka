@@ -13,10 +13,12 @@
 #include <heyoka/math/asin.hpp>
 #include <heyoka/math/atan.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/cosh.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sinh.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
