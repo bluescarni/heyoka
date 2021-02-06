@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -644,6 +645,32 @@ llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
 
     // Return it.
     return gl_arr;
+}
+
+// Helper to invoke an external function on a vector argument.
+// The function will be called on each element of the vector separately,
+// and the return will be re-assembled as a vector.
+llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string &fname)
+{
+    auto &builder = s.builder();
+
+    // Decompose the argument into scalars.
+    auto scalars = vector_to_scalars(builder, arg);
+
+    // Invoke the function on each scalar.
+    std::vector<llvm::Value *> retvals;
+    for (auto scal : scalars) {
+        retvals.push_back(llvm_invoke_external(
+            s, fname, scal->getType(), {scal},
+            // NOTE: in theory we may add ReadNone here as well,
+            // but for some reason, at least up to LLVM 10,
+            // this causes strange codegen issues. Revisit
+            // in the future.
+            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+    }
+
+    // Build a vector with the results.
+    return scalars_to_vector(builder, retvals);
 }
 
 } // namespace heyoka::detail
