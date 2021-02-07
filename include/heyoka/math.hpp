@@ -10,8 +10,11 @@
 #define HEYOKA_MATH_HPP
 
 #include <heyoka/math/acos.hpp>
+#include <heyoka/math/acosh.hpp>
 #include <heyoka/math/asin.hpp>
+#include <heyoka/math/asinh.hpp>
 #include <heyoka/math/atan.hpp>
+#include <heyoka/math/atanh.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/exp.hpp>
