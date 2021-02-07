@@ -11,7 +11,7 @@ propagate in time the state of the system, either step-by-step or by specifying
 time limits.
 
 Let's see how we can use ``taylor_adaptive`` to integrate the ODE
-system of the simple pendulum,
+system of the `simple pendulum <https://en.wikipedia.org/wiki/Pendulum_(mathematics)>`__,
 
 .. math::
 
