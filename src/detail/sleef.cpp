@@ -195,6 +195,96 @@ auto make_sleef_map_dbl()
         retval[{"atan", 2}] = "Sleef_atand2_u10sse2";
     }
 
+    // cosh().
+    if (features.avx512f) {
+        retval[{"cosh", 8}] = "Sleef_coshd8_u10avx512f";
+        retval[{"cosh", 4}] = "Sleef_coshd4_u10avx2";
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"cosh", 4}] = "Sleef_coshd4_u10avx2";
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"cosh", 4}] = "Sleef_coshd4_u10avx";
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10sse2";
+    }
+
+    // sinh().
+    if (features.avx512f) {
+        retval[{"sinh", 8}] = "Sleef_sinhd8_u10avx512f";
+        retval[{"sinh", 4}] = "Sleef_sinhd4_u10avx2";
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"sinh", 4}] = "Sleef_sinhd4_u10avx2";
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"sinh", 4}] = "Sleef_sinhd4_u10avx";
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse2";
+    }
+
+    // tanh().
+    if (features.avx512f) {
+        retval[{"tanh", 8}] = "Sleef_tanhd8_u10avx512f";
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx2";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx2";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"tanh", 4}] = "Sleef_tanhd4_u10avx";
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse2";
+    }
+
+    // asinh().
+    if (features.avx512f) {
+        retval[{"asinh", 8}] = "Sleef_asinhd8_u10avx512f";
+        retval[{"asinh", 4}] = "Sleef_asinhd4_u10avx2";
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"asinh", 4}] = "Sleef_asinhd4_u10avx2";
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"asinh", 4}] = "Sleef_asinhd4_u10avx";
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse2";
+    }
+
+    // acosh().
+    if (features.avx512f) {
+        retval[{"acosh", 8}] = "Sleef_acoshd8_u10avx512f";
+        retval[{"acosh", 4}] = "Sleef_acoshd4_u10avx2";
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"acosh", 4}] = "Sleef_acoshd4_u10avx2";
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"acosh", 4}] = "Sleef_acoshd4_u10avx";
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse2";
+    }
+
+    // atanh().
+    if (features.avx512f) {
+        retval[{"atanh", 8}] = "Sleef_atanhd8_u10avx512f";
+        retval[{"atanh", 4}] = "Sleef_atanhd4_u10avx2";
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"atanh", 4}] = "Sleef_atanhd4_u10avx2";
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"atanh", 4}] = "Sleef_atanhd4_u10avx";
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse2";
+    }
+
     return retval;
 }
 

@@ -63,36 +63,6 @@ asin_impl::asin_impl(expression e) : func_base("asin", std::vector{std::move(e)}
 
 asin_impl::asin_impl() : asin_impl(0_dbl) {}
 
-namespace
-{
-
-// Generic implementation for the codegen of asin that will invoke the external
-// function fname, after the decomposition of the input argument arg into scalars.
-llvm::Value *asin_codegen_impl(llvm_state &s, llvm::Value *arg, const std::string &fname)
-{
-    auto &builder = s.builder();
-
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, arg);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, fname, scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
-}
-
-} // namespace
-
 llvm::Value *asin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
@@ -112,7 +82,7 @@ llvm::Value *asin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
         }
     }
 
-    return asin_codegen_impl(s, args[0], "asin");
+    return call_extern_vec(s, args[0], "asin");
 }
 
 llvm::Value *asin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -120,14 +90,14 @@ llvm::Value *asin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return asin_codegen_impl(s, args[0],
+    return call_extern_vec(s, args[0],
 #if defined(_MSC_VER)
-                             // NOTE: it seems like the MSVC stdlib does not have an asinl function,
-                             // because LLVM complains about the symbol "asinl" not being
-                             // defined. Hence, use our own wrapper instead.
-                             "heyoka_asinl"
+                           // NOTE: it seems like the MSVC stdlib does not have an asinl function,
+                           // because LLVM complains about the symbol "asinl" not being
+                           // defined. Hence, use our own wrapper instead.
+                           "heyoka_asinl"
 #else
-                             "asinl"
+                           "asinl"
 #endif
     );
 }
@@ -139,7 +109,7 @@ llvm::Value *asin_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return asin_codegen_impl(s, args[0], "heyoka_asin128");
+    return call_extern_vec(s, args[0], "heyoka_asin128");
 }
 
 #endif

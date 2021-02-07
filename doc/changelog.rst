@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Implement the basic hyperbolic functions and their
+  inverse counterparts
+  (`#84 <https://github.com/bluescarni/heyoka/pull/84>`__).
 - Implement the inverse trigonometric functions
   (`#81 <https://github.com/bluescarni/heyoka/pull/81>`__).
 - The stream operator of functions can now be customised
