@@ -142,7 +142,7 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atanh128(__float128 x)
 #include <cmath>
 
 // NOTE: there seems to be issues when trying to invoke long double
-// math functions on MSVC (LLVM complaining about missing symbol).
+// math functions on MSVC (LLVM complaining about missing symbols).
 // Let's create ad-hoc wrappers.
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x)
 {
