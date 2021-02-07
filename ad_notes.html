@@ -300,6 +300,50 @@
    </li>
   </ul>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#hyperbolic-functions">
+   Hyperbolic functions
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#hyperbolic-sine">
+     Hyperbolic sine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#hyperbolic-cosine">
+     Hyperbolic cosine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#hyperbolic-tangent">
+     Hyperbolic tangent
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#inverse-hyperbolic-functions">
+   Inverse hyperbolic functions
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-hyperbolic-sine">
+     Inverse hyperbolic sine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-hyperbolic-cosine">
+     Inverse hyperbolic cosine
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-hyperbolic-tangent">
+     Inverse hyperbolic tangent
+    </a>
+   </li>
+  </ul>
+ </li>
 </ul>
 
         </nav>
@@ -426,7 +470,7 @@ and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt
 <div class="section" id="trigonometric-functions">
 <h2>Trigonometric functions<a class="headerlink" href="#trigonometric-functions" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="tangent">
-<h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this headline">¶</a></h3>
+<span id="ad-tan"></span><h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-13">
 <span class="eqno">(18)<a class="headerlink" href="#equation-ad-notes-13" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),\]</div>
@@ -478,7 +522,7 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <span class="eqno">(29)<a class="headerlink" href="#equation-ad-notes-23" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
 </div>
 <div class="section" id="inverse-tangent">
-<h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this headline">¶</a></h3>
+<span id="ad-atan"></span><h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arctan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-24">
 <span class="eqno">(30)<a class="headerlink" href="#equation-ad-notes-24" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
@@ -497,6 +541,77 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <p>With the help of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, after re-arranging we obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-28">
 <span class="eqno">(35)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+</div>
+<div class="section" id="hyperbolic-functions">
+<h2>Hyperbolic functions<a class="headerlink" href="#hyperbolic-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="hyperbolic-sine">
+<span id="ad-sinh"></span><h3>Hyperbolic sine<a class="headerlink" href="#hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \sinh b\left( t \right)\)</span>, we have</p>
+<div class="math notranslate nohighlight" id="equation-eq-ad-sinh-00">
+<span class="eqno">(36)<a class="headerlink" href="#equation-eq-ad-sinh-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).\]</div>
+<p>We introduce the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-29">
+<span class="eqno">(37)<a class="headerlink" href="#equation-ad-notes-29" title="Permalink to this equation">¶</a></span>\[c\left( t \right) = \cosh b\left( t \right),\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-sinh-00">(36)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-30">
+<span class="eqno">(38)<a class="headerlink" href="#equation-ad-notes-30" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).\]</div>
+<p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, and, via <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-31">
+<span class="eqno">(39)<a class="headerlink" href="#equation-ad-notes-31" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+</div>
+<div class="section" id="hyperbolic-cosine">
+<h3>Hyperbolic cosine<a class="headerlink" href="#hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \cosh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
+identical to the <a class="reference internal" href="#ad-sinh"><span class="std std-ref">hyperbolic sine</span></a>. After the definition of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-32">
+<span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-32" title="Permalink to this equation">¶</a></span>\[s\left( t \right) = \sinh b\left( t \right),\]</div>
+<p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-33">
+<span class="eqno">(41)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+</div>
+<div class="section" id="hyperbolic-tangent">
+<h3>Hyperbolic tangent<a class="headerlink" href="#hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tanh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
+identical to the <a class="reference internal" href="#ad-tan"><span class="std std-ref">tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-34">
+<span class="eqno">(42)<a class="headerlink" href="#equation-ad-notes-34" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right),\]</div>
+<p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-35">
+<span class="eqno">(43)<a class="headerlink" href="#equation-ad-notes-35" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+</div>
+</div>
+<div class="section" id="inverse-hyperbolic-functions">
+<h2>Inverse hyperbolic functions<a class="headerlink" href="#inverse-hyperbolic-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="inverse-hyperbolic-sine">
+<span id="ad-asinh"></span><h3>Inverse hyperbolic sine<a class="headerlink" href="#inverse-hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arsinh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
+identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-36">
+<span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 + b^2\left( t \right) },\]</div>
+<p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-37">
+<span class="eqno">(45)<a class="headerlink" href="#equation-ad-notes-37" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+<div class="section" id="inverse-hyperbolic-cosine">
+<h3>Inverse hyperbolic cosine<a class="headerlink" href="#inverse-hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arcosh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
+identical to the <a class="reference internal" href="#ad-asinh"><span class="std std-ref">inverse hyperbolic sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-38">
+<span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{b^2\left( t \right) - 1 },\]</div>
+<p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-39">
+<span class="eqno">(47)<a class="headerlink" href="#equation-ad-notes-39" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+<div class="section" id="inverse-hyperbolic-tangent">
+<h3>Inverse hyperbolic tangent<a class="headerlink" href="#inverse-hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{artanh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
+identical to the <a class="reference internal" href="#ad-atan"><span class="std std-ref">inverse tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-40">
+<span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-41">
+<span class="eqno">(49)<a class="headerlink" href="#equation-ad-notes-41" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 </div>
 </div>
