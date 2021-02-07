@@ -1,0 +1,424 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Runtime parameters &#8212; heyoka 0.3.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.40e2e510f6b7d1648584402491bb10fe.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.d31b09fe5c1d09cb49b26a786de4a05d.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="prev" title="Customising the adaptive integrator" href="tut_adaptive_custom.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  <img src="_static/white_logo.png" class="logo" alt="logo">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.3.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="reference internal" href="tutorial.html">
+   Tutorial
+  </a>
+  <ul class="current collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Runtime parameters
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ad_notes.html">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_param.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+        <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_param.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#full-code-listing">
+   Full code listing
+  </a>
+ </li>
+</ul>
+
+        </nav>
+        
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="runtime-parameters">
+<span id="tut-param"></span><h1>Runtime parameters<a class="headerlink" href="#runtime-parameters" title="Permalink to this headline">¶</a></h1>
+<p>In all the examples we have seen so far, numerical constants
+have always been hard-coded to fixed values when constructing
+the expressions of the ODEs.</p>
+<p>While this approach
+leads to efficient code generation by embedding the values of the constants
+directly in the source code and by opening up further
+optimisation opportunities for the compiler, on the other hand it requires
+the construction of a new integrator if the values of the numerical
+constants change. In some applications (e.g., parametric studies),
+this overhead can become a performance bottleneck, especially
+for large ODE systems.</p>
+<p>In order to avoid having to re-create a new integrator if the value of a constant
+in an expression changes, heyoka’s expression system provides a node type,
+called <code class="docutils literal notranslate"><span class="pre">param</span></code> (or <em>runtime parameter</em>), which
+represents mathematical constants whose value is not known at the time of
+construction of the expression.</p>
+<p>In this section, we will illustrate
+the usage of runtime parameters in heyoka via a pendulum
+ODE system in which the values of the gravitational constant <span class="math notranslate nohighlight">\(g\)</span>
+and of the pendulum’s length <span class="math notranslate nohighlight">\(l\)</span> are left undetermined at the time
+of the definition of the system:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = -\frac{g}{l} \sin x
+\end{cases}.\end{split}\]</div>
+<p>Let’s start with the construction of the integrator:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -g/l * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
+                                      <span class="c1">// Values of the runtime parameters</span>
+                                      <span class="c1">// g and l. If not provided,</span>
+                                      <span class="c1">// all parameters will be inited</span>
+                                      <span class="c1">// to zero.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="p">{</span><span class="mf">9.8</span><span class="p">,</span> <span class="mf">1.</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>With respect to the previous examples, where <span class="math notranslate nohighlight">\(g/l\)</span> had been
+hard-coded to <code class="docutils literal notranslate"><span class="pre">9.8</span></code>, now <span class="math notranslate nohighlight">\(g/l\)</span> is represented as <code class="docutils literal notranslate"><span class="pre">par[0]</span> <span class="pre">/</span> <span class="pre">par[1]</span></code>.
+The syntax <code class="docutils literal notranslate"><span class="pre">par[i]</span></code> indicates a runtime parameter that is stored
+at the index <code class="docutils literal notranslate"><span class="pre">i</span></code> in an array of parameter values. The array of
+parameter values is optionally passed to the constructor as the keyword argument
+<code class="docutils literal notranslate"><span class="pre">kw::pars</span></code> (which, in this case, contains the values <code class="docutils literal notranslate"><span class="pre">9.8</span></code> for <span class="math notranslate nohighlight">\(g\)</span> and <code class="docutils literal notranslate"><span class="pre">1.</span></code>
+for <span class="math notranslate nohighlight">\(l\)</span>).
+If an array of parameter values is not passed to the constructor,
+heyoka will infer that the ODE system contains 2 parameters and will then initialise
+the array of parameter values with zeroes.</p>
+<p>If we try to print the integrator to screen, the output will confirm the
+presence of runtime parameters:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 0.0000000000000000</span>
+<span class="go">State       : [0.050000000000000003, 0.025000000000000001]</span>
+<span class="go">Parameters  : [9.8000000000000007, 1.0000000000000000]</span>
+</pre></div>
+</div>
+<p>Note that the array of parameter values, like the state vector and the time coordinate,
+is stored as a data member in the integrator object.</p>
+<p>The period of a pendulum of length <span class="math notranslate nohighlight">\(1\,\mathrm{m}\)</span> on Earth is <span class="math notranslate nohighlight">\(\sim 2\,\mathrm{s}\)</span>
+in the small-angle approximation,
+as it can be confirmed via numerical integration:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for ~1 period.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 2.0074035758801299</span>
+<span class="go">State       : [0.050000000000000003, 2.2135840145976364e-16]</span>
+<span class="go">Parameters  : [9.8000000000000007, 1.0000000000000000]</span>
+</pre></div>
+</div>
+<p>Let’s now move to Mars, where the gravitational acceleration on the surface
+is <span class="math notranslate nohighlight">\(\sim 3.72\,\mathrm{m}/\mathrm{s}^2\)</span>.
+Because gravity is weaker, the period of the pendulum increases to
+<span class="math notranslate nohighlight">\(\sim 3.26\,\mathrm{s}\)</span>, as it can be confirmed via numerical integration:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the time coordinate.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+
+    <span class="c1">// Change the value of g.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.72</span><span class="p">;</span>
+
+    <span class="c1">// Integrate for ~1 period on Mars.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
+<span class="go">Dimension   : 2</span>
+<span class="go">Time        : 3.2581889116828258</span>
+<span class="go">State       : [0.049999999999999996, 3.1292770074142271e-16]</span>
+<span class="go">Parameters  : [3.7200000000000002, 1.0000000000000000]</span>
+</pre></div>
+</div>
+<p>After resetting the time coordinate to zero, via the <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code> function
+we accessed the array of parameter values and changed its first
+element (which corresponds to the <span class="math notranslate nohighlight">\(g\)</span> parameter) from <code class="docutils literal notranslate"><span class="pre">9.8</span></code> to <code class="docutils literal notranslate"><span class="pre">3.72</span></code>.
+The subsequent numerical integration confirms that the new value of <span class="math notranslate nohighlight">\(g\)</span> was
+indeed used.</p>
+<p>Note that, like the for the state data, <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code> returns a naked pointer
+that can be used to modify the parameter values. Another function, <code class="docutils literal notranslate"><span class="pre">get_pars()</span></code>,
+returns a const reference to the <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>
+holding the parameter values, which cannot be used to mutate the parameter values.</p>
+<div class="section" id="full-code-listing">
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -g/l * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
+                                      <span class="c1">// Values of the runtime parameters</span>
+                                      <span class="c1">// g and l. If not provided,</span>
+                                      <span class="c1">// all parameters will be inited</span>
+                                      <span class="c1">// to zero.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="p">{</span><span class="mf">9.8</span><span class="p">,</span> <span class="mf">1.</span><span class="p">}};</span>
+
+    <span class="c1">// Let&#39;s print to screen the integrator object.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Integrate for ~1 period.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Reset the time coordinate.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+
+    <span class="c1">// Change the value of g.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.72</span><span class="p">;</span>
+
+    <span class="c1">// Integrate for ~1 period on Mars.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="tut_adaptive_custom.html" title="previous page">Customising the adaptive integrator</a>
+    <a class='right-next' id="next-link" href="ad_notes.html" title="next page">Notes on automatic differentiation</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
+
+
+    
+  </body>
+</html>
