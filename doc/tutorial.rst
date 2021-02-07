@@ -24,3 +24,4 @@ of the source tree. The tutorials can be compiled by enabling the
   tut_expression_system
   tut_adaptive
   tut_adaptive_custom
+  tut_param
