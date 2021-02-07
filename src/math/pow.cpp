@@ -660,6 +660,8 @@ expression pow_wrapper_impl(expression b, T e)
 
 } // namespace detail
 
+// NOTE: should we also try other automatic simplifications?
+// E.g., pow(x, 2) -> square(x), pow(x, 1) -> x?
 expression pow(expression b, expression e)
 {
     return detail::pow_wrapper_impl(std::move(b), std::move(e));

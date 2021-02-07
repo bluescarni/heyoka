@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_TAN_HPP
-#define HEYOKA_MATH_TAN_HPP
+#ifndef HEYOKA_MATH_TANH_HPP
+#define HEYOKA_MATH_TANH_HPP
 
 #include <cstdint>
 #include <utility>

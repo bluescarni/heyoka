@@ -600,6 +600,15 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 
 // Taylor decomposition with automatic deduction
 // of variables.
+// NOTE: when dealing with functions with hidden deps,
+// we should consider avoiding adding hidden deps if the
+// function argument(s) is a number/param: the hidden deps
+// won't be used for the computation of the derivatives
+// and thus they can be optimised out. Note that a straightforward
+// implementation of this idea this will only work when the argument
+// is a number/param, not when, e.g., the argument is par[0] + par[1] - in
+// order to simplify this out, it should be recognized that the definition
+// of a u variable depends only on numbers/params.
 std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(std::vector<expression> v_ex)
 {
     if (v_ex.empty()) {
