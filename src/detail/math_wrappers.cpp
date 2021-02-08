@@ -15,6 +15,18 @@
 
 #endif
 
+// These functions are not in the standard library and thus need wrappers
+// for their double and long double versions
+extern "C" HEYOKA_DLL_PUBLIC double heyoka_sigmoid(double x)
+{
+    return 1. / (1. + std::exp(-x));
+}
+
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sigmoidl(long double x)
+{
+    return 1. / (1. + std::exp(-x));
+}
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 // Make sure that the size and alignment of __float128
@@ -133,6 +145,11 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acosh128(__float128 x)
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atanh128(__float128 x)
 {
     return mppp::atanh(mppp::real128{x}).m_value;
+}
+
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sigmoid128(__float128 x)
+{
+    return (mppp::real128{1.}/(mppp::real128{1.} + mppp::exp(-mppp::real128{x}))).m_value;
 }
 
 #endif
