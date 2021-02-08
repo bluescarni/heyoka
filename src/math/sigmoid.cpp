@@ -49,7 +49,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/square.hpp>
-#include <heyoka/math/tan.hpp>
+#include <heyoka/math/sigmoid.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -180,10 +180,10 @@ sigmoid_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std
         arg = expression{variable{"u_" + detail::li_to_string(dres)}};
     }
 
-    // Append the tan decomposition.
-    u_vars_defs.emplace_back(tan(std::move(arg)), std::vector<std::uint32_t>{});
+    // Append the sigmoid decomposition.
+    u_vars_defs.emplace_back(sigmoid(std::move(arg)), std::vector<std::uint32_t>{});
 
-    // Append the auxiliary function tan(arg) * tan(arg).
+    // Append the auxiliary function sigmoid(arg) * sigmoid(arg).
     u_vars_defs.emplace_back(square(expression{variable{"u_" + detail::li_to_string(u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
 
@@ -213,7 +213,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, const sigmoid_impl &f, cons
 template <typename T>
 llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, const sigmoid_impl &f, const std::vector<std::uint32_t> &deps,
                                       const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                      std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                      std::uint32_t n_uvars, std::uint32_t order, std::uint32_t a_idx,
                                       std::uint32_t batch_size)
 {
     auto &builder = s.builder();
@@ -263,7 +263,7 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &, const sigmoid_impl &, const 
 }
 
 template <typename T>
-llvm::Value *taylor_diff_tan(llvm_state &s, const sigmoid_impl &f, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_sigmoid(llvm_state &s, const sigmoid_impl &f, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
@@ -274,7 +274,7 @@ llvm::Value *taylor_diff_tan(llvm_state &s, const sigmoid_impl &f, const std::ve
 
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the tangent, but a vector of size {} was passed instead"_format(deps.size()));
+            "derivative of the sigmoid, but a vector of size {} was passed instead"_format(deps.size()));
     }
 
     return std::visit(
@@ -291,7 +291,7 @@ llvm::Value *sigmoid_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std:
                                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                            std::uint32_t batch_size) const
 {
-    return taylor_diff_tan<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sigmoid<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 llvm::Value *sigmoid_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
@@ -299,7 +299,7 @@ llvm::Value *sigmoid_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std
                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                             std::uint32_t batch_size) const
 {
-    return taylor_diff_tan<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sigmoid<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -309,7 +309,7 @@ llvm::Value *sigmoid_impl::taylor_diff_f128(llvm_state &s, const std::vector<std
                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                             std::uint32_t batch_size) const
 {
-    return taylor_diff_tan<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_sigmoid<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
@@ -441,7 +441,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
             throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of the tangent in compact mode detected");
+                "Inconsistent function signature for the Taylor derivative of the sigmpid in compact mode detected");
         }
     }
 
@@ -454,11 +454,11 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &, const sigmoid_impl
                                                 std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of a tangent in compact mode");
+                                "of a sigmpid in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_tan(llvm_state &s, const sigmoid_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_sigmoid(llvm_state &s, const sigmoid_impl &fn, std::uint32_t n_uvars,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
@@ -472,13 +472,13 @@ llvm::Function *taylor_c_diff_func_tan(llvm_state &s, const sigmoid_impl &fn, st
 llvm::Function *sigmoid_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars,
                                                      std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_tan<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<double>(s, *this, n_uvars, batch_size);
 }
 
 llvm::Function *sigmoid_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars,
                                                       std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_tan<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -486,7 +486,7 @@ llvm::Function *sigmoid_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32
 llvm::Function *sigmoid_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars,
                                                       std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_tan<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif
@@ -497,12 +497,13 @@ expression sigmoid_impl::diff(const std::string &s) const
 
     // NOTE: if single-precision floats are implemented,
     // should 1_dbl become 1_flt?
-    return (1_dbl + square(tan(args()[0]))) * heyoka::diff(args()[0], s);
+    return (1_dbl + sigmoid(args()[0])) * sigmoid(args()[0]) * heyoka::diff(args()[0], s);
+
 }
 
 } // namespace detail
 
-expression tan(expression e)
+expression sigmoid(expression e)
 {
     return expression{func{detail::sigmoid_impl(std::move(e))}};
 }
