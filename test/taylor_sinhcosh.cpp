@@ -22,8 +22,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
-#include <heyoka/math/tan.hpp>
+#include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -83,70 +82,39 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
 TEST_CASE("ode test")
 {
-    using std::abs;
-    using std::tan;
+    using std::cosh;
+    using std::sinh;
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
-                auto [x, s] = make_vars("x", "s");
+                auto [x, s, c] = make_vars("x", "s", "c");
 
-                taylor_adaptive<double> ta0({prime(x) = tan(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
+                taylor_adaptive<double> ta0({prime(x) = sinh(x) + cosh(x)}, {-.005}, kw::high_accuracy = ha,
                                             kw::compact_mode = cm, kw::opt_level = opt_level);
-                taylor_adaptive<double> ta1({prime(x) = s + x, prime(s) = (1. + s * s) * 1e-2 * (s + x)},
-                                            {.5, tan(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm,
-                                            kw::opt_level = opt_level);
+                taylor_adaptive<double> ta1({prime(x) = s + c, prime(s) = c * (s + c), prime(c) = s * (s + c)},
+                                            {-.005, sinh(-.005), cosh(-.005)}, kw::high_accuracy = ha,
+                                            kw::compact_mode = cm, kw::opt_level = opt_level);
 
-                ta0.propagate_until(5.);
-                ta1.propagate_until(5.);
+                ta0.propagate_until(-5.);
+                ta1.propagate_until(-5.);
 
-                REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
+                REQUIRE(ta0.get_state()[0] == approximately(ta1.get_state()[0]));
 
-                const auto v0 = tan(ta0.get_state()[0] * 1e-2);
-                const auto v1 = ta1.get_state()[1];
+                const auto v0 = sinh(ta0.get_state()[0]) + cosh(ta0.get_state()[0]);
+                const auto v1 = ta1.get_state()[1] + ta1.get_state()[2];
 
-                REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+                REQUIRE(v0 == approximately(v1));
             }
         }
     }
 }
 
-// Test CSE involving hidden dependencies.
-TEST_CASE("taylor tan test simplifications")
-{
-    using std::tan;
-
-    auto x = "x"_var, y = "y"_var;
-
-    llvm_state s{kw::opt_level = 0u};
-
-    taylor_add_jet<double>(s, "jet", {square(tan(x + y)) + tan(x + y), x}, 2, 1, false, false);
-
-    s.compile();
-
-    auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
-
-    std::vector<double> jet{double{2}, double{3}};
-    jet.resize(6);
-
-    jptr(jet.data(), nullptr, nullptr);
-
-    REQUIRE(jet[0] == 2);
-    REQUIRE(jet[1] == 3);
-    REQUIRE(jet[2] == approximately(tan(jet[0] + jet[1]) * tan(jet[0] + jet[1]) + tan(jet[0] + jet[1])));
-    REQUIRE(jet[3] == jet[0]);
-    REQUIRE(jet[4]
-            == approximately(
-                .5
-                * (2 * tan(jet[0] + jet[1]) * (1 + tan(jet[0] + jet[1]) * tan(jet[0] + jet[1])) * (jet[2] + jet[3])
-                   + (1 + tan(jet[0] + jet[1]) * tan(jet[0] + jet[1])) * (jet[2] + jet[3]))));
-    REQUIRE(jet[5] == approximately(.5 * jet[2]));
-}
-
-TEST_CASE("taylor tan")
+TEST_CASE("taylor sinhcosh")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
-        using std::tan;
+        using std::sinh;
+        using std::cosh;
 
         using fp_t = decltype(fp_x);
 
@@ -154,12 +122,13 @@ TEST_CASE("taylor tan")
 
         auto x = "x"_var, y = "y"_var;
 
-        // Number tests.
+        // Number-number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(expression{number{fp_t{2}}}), x + y}, 1, 1, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y}, 1, 1,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -172,14 +141,14 @@ TEST_CASE("taylor tan")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(par[0]), x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]) + cosh(par[1]), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -188,21 +157,22 @@ TEST_CASE("taylor tan")
             std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
             jet.resize(4);
 
-            std::vector<fp_t> pars{fp_t{2}};
+            std::vector<fp_t> pars{fp_t{2}, fp_t{3}};
 
             jptr(jet.data(), pars.data(), nullptr);
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(expression{number{fp_t{2}}}), x + y}, 1, 2, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y}, 1, 2,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -219,8 +189,8 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[5] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[4] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
 
             REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
@@ -229,7 +199,7 @@ TEST_CASE("taylor tan")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]) + cosh(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -248,8 +218,8 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(tan(fp_t{3})));
-            REQUIRE(jet[5] == approximately(tan(fp_t{3})));
+            REQUIRE(jet[4] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
 
             REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
@@ -258,8 +228,9 @@ TEST_CASE("taylor tan")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(expression{number{fp_t{2}}}), x + y}, 2, 1, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y}, 2, 1,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -272,7 +243,7 @@ TEST_CASE("taylor tan")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[2] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
             REQUIRE(jet[4] == 0);
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
@@ -281,8 +252,9 @@ TEST_CASE("taylor tan")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(expression{number{fp_t{2}}}), x + y}, 2, 2, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y}, 2, 2,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -299,8 +271,8 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == 5);
 
-            REQUIRE(jet[4] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[5] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[4] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[5] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
 
             REQUIRE(jet[6] == approximately(jet[0] + jet[2]));
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
@@ -315,8 +287,9 @@ TEST_CASE("taylor tan")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(expression{number{fp_t{2}}}), x + y}, 3, 3, high_accuracy,
-                                 compact_mode);
+            taylor_add_jet<fp_t>(s, "jet",
+                                 {sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y}, 3, 3,
+                                 high_accuracy, compact_mode);
 
             s.compile();
 
@@ -335,9 +308,9 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[4] == 5);
             REQUIRE(jet[5] == -2);
 
-            REQUIRE(jet[6] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[7] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[8] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[6] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[7] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[8] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
 
             REQUIRE(jet[9] == approximately(jet[0] + jet[3]));
             REQUIRE(jet[10] == approximately(jet[1] + jet[4]));
@@ -363,7 +336,7 @@ TEST_CASE("taylor tan")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(par[0]) + cosh(par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -384,9 +357,9 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[4] == 5);
             REQUIRE(jet[5] == -2);
 
-            REQUIRE(jet[6] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[7] == approximately(tan(fp_t{2})));
-            REQUIRE(jet[8] == approximately(tan(fp_t{2})));
+            REQUIRE(jet[6] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[7] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
+            REQUIRE(jet[8] == approximately(sinh(fp_t{2}) + cosh(fp_t{3})));
 
             REQUIRE(jet[9] == approximately(jet[0] + jet[3]));
             REQUIRE(jet[10] == approximately(jet[1] + jet[4]));
@@ -410,13 +383,14 @@ TEST_CASE("taylor tan")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({tan(expression{number{fp_t{2}}}), x + y}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({sinh(expression{number{fp_t{2}}}) + cosh(expression{number{fp_t{3}}}), x + y},
+                                   opt_level, high_accuracy, compact_mode);
 
         // Variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(y), tan(x)}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(y), cosh(x)}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -429,14 +403,14 @@ TEST_CASE("taylor tan")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(tan(jet[1])));
-            REQUIRE(jet[3] == approximately(tan(jet[0])));
+            REQUIRE(jet[2] == approximately(sinh(jet[1])));
+            REQUIRE(jet[3] == approximately(cosh(jet[0])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(y), tan(x)}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(y), cosh(x)}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -453,17 +427,17 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -4);
 
-            REQUIRE(jet[4] == approximately(tan(jet[2])));
-            REQUIRE(jet[5] == approximately(tan(jet[3])));
+            REQUIRE(jet[4] == approximately(sinh(jet[2])));
+            REQUIRE(jet[5] == approximately(sinh(jet[3])));
 
-            REQUIRE(jet[6] == approximately(tan(jet[0])));
-            REQUIRE(jet[7] == approximately(tan(jet[1])));
+            REQUIRE(jet[6] == approximately(cosh(jet[0])));
+            REQUIRE(jet[7] == approximately(cosh(jet[1])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(y), tan(x)}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(y), cosh(x)}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -476,16 +450,16 @@ TEST_CASE("taylor tan")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(tan(jet[1])));
-            REQUIRE(jet[3] == approximately(tan(jet[0])));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * ((1 + jet[2] * jet[2]) * jet[3])));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * ((1 + jet[3] * jet[3]) * jet[2])));
+            REQUIRE(jet[2] == approximately(sinh(jet[1])));
+            REQUIRE(jet[3] == approximately(cosh(jet[0])));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] * cosh(jet[1])));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] * sinh(jet[0])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(y), tan(x)}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(y), cosh(x)}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -502,23 +476,23 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -4);
 
-            REQUIRE(jet[4] == approximately(tan(jet[2])));
-            REQUIRE(jet[5] == approximately(tan(jet[3])));
+            REQUIRE(jet[4] == approximately(sinh(jet[2])));
+            REQUIRE(jet[5] == approximately(sinh(jet[3])));
 
-            REQUIRE(jet[6] == approximately(tan(jet[0])));
-            REQUIRE(jet[7] == approximately(tan(jet[1])));
+            REQUIRE(jet[6] == approximately(cosh(jet[0])));
+            REQUIRE(jet[7] == approximately(cosh(jet[1])));
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * (1 + jet[4] * jet[4]) * jet[6]));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * (1 + jet[5] * jet[5]) * jet[7]));
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[6] * cosh(jet[2])));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[7] * cosh(jet[3])));
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (1 + jet[6] * jet[6]) * jet[4]));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (1 + jet[7] * jet[7]) * jet[5]));
+            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] * sinh(jet[0])));
+            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] * sinh(jet[1])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {tan(y), tan(x)}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sinh(y), cosh(x)}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -537,51 +511,39 @@ TEST_CASE("taylor tan")
             REQUIRE(jet[4] == -4);
             REQUIRE(jet[5] == 6);
 
-            REQUIRE(jet[6] == approximately(tan(jet[3])));
-            REQUIRE(jet[7] == approximately(tan(jet[4])));
-            REQUIRE(jet[8] == approximately(tan(jet[5])));
+            REQUIRE(jet[6] == approximately(sinh(jet[3])));
+            REQUIRE(jet[7] == approximately(sinh(jet[4])));
+            REQUIRE(jet[8] == approximately(sinh(jet[5])));
 
-            REQUIRE(jet[9] == approximately(tan(jet[0])));
-            REQUIRE(jet[10] == approximately(tan(jet[1])));
-            REQUIRE(jet[11] == approximately(tan(jet[2])));
+            REQUIRE(jet[9] == approximately(cosh(jet[0])));
+            REQUIRE(jet[10] == approximately(cosh(jet[1])));
+            REQUIRE(jet[11] == approximately(cosh(jet[2])));
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * (1 + jet[6] * jet[6]) * jet[9]));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * (1 + jet[7] * jet[7]) * jet[10]));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * (1 + jet[8] * jet[8]) * jet[11]));
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[9] * cosh(jet[3])));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[10] * cosh(jet[4])));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[11] * cosh(jet[5])));
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (1 + jet[9] * jet[9]) * jet[6]));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (1 + jet[10] * jet[10]) * jet[7]));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * (1 + jet[11] * jet[11]) * jet[8]));
+            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] * sinh(jet[0])));
+            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] * sinh(jet[1])));
+            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] * sinh(jet[2])));
 
             REQUIRE(jet[18]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[6] * (1 + jet[6] * jet[6]) * jet[9] * jet[9]
-                                        + (1 + jet[6] * jet[6]) * 2 * jet[15])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[15] * cosh(jet[3]) + jet[9] * jet[9] * sinh(jet[3]))));
             REQUIRE(jet[19]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[7] * (1 + jet[7] * jet[7]) * jet[10] * jet[10]
-                                        + (1 + jet[7] * jet[7]) * 2 * jet[16])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[16] * cosh(jet[4]) + jet[10] * jet[10] * sinh(jet[4]))));
             REQUIRE(jet[20]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[8] * (1 + jet[8] * jet[8]) * jet[11] * jet[11]
-                                        + (1 + jet[8] * jet[8]) * 2 * jet[17])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[17] * cosh(jet[5]) + jet[11] * jet[11] * sinh(jet[5]))));
 
             REQUIRE(jet[21]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[9] * (1 + jet[9] * jet[9]) * jet[6] * jet[6]
-                                        + (1 + jet[9] * jet[9]) * 2 * jet[12])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[12] * sinh(jet[0]) + jet[6] * jet[6] * cosh(jet[0]))));
             REQUIRE(jet[22]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[10] * (1 + jet[10] * jet[10]) * jet[7] * jet[7]
-                                        + (1 + jet[10] * jet[10]) * 2 * jet[13])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[13] * sinh(jet[1]) + jet[7] * jet[7] * cosh(jet[1]))));
             REQUIRE(jet[23]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[11] * (1 + jet[11] * jet[11]) * jet[8] * jet[8]
-                                        + (1 + jet[11] * jet[11]) * 2 * jet[14])));
+                    == approximately(fp_t{1} / 6 * (2 * jet[14] * sinh(jet[2]) + jet[8] * jet[8] * cosh(jet[2]))));
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({tan(y), tan(x)}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({sinh(y), cosh(x)}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {false, true}) {
@@ -592,4 +554,38 @@ TEST_CASE("taylor tan")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
+}
+
+// Test expression simplification with sinh/cosh.
+TEST_CASE("taylor sinhcosh cse")
+{
+    using std::cosh;
+    using std::sinh;
+
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s;
+
+    auto dc = taylor_add_jet<double>(
+        s, "jet", {sinh(y) + cosh(x) + sinh(x) + cosh(y), sinh(y) + cosh(x) + sinh(x) + cosh(y)}, 2, 1, false, false);
+
+    s.compile();
+
+    auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+
+    std::vector<double> jet{2., 3.};
+    jet.resize(6);
+
+    jptr(jet.data(), nullptr, nullptr);
+
+    REQUIRE(jet[0] == 2);
+    REQUIRE(jet[1] == 3);
+    REQUIRE(jet[2] == approximately(sinh(jet[1]) + cosh(jet[0]) + sinh(jet[0]) + cosh(jet[1])));
+    REQUIRE(jet[3] == approximately(sinh(jet[1]) + cosh(jet[0]) + sinh(jet[0]) + cosh(jet[1])));
+    REQUIRE(jet[4]
+            == approximately(
+                (cosh(jet[1]) * jet[3] + sinh(jet[0]) * jet[2] + cosh(jet[0]) * jet[2] + sinh(jet[1]) * jet[3]) / 2));
+    REQUIRE(jet[5]
+            == approximately(
+                (cosh(jet[1]) * jet[3] + sinh(jet[0]) * jet[2] + cosh(jet[0]) * jet[2] + sinh(jet[1]) * jet[3]) / 2));
 }

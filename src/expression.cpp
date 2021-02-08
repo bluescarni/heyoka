@@ -276,6 +276,9 @@ expression operator-(expression e1, expression e2)
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
 
+// NOTE: shuold we try to recognize and simplify
+// x * x -> square(x)? Is the cost of comparison worth
+// the increase in performance?
 expression operator*(expression e1, expression e2)
 {
     auto visitor = [](auto &&v1, auto &&v2) {

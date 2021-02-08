@@ -600,6 +600,15 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 
 // Taylor decomposition with automatic deduction
 // of variables.
+// NOTE: when dealing with functions with hidden deps,
+// we should consider avoiding adding hidden deps if the
+// function argument(s) is a number/param: the hidden deps
+// won't be used for the computation of the derivatives
+// and thus they can be optimised out. Note that a straightforward
+// implementation of this idea this will only work when the argument
+// is a number/param, not when, e.g., the argument is par[0] + par[1] - in
+// order to simplify this out, it should be recognized that the definition
+// of a u variable depends only on numbers/params.
 std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(std::vector<expression> v_ex)
 {
     if (v_ex.empty()) {
@@ -2158,11 +2167,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     assert(!vc.empty());
 
     // Check if all the numbers are the same.
-    // NOTE: the current implementation of operator== for number will return false
-    // if the internal number types differ, even if their values are equal. Thus this
-    // simplification will not trigger if the ODE expressions contain different
-    // number types. Perhaps in the future we can change the operator== implementation
-    // to take into account the values only, but then we need to adapt the hasher as well.
+    // NOTE: the comparison operator of number will consider two numbers of different
+    // type but equal value to be equal.
     if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
         // If all constants are the same, don't construct an array, just always return
         // the same value.

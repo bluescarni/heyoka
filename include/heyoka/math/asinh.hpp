@@ -6,22 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_POW_HPP
-#define HEYOKA_MATH_POW_HPP
-
-#include <heyoka/config.hpp>
+#ifndef HEYOKA_MATH_ASINH_HPP
+#define HEYOKA_MATH_ASINH_HPP
 
 #include <cstdint>
-#include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
-#if defined(HEYOKA_HAVE_REAL128)
-
-#include <mp++/real128.hpp>
-
-#endif
-
+#include <heyoka/config.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -33,14 +25,11 @@ namespace heyoka
 namespace detail
 {
 
-// NOTE: when we implement serialization, we will
-// want to make sure that the deserialized exponent
-// is never 0.
-class HEYOKA_DLL_PUBLIC pow_impl : public func_base
+class HEYOKA_DLL_PUBLIC asinh_impl : public func_base
 {
 public:
-    pow_impl();
-    explicit pow_impl(expression, expression);
+    asinh_impl();
+    explicit asinh_impl(expression);
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -48,14 +37,8 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
-    expression diff(const std::string &) const;
-
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
-
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
@@ -76,15 +59,7 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression pow(expression, expression);
-HEYOKA_DLL_PUBLIC expression pow(expression, double);
-HEYOKA_DLL_PUBLIC expression pow(expression, long double);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
-
-#endif
+HEYOKA_DLL_PUBLIC expression asinh(expression);
 
 } // namespace heyoka
 

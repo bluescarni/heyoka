@@ -47,10 +47,13 @@ Note that support for extended-precision floating-point types
 In addition to the standard mathematical operators, heyoka's expression system
 also supports the following elementary functions (with more to come in the near future):
 
-* sine, cosine and tangent (and their inverse counterparts),
-* logarithm and exponential,
+* the basic trigonometric and hyperbolic functions, and their inverse counterparts,
+* the natural logarithm and exponential,
 * exponentiation,
 * square root.
+
+heyoka also provides an API for implementing new functions without
+modifying the library's code.
 
 It must be emphasised that heyoka's expression system is not a full-fledged
 computer algebra system. In particular, its simplification capabilities

@@ -46,7 +46,8 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/atan.hpp>
+#include <heyoka/math/acosh.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -58,17 +59,17 @@ namespace heyoka
 namespace detail
 {
 
-atan_impl::atan_impl(expression e) : func_base("atan", std::vector{std::move(e)}) {}
+acosh_impl::acosh_impl(expression e) : func_base("acosh", std::vector{std::move(e)}) {}
 
-atan_impl::atan_impl() : atan_impl(0_dbl) {}
+acosh_impl::acosh_impl() : acosh_impl(0_dbl) {}
 
-llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
+llvm::Value *acosh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
     if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
-        if (const auto sfn = sleef_function_name(s.context(), "atan", vec_t->getElementType(),
+        if (const auto sfn = sleef_function_name(s.context(), "acosh", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
             return llvm_invoke_external(
@@ -81,40 +82,40 @@ llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
         }
     }
 
-    return call_extern_vec(s, args[0], "atan");
+    return call_extern_vec(s, args[0], "acosh");
 }
 
-llvm::Value *atan_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
+llvm::Value *acosh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
     return call_extern_vec(s, args[0],
 #if defined(_MSC_VER)
-                           // NOTE: it seems like the MSVC stdlib does not have an atanl function,
-                           // because LLVM complains about the symbol "atanl" not being
+                           // NOTE: it seems like the MSVC stdlib does not have an acoshl function,
+                           // because LLVM complains about the symbol "acoshl" not being
                            // defined. Hence, use our own wrapper instead.
-                           "heyoka_atanl"
+                           "heyoka_acoshl"
 #else
-                           "atanl"
+                           "acoshl"
 #endif
     );
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *atan_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
+llvm::Value *acosh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_atan128");
+    return call_extern_vec(s, args[0], "heyoka_acosh128");
 }
 
 #endif
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-atan_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+acosh_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
@@ -126,26 +127,32 @@ atan_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::u
         arg = expression{"u_{}"_format(dres)};
     }
 
-    // Append the atan decomposition.
-    u_vars_defs.emplace_back(atan(arg), std::vector<std::uint32_t>{});
+    // Append the acosh decomposition.
+    u_vars_defs.emplace_back(acosh(arg), std::vector<std::uint32_t>{});
 
     // Append arg * arg.
     u_vars_defs.emplace_back(square(std::move(arg)), std::vector<std::uint32_t>{});
 
-    // Add the hidden dep.
-    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    // Append arg * arg - 1.
+    u_vars_defs.emplace_back(expression{"u_{}"_format(u_vars_defs.size() - 1u)} - 1_dbl, std::vector<std::uint32_t>{});
 
-    return u_vars_defs.size() - 2u;
+    // Append sqrt(arg * arg - 1).
+    u_vars_defs.emplace_back(sqrt(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
+
+    // Add the hidden dep.
+    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+
+    return u_vars_defs.size() - 4u;
 }
 
 namespace
 {
 
-// Derivative of atan(number).
+// Derivative of acosh(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std::vector<std::uint32_t> &, const U &num,
-                                   const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                   std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+llvm::Value *taylor_diff_acosh_impl(llvm_state &s, const acosh_impl &f, const std::vector<std::uint32_t> &,
+                                    const U &num, const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
+                                    std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
     if (order == 0u) {
         return codegen_from_values<T>(s, f, {taylor_codegen_numparam<T>(s, num, par_ptr, batch_size)});
@@ -155,10 +162,10 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std:
 }
 
 template <typename T>
-llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std::vector<std::uint32_t> &deps,
-                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
-                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                   std::uint32_t batch_size)
+llvm::Value *taylor_diff_acosh_impl(llvm_state &s, const acosh_impl &f, const std::vector<std::uint32_t> &deps,
+                                    const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size)
 {
     assert(deps.size() == 1u);
 
@@ -171,14 +178,11 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std:
         return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, b_idx, 0, n_uvars)});
     }
 
-    // Create the constant 1 in fp format.
-    auto one_fp = vector_splat(builder, codegen<T>(s, number{1.}), batch_size);
-
     if (order == 1u) {
         // Special-case the first-order derivative, in order
         // to avoid an empty summation below.
         return builder.CreateFDiv(taylor_fetch_diff(arr, b_idx, 1, n_uvars),
-                                  builder.CreateFAdd(taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
+                                  taylor_fetch_diff(arr, deps[0], 0, n_uvars));
     }
 
     // Create the fp version of the order.
@@ -187,14 +191,14 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std:
     // Assemble the first part of the result: n*b^[n].
     auto ret = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, b_idx, order, n_uvars));
 
-    // Compute n*(c^[0] + 1).
-    auto n_c0_p1 = builder.CreateFMul(ord_fp, builder.CreateFAdd(taylor_fetch_diff(arr, deps[0], 0, n_uvars), one_fp));
+    // Compute n*c^[0].
+    auto n_c0 = builder.CreateFMul(ord_fp, taylor_fetch_diff(arr, deps[0], 0, n_uvars));
 
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j < order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
-        // u variable whose definition is var * var.
+        // u variable whose definition is sqrt(var * var - 1).
         auto cnj = taylor_fetch_diff(arr, deps[0], order - j, n_uvars);
         auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
 
@@ -207,24 +211,24 @@ llvm::Value *taylor_diff_atan_impl(llvm_state &s, const atan_impl &f, const std:
     // Update ret.
     ret = builder.CreateFSub(ret, pairwise_sum(builder, sum));
 
-    // Divide by n*(c^[0] + 1) and return.
-    return builder.CreateFDiv(ret, n_c0_p1);
+    // Divide by n*c^[0] and return.
+    return builder.CreateFDiv(ret, n_c0);
 }
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Value *taylor_diff_atan_impl(llvm_state &, const atan_impl &, const std::vector<std::uint32_t> &, const U &,
-                                   const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
-                                   std::uint32_t, std::uint32_t)
+llvm::Value *taylor_diff_acosh_impl(llvm_state &, const acosh_impl &, const std::vector<std::uint32_t> &, const U &,
+                                    const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t, std::uint32_t)
 {
-    throw std::invalid_argument(
-        "An invalid argument type was encountered while trying to build the Taylor derivative of an inverse tangent");
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of an inverse hyperbolic cosine");
 }
 
 template <typename T>
-llvm::Value *taylor_diff_atan(llvm_state &s, const atan_impl &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                              std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *taylor_diff_acosh(llvm_state &s, const acosh_impl &f, const std::vector<std::uint32_t> &deps,
+                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                               std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
@@ -233,42 +237,43 @@ llvm::Value *taylor_diff_atan(llvm_state &s, const atan_impl &f, const std::vect
 
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
-            "derivative of the inverse tangent, but a vector of size {} was passed instead"_format(deps.size()));
+            "derivative of the inverse hyperbolic cosine, but a vector of size {} was passed instead"_format(
+                deps.size()));
     }
 
     return std::visit(
         [&](const auto &v) {
-            return taylor_diff_atan_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
+            return taylor_diff_acosh_impl<T>(s, f, deps, v, arr, par_ptr, n_uvars, order, idx, batch_size);
         },
         f.args()[0].value());
 }
 
 } // namespace
 
-llvm::Value *atan_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size) const
-{
-    return taylor_diff_atan<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
-}
-
-llvm::Value *atan_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+llvm::Value *acosh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                          std::uint32_t batch_size) const
 {
-    return taylor_diff_atan<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_acosh<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *acosh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                          std::uint32_t batch_size) const
+{
+    return taylor_diff_acosh<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *atan_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size) const
+llvm::Value *acosh_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                          std::uint32_t batch_size) const
 {
-    return taylor_diff_atan<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_acosh<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
@@ -276,24 +281,24 @@ llvm::Value *atan_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::u
 namespace
 {
 
-// Derivative of atan(number).
+// Derivative of acosh(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn, const U &num, std::uint32_t,
-                                             std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &fn, const U &num, std::uint32_t,
+                                              std::uint32_t batch_size)
 {
     using namespace fmt::literals;
 
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
-        "heyoka_taylor_diff_atan_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
-                                               taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "the inverse tangent", 1);
+        "heyoka_taylor_diff_acosh_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
+                                                taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
+        "the inverse hyperbolic cosine", 1);
 }
 
-// Derivative of atan(variable).
+// Derivative of acosh(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn, const variable &,
-                                             std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &fn, const variable &,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -303,8 +308,8 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_atan_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    using namespace fmt::literals;
+    const auto fname = "heyoka_taylor_diff_acosh_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -313,7 +318,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
     // - par ptr,
     // - time ptr,
     // - idx of the var argument,
-    // - idx of the uvar whose definition is var * var.
+    // - idx of the uvar whose definition is sqrt(var * var - 1).
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
                                     llvm::Type::getInt32Ty(context),
                                     llvm::PointerType::getUnqual(val_t),
@@ -362,19 +367,15 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
                                     retval);
             },
             [&]() {
-                // Create the constant 1 in fp format.
-                auto one_fp = vector_splat(builder, codegen<T>(s, number{1.}), batch_size);
-
                 // Compute the fp version of the order.
                 auto ord_fp = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Compute n*b^[n].
                 auto ret = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, b_idx));
 
-                // Compute n*(c^[0] + 1).
-                auto n_c0_p1 = builder.CreateFMul(
-                    ord_fp,
-                    builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx), one_fp));
+                // Compute n*c^[0].
+                auto n_c0
+                    = builder.CreateFMul(ord_fp, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), c_idx));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
@@ -394,8 +395,8 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
                 // Update ret.
                 ret = builder.CreateFSub(ret, builder.CreateLoad(acc));
 
-                // Divide by n*(c^[0] + 1).
-                ret = builder.CreateFDiv(ret, n_c0_p1);
+                // Divide by n*c^[0].
+                ret = builder.CreateFDiv(ret, n_c0);
 
                 // Store into retval.
                 builder.CreateStore(ret, retval);
@@ -416,7 +417,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
             throw std::invalid_argument(
-                "Inconsistent function signature for the Taylor derivative of the inverse tangent "
+                "Inconsistent function signature for the Taylor derivative of the inverse hyperbolic cosine "
                 "in compact mode detected");
         }
     }
@@ -426,48 +427,50 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &, const atan_impl &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &, const acosh_impl &, const U &, std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
-                                "of an inverse tangent in compact mode");
+                                "of an inverse hyperbolic cosine in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_atan(llvm_state &s, const atan_impl &fn, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_acosh(llvm_state &s, const acosh_impl &fn, std::uint32_t n_uvars,
+                                         std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_atan_impl<T>(s, fn, v, n_uvars, batch_size); },
+    return std::visit([&](const auto &v) { return taylor_c_diff_func_acosh_impl<T>(s, fn, v, n_uvars, batch_size); },
                       fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *atan_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *acosh_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_atan<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_acosh<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *atan_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *acosh_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars,
+                                                    std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_atan<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_acosh<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *atan_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *acosh_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars,
+                                                    std::uint32_t batch_size) const
 {
-    return taylor_c_diff_func_atan<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_acosh<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif
 
 } // namespace detail
 
-expression atan(expression e)
+expression acosh(expression e)
 {
-    return expression{func{detail::atan_impl(std::move(e))}};
+    return expression{func{detail::acosh_impl(std::move(e))}};
 }
 
 } // namespace heyoka
