@@ -20,6 +20,7 @@
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/sigmoid.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sinh.hpp>
 #include <heyoka/math/sqrt.hpp>
