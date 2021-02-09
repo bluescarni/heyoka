@@ -55,7 +55,7 @@
 #include <heyoka/variable.hpp>
 
 // The sigmoid is not in the standard library and thus needs wrappers
-// for its double, long double and 128 version.
+// for its double, long double and 128 versions.
 
 extern "C" HEYOKA_DLL_PUBLIC double heyoka_sigmoid(double x)
 {
@@ -68,10 +68,12 @@ extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sigmoidl(long double x)
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sigmoid128(__float128 x)
 {
-    return (mppp::real128{1.} / (mppp::real128{1.} + mppp::exp(-mppp::real128{x}))).m_value;
+    return (1. / (1. + mppp::exp(-mppp::real128{x}))).m_value;
 }
+
 #endif
 
 namespace heyoka
@@ -89,20 +91,30 @@ llvm::Value *sigmoid_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Va
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    // @BLUESCARNI: what to do here with sigmoid?
-    // if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
-    //     if (const auto sfn = sleef_function_name(s.context(), "tan", vec_t->getElementType(),
-    //                                              boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-    //         !sfn.empty()) {
-    //         return llvm_invoke_external(
-    //             s, sfn, vec_t, args,
-    //             // NOTE: in theory we may add ReadNone here as well,
-    //             // but for some reason, at least up to LLVM 10,
-    //             // this causes strange codegen issues. Revisit
-    //             // in the future.
-    //             {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-    //     }
-    // }
+    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+        const auto batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
+
+        if (const auto sfn = sleef_function_name(s.context(), "exp", vec_t->getElementType(), batch_size);
+            !sfn.empty()) {
+            auto &builder = s.builder();
+
+            // Compute -arg.
+            auto m_arg = builder.CreateFNeg(args[0]);
+
+            // Compute e^(-arg).
+            auto e_m_arg = llvm_invoke_external(
+                s, sfn, vec_t, {m_arg},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+
+            // Return 1 / (1 + e_m_arg).
+            auto one_fp = vector_splat(builder, codegen<double>(s, number{1.}), batch_size);
+            return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_arg));
+        }
+    }
 
     return call_extern_vec(s, args[0], "heyoka_sigmoid");
 }
@@ -174,18 +186,19 @@ sigmoid_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std
 {
     assert(args().size() == 1u);
 
+    using namespace fmt::literals;
+
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
     if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        arg = expression{"u_{}"_format(dres)};
     }
 
     // Append the sigmoid decomposition.
     u_vars_defs.emplace_back(sigmoid(std::move(arg)), std::vector<std::uint32_t>{});
 
     // Append the auxiliary function sigmoid(arg) * sigmoid(arg).
-    u_vars_defs.emplace_back(square(expression{variable{"u_" + detail::li_to_string(u_vars_defs.size() - 1u)}}),
-                             std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
@@ -236,10 +249,11 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &s, const sigmoid_impl &f, cons
 
         auto fac = vector_splat(builder, codegen<T>(s, number(static_cast<T>(j))), batch_size);
 
-        // Add j*(anj- cnj)*bj to the sum.
+        // Add j*(anj-cnj)*bj to the sum.
         auto tmp1 = builder.CreateFSub(anj, cnj);
         auto tmp2 = builder.CreateFMul(tmp1, bj);
         auto tmp3 = builder.CreateFMul(tmp2, fac);
+
         sum.push_back(tmp3);
     }
 
@@ -417,7 +431,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    // Add  j*(anj- cnj)*bj into the sum.
+                    // Add  j*(anj-cnj)*bj into the sum.
                     auto tmp1 = builder.CreateFSub(anj, cnj);
                     auto tmp2 = builder.CreateFMul(tmp1, bj);
                     auto tmp3 = builder.CreateFMul(tmp2, fac);
@@ -425,7 +439,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), tmp3), acc);
                 });
 
-                // Divide by the order and add to b^[n] to produce the return value.
+                // Divide by the order to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
