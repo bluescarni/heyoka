@@ -173,7 +173,6 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
                                    std::uint32_t batch_size)
 {
-
     using std::sqrt;
 
     assert(deps.size() == 1u);
@@ -189,7 +188,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
 
     // NOTE: iteration in the [1, order) range.
     std::vector<llvm::Value *> sum;
-    for (std::uint32_t j = 1; j < order; ++j) {
+    for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
         // u variable whose definition is exp(- var * var).
         auto bj = taylor_fetch_diff(arr, b_idx, j, n_uvars);
@@ -204,12 +203,12 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
     // Create ret with the sum.
     auto ret = pairwise_sum(builder, sum);
 
-    // Generate the factor n * sqrt(pi) /2
+    // Generate the factor n * sqrt(pi) /2 (check what boost does with real128)
     auto fac = number(static_cast<T>(order) * sqrt(boost::math::constants::pi<T>()) / static_cast<T>(2));
     auto fac_s = vector_splat(builder, codegen<T>(s, fac), batch_size);
 
     // Multiply and return.
-    return builder.CreateFMul(ret, fac_s);
+    return builder.CreateFDiv(ret, fac_s);
 }
 
 // All the other cases.

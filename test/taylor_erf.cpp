@@ -100,14 +100,14 @@ TEST_CASE("ode test")
                                             kw::compact_mode = cm, kw::opt_level = opt_level);
                 taylor_adaptive<double> ta1(
                     {prime(x) = s + x, prime(s) = (2. / sqrt(pi) * exp(-1e-4 * x * x)) * 1e-2 * (s + x)},
-                    {.5, tan(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm, kw::opt_level = opt_level);
+                    {.5, erf(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm, kw::opt_level = opt_level);
 
                 ta0.propagate_until(5.);
                 ta1.propagate_until(5.);
 
                 REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
 
-                const auto v0 = tan(ta0.get_state()[0] * 1e-2);
+                const auto v0 = erf(ta0.get_state()[0] * 1e-2);
                 const auto v1 = ta1.get_state()[1];
 
                 REQUIRE(abs((v0 - v1) / v0) < 1e-14);
