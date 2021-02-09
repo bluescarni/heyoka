@@ -26,16 +26,16 @@ int main()
                                       {prime(x) = v, prime(v) = cos(hy::time) - .1 * v - sin(x)},
                                       // Initial conditions
                                       // for x and v.
-                                      {0., 1.97},
+                                      {0., 1.85},
                                       // Explicitly specify the
                                       // initial value for the time
                                       // variable.
                                       kw::time = 0.};
 
-    // Integrate for 10 time units.
-    ta.propagate_for(10.);
-
-    // Print the state vector.
-    std::cout << "x(10) = " << ta.get_state()[0] << '\n';
-    std::cout << "v(10) = " << ta.get_state()[1] << '\n';
+    // Integrate for 50 time units, and print
+    // the value of x every 2 time units.
+    for (auto i = 0; i < 25; ++i) {
+        ta.propagate_for(2.);
+        std::cout << "x = " << ta.get_state()[0] << '\n';
+    }
 }
