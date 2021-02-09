@@ -17,6 +17,7 @@
 #include <heyoka/math/atanh.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/cosh.hpp>
+#include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
