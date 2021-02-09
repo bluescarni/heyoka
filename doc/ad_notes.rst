@@ -154,15 +154,23 @@ and obtain, for :math:`n > 0`:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
 
-Sigmoid function
-^^^^^^^^^^^^^^^^^^^
+Standard logistic function
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Given :math:`a\left( t \right) = \mbox{sig } {b\left( t \right)}`, we have
+Given :math:`a\left( t \right) = \operatorname{sig} {b\left( t \right)}`, where :math:`\operatorname{sig}\left( x \right)`
+is the `standard logistic function <https://en.wikipedia.org/wiki/Logistic_function>`__
 
 .. math::
    :label:
 
-   a^\prime\left( t \right) = \mbox{sig }{b\left( t \right)} (1 - \mbox{sig }{b\left( t \right)}) b^\prime\left( t \right) = a\left( t \right) (1 - a\left( t \right)) b^\prime\left( t \right).
+   \operatorname{sig} \left( x \right) = \frac{1}{1+e^{-x}},
+
+we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \operatorname{sig}{b\left( t \right)} \left[1 - \operatorname{sig}{b\left( t \right)} \right] b^\prime\left( t \right) = a\left( t \right) \left[1 - a\left( t \right) \right] b^\prime\left( t \right),
 
 which, after the introduction of the auxiliary function
 
@@ -176,7 +184,7 @@ becomes
 .. math::
    :label:
 
-   a^\prime\left( t \right) = \left(a\left( t \right) - c\left( t \right) \right) b^\prime\left( t \right).
+   a^\prime\left( t \right) = \left[ a\left( t \right) - c\left( t \right) \right] b^\prime\left( t \right).
 
 After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`,
 :eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00` to obtain, for :math:`n > 0`:
@@ -184,7 +192,7 @@ After applying the normalised derivative of order :math:`n-1` to both sides, we 
 .. math::
    :label:
 
-   a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left(a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right) b^{\left[ j \right]}\left( t \right).
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left[ a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right] b^{\left[ j \right]}\left( t \right).
 
 
 Logarithms
