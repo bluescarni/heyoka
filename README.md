@@ -8,6 +8,25 @@ heyoka
 
 [![Anaconda-Server Badge](https://img.shields.io/conda/vn/conda-forge/heyoka.svg?style=for-the-badge)](https://anaconda.org/conda-forge/heyoka)
 
+<!-- PROJECT LOGO -->
+<br />
+<p align="center">
+  <a href="https://github.com/bluescarni/heyoka">
+    <img src="doc/images/white_logo.png" alt="Logo" width="280">
+  </a>
+  <p align="center">
+    Modern Taylor's method via just-in-time compilation
+    <br />
+    <a href="https://bluescarni.github.io/heyoka/index.html"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Report bug</a>
+    ·
+    <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Request feature</a>
+  </p>
+</p>
+
+
 > The [heyókȟa](https://en.wikipedia.org/wiki/Heyoka>) [...] is a kind of
 > sacred clown in the culture of the Sioux (Lakota and Dakota people)
 > of the Great Plains of North America. The heyoka is a contrarian, jester,

@@ -197,16 +197,34 @@ void compare_taylor_vs_rkf(const P &mascon_points, const M &mascon_masses, taylo
 }
 
 template <typename P, typename M>
-void plot_data(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
-               double integration_time, unsigned N = 5000)
+void plot_data_taylor(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
+                      double integration_time, unsigned N = 5000)
 {
-    auto dt = integration_time / N;
+    double dt = integration_time / N;
     for (decltype(N) i = 0u; i < N + 1; ++i) {
         auto state = taylor.get_state();
         auto energy = compute_energy(state, mascon_points, mascon_masses, 0., 0., wz, 1.);
         fmt::print("[{}, {}, {}, {}, {}, {}, {}],\n", state[0], state[1], state[2], state[3], state[4], state[5],
                    energy);
         taylor.propagate_for(dt);
+    }
+}
+
+template <typename P, typename M>
+void plot_data_rkf78(const P &mascon_points, const M &mascon_masses, taylor_adaptive<double> &taylor, double wz,
+                     double integration_time, unsigned N = 5000)
+{
+    auto ic = taylor.get_state();
+    double dt = integration_time / N;
+    // The error stepper
+    typedef odeint::runge_kutta_fehlberg78<std::vector<double>> error_stepper_type;
+    // The dynamics
+    mascon_dynamics dynamics(mascon_points, mascon_masses, 0., 0., wz, 1.);
+    for (decltype(N) i = 0u; i < N + 1; ++i) {
+        auto energy = compute_energy(ic, mascon_points, mascon_masses, 0., 0., wz, 1.);
+        fmt::print("[{}, {}, {}, {}, {}, {}, {}],\n", ic[0], ic[1], ic[2], ic[3], ic[4], ic[5], energy);
+        odeint::integrate_adaptive(odeint::make_controlled<error_stepper_type>(1.0e-14, 1.0e-14), dynamics, ic, 0.0, dt,
+                                   1e-8);
     }
 }
 
@@ -225,8 +243,8 @@ int main(int argc, char *argv[])
     auto T_67p = 4500.388359040116;
     auto wz_67p = 0.633440278094151;
     fmt::print("67P, {} mascons:\n", std::size(mascon_masses_67p));
-    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
-    compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
+    // auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
+    // compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
     // plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p * 365.25, 5000u);
 
     // Bennu
@@ -238,7 +256,8 @@ int main(int argc, char *argv[])
     auto wz_bennu = 1.5633255034258877;
     fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
     auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
-    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
+    // compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu,
+    // integration_time / T_bennu);
     // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
     // 1000u);
 
@@ -250,12 +269,14 @@ int main(int argc, char *argv[])
     auto T_itokawa = 6833.636194780773;
     auto wz_itokawa = 0.9830980174940738;
     fmt::print("\nItokawa, {} mascons:\n", std::size(mascon_masses_itokawa));
-    auto taylor_itokawa
-        = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, distance, inclination, 1.);
-    compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
-                          integration_time / T_itokawa);
+    // auto taylor_itokawa
+    //    = taylor_factory(mascon_points_itokawa, mascon_masses_itokawa, wz_itokawa, distance, inclination, 1.);
+    // compare_taylor_vs_rkf(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
+    //                      integration_time / T_itokawa);
     // plot_data(mascon_points_itokawa, mascon_masses_itokawa, taylor_itokawa, wz_itokawa,
     //         integration_time / T_itokawa * 7, 1000u);
+    plot_data_rkf78(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu,
+                    integration_time / T_bennu * 365.25, 1000u);
 
     return 0;
 }
