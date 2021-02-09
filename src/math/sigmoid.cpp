@@ -153,7 +153,7 @@ double sigmoid_impl::eval_num_dbl(const std::vector<double> &a) const
 
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
-            "tangent over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
+            "sigmoid over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
     }
 
     return heyoka_sigmoid(a[0]);
@@ -163,7 +163,7 @@ double sigmoid_impl::deval_num_dbl(const std::vector<double> &a, std::vector<dou
 {
     if (a.size() != 1u || i != 0u) {
         throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
-                                    "numerical derivative of the tangent");
+                                    "numerical derivative of the sigmoid");
     }
     auto sigma = heyoka_sigmoid(a[0]);
     return sigma * (1 - sigma);
@@ -317,7 +317,7 @@ llvm::Value *sigmoid_impl::taylor_diff_f128(llvm_state &s, const std::vector<std
 namespace
 {
 
-// Derivative of tan(number).
+// Derivative of sigmoid(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_impl &fn, const U &num, std::uint32_t,
                                                 std::uint32_t batch_size)
@@ -328,14 +328,17 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
         s, fn, num, batch_size,
         "heyoka_taylor_diff_sigmoid_{}_{}"_format(
             taylor_c_diff_numparam_mangle(num), taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "the tangent", 1);
+        "the sigmoid", 1);
 }
 
-// Derivative of tan(variable).
+// Derivative of sigmoid(variable).
 template <typename T>
 llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_impl &fn, const variable &,
                                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+
+    using namespace fmt::literals;
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -344,8 +347,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_sigmoid_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_sigmoid_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -354,7 +356,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
     // - par ptr,
     // - time ptr,
     // - idx of the var argument,
-    // - idx of the uvar whose definition is tan(var) * tan(var).
+    // - idx of the uvar whose definition is sigmoid(var) * sigmoid(var).
     std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
                                     llvm::Type::getInt32Ty(context),
                                     llvm::PointerType::getUnqual(val_t),
@@ -380,8 +382,9 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
+        auto a_idx = f->args().begin() + 1;
         auto diff_ptr = f->args().begin() + 2;
-        auto var_idx = f->args().begin() + 5;
+        auto b_idx = f->args().begin() + 5;
         auto dep_idx = f->args().begin() + 6;
 
         // Create a new basic block to start insertion into.
@@ -396,11 +399,10 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
         llvm_if_then_else(
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
-                // For order 0, invoke the function on the order 0 of var_idx.
-                builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
-                    retval);
+                // For order 0, invoke the function on the order 0 of b_idx.
+                builder.CreateStore(codegen_from_values<T>(
+                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
+                                    retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -408,22 +410,25 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
+                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
                     auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
 
+                    // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
-                                                           builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
-                                        acc);
+                    // Add  j*(anj- cnj)*bj into the sum.
+                    auto tmp1 = builder.CreateFSub(anj, cnj);
+                    auto tmp2 = builder.CreateFMul(tmp1, bj);
+                    auto tmp3 = builder.CreateFMul(tmp2, fac);
+
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), tmp3), acc);
                 });
 
                 // Divide by the order and add to b^[n] to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
-                builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
-                                                       builder.CreateFDiv(builder.CreateLoad(acc), ord_v)),
-                                    retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
             });
 
         // Return the result.

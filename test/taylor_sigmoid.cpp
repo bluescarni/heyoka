@@ -81,10 +81,6 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// For consistency with other tests we
-// create a sigmoid function in the std namespace.
-namespace std
-{
 double sigmoid(double x)
 {
     return 1. / (1. + std::exp(-x));
@@ -100,44 +96,39 @@ mppp::real128 sigmoid(mppp::real128 x)
     return 1. / (1. + mppp::exp(-x));
 }
 
-} // namespace std
 
 TEST_CASE("ode test")
 {
     using std::abs;
-    using std::sigmoid;
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        // for (auto cm : {false, true}) {
-        auto cm = false;
-        for (auto ha : {false, true}) {
-            auto [x, s] = make_vars("x", "s");
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto [x, s] = make_vars("x", "s");
 
-            taylor_adaptive<double> ta0({prime(x) = sigmoid(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
-                                        kw::compact_mode = cm, kw::opt_level = opt_level);
-            taylor_adaptive<double> ta1({prime(x) = s + x, prime(s) = s * (1_dbl - s) * 1e-2 * (s + x)},
-                                        {.5, sigmoid(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm,
-                                        kw::opt_level = opt_level);
+                taylor_adaptive<double> ta0({prime(x) = sigmoid(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
+                                            kw::compact_mode = cm, kw::opt_level = opt_level);
+                taylor_adaptive<double> ta1({prime(x) = s + x, prime(s) = s * (1_dbl - s) * 1e-2 * (s + x)},
+                                            {.5, sigmoid(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm,
+                                            kw::opt_level = opt_level);
 
-            ta0.propagate_until(5.);
-            ta1.propagate_until(5.);
+                ta0.propagate_until(5.);
+                ta1.propagate_until(5.);
 
-            REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
+                REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
 
-            const auto v0 = sigmoid(ta0.get_state()[0] * 1e-2);
-            const auto v1 = ta1.get_state()[1];
+                const auto v0 = sigmoid(ta0.get_state()[0] * 1e-2);
+                const auto v1 = ta1.get_state()[1];
 
-            REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+                REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+            }
         }
-        //}
     }
 }
 
 // Test CSE involving hidden dependencies.
 TEST_CASE("taylor sigmoid test simplifications")
 {
-    using std::sigmoid;
-
     auto x = "x"_var, y = "y"_var;
 
     llvm_state s{kw::opt_level = 0u};
@@ -168,8 +159,6 @@ TEST_CASE("taylor sigmoid test simplifications")
 TEST_CASE("taylor sigmoid")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
-        using std::sigmoid;
-
         using fp_t = decltype(fp_x);
 
         using Catch::Matchers::Message;
@@ -607,13 +596,12 @@ TEST_CASE("taylor sigmoid")
         compare_batch_scalar<fp_t>({sigmoid(y), sigmoid(x)}, opt_level, high_accuracy, compact_mode);
     };
 
-    // for (auto cm : {false, true}) {
-    bool cm = false;
-    for (auto f : {false, true}) {
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
     }
-    //}
 }
