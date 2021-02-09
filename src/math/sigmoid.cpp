@@ -48,8 +48,8 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/sigmoid.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -264,8 +264,8 @@ llvm::Value *taylor_diff_sigmoid_impl(llvm_state &, const sigmoid_impl &, const 
 
 template <typename T>
 llvm::Value *taylor_diff_sigmoid(llvm_state &s, const sigmoid_impl &f, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
-                             std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                                 const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                 std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
     assert(f.args().size() == 1u);
 
@@ -459,7 +459,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &, const sigmoid_impl
 
 template <typename T>
 llvm::Function *taylor_c_diff_func_sigmoid(llvm_state &s, const sigmoid_impl &fn, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size)
+                                           std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
@@ -497,8 +497,7 @@ expression sigmoid_impl::diff(const std::string &s) const
 
     // NOTE: if single-precision floats are implemented,
     // should 1_dbl become 1_flt?
-    return (1_dbl + sigmoid(args()[0])) * sigmoid(args()[0]) * heyoka::diff(args()[0], s);
-
+    return (1_dbl - sigmoid(args()[0])) * sigmoid(args()[0]) * heyoka::diff(args()[0], s);
 }
 
 } // namespace detail
