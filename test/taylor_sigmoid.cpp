@@ -91,11 +91,12 @@ long double sigmoid(long double x)
     return 1. / (1. + std::exp(-x));
 }
 
+#if defined(HEYOKA_HAVE_REAL128)
 mppp::real128 sigmoid(mppp::real128 x)
 {
     return 1. / (1. + mppp::exp(-x));
 }
-
+#endif
 
 TEST_CASE("ode test")
 {
