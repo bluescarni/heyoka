@@ -9,8 +9,10 @@ global header ``heyoka/heyoka.hpp``, and the use of
 .. code-block:: c++
 
    using namespace heyoka;
+   namespace hy = heyoka;
 
-to import all names from the ``heyoka`` namespace.
+to import all names from the ``heyoka`` namespace, and to provide
+a handy shortcut ``hy`` to the ``heyoka`` namespace.
 
 The tutorials' code is available in the ``tutorials/`` subdirectory
 of the source tree. The tutorials can be compiled by enabling the
@@ -25,3 +27,4 @@ of the source tree. The tutorials can be compiled by enabling the
   tut_adaptive
   tut_adaptive_custom
   tut_param
+  tut_nonauto
