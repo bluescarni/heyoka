@@ -92,10 +92,12 @@ long double sigmoid(long double x)
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 sigmoid(mppp::real128 x)
 {
     return 1. / (1. + mppp::exp(-x));
 }
+
 #endif
 
 TEST_CASE("ode test")
@@ -156,7 +158,7 @@ TEST_CASE("taylor sigmoid test simplifications")
                                 + (1. - sigmoid(jet[0] + jet[1])) * sigmoid(jet[0] + jet[1]) * (jet[2] + jet[3]))));
     REQUIRE(jet[5] == approximately(.5 * jet[2]));
 }
-//
+
 TEST_CASE("taylor sigmoid")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
