@@ -92,27 +92,26 @@ TEST_CASE("ode test")
     auto pi = boost::math::constants::pi<double>();
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        // for (auto cm : {false, true}) {
-        auto cm = false;
-        for (auto ha : {false, true}) {
-            auto [x, s] = make_vars("x", "s");
-            taylor_adaptive<double> ta0({prime(x) = erf(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
-                                        kw::compact_mode = cm, kw::opt_level = opt_level);
-            taylor_adaptive<double> ta1(
-                {prime(x) = s + x, prime(s) = (2. / sqrt(pi) * exp(-1e-4 * x * x)) * 1e-2 * (s + x)},
-                {.5, erf(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm, kw::opt_level = opt_level);
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto [x, s] = make_vars("x", "s");
+                taylor_adaptive<double> ta0({prime(x) = erf(1e-2 * x) + x}, {.5}, kw::high_accuracy = ha,
+                                            kw::compact_mode = cm, kw::opt_level = opt_level);
+                taylor_adaptive<double> ta1(
+                    {prime(x) = s + x, prime(s) = (2. / sqrt(pi) * exp(-1e-4 * x * x)) * 1e-2 * (s + x)},
+                    {.5, erf(1e-2 * .5)}, kw::high_accuracy = ha, kw::compact_mode = cm, kw::opt_level = opt_level);
 
-            ta0.propagate_until(5.);
-            ta1.propagate_until(5.);
+                ta0.propagate_until(5.);
+                ta1.propagate_until(5.);
 
-            REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
+                REQUIRE(abs((ta0.get_state()[0] - ta1.get_state()[0]) / ta0.get_state()[0]) < 1e-14);
 
-            const auto v0 = erf(ta0.get_state()[0] * 1e-2);
-            const auto v1 = ta1.get_state()[1];
+                const auto v0 = erf(ta0.get_state()[0] * 1e-2);
+                const auto v1 = ta1.get_state()[1];
 
-            REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+                REQUIRE(abs((v0 - v1) / v0) < 1e-14);
+            }
         }
-        //}
     }
 }
 
@@ -157,11 +156,8 @@ TEST_CASE("taylor erf")
         using std::erf;
         using std::exp;
         using std::sqrt;
-
-        auto pi = boost::math::constants::pi<double>();
-
         using fp_t = decltype(fp_x);
-
+        auto pi = boost::math::constants::pi<fp_t>();
         using Catch::Matchers::Message;
 
         auto x = "x"_var, y = "y"_var;
@@ -568,41 +564,40 @@ TEST_CASE("taylor erf")
             REQUIRE(jet[18]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[3] * jet[3]) * jet[3] * jet[9] * jet[9]
-                                        + exp(-jet[3] * jet[3]) * 2. / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6] )));
+                                        + exp(-jet[3] * jet[3]) * 2. / sqrt(pi) * exp(-jet[0] * jet[0]) * jet[6])));
             REQUIRE(jet[19]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[4] * jet[4]) * jet[4] * jet[10] * jet[10]
-                                        + exp(-jet[4] * jet[4]) * 2. / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7] )));
+                                        + exp(-jet[4] * jet[4]) * 2. / sqrt(pi) * exp(-jet[1] * jet[1]) * jet[7])));
             REQUIRE(jet[20]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[5] * jet[5]) * jet[5] * jet[11] * jet[11]
-                                        + exp(-jet[5] * jet[5]) * 2. / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8] )));
+                                        + exp(-jet[5] * jet[5]) * 2. / sqrt(pi) * exp(-jet[2] * jet[2]) * jet[8])));
 
             REQUIRE(jet[21]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[0] * jet[0]) * jet[0] * jet[6] * jet[6]
-                                        + exp(-jet[0] * jet[0]) * 2. / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9] )));
+                                        + exp(-jet[0] * jet[0]) * 2. / sqrt(pi) * exp(-jet[3] * jet[3]) * jet[9])));
             REQUIRE(jet[22]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[1] * jet[1]) * jet[1] * jet[7] * jet[7]
-                                        + exp(-jet[1] * jet[1]) * 2. / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10] )));
+                                        + exp(-jet[1] * jet[1]) * 2. / sqrt(pi) * exp(-jet[4] * jet[4]) * jet[10])));
             REQUIRE(jet[23]
                     == approximately(fp_t{1} / 6 * 2. / sqrt(pi)
                                      * (-2. * exp(-jet[2] * jet[2]) * jet[2] * jet[8] * jet[8]
-                                        + exp(-jet[2] * jet[2]) * 2. / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11] )));
+                                        + exp(-jet[2] * jet[2]) * 2. / sqrt(pi) * exp(-jet[5] * jet[5]) * jet[11])));
         }
 
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({erf(y), erf(x)}, opt_level, high_accuracy, compact_mode);
     };
 
-    // for (auto cm : {false, true}) {
-    auto cm = false;
-    for (auto f : {false, true}) {
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
-        tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
     }
-    //}
 }
