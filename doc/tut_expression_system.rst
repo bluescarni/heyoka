@@ -47,10 +47,11 @@ Note that support for extended-precision floating-point types
 In addition to the standard mathematical operators, heyoka's expression system
 also supports the following elementary functions (with more to come in the near future):
 
+* square root,
+* exponentiation,
 * the basic trigonometric and hyperbolic functions, and their inverse counterparts,
 * the natural logarithm and exponential,
-* exponentiation,
-* square root.
+* the standard logistic function (sigmoid).
 
 heyoka also provides an API for implementing new functions without
 modifying the library's code.
