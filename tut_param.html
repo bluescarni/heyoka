@@ -38,7 +38,7 @@
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="next" title="Non-autonomous systems" href="tut_nonauto.html" />
     <link rel="prev" title="Customising the adaptive integrator" href="tut_adaptive_custom.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -105,6 +105,11 @@
      Runtime parameters
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_nonauto.html">
+     Non-autonomous systems
+    </a>
+   </li>
   </ul>
   <i class="fas fa-chevron-down">
   </i>
@@ -117,6 +122,11 @@
  <li class="toctree-l1">
   <a class="reference internal" href="changelog.html">
    Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
   </a>
  </li>
 </ul>
@@ -305,17 +315,30 @@ as it can be confirmed via numerical integration:</p>
 <span class="go">Parameters  : [9.8000000000000007, 1.0000000000000000]</span>
 </pre></div>
 </div>
-<p>Let’s now move to Mars, where the gravitational acceleration on the surface
-is <span class="math notranslate nohighlight">\(\sim 3.72\,\mathrm{m}/\mathrm{s}^2\)</span>.
-Because gravity is weaker, the period of the pendulum increases to
-<span class="math notranslate nohighlight">\(\sim 3.26\,\mathrm{s}\)</span>, as it can be confirmed via numerical integration:</p>
+<p>As you can see, after 1 period the state of the system went back to the initial conditions.</p>
+<p>We are now going to move to Mars, where the gravitational acceleration on the surface
+is <span class="math notranslate nohighlight">\(\sim 3.72\,\mathrm{m}/\mathrm{s}^2\)</span> (instead of Earth’s
+<span class="math notranslate nohighlight">\(\sim 9.8\,\mathrm{m}/\mathrm{s}^2\)</span>). First we reset the time
+coordinate:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the time coordinate.</span>
     <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
-
-    <span class="c1">// Change the value of g.</span>
+</pre></div>
+</div>
+<p>Then we change the value of the gravitational constant <span class="math notranslate nohighlight">\(g\)</span>, which,
+as explained above, is stored at index 0 in the array of parameter values:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Change the value of g.</span>
     <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.72</span><span class="p">;</span>
-
-    <span class="c1">// Integrate for ~1 period on Mars.</span>
+</pre></div>
+</div>
+<p>Note that, like the for the state data, the <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code>
+function returns a naked pointer
+that can be used to modify the parameter values. Another function
+of the integrator object, <code class="docutils literal notranslate"><span class="pre">get_pars()</span></code>,
+returns a const reference to the <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>
+holding the parameter values.</p>
+<p>Because gravity is weaker on Mars, the period of a <span class="math notranslate nohighlight">\(1\,\mathrm{m}\)</span> pendulum increases to
+<span class="math notranslate nohighlight">\(\sim 3.26\,\mathrm{s}\)</span>. We can confirm this via numerical integration:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for ~1 period on Mars.</span>
     <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
@@ -327,15 +350,6 @@ Because gravity is weaker, the period of the pendulum increases to
 <span class="go">Parameters  : [3.7200000000000002, 1.0000000000000000]</span>
 </pre></div>
 </div>
-<p>After resetting the time coordinate to zero, via the <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code> function
-we accessed the array of parameter values and changed its first
-element (which corresponds to the <span class="math notranslate nohighlight">\(g\)</span> parameter) from <code class="docutils literal notranslate"><span class="pre">9.8</span></code> to <code class="docutils literal notranslate"><span class="pre">3.72</span></code>.
-The subsequent numerical integration confirms that the new value of <span class="math notranslate nohighlight">\(g\)</span> was
-indeed used.</p>
-<p>Note that, like the for the state data, <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code> returns a naked pointer
-that can be used to modify the parameter values. Another function, <code class="docutils literal notranslate"><span class="pre">get_pars()</span></code>,
-returns a const reference to the <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>
-holding the parameter values, which cannot be used to mutate the parameter values.</p>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
@@ -396,7 +410,7 @@ holding the parameter values, which cannot be used to mutate the parameter value
     <div class='prev-next-bottom'>
         
     <a class='left-prev' id="prev-link" href="tut_adaptive_custom.html" title="previous page">Customising the adaptive integrator</a>
-    <a class='right-next' id="next-link" href="ad_notes.html" title="next page">Notes on automatic differentiation</a>
+    <a class='right-next' id="next-link" href="tut_nonauto.html" title="next page">Non-autonomous systems</a>
 
     </div>
     <footer class="footer mt-5 mt-md-0">
