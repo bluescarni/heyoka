@@ -267,6 +267,11 @@
      Natural exponential
     </a>
    </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#standard-logistic-function">
+     Standard logistic function
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
@@ -465,21 +470,41 @@ and obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:<
 <div class="math notranslate nohighlight" id="equation-ad-notes-9">
 <span class="eqno">(14)<a class="headerlink" href="#equation-ad-notes-9" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </div>
+<div class="section" id="standard-logistic-function">
+<h3>Standard logistic function<a class="headerlink" href="#standard-logistic-function" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{sig} {b\left( t \right)}\)</span>, where <span class="math notranslate nohighlight">\(\operatorname{sig}\left( x \right)\)</span>
+is the <a class="reference external" href="https://en.wikipedia.org/wiki/Logistic_function">standard logistic function</a></p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-10">
+<span class="eqno">(15)<a class="headerlink" href="#equation-ad-notes-10" title="Permalink to this equation">¶</a></span>\[\operatorname{sig} \left( x \right) = \frac{1}{1+e^{-x}},\]</div>
+<p>we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-11">
+<span class="eqno">(16)<a class="headerlink" href="#equation-ad-notes-11" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \operatorname{sig}{b\left( t \right)} \left[1 - \operatorname{sig}{b\left( t \right)} \right] b^\prime\left( t \right) = a\left( t \right) \left[1 - a\left( t \right) \right] b^\prime\left( t \right),\]</div>
+<p>which, after the introduction of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-12">
+<span class="eqno">(17)<a class="headerlink" href="#equation-ad-notes-12" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
+<p>becomes</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-13">
+<span class="eqno">(18)<a class="headerlink" href="#equation-ad-notes-13" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ a\left( t \right) - c\left( t \right) \right] b^\prime\left( t \right).\]</div>
+<p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
+<a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-14">
+<span class="eqno">(19)<a class="headerlink" href="#equation-ad-notes-14" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left[ a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right] b^{\left[ j \right]}\left( t \right).\]</div>
+</div>
 </div>
 <div class="section" id="logarithms">
 <h2>Logarithms<a class="headerlink" href="#logarithms" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="natural-logarithm">
 <h3>Natural logarithm<a class="headerlink" href="#natural-logarithm" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \log b\left( t \right)\)</span>, we have</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-10">
-<span class="eqno">(15)<a class="headerlink" href="#equation-ad-notes-10" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-15">
+<span class="eqno">(20)<a class="headerlink" href="#equation-ad-notes-15" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{b\left( t \right)},\]</div>
 <p>or, equivalently,</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-11">
-<span class="eqno">(16)<a class="headerlink" href="#equation-ad-notes-11" title="Permalink to this equation">¶</a></span>\[b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-16">
+<span class="eqno">(21)<a class="headerlink" href="#equation-ad-notes-16" title="Permalink to this equation">¶</a></span>\[b\left( t \right) a^\prime\left( t \right) = b^\prime\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>
 and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-12">
-<span class="eqno">(17)<a class="headerlink" href="#equation-ad-notes-12" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-17">
+<span class="eqno">(22)<a class="headerlink" href="#equation-ad-notes-17" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 </div>
 <div class="section" id="trigonometric-functions">
@@ -487,18 +512,18 @@ and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt
 <div class="section" id="tangent">
 <span id="ad-tan"></span><h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tan b\left( t \right)\)</span>, we have</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-13">
-<span class="eqno">(18)<a class="headerlink" href="#equation-ad-notes-13" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-18">
+<span class="eqno">(23)<a class="headerlink" href="#equation-ad-notes-18" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \left[ \tan^2 b\left( t \right) + 1 \right] b^\prime\left( t \right) = a^2\left( t \right)b^\prime\left( t \right) + b^\prime\left( t \right),\]</div>
 <p>which, after the introduction of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-14">
-<span class="eqno">(19)<a class="headerlink" href="#equation-ad-notes-14" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-19">
+<span class="eqno">(24)<a class="headerlink" href="#equation-ad-notes-19" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right) ,\]</div>
 <p>becomes</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-15">
-<span class="eqno">(20)<a class="headerlink" href="#equation-ad-notes-15" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-20">
+<span class="eqno">(25)<a class="headerlink" href="#equation-ad-notes-20" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right) + b^\prime\left( t \right).\]</div>
 <p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-16">
-<span class="eqno">(21)<a class="headerlink" href="#equation-ad-notes-16" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-21">
+<span class="eqno">(26)<a class="headerlink" href="#equation-ad-notes-21" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).\]</div>
 </div>
 </div>
 <div class="section" id="inverse-trigonometric-functions">
@@ -506,56 +531,56 @@ and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt
 <div class="section" id="inverse-sine">
 <span id="ad-asin"></span><h3>Inverse sine<a class="headerlink" href="#inverse-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arcsin b\left( t \right)\)</span>, we have</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-17">
-<span class="eqno">(22)<a class="headerlink" href="#equation-ad-notes-17" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{\sqrt{1 - b^2\left( t \right) }},\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-22">
+<span class="eqno">(27)<a class="headerlink" href="#equation-ad-notes-22" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{\sqrt{1 - b^2\left( t \right) }},\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-asin00">
-<span class="eqno">(23)<a class="headerlink" href="#equation-eq-ad-asin00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \sqrt{1 - b^2\left( t \right) } = b^\prime\left( t \right).\]</div>
+<span class="eqno">(28)<a class="headerlink" href="#equation-eq-ad-asin00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \sqrt{1 - b^2\left( t \right) } = b^\prime\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-18">
-<span class="eqno">(24)<a class="headerlink" href="#equation-ad-notes-18" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) },\]</div>
-<p>so that <a class="reference internal" href="#equation-eq-ad-asin00">(23)</a> can be rewritten as</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-19">
-<span class="eqno">(25)<a class="headerlink" href="#equation-ad-notes-19" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-23">
+<span class="eqno">(29)<a class="headerlink" href="#equation-ad-notes-23" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) },\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-asin00">(28)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-24">
+<span class="eqno">(30)<a class="headerlink" href="#equation-ad-notes-24" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
 <p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-20">
-<span class="eqno">(26)<a class="headerlink" href="#equation-ad-notes-20" title="Permalink to this equation">¶</a></span>\[\left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-25">
+<span class="eqno">(31)<a class="headerlink" href="#equation-ad-notes-25" title="Permalink to this equation">¶</a></span>\[\left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
 <p>We can now apply the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to the left-hand side and re-arrange
 the terms to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-21">
-<span class="eqno">(27)<a class="headerlink" href="#equation-ad-notes-21" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-26">
+<span class="eqno">(32)<a class="headerlink" href="#equation-ad-notes-26" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 <div class="section" id="inverse-cosine">
 <span id="ad-acos"></span><h3>Inverse cosine<a class="headerlink" href="#inverse-cosine" title="Permalink to this headline">¶</a></h3>
 <p>The derivation is identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change.
 Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arccos b\left( t \right)\)</span>,
 the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-22">
-<span class="eqno">(28)<a class="headerlink" href="#equation-ad-notes-22" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = -\frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right],\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-27">
+<span class="eqno">(33)<a class="headerlink" href="#equation-ad-notes-27" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = -\frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right],\]</div>
 <p>with <span class="math notranslate nohighlight">\(c\left( t \right)\)</span> defined as:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-23">
-<span class="eqno">(29)<a class="headerlink" href="#equation-ad-notes-23" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-28">
+<span class="eqno">(34)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
 </div>
 <div class="section" id="inverse-tangent">
 <span id="ad-atan"></span><h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arctan b\left( t \right)\)</span>, we have</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-24">
-<span class="eqno">(30)<a class="headerlink" href="#equation-ad-notes-24" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-29">
+<span class="eqno">(35)<a class="headerlink" href="#equation-ad-notes-29" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{b^\prime\left( t \right)}{1 + b^2\left( t \right) },\]</div>
 <p>or, equivalently,</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-atan00">
-<span class="eqno">(31)<a class="headerlink" href="#equation-eq-ad-atan00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \left[1 + b^2\left( t \right) \right] = b^\prime\left( t \right).\]</div>
+<span class="eqno">(36)<a class="headerlink" href="#equation-eq-ad-atan00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) \left[1 + b^2\left( t \right) \right] = b^\prime\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-25">
-<span class="eqno">(32)<a class="headerlink" href="#equation-ad-notes-25" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
-<p>so that <a class="reference internal" href="#equation-eq-ad-atan00">(31)</a> can be rewritten as</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-26">
-<span class="eqno">(33)<a class="headerlink" href="#equation-ad-notes-26" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) + a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-30">
+<span class="eqno">(37)<a class="headerlink" href="#equation-ad-notes-30" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-atan00">(36)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-31">
+<span class="eqno">(38)<a class="headerlink" href="#equation-ad-notes-31" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) + a^\prime\left( t \right) c\left( t \right)  = b^\prime\left( t \right).\]</div>
 <p>Applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides yields, via <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-27">
-<span class="eqno">(34)<a class="headerlink" href="#equation-ad-notes-27" title="Permalink to this equation">¶</a></span>\[n a^{\left[ n \right]} \left( t \right) + \left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-32">
+<span class="eqno">(39)<a class="headerlink" href="#equation-ad-notes-32" title="Permalink to this equation">¶</a></span>\[n a^{\left[ n \right]} \left( t \right) + \left[a^\prime\left( t \right) c\left( t \right)\right]^{\left[ n - 1 \right]}  = n b^{\left[ n \right]} \left( t \right).\]</div>
 <p>With the help of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, after re-arranging we obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-28">
-<span class="eqno">(35)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-33">
+<span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 </div>
 <div class="section" id="hyperbolic-functions">
@@ -564,36 +589,36 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <span id="ad-sinh"></span><h3>Hyperbolic sine<a class="headerlink" href="#hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \sinh b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-sinh-00">
-<span class="eqno">(36)<a class="headerlink" href="#equation-eq-ad-sinh-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).\]</div>
+<span class="eqno">(41)<a class="headerlink" href="#equation-eq-ad-sinh-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = b^\prime\left( t \right) \cosh b\left( t \right).\]</div>
 <p>We introduce the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-29">
-<span class="eqno">(37)<a class="headerlink" href="#equation-ad-notes-29" title="Permalink to this equation">¶</a></span>\[c\left( t \right) = \cosh b\left( t \right),\]</div>
-<p>so that <a class="reference internal" href="#equation-eq-ad-sinh-00">(36)</a> can be rewritten as</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-30">
-<span class="eqno">(38)<a class="headerlink" href="#equation-ad-notes-30" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-34">
+<span class="eqno">(42)<a class="headerlink" href="#equation-ad-notes-34" title="Permalink to this equation">¶</a></span>\[c\left( t \right) = \cosh b\left( t \right),\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-sinh-00">(41)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-35">
+<span class="eqno">(43)<a class="headerlink" href="#equation-ad-notes-35" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right).\]</div>
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, and, via <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-31">
-<span class="eqno">(39)<a class="headerlink" href="#equation-ad-notes-31" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-36">
+<span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </div>
 <div class="section" id="hyperbolic-cosine">
 <h3>Hyperbolic cosine<a class="headerlink" href="#hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \cosh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-sinh"><span class="std std-ref">hyperbolic sine</span></a>. After the definition of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-32">
-<span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-32" title="Permalink to this equation">¶</a></span>\[s\left( t \right) = \sinh b\left( t \right),\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-37">
+<span class="eqno">(45)<a class="headerlink" href="#equation-ad-notes-37" title="Permalink to this equation">¶</a></span>\[s\left( t \right) = \sinh b\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-33">
-<span class="eqno">(41)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-38">
+<span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </div>
 <div class="section" id="hyperbolic-tangent">
 <h3>Hyperbolic tangent<a class="headerlink" href="#hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tanh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-tan"><span class="std std-ref">tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-34">
-<span class="eqno">(42)<a class="headerlink" href="#equation-ad-notes-34" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right),\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-39">
+<span class="eqno">(47)<a class="headerlink" href="#equation-ad-notes-39" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = a^2\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-35">
-<span class="eqno">(43)<a class="headerlink" href="#equation-ad-notes-35" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-40">
+<span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </div>
 </div>
 <div class="section" id="inverse-hyperbolic-functions">
@@ -602,31 +627,31 @@ identical to the <a class="reference internal" href="#ad-tan"><span class="std s
 <span id="ad-asinh"></span><h3>Inverse hyperbolic sine<a class="headerlink" href="#inverse-hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arsinh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-36">
-<span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 + b^2\left( t \right) },\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-41">
+<span class="eqno">(49)<a class="headerlink" href="#equation-ad-notes-41" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 + b^2\left( t \right) },\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-37">
-<span class="eqno">(45)<a class="headerlink" href="#equation-ad-notes-37" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-42">
+<span class="eqno">(50)<a class="headerlink" href="#equation-ad-notes-42" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 <div class="section" id="inverse-hyperbolic-cosine">
 <h3>Inverse hyperbolic cosine<a class="headerlink" href="#inverse-hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arcosh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asinh"><span class="std std-ref">inverse hyperbolic sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-38">
-<span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{b^2\left( t \right) - 1 },\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-43">
+<span class="eqno">(51)<a class="headerlink" href="#equation-ad-notes-43" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{b^2\left( t \right) - 1 },\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-39">
-<span class="eqno">(47)<a class="headerlink" href="#equation-ad-notes-39" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-44">
+<span class="eqno">(52)<a class="headerlink" href="#equation-ad-notes-44" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 <div class="section" id="inverse-hyperbolic-tangent">
 <h3>Inverse hyperbolic tangent<a class="headerlink" href="#inverse-hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{artanh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-atan"><span class="std std-ref">inverse tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-40">
-<span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-45">
+<span class="eqno">(53)<a class="headerlink" href="#equation-ad-notes-45" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = b^2\left( t \right),\]</div>
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
-<div class="math notranslate nohighlight" id="equation-ad-notes-41">
-<span class="eqno">(49)<a class="headerlink" href="#equation-ad-notes-41" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+<div class="math notranslate nohighlight" id="equation-ad-notes-46">
+<span class="eqno">(54)<a class="headerlink" href="#equation-ad-notes-46" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
 </div>
 </div>
 </div>

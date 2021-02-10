@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement the standard logistic function
+  (`#87 <https://github.com/bluescarni/heyoka/pull/87>`__).
 - Implement the basic hyperbolic functions and their
   inverse counterparts
   (`#84 <https://github.com/bluescarni/heyoka/pull/84>`__).
@@ -44,7 +46,9 @@ Fix
 - Fix build issue with older Boost versions
   (`#80 <https://github.com/bluescarni/heyoka/pull/80>`__).
 - Various build system and doc fixes/improvements
-  (`#83 <https://github.com/bluescarni/heyoka/pull/83>`__,
+  (`#86 <https://github.com/bluescarni/heyoka/pull/86>`__,
+  `#85 <https://github.com/bluescarni/heyoka/pull/85>`__,
+  `#83 <https://github.com/bluescarni/heyoka/pull/83>`__,
   `#82 <https://github.com/bluescarni/heyoka/pull/82>`__,
   `#76 <https://github.com/bluescarni/heyoka/pull/76>`__,
   `#74 <https://github.com/bluescarni/heyoka/pull/74>`__).
