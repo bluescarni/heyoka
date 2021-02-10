@@ -64,6 +64,7 @@ Contents
    tutorial.rst
    ad_notes.rst
    changelog.rst
+   bibliography.rst
 
 Authors
 -------

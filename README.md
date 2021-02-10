@@ -15,14 +15,14 @@ heyoka
     <img src="doc/images/white_logo.png" alt="Logo" width="280">
   </a>
   <p align="center">
-    Modern Taylor's method via inline compilation
+    Modern Taylor's method via just-in-time compilation
     <br />
     <a href="https://bluescarni.github.io/heyoka/index.html"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/bluescarni/heyoka/issues">Report Bug</a>
+    <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Report bug</a>
     ·
-    <a href="https://github.com//bluescarni/heyoka/issues">Request Feature</a>
+    <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Request feature</a>
   </p>
 </p>
 
