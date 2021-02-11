@@ -82,14 +82,37 @@ as it can be confirmed via numerical integration:
    State       : [0.050000000000000003, 2.2135840145976364e-16]
    Parameters  : [9.8000000000000007, 1.0000000000000000]
 
-Let's now move to Mars, where the gravitational acceleration on the surface
-is :math:`\sim 3.72\,\mathrm{m}/\mathrm{s}^2`.
-Because gravity is weaker, the period of the pendulum increases to
-:math:`\sim 3.26\,\mathrm{s}`, as it can be confirmed via numerical integration:
+As you can see, after 1 period the state of the system went back to the initial conditions.
+
+We are now going to move to Mars, where the gravitational acceleration on the surface
+is :math:`\sim 3.72\,\mathrm{m}/\mathrm{s}^2` (instead of Earth's
+:math:`\sim 9.8\,\mathrm{m}/\mathrm{s}^2`). First we reset the time
+coordinate:
 
 .. literalinclude:: ../tutorial/pendulum_param.cpp
    :language: c++
-   :lines: 42-50
+   :lines: 42-43
+
+Then we change the value of the gravitational constant :math:`g`, which,
+as explained above, is stored at index 0 in the array of parameter values:
+
+.. literalinclude:: ../tutorial/pendulum_param.cpp
+   :language: c++
+   :lines: 45-46
+
+Note that, like the for the state data, the ``get_pars_data()``
+function returns a naked pointer
+that can be used to modify the parameter values. Another function
+of the integrator object, ``get_pars()``,
+returns a const reference to the ``std::vector``
+holding the parameter values.
+
+Because gravity is weaker on Mars, the period of a :math:`1\,\mathrm{m}` pendulum increases to
+:math:`\sim 3.26\,\mathrm{s}`. We can confirm this via numerical integration:
+
+.. literalinclude:: ../tutorial/pendulum_param.cpp
+   :language: c++
+   :lines: 48-50
 
 .. code-block:: console
 
@@ -98,17 +121,6 @@ Because gravity is weaker, the period of the pendulum increases to
    Time        : 3.2581889116828258
    State       : [0.049999999999999996, 3.1292770074142271e-16]
    Parameters  : [3.7200000000000002, 1.0000000000000000]
-
-After resetting the time coordinate to zero, via the ``get_pars_data()`` function
-we accessed the array of parameter values and changed its first
-element (which corresponds to the :math:`g` parameter) from ``9.8`` to ``3.72``.
-The subsequent numerical integration confirms that the new value of :math:`g` was
-indeed used.
-
-Note that, like the for the state data, ``get_pars_data()`` returns a naked pointer
-that can be used to modify the parameter values. Another function, ``get_pars()``,
-returns a const reference to the ``std::vector``
-holding the parameter values, which cannot be used to mutate the parameter values.
 
 Full code listing
 -----------------

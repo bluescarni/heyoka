@@ -21,11 +21,6 @@
 using namespace std::chrono;
 using namespace heyoka;
 
-expression sigmoid(const expression &in)
-{
-    return 1._dbl / (1._dbl + exp(-in));
-}
-
 // In this benchmark we integrate the two dimensional motion of a spacecraft perturbed by a conservative field
 // defined by a neural network. The propagation is made forward and then backward to 0. The error is thus computed.
 
