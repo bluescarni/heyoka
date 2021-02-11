@@ -364,6 +364,18 @@
    </li>
   </ul>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#special-functions">
+   Special functions
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#error-function">
+     Error function
+    </a>
+   </li>
+  </ul>
+ </li>
 </ul>
 
         </nav>
@@ -652,6 +664,25 @@ identical to the <a class="reference internal" href="#ad-atan"><span class="std 
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-46">
 <span class="eqno">(54)<a class="headerlink" href="#equation-ad-notes-46" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
+</div>
+</div>
+<div class="section" id="special-functions">
+<h2>Special functions<a class="headerlink" href="#special-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="error-function">
+<span id="ad-erf"></span><h3>Error function<a class="headerlink" href="#error-function" title="Permalink to this headline">¶</a></h3>
+<p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{erf} b\left( t \right)\)</span>, we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-47">
+<span class="eqno">(55)<a class="headerlink" href="#equation-ad-notes-47" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left[-b^2\left( t \right)\right]} b^\prime\left( t \right),\]</div>
+<p>which, after the introduction of the auxiliary function</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-48">
+<span class="eqno">(56)<a class="headerlink" href="#equation-ad-notes-48" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \exp{\left[ -b^2\left( t \right)\right]} ,\]</div>
+<p>becomes</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-49">
+<span class="eqno">(57)<a class="headerlink" href="#equation-ad-notes-49" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).\]</div>
+<p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
+<a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-50">
+<span class="eqno">(58)<a class="headerlink" href="#equation-ad-notes-50" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
 </div>
 </div>
 </div>

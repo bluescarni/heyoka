@@ -509,3 +509,40 @@ the final result, for :math:`n > 0`, is:
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
+
+Special functions
+-----------------------
+
+.. _ad_erf:
+
+Error function
+^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \operatorname{erf} b\left( t \right)`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left[-b^2\left( t \right)\right]} b^\prime\left( t \right),
+
+which, after the introduction of the auxiliary function
+
+.. math::
+   :label:
+
+   c\left( t \right)  = \exp{\left[ -b^2\left( t \right)\right]} ,
+
+becomes
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).
+
+After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`,
+:eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00` to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
