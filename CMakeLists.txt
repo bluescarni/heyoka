@@ -172,6 +172,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/pow.cpp"
