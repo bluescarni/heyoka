@@ -420,6 +420,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     step_f_t m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
+    // The vector for the dense output.
+    std::vector<T> m_dense_output;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
 
@@ -620,6 +622,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     step_f_t m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
+    // The vector for the dense output.
+    std::vector<T> m_dense_output;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,

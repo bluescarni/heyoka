@@ -945,13 +945,25 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Setup the vector for the dense output.
+    // LCOV_EXCL_START
+    using do_size_t = decltype(m_dense_output.size());
+    if (m_order == std::numeric_limits<std::uint32_t>::max()
+        || m_state.size() > std::numeric_limits<do_size_t>::max() / (m_order + 1u)) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                                  "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+
+    m_dense_output.resize(m_state.size() * (m_order + 1u));
 }
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointer.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars)
+      m_order(other.m_order), m_pars(other.m_pars), m_dense_output(other.m_dense_output)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -1260,6 +1272,18 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 
+    // Setup the vector for the dense output.
+    // LCOV_EXCL_START
+    using do_size_t = decltype(m_dense_output.size());
+    if (m_order == std::numeric_limits<std::uint32_t>::max()
+        || m_state.size() > std::numeric_limits<do_size_t>::max() / (m_order + 1u)) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                                  "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+
+    m_dense_output.resize(m_state.size() * (m_order + 1u));
+
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
@@ -1280,10 +1304,11 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_pinf(other.m_pinf),
-      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
-      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
-      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts)
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
+      m_dense_output(other.m_dense_output), m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts),
+      m_step_res(other.m_step_res), m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count),
+      m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts),
+      m_pfor_ts(other.m_pfor_ts)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
