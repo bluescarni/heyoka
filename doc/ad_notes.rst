@@ -477,19 +477,19 @@ Special functions
 Error function
 ^^^^^^^^^^^^^^
 
-Given :math:`a\left( t \right) = \mbox{erf } b\left( t \right)`, we have
+Given :math:`a\left( t \right) = \operatorname{erf} b\left( t \right)`, we have
 
 .. math::
    :label:
 
-   a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left(-b^2\left( t \right)\right)} b^\prime\left( t \right),
+   a^\prime\left( t \right) = \frac 2{\sqrt\pi} \exp{\left[-b^2\left( t \right)\right]} b^\prime\left( t \right),
 
 which, after the introduction of the auxiliary function
 
 .. math::
    :label:
 
-   c\left( t \right)  = \exp{\left(-b^2\left( t \right)\right)} ,
+   c\left( t \right)  = \exp{\left[ -b^2\left( t \right)\right]} ,
 
 becomes
 

@@ -151,6 +151,17 @@ erf_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
 namespace
 {
 
+// Variable template for the constant sqrt(pi) / 2 at different levels of precision.
+template <typename T>
+const auto sqrt_pi_2 = std::sqrt(boost::math::constants::pi<T>()) / 2;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+const mppp::real128 sqrt_pi_2<mppp::real128> = mppp::sqrt(mppp::pi_128) / 2;
+
+#endif
+
 // Derivative of erf(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::vector<std::uint32_t> &, const U &num,
@@ -170,8 +181,6 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
                                   const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *,
                                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
 {
-    using std::sqrt;
-
     assert(deps.size() == 1u);
 
     auto &builder = s.builder();
@@ -183,7 +192,7 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
         return codegen_from_values<T>(s, f, {taylor_fetch_diff(arr, b_idx, 0, n_uvars)});
     }
 
-    // NOTE: iteration in the [1, order) range.
+    // NOTE: iteration in the [1, order] range.
     std::vector<llvm::Value *> sum;
     for (std::uint32_t j = 1; j <= order; ++j) {
         // NOTE: the only hidden dependency contains the index of the
@@ -200,8 +209,8 @@ llvm::Value *taylor_diff_erf_impl(llvm_state &s, const erf_impl &f, const std::v
     // Create ret with the sum.
     auto ret = pairwise_sum(builder, sum);
 
-    // Generate the factor n * sqrt(pi) /2 (check what boost does with real128)
-    auto fac = number(static_cast<T>(order) * sqrt(boost::math::constants::pi<T>()) / static_cast<T>(2));
+    // Generate the factor n * sqrt(pi) / 2.
+    auto fac = number(order * sqrt_pi_2<T>);
     auto fac_s = vector_splat(builder, codegen<T>(s, fac), batch_size);
 
     // Multiply and return.
@@ -292,9 +301,6 @@ template <typename T>
 llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, const variable &, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-
-    using std::sqrt;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -303,8 +309,8 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_erf_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    using namespace fmt::literals;
+    const auto fname = "heyoka_taylor_diff_erf_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -380,8 +386,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
                 });
 
                 // Generate the factor n * sqrt(pi) /2
-                auto t1 = sqrt(boost::math::constants::pi<T>()) / 2;
-                auto t1_llvm = vector_splat(builder, codegen<T>(s, number(t1)), batch_size);
+                auto t1_llvm = vector_splat(builder, codegen<T>(s, number(sqrt_pi_2<T>)), batch_size);
                 auto fac = builder.CreateFMul(t1_llvm, ord_fp);
 
                 // Store into retval.
@@ -402,8 +407,9 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of the error function "
-                                        "in compact mode detected");
+            throw std::invalid_argument(
+                "Inconsistent function signature for the Taylor derivative of the error function "
+                "in compact mode detected");
         }
     }
 

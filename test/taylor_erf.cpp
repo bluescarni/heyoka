@@ -116,7 +116,7 @@ TEST_CASE("ode test")
 }
 
 // Test CSE involving hidden dependencies.
-TEST_CASE("taylor tan test simplifications")
+TEST_CASE("taylor erf test simplifications")
 {
     using std::erf;
     using std::sqrt;
