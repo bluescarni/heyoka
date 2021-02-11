@@ -78,7 +78,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             jptr_scalar(jet_scalar.data(), nullptr, nullptr);
 
             for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
             }
         }
     }
@@ -119,6 +119,7 @@ TEST_CASE("ode test")
 TEST_CASE("taylor erf test simplifications")
 {
     using std::erf;
+    using std::exp;
     using std::sqrt;
 
     auto pi = boost::math::constants::pi<double>();
@@ -127,7 +128,9 @@ TEST_CASE("taylor erf test simplifications")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet", {square(erf(x + y)) + erf(x + y), x}, 2, 1, false, false);
+    auto dc = taylor_add_jet<double>(s, "jet", {exp(-square(x + y)) + erf(x + y), x}, 2, 1, false, false);
+
+    REQUIRE(dc.size() == 10u);
 
     s.compile();
 
@@ -140,13 +143,13 @@ TEST_CASE("taylor erf test simplifications")
 
     REQUIRE(jet[0] == 2.);
     REQUIRE(jet[1] == 3.);
-    REQUIRE(jet[2] == approximately(erf(jet[0] + jet[1]) * erf(jet[0] + jet[1]) + erf(jet[0] + jet[1])));
+    REQUIRE(jet[2] == approximately(exp(-(jet[0] + jet[1]) * (jet[0] + jet[1])) + erf(jet[0] + jet[1])));
     REQUIRE(jet[3] == jet[0]);
-    REQUIRE(jet[4]
-            == approximately(.5
-                             * (2. * erf(jet[0] + jet[1]) * 2 / sqrt(pi) * exp(-(jet[0] + jet[1]) * (jet[0] + jet[1]))
-                                    * (jet[2] + jet[3])
-                                + 2 / sqrt(pi) * exp(-(jet[0] + jet[1]) * (jet[0] + jet[1])) * (jet[2] + jet[3]))));
+    REQUIRE(
+        jet[4]
+        == approximately(.5
+                         * (-2. * (jet[0] + jet[1]) * (jet[2] + jet[3]) * exp(-(jet[0] + jet[1]) * (jet[0] + jet[1]))
+                            + 2 / sqrt(pi) * exp(-(jet[0] + jet[1]) * (jet[0] + jet[1])) * (jet[2] + jet[3]))));
     REQUIRE(jet[5] == approximately(.5 * jet[2]));
 }
 

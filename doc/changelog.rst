@@ -48,7 +48,8 @@ Fix
 - Fix build issue with older Boost versions
   (`#80 <https://github.com/bluescarni/heyoka/pull/80>`__).
 - Various build system and doc fixes/improvements
-  (`#86 <https://github.com/bluescarni/heyoka/pull/86>`__,
+  (`#88 <https://github.com/bluescarni/heyoka/pull/88>`__,
+  `#86 <https://github.com/bluescarni/heyoka/pull/86>`__,
   `#85 <https://github.com/bluescarni/heyoka/pull/85>`__,
   `#83 <https://github.com/bluescarni/heyoka/pull/83>`__,
   `#82 <https://github.com/bluescarni/heyoka/pull/82>`__,
