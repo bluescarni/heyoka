@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement the error function
+  (`#89 <https://github.com/bluescarni/heyoka/pull/89>`__).
 - Implement the standard logistic function
   (`#87 <https://github.com/bluescarni/heyoka/pull/87>`__).
 - Implement the basic hyperbolic functions and their
