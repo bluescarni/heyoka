@@ -946,24 +946,24 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 
-    // Setup the vector for the dense output.
+    // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
-    using do_size_t = decltype(m_dense_output.size());
+    using tc_size_t = decltype(m_tc.size());
     if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<do_size_t>::max() / (m_order + 1u)) {
+        || m_state.size() > std::numeric_limits<tc_size_t>::max() / (m_order + 1u)) {
         throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
                                   "or the state size is too large");
     }
     // LCOV_EXCL_STOP
 
-    m_dense_output.resize(m_state.size() * (m_order + 1u));
+    m_tc.resize(m_state.size() * (m_order + 1u));
 }
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointer.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_dense_output(other.m_dense_output)
+      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -997,7 +997,7 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 // a flag describing the outcome of the integration,
 // and the integration timestep that was used.
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, write_tc wtc)
 {
     using std::isfinite;
 
@@ -1009,7 +1009,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 
     // Invoke the stepper.
     auto h = max_delta_t;
-    m_step_f(m_state.data(), m_pars.data(), &m_time, &h);
+    if (wtc == write_tc::yes) {
+        m_step_f(m_state.data(), m_pars.data(), &m_time, &h, m_tc.data());
+    } else {
+        m_step_f(m_state.data(), m_pars.data(), &m_time, &h, nullptr);
+    }
 
     // Update the time.
     m_time += h;
@@ -1025,21 +1029,21 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t)
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step()
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(write_tc wtc)
 {
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
-    return step_impl(std::numeric_limits<T>::infinity());
+    return step_impl(std::numeric_limits<T>::infinity(), wtc);
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward()
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(write_tc wtc)
 {
-    return step_impl(-std::numeric_limits<T>::infinity());
+    return step_impl(-std::numeric_limits<T>::infinity(), wtc);
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, write_tc wtc)
 {
     using std::isnan;
 
@@ -1048,7 +1052,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t)
             "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
     }
 
-    return step_impl(max_delta_t);
+    return step_impl(max_delta_t, wtc);
 }
 
 template <typename T>
@@ -1089,7 +1093,7 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         // and at the first iteration we have checked above the value of m_time.
         // At successive iterations, we know that m_time must be finite because
         // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(t - m_time);
+        const auto [res, h] = step_impl(t - m_time, write_tc::no);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
             // Something went wrong in the propagation of the timestep, exit.
@@ -1272,17 +1276,17 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 
-    // Setup the vector for the dense output.
+    // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
-    using do_size_t = decltype(m_dense_output.size());
+    using tc_size_t = decltype(m_tc.size());
     if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<do_size_t>::max() / (m_order + 1u)) {
+        || m_state.size() > std::numeric_limits<tc_size_t>::max() / (m_order + 1u)) {
         throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
                                   "or the state size is too large");
     }
     // LCOV_EXCL_STOP
 
-    m_dense_output.resize(m_state.size() * (m_order + 1u));
+    m_tc.resize(m_state.size() * (m_order + 1u));
 
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
@@ -1304,11 +1308,10 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
-      m_dense_output(other.m_dense_output), m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts),
-      m_step_res(other.m_step_res), m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count),
-      m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts),
-      m_pfor_ts(other.m_pfor_ts)
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
+      m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res),
+      m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h),
+      m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -1346,7 +1349,7 @@ taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
 // and the integration timestep that was used.
 template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
+taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, write_tc wtc)
 {
     using std::isfinite;
 
@@ -1364,7 +1367,11 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data());
+    if (wtc == write_tc::yes) {
+        m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), m_tc.data());
+    } else {
+        m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), nullptr);
+    }
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -1397,20 +1404,20 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts)
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step()
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step(write_tc wtc)
 {
-    return step_impl(m_pinf);
+    return step_impl(m_pinf, wtc);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step_backward()
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step_backward(write_tc wtc)
 {
-    return step_impl(m_minf);
+    return step_impl(m_minf, wtc);
 }
 
 template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts)
+taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, write_tc wtc)
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1430,7 +1437,7 @@ taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts)
             "one of the max timesteps is nan");
     }
 
-    return step_impl(max_delta_ts);
+    return step_impl(max_delta_ts, wtc);
 }
 
 template <typename T>
@@ -1498,7 +1505,7 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
         }
 
         // Run the integration timestep.
-        step_impl(m_cur_max_delta_ts);
+        step_impl(m_cur_max_delta_ts, write_tc::no);
 
         // Check if the integration timestep produced an error condition.
         if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {
@@ -2689,14 +2696,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
         llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
                       [&](llvm::Value *cur_order) {
                           llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
-                              // Compute the index in diff_arr.
-                              // NOTE: in compact mode diff_arr contains the derivatives for *all* uvars,
-                              // hence the indexing is cur_order * n_uvars + cur_idx.
-                              auto arr_idx
-                                  = builder.CreateAdd(builder.CreateMul(cur_order, builder.getInt32(n_uvars)), cur_idx);
-
                               // Load the derivative value from diff_arr.
-                              auto diff_val = builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {arr_idx}));
+                              auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
 
                               // Compute the index in the output pointer.
                               auto out_idx
@@ -3482,9 +3483,10 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // - pointer to the current state vector (read & write),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
-    // - pointer to the array of max timesteps (read & write).
+    // - pointer to the array of max timesteps (read & write),
+    // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(4, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -3517,6 +3519,12 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     h_ptr->setName("h_ptr");
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto tc_ptr = h_ptr + 1;
+    tc_ptr->setName("tc_ptr");
+    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    tc_ptr->addAttr(llvm::Attribute::NoAlias);
+    tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
@@ -3655,6 +3663,60 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Store the timesteps that were used.
     store_vector_to_memory(builder, h_ptr, h);
+
+    // Write the Taylor coefficients, if requested.
+    auto nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    llvm_if_then_else(
+        s, builder.CreateICmpNE(tc_ptr, nptr),
+        [&]() {
+            // tc_ptr is not null: copy the Taylor coefficients
+            // for the state variables.
+            if (compact_mode) {
+                auto diff_arr = std::get<llvm::Value *>(diff_variant);
+
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
+                    llvm_loop_u32(
+                        s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                        [&](llvm::Value *cur_order) {
+                            // Load the value of the derivative from diff_arr.
+                            auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
+
+                            // Compute the index in the output pointer.
+                            auto out_idx = builder.CreateAdd(
+                                builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
+                                builder.CreateMul(cur_order, builder.getInt32(batch_size)));
+
+                            // Store into tc_ptr.
+                            store_vector_to_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {out_idx}), diff_val);
+                        });
+                });
+            } else {
+                const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
+
+                for (std::uint32_t j = 0; j < n_eq; ++j) {
+                    for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
+                        // Index in the jet of derivatives.
+                        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+                        // state variables (not all u vars), hence the indexing is cur_order * n_eq + j.
+                        const auto arr_idx = cur_order * n_eq + j;
+                        assert(arr_idx < diff_arr.size());
+                        const auto val = diff_arr[arr_idx];
+
+                        // Index in tc_ptr.
+                        const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
+
+                        // Write to tc_ptr.
+                        auto out_ptr = builder.CreateInBoundsGEP(
+                            tc_ptr, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                        store_vector_to_memory(builder, out_ptr, val);
+                    }
+                }
+            }
+        },
+        [&]() {
+            // Taylor coefficients were not requested,
+            // don't do anything in this branch.
+        });
 
     // Create the return value.
     builder.CreateRetVoid();
