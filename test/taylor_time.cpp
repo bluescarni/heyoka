@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <initializer_list>
 #include <random>
 #include <sstream>
@@ -21,6 +22,7 @@
 #endif
 
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -80,6 +82,31 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
             for (auto i = 2u; i < 8u; ++i) {
                 REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+            }
+        }
+    }
+}
+
+TEST_CASE("ode test")
+{
+    using std::cos;
+    using std::sin;
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto [x] = make_vars("x");
+
+                taylor_adaptive<double> ta({prime(x) = cos(hy::time)}, {.5}, kw::high_accuracy = ha,
+                                           kw::compact_mode = cm, kw::opt_level = opt_level);
+
+                ta.propagate_until(100.);
+
+                REQUIRE(ta.get_state()[0] == approximately(sin(100.) + .5, 10000.));
+
+                ta.propagate_until(0.);
+
+                REQUIRE(ta.get_state()[0] == approximately(.5, 1000.));
             }
         }
     }
