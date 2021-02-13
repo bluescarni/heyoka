@@ -948,9 +948,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
-    using tc_size_t = decltype(m_tc.size());
     if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<tc_size_t>::max() / (m_order + 1u)) {
+        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
         throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
                                   "or the state size is too large");
     }
@@ -1278,9 +1277,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
-    using tc_size_t = decltype(m_tc.size());
     if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<tc_size_t>::max() / (m_order + 1u)) {
+        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
         throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
                                   "or the state size is too large");
     }
