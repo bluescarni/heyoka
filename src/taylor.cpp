@@ -1008,11 +1008,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
     // Invoke the stepper.
     auto h = max_delta_t;
-    if (wtc) {
-        m_step_f(m_state.data(), m_pars.data(), &m_time, &h, m_tc.data());
-    } else {
-        m_step_f(m_state.data(), m_pars.data(), &m_time, &h, nullptr);
-    }
+    m_step_f(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
 
     // Update the time.
     m_time += h;
@@ -1367,11 +1363,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, boo
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    if (wtc) {
-        m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), m_tc.data());
-    } else {
-        m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), nullptr);
-    }
+    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
