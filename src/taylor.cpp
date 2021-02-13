@@ -3045,33 +3045,28 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
         // Init the return value, filling it with the values of the
         // coefficients of the highest-degree monomial in each polynomial.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            // Load the value from diff_arr.
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(
-                diff_arr, {builder.CreateAdd(builder.getInt32(order * n_uvars), cur_var_idx)}));
-
-            // Store it in res_arr.
-            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+            // Load the value from diff_arr and store it in res_arr.
+            builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
+                                builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
         });
 
         // Run the evaluation.
-        llvm_loop_u32(
-            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-            [&](llvm::Value *cur_order) {
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                    // Load the current poly coeff from diff_arr.
-                    // NOTE: the index is (order - cur_order) * n_uvars + cur_var_idx.
-                    auto cf = builder.CreateLoad(builder.CreateInBoundsGEP(
-                        diff_arr,
-                        {builder.CreateAdd(builder.CreateMul(builder.CreateSub(builder.getInt32(order), cur_order),
-                                                             builder.getInt32(n_uvars)),
-                                           cur_var_idx)}));
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Load the current poly coeff from diff_arr.
+                              // NOTE: we are loading the coefficients backwards wrt the order, hence
+                              // we specify order - cur_order.
+                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                           builder.CreateSub(builder.getInt32(order), cur_order),
+                                                           cur_var_idx);
 
-                    // Accumulate in res_arr.
-                    auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                    builder.CreateStore(builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)),
-                                        res_ptr);
-                });
-            });
+                              // Accumulate in res_arr.
+                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                              builder.CreateStore(
+                                  builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)), res_ptr);
+                          });
+                      });
 
         return res_arr;
     } else {
@@ -3234,10 +3229,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
 
                           llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
                               // Evaluate the current monomial.
-                              // NOTE: the index is cur_order * n_uvars + cur_var_idx.
-                              auto cf = builder.CreateLoad(builder.CreateInBoundsGEP(
-                                  diff_arr, {builder.CreateAdd(builder.CreateMul(cur_order, builder.getInt32(n_uvars)),
-                                                               cur_var_idx)}));
+                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
                               auto tmp = builder.CreateFMul(cf, cur_h_val);
 
                               // Compute the quantities for the compensation.
