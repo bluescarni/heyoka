@@ -956,6 +956,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
     // LCOV_EXCL_STOP
 
+    // NOTE: the size of m_state.size() already takes
+    // into account the batch size.
     m_tc.resize(m_state.size() * (m_order + 1u));
 }
 

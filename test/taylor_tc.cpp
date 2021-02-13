@@ -49,6 +49,8 @@ TEST_CASE("taylor tc basic")
                                                   kw::compact_mode = cm,
                                                   kw::opt_level = opt_level};
 
+                REQUIRE(ta.get_tc().size() == 2u * (ta.get_order() + 1u));
+
                 auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u});
 
                 auto [_, h] = ta.step(true);
@@ -87,6 +89,8 @@ TEST_CASE("taylor tc basic")
                                                             kw::high_accuracy = ha,
                                                             kw::compact_mode = cm,
                                                             kw::opt_level = opt_level};
+
+                    REQUIRE(ta.get_tc().size() == 2u * (ta.get_order() + 1u) * batch_size);
 
                     auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u, batch_size});
                     auto sa = xt::adapt(ta.get_state_data(), {2u, batch_size});
