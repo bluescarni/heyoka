@@ -997,7 +997,7 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 // a flag describing the outcome of the integration,
 // and the integration timestep that was used.
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, write_tc wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
     using std::isfinite;
 
@@ -1009,7 +1009,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
     // Invoke the stepper.
     auto h = max_delta_t;
-    if (wtc == write_tc::yes) {
+    if (wtc) {
         m_step_f(m_state.data(), m_pars.data(), &m_time, &h, m_tc.data());
     } else {
         m_step_f(m_state.data(), m_pars.data(), &m_time, &h, nullptr);
@@ -1029,7 +1029,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(write_tc wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(bool wtc)
 {
     // NOTE: time limit +inf means integration forward in time
     // and no time limit.
@@ -1037,13 +1037,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(write_tc wtc)
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(write_tc wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(bool wtc)
 {
     return step_impl(-std::numeric_limits<T>::infinity(), wtc);
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, write_tc wtc)
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool wtc)
 {
     using std::isnan;
 
@@ -1093,7 +1093,7 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         // and at the first iteration we have checked above the value of m_time.
         // At successive iterations, we know that m_time must be finite because
         // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(t - m_time, write_tc::no);
+        const auto [res, h] = step_impl(t - m_time, false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
             // Something went wrong in the propagation of the timestep, exit.
@@ -1349,7 +1349,7 @@ taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
 // and the integration timestep that was used.
 template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, write_tc wtc)
+taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
     using std::isfinite;
 
@@ -1367,7 +1367,7 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, wri
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    if (wtc == write_tc::yes) {
+    if (wtc) {
         m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), m_tc.data());
     } else {
         m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), nullptr);
@@ -1404,20 +1404,20 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, wri
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step(write_tc wtc)
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step(bool wtc)
 {
     return step_impl(m_pinf, wtc);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step_backward(write_tc wtc)
+const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
 {
     return step_impl(m_minf, wtc);
 }
 
 template <typename T>
 const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, write_tc wtc)
+taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1505,7 +1505,7 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
         }
 
         // Run the integration timestep.
-        step_impl(m_cur_max_delta_ts, write_tc::no);
+        step_impl(m_cur_max_delta_ts, false);
 
         // Check if the integration timestep produced an error condition.
         if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {

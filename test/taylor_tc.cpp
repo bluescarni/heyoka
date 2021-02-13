@@ -7,9 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <tuple>
+#include <vector>
 
 #include <xtensor/xadapt.hpp>
-#include <xtensor/xio.hpp>
 #include <xtensor/xview.hpp>
 
 #include <heyoka/expression.hpp>
@@ -17,8 +18,10 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 template <typename Out, typename P, typename T>
 auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
@@ -34,21 +37,77 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
 
 TEST_CASE("taylor tc basic")
 {
-    auto [x, v] = make_vars("x", "v");
+    // Scalar test.
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto [x, v] = make_vars("x", "v");
 
-    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+                auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                  {0.05, 0.025},
+                                                  kw::high_accuracy = ha,
+                                                  kw::compact_mode = cm,
+                                                  kw::opt_level = opt_level};
 
-    auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u});
+                auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u});
 
-    auto [_, h] = ta.step(write_tc::yes);
+                auto [_, h] = ta.step(true);
 
-    auto ret = xt::eval(xt::zeros<double>({2}));
+                auto ret = xt::eval(xt::zeros<double>({2}));
 
-    std::cout << horner_eval(ret, tca, 20, 0) << '\n';
-    std::cout << horner_eval(ret, tca, 20, h / 4) << '\n';
-    std::cout << horner_eval(ret, tca, 20, h / 2) << '\n';
-    std::cout << horner_eval(ret, tca, 20, (3 * h) / 4) << '\n';
-    std::cout << horner_eval(ret, tca, 20, h) << '\n';
+                horner_eval(ret, tca, static_cast<int>(ta.get_order()), 0);
+                REQUIRE(ret[0] == approximately(0.05, 10.));
+                REQUIRE(ret[1] == approximately(0.025, 10.));
 
-    std::cout << ta << '\n';
+                horner_eval(ret, tca, static_cast<int>(ta.get_order()), h);
+                REQUIRE(ret[0] == approximately(ta.get_state()[0], 10.));
+                REQUIRE(ret[1] == approximately(ta.get_state()[1], 10.));
+            }
+        }
+    }
+
+    // Batch test.
+    for (auto batch_size : {1u, 4u, 23u}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            for (auto cm : {false, true}) {
+                for (auto ha : {false, true}) {
+                    auto [x, v] = make_vars("x", "v");
+
+                    std::vector<double> init_state;
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        init_state.push_back(0.05 + i / 100.);
+                    }
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        init_state.push_back(0.025 + i / 1000.);
+                    }
+
+                    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                            init_state,
+                                                            batch_size,
+                                                            kw::high_accuracy = ha,
+                                                            kw::compact_mode = cm,
+                                                            kw::opt_level = opt_level};
+
+                    auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u, batch_size});
+                    auto sa = xt::adapt(ta.get_state_data(), {2u, batch_size});
+                    auto isa = xt::adapt(init_state.data(), {2u, batch_size});
+
+                    auto &oc = ta.step(true);
+
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        auto ret = xt::eval(xt::zeros<double>({2u}));
+
+                        horner_eval(ret, xt::view(tca, xt::all(), xt::all(), i), static_cast<int>(ta.get_order()), 0);
+                        REQUIRE(ret[0] == approximately(xt::view(isa, 0, i)[0], 10.));
+                        REQUIRE(ret[1] == approximately(xt::view(isa, 1, i)[0], 10.));
+
+                        horner_eval(ret, xt::view(tca, xt::all(), xt::all(), i), static_cast<int>(ta.get_order()),
+                                    std::get<1>(oc[i]));
+                        REQUIRE(ret[0] == approximately(xt::view(sa, 0, i)[0], 10.));
+                        REQUIRE(ret[1] == approximately(xt::view(sa, 1, i)[0], 10.));
+                    }
+                }
+            }
+        }
+    }
 }

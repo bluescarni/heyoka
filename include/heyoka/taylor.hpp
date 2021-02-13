@@ -345,11 +345,6 @@ IGOR_MAKE_NAMED_ARGUMENT(pars);
 
 } // namespace kw
 
-// Flag to signal if we want
-// to write the Taylor coefficients
-// at the end of each timestep.
-enum class write_tc : bool { no, yes };
-
 namespace detail
 {
 
@@ -428,7 +423,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // The vector for the Taylor coefficients.
     std::vector<T> m_tc;
 
-    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, write_tc);
+    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
     // NOTE: apparently on Windows we need to re-iterate
@@ -540,9 +535,9 @@ public:
         return m_tc.data();
     }
 
-    std::tuple<taylor_outcome, T> step(write_tc = write_tc::no);
-    std::tuple<taylor_outcome, T> step_backward(write_tc = write_tc::no);
-    std::tuple<taylor_outcome, T> step(T, write_tc = write_tc::no);
+    std::tuple<taylor_outcome, T> step(bool = false);
+    std::tuple<taylor_outcome, T> step_backward(bool = false);
+    std::tuple<taylor_outcome, T> step(T, bool = false);
 
     // NOTE: return values:
     // - outcome,
@@ -659,7 +654,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_cur_max_delta_ts;
     std::vector<T> m_pfor_ts;
 
-    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, write_tc);
+    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
@@ -776,9 +771,9 @@ public:
         return m_tc.data();
     }
 
-    const std::vector<std::tuple<taylor_outcome, T>> &step(write_tc = write_tc::no);
-    const std::vector<std::tuple<taylor_outcome, T>> &step_backward(write_tc = write_tc::no);
-    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &, write_tc = write_tc::no);
+    const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);
+    const std::vector<std::tuple<taylor_outcome, T>> &step_backward(bool = false);
+    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &, bool = false);
 
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_for(const std::vector<T> &,
                                                                                     std::size_t = 0);
