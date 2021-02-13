@@ -1,6 +1,17 @@
 Changelog
 =========
 
+0.4.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Add the ability to output the Taylor coefficients
+  when invoking the single-step functions in the
+  integrator classes
+  (`#91 <https://github.com/bluescarni/heyoka/pull/91>`__).
+
 0.3.0 (2021-02-11)
 ------------------
 

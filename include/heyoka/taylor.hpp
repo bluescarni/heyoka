@@ -416,12 +416,14 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, const T *, const T *, T *);
+    using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     step_f_t m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
+    // The vector for the Taylor coefficients.
+    std::vector<T> m_tc;
 
-    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T);
+    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
     // NOTE: apparently on Windows we need to re-iterate
@@ -520,9 +522,22 @@ public:
         return m_pars.data();
     }
 
-    std::tuple<taylor_outcome, T> step();
-    std::tuple<taylor_outcome, T> step_backward();
-    std::tuple<taylor_outcome, T> step(T);
+    const std::vector<T> &get_tc() const
+    {
+        return m_tc;
+    }
+    const T *get_tc_data() const
+    {
+        return m_tc.data();
+    }
+    T *get_tc_data()
+    {
+        return m_tc.data();
+    }
+
+    std::tuple<taylor_outcome, T> step(bool = false);
+    std::tuple<taylor_outcome, T> step_backward(bool = false);
+    std::tuple<taylor_outcome, T> step(T, bool = false);
 
     // NOTE: return values:
     // - outcome,
@@ -616,10 +631,12 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
-    using step_f_t = void (*)(T *, const T *, const T *, T *);
+    using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     step_f_t m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
+    // The vector for the Taylor coefficients.
+    std::vector<T> m_tc;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,
@@ -637,7 +654,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_cur_max_delta_ts;
     std::vector<T> m_pfor_ts;
 
-    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &);
+    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
@@ -741,9 +758,22 @@ public:
         return m_pars.data();
     }
 
-    const std::vector<std::tuple<taylor_outcome, T>> &step();
-    const std::vector<std::tuple<taylor_outcome, T>> &step_backward();
-    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &);
+    const std::vector<T> &get_tc() const
+    {
+        return m_tc;
+    }
+    const T *get_tc_data() const
+    {
+        return m_tc.data();
+    }
+    T *get_tc_data()
+    {
+        return m_tc.data();
+    }
+
+    const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);
+    const std::vector<std::tuple<taylor_outcome, T>> &step_backward(bool = false);
+    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &, bool = false);
 
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_for(const std::vector<T> &,
                                                                                     std::size_t = 0);
