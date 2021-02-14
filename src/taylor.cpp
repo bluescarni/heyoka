@@ -3480,7 +3480,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -3521,7 +3521,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
