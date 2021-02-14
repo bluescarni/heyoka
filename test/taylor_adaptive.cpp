@@ -11,9 +11,12 @@
 #include <initializer_list>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 #include <boost/math/constants/constants.hpp>
 
+#include <heyoka/expression.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -168,4 +171,94 @@ TEST_CASE("param batch")
     REQUIRE(tad.get_state()[18 + 1] == approximately(0.));
     REQUIRE(tad.get_state()[20 + 1] == approximately(v0));
     REQUIRE(tad.get_state()[22 + 1] == approximately(0.));
+}
+
+TEST_CASE("continuous output")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        for (auto cm : {false, true}) {
+            for (auto ha : {false, true}) {
+                auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                  {0.05, 0.025},
+                                                  kw::high_accuracy = ha,
+                                                  kw::compact_mode = cm,
+                                                  kw::opt_level = opt_level};
+
+                std::vector<double> c_out;
+                c_out.resize(2);
+
+                // Take a first step.
+                ta.step(true);
+
+                // The c_out at t = 0 must be the same
+                // as the IC.
+                ta.c_output(c_out.data(), 0);
+                REQUIRE(c_out[0] == approximately(0.05, 10.));
+                REQUIRE(c_out[1] == approximately(0.025, 10.));
+
+                // The c_out at the end of the timestep must be
+                // equal to the current state.
+                ta.c_output(c_out.data(), ta.get_time());
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+
+                // Store the state at the end of the first step.
+                auto old_state1 = ta.get_state();
+
+                // Take a second step.
+                ta.step(true);
+
+                // The c_out at the beginning of the timestep
+                // must be equal to the state at the end of the
+                // previous timestep.
+                ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                REQUIRE(c_out[0] == approximately(old_state1[0], 10.));
+                REQUIRE(c_out[1] == approximately(old_state1[1], 10.));
+
+                // The c_out at the end of the timestep must be
+                // equal to the current state.
+                ta.c_output(c_out.data(), ta.get_time());
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+
+                // Store the state at the end of the second timestep.
+                auto old_state2 = ta.get_state();
+
+                // Take a third timestep.
+                ta.step(true);
+
+                // The c_out at the beginning of the timestep
+                // must be equal to the state at the end of the
+                // previous timestep.
+                ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                REQUIRE(c_out[0] == approximately(old_state2[0], 10.));
+                REQUIRE(c_out[1] == approximately(old_state2[1], 10.));
+
+                // The c_out at the end of the timestep must be
+                // equal to the current state.
+                ta.c_output(c_out.data(), ta.get_time());
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+
+                // Do it a few more times.
+                for (auto i = 0; i < 100; ++i) {
+                    old_state2 = ta.get_state();
+
+                    auto [oc, _] = ta.step(true);
+
+                    REQUIRE(oc == taylor_outcome::success);
+
+                    ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                    REQUIRE(c_out[0] == approximately(old_state2[0], 1000.));
+                    REQUIRE(c_out[1] == approximately(old_state2[1], 1000.));
+
+                    ta.c_output(c_out.data(), ta.get_time());
+                    REQUIRE(c_out[0] == approximately(ta.get_state()[0], 1000.));
+                    REQUIRE(c_out[1] == approximately(ta.get_state()[1], 1000.));
+                }
+            }
+        }
+    }
 }

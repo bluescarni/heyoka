@@ -218,6 +218,112 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
 namespace
 {
 
+// Add a function for computing the continuous output
+// via polynomial evaluation.
+template <typename T>
+void taylor_add_c_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size)
+{
+    assert(n_eq > 0u);
+    assert(order > 0u);
+    assert(batch_size > 0u);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // The function arguments:
+    // - the output pointer (read/write, used also for accumulation),
+    // - the pointer to the Taylor coefficients (read-only),
+    // - the pointer to the h values (read-only).
+    // No overlap is allowed.
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "c_out_f", &s.module());
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument(
+            "Unable to create a function for the continuous output in an adaptive Taylor integrator");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto tc_ptr = f->args().begin() + 1;
+    tc_ptr->setName("tc_ptr");
+    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    tc_ptr->addAttr(llvm::Attribute::NoAlias);
+    tc_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = f->args().begin() + 2;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Start by writing into out_ptr the coefficients of the highest-degree
+    // monomial in each polynomial.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+        // Load the coefficient from tc_ptr. The index is:
+        // batch_size * (order + 1u) * cur_var_idx + batch_size * order.
+        auto tc_idx = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                        builder.getInt32(batch_size * order));
+        auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+        // Store it in out_ptr. The index is:
+        // batch_size * cur_var_idx.
+        auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+    });
+
+    // Load the value of h.
+    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+
+    // Now let's run the Horner scheme.
+    llvm_loop_u32(
+        s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+        [&](llvm::Value *cur_order) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                // Load the current Taylor coefficient from tc_ptr.
+                // NOTE: we are loading the coefficients backwards wrt the order, hence
+                // we specify order - cur_order.
+                // NOTE: the index is:
+                // batch_size * (order + 1u) * cur_var_idx + batch_size * (order - cur_order).
+                auto tc_idx
+                    = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                        builder.CreateMul(builder.getInt32(batch_size),
+                                                          builder.CreateSub(builder.getInt32(order), cur_order)));
+                auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+                // Accumulate in out_ptr. The index is:
+                // batch_size * cur_var_idx.
+                auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+                auto out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                auto cur_out = load_vector_from_memory(builder, out_p, batch_size);
+                store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
+            });
+        });
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+}
+
 // Simplify a Taylor decomposition by removing
 // common subexpressions.
 // NOTE: the hidden deps are not considered for CSE
@@ -940,11 +1046,18 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
 
+    // Add the function for the computation of
+    // the continuous output.
+    taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, 1);
+
     // Run the jit.
     m_llvm.compile();
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Fetch the function to compute the continuous output.
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -1145,6 +1258,18 @@ template <typename T>
 std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 {
     return m_dim;
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::c_output(T *out, T time) const
+{
+    // NOTE: "time" needs to be translated
+    // because m_c_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, need to compute:
+    const auto h = time - (m_time - m_last_h);
+
+    m_c_out_f(out, m_tc.data(), &h);
 }
 
 // Explicit instantiation of the implementation classes/functions.
