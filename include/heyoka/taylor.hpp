@@ -422,6 +422,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
     std::vector<T> m_tc;
+    // Size of the last timestep taken.
+    T m_last_h = T(0);
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
@@ -535,6 +537,11 @@ public:
         return m_tc.data();
     }
 
+    T get_last_h() const
+    {
+        return m_last_h;
+    }
+
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
     std::tuple<taylor_outcome, T> step(T, bool = false);
@@ -637,6 +644,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
     std::vector<T> m_tc;
+    // The sizes of the last timesteps taken.
+    std::vector<T> m_last_h;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,
@@ -769,6 +778,11 @@ public:
     T *get_tc_data()
     {
         return m_tc.data();
+    }
+
+    const std::vector<T> &get_last_h() const
+    {
+        return m_last_h;
     }
 
     const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);

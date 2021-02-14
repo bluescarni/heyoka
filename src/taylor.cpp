@@ -962,7 +962,7 @@ template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointer.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc)
+      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -1012,6 +1012,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
     // Update the time.
     m_time += h;
+
+    // Store the last timestep.
+    m_last_h = h;
 
     // Check if the time or the state vector are non-finite at the
     // end of the timestep.
@@ -1284,6 +1287,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // into account the batch size.
     m_tc.resize(m_state.size() * (m_order + 1u));
 
+    // Setup m_last_h.
+    m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
+
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
@@ -1305,9 +1311,10 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
       m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res),
-      m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h),
-      m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts)
+      m_last_h(other.m_last_h), m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts),
+      m_step_res(other.m_step_res), m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count),
+      m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts),
+      m_pfor_ts(other.m_pfor_ts)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
 }
@@ -1376,12 +1383,15 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         return false;
     };
 
-    // Update the times and write out the result.
+    // Update the times and the last timesteps, and write out the result.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         // The timestep that was actually used for
         // this batch element.
         const auto h = m_delta_ts[i];
         m_time[i] += h;
+
+        // Update the size of the last timestep.
+        m_last_h[i] = h;
 
         if (!isfinite(m_time[i]) || check_nf_batch(i)) {
             // Either the new time or state contain non-finite values,
