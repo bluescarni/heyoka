@@ -51,7 +51,7 @@ TEST_CASE("taylor tc basic")
 
                 REQUIRE(ta.get_tc().size() == 2u * (ta.get_order() + 1u));
 
-                auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u});
+                auto tca = xt::adapt(ta.get_tc().data(), {2u, ta.get_order() + 1u});
 
                 auto [oc, h] = ta.step(true);
 
@@ -116,7 +116,6 @@ TEST_CASE("taylor tc basic")
 
                     REQUIRE(ta.get_tc().size() == 2u * (ta.get_order() + 1u) * batch_size);
 
-                    auto tca = xt::adapt(ta.get_tc_data(), {2u, ta.get_order() + 1u, batch_size});
                     auto sa = xt::adapt(ta.get_state_data(), {2u, batch_size});
                     auto isa = xt::adapt(init_state.data(), {2u, batch_size});
 
@@ -125,6 +124,9 @@ TEST_CASE("taylor tc basic")
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));
+
+                            auto tc_copy(ta.get_tc());
+                            auto tca = xt::adapt(tc_copy.data(), {2u, ta.get_order() + 1u, batch_size});
 
                             horner_eval(ret, xt::view(tca, xt::all(), xt::all(), i), static_cast<int>(ta.get_order()),
                                         0);
@@ -145,6 +147,9 @@ TEST_CASE("taylor tc basic")
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));
+
+                            auto tc_copy(ta.get_tc());
+                            auto tca = xt::adapt(tc_copy.data(), {2u, ta.get_order() + 1u, batch_size});
 
                             horner_eval(ret, xt::view(tca, xt::all(), xt::all(), i), static_cast<int>(ta.get_order()),
                                         0);
@@ -170,6 +175,9 @@ TEST_CASE("taylor tc basic")
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));
+
+                            auto tc_copy(ta.get_tc());
+                            auto tca = xt::adapt(tc_copy.data(), {2u, ta.get_order() + 1u, batch_size});
 
                             horner_eval(ret, xt::view(tca, xt::all(), xt::all(), i), static_cast<int>(ta.get_order()),
                                         0);

@@ -528,14 +528,6 @@ public:
     {
         return m_tc;
     }
-    const T *get_tc_data() const
-    {
-        return m_tc.data();
-    }
-    T *get_tc_data()
-    {
-        return m_tc.data();
-    }
 
     T get_last_h() const
     {
@@ -770,14 +762,6 @@ public:
     const std::vector<T> &get_tc() const
     {
         return m_tc;
-    }
-    const T *get_tc_data() const
-    {
-        return m_tc.data();
-    }
-    T *get_tc_data()
-    {
-        return m_tc.data();
     }
 
     const std::vector<T> &get_last_h() const
