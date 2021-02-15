@@ -1299,7 +1299,7 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_c_output(T time)
     // NOTE: "time" needs to be translated
     // because m_c_out_f expects a time coordinate
     // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, need to compute:
+    // the *previous* timestep. Thus, we need to compute:
     const auto h = time - (m_time - m_last_h);
 
     m_c_out_f(m_c_out.data(), m_tc.data(), &h);
@@ -1807,7 +1807,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_c_output(const std::
     // NOTE: "time" needs to be translated
     // because m_c_out_f expects a time coordinate
     // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, need to compute:
+    // the *previous* timestep. Thus, we need to compute:
     // time - (m_time - m_last_h);
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_c_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
