@@ -198,14 +198,14 @@ TEST_CASE("continuous output")
                 // The c_out at t = 0 must be the same
                 // as the IC.
                 ta.update_c_output(0);
-                REQUIRE(c_out[0] == approximately(0.05, 10.));
-                REQUIRE(c_out[1] == approximately(0.025, 10.));
+                REQUIRE(c_out[0] == approximately(0.05, 100.));
+                REQUIRE(c_out[1] == approximately(0.025, 100.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
                 ta.update_c_output(ta.get_time());
-                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
-                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 100.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 100.));
 
                 // Store the state at the end of the first step.
                 auto old_state1 = ta.get_state();
@@ -217,14 +217,14 @@ TEST_CASE("continuous output")
                 // must be equal to the state at the end of the
                 // previous timestep.
                 ta.update_c_output(ta.get_time() - ta.get_last_h());
-                REQUIRE(c_out[0] == approximately(old_state1[0], 10.));
-                REQUIRE(c_out[1] == approximately(old_state1[1], 10.));
+                REQUIRE(c_out[0] == approximately(old_state1[0], 100.));
+                REQUIRE(c_out[1] == approximately(old_state1[1], 100.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
                 ta.update_c_output(ta.get_time());
-                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
-                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 100.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 100.));
 
                 // Store the state at the end of the second timestep.
                 auto old_state2 = ta.get_state();
@@ -236,14 +236,14 @@ TEST_CASE("continuous output")
                 // must be equal to the state at the end of the
                 // previous timestep.
                 ta.update_c_output(ta.get_time() - ta.get_last_h());
-                REQUIRE(c_out[0] == approximately(old_state2[0], 10.));
-                REQUIRE(c_out[1] == approximately(old_state2[1], 10.));
+                REQUIRE(c_out[0] == approximately(old_state2[0], 100.));
+                REQUIRE(c_out[1] == approximately(old_state2[1], 100.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
                 ta.update_c_output(ta.get_time());
-                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
-                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
+                REQUIRE(c_out[0] == approximately(ta.get_state()[0], 100.));
+                REQUIRE(c_out[1] == approximately(ta.get_state()[1], 100.));
 
                 // Do it a few more times.
                 for (auto i = 0; i < 100; ++i) {
@@ -293,14 +293,14 @@ TEST_CASE("continuous output")
 
                     ta.update_c_output(std::vector<double>(batch_size, 0.));
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(isa(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(isa(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(isa(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(isa(1u, i), 100.));
                     }
 
                     ta.update_c_output(ta.get_time());
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 100.));
                     }
 
                     auto old_state1 = ta.get_state();
@@ -311,14 +311,14 @@ TEST_CASE("continuous output")
 
                     ta.update_c_output(old_time1);
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(ost1a(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(ost1a(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(ost1a(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(ost1a(1u, i), 100.));
                     }
 
                     ta.update_c_output(ta.get_time());
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 100.));
                     }
 
                     auto old_state2 = ta.get_state();
@@ -329,14 +329,14 @@ TEST_CASE("continuous output")
 
                     ta.update_c_output(old_time2);
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(ost2a(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(ost2a(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(ost2a(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(ost2a(1u, i), 100.));
                     }
 
                     ta.update_c_output(ta.get_time());
                     for (auto i = 0u; i < batch_size; ++i) {
-                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
-                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 100.));
                     }
 
                     for (auto _ = 0; _ < 100; ++_) {

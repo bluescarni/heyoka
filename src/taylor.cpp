@@ -1062,8 +1062,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the c_out.
-    std::optional<opt_disabler> od;
-    od.emplace(m_llvm);
+    std::optional<opt_disabler> od(m_llvm);
 
     // Add the stepper function.
     std::tie(m_dc, m_order)
@@ -1427,8 +1426,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the c_out.
-    std::optional<opt_disabler> od;
-    od.emplace(m_llvm);
+    std::optional<opt_disabler> od(m_llvm);
 
     // Add the stepper function.
     std::tie(m_dc, m_order)
@@ -4087,8 +4085,7 @@ auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, 
     const auto n_vars = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Temporarily disable optimisations in s.
-    std::optional<opt_disabler> od;
-    od.emplace(s);
+    std::optional<opt_disabler> od(s);
 
     // Add the function for the computation of the jet of derivatives.
     auto dc = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode);
