@@ -1069,15 +1069,19 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // LCOV_EXCL_STOP
 
     m_tc.resize(m_state.size() * (m_order + 1u));
+
+    // Setup the vector for the continuous output.
+    m_c_out.resize(m_state.size());
 }
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointer.
+    // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h)
+      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_c_out(other.m_c_out)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 }
 
 template <typename T>
@@ -1261,7 +1265,7 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::c_output(T *out, T time) const
+const std::vector<T> &taylor_adaptive_impl<T>::update_c_output(T time)
 {
     // NOTE: "time" needs to be translated
     // because m_c_out_f expects a time coordinate
@@ -1269,7 +1273,9 @@ void taylor_adaptive_impl<T>::c_output(T *out, T time) const
     // the *previous* timestep. Thus, need to compute:
     const auto h = time - (m_time - m_last_h);
 
-    m_c_out_f(out, m_tc.data(), &h);
+    m_c_out_f(m_c_out.data(), m_tc.data(), &h);
+
+    return m_c_out;
 }
 
 // Explicit instantiation of the implementation classes/functions.

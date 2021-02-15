@@ -15,6 +15,9 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <xtensor/xadapt.hpp>
+#include <xtensor/xview.hpp>
+
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/nbody.hpp>
@@ -186,21 +189,20 @@ TEST_CASE("continuous output")
                                                   kw::compact_mode = cm,
                                                   kw::opt_level = opt_level};
 
-                std::vector<double> c_out;
-                c_out.resize(2);
+                auto c_out = xt::adapt(ta.get_c_output());
 
                 // Take a first step.
                 ta.step(true);
 
                 // The c_out at t = 0 must be the same
                 // as the IC.
-                ta.c_output(c_out.data(), 0);
+                ta.update_c_output(0);
                 REQUIRE(c_out[0] == approximately(0.05, 10.));
                 REQUIRE(c_out[1] == approximately(0.025, 10.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
-                ta.c_output(c_out.data(), ta.get_time());
+                ta.update_c_output(ta.get_time());
                 REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
                 REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
 
@@ -213,13 +215,13 @@ TEST_CASE("continuous output")
                 // The c_out at the beginning of the timestep
                 // must be equal to the state at the end of the
                 // previous timestep.
-                ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                ta.update_c_output(ta.get_time() - ta.get_last_h());
                 REQUIRE(c_out[0] == approximately(old_state1[0], 10.));
                 REQUIRE(c_out[1] == approximately(old_state1[1], 10.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
-                ta.c_output(c_out.data(), ta.get_time());
+                ta.update_c_output(ta.get_time());
                 REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
                 REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
 
@@ -232,13 +234,13 @@ TEST_CASE("continuous output")
                 // The c_out at the beginning of the timestep
                 // must be equal to the state at the end of the
                 // previous timestep.
-                ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                ta.update_c_output(ta.get_time() - ta.get_last_h());
                 REQUIRE(c_out[0] == approximately(old_state2[0], 10.));
                 REQUIRE(c_out[1] == approximately(old_state2[1], 10.));
 
                 // The c_out at the end of the timestep must be
                 // equal to the current state.
-                ta.c_output(c_out.data(), ta.get_time());
+                ta.update_c_output(ta.get_time());
                 REQUIRE(c_out[0] == approximately(ta.get_state()[0], 10.));
                 REQUIRE(c_out[1] == approximately(ta.get_state()[1], 10.));
 
@@ -250,11 +252,11 @@ TEST_CASE("continuous output")
 
                     REQUIRE(oc == taylor_outcome::success);
 
-                    ta.c_output(c_out.data(), ta.get_time() - ta.get_last_h());
+                    ta.update_c_output(ta.get_time() - ta.get_last_h());
                     REQUIRE(c_out[0] == approximately(old_state2[0], 1000.));
                     REQUIRE(c_out[1] == approximately(old_state2[1], 1000.));
 
-                    ta.c_output(c_out.data(), ta.get_time());
+                    ta.update_c_output(ta.get_time());
                     REQUIRE(c_out[0] == approximately(ta.get_state()[0], 1000.));
                     REQUIRE(c_out[1] == approximately(ta.get_state()[1], 1000.));
                 }

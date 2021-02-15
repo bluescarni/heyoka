@@ -427,6 +427,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // The function for computing the continuous output.
     using c_out_f_t = void (*)(T *, const T *, const T *);
     c_out_f_t m_c_out_f;
+    // The vector for the continuous output.
+    std::vector<T> m_c_out;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
@@ -537,7 +539,11 @@ public:
         return m_last_h;
     }
 
-    void c_output(T *, T) const;
+    const std::vector<T> &get_c_output() const
+    {
+        return m_c_out;
+    }
+    const std::vector<T> &update_c_output(T);
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
