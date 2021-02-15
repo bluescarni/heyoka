@@ -180,6 +180,7 @@ TEST_CASE("continuous output")
 {
     auto [x, v] = make_vars("x", "v");
 
+    // Scalar test.
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         for (auto cm : {false, true}) {
             for (auto ha : {false, true}) {
@@ -259,6 +260,104 @@ TEST_CASE("continuous output")
                     ta.update_c_output(ta.get_time());
                     REQUIRE(c_out[0] == approximately(ta.get_state()[0], 1000.));
                     REQUIRE(c_out[1] == approximately(ta.get_state()[1], 1000.));
+                }
+            }
+        }
+    }
+
+    // Batch test.
+    for (auto batch_size : {1u, 4u, 23u}) {
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            for (auto cm : {false, true}) {
+                for (auto ha : {false, true}) {
+                    std::vector<double> init_state;
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        init_state.push_back(0.05 + i / 100.);
+                    }
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        init_state.push_back(0.025 + i / 1000.);
+                    }
+
+                    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                            init_state,
+                                                            batch_size,
+                                                            kw::high_accuracy = ha,
+                                                            kw::compact_mode = cm,
+                                                            kw::opt_level = opt_level};
+
+                    auto sa = xt::adapt(ta.get_state_data(), {2u, batch_size});
+                    auto isa = xt::adapt(init_state.data(), {2u, batch_size});
+                    auto coa = xt::adapt(ta.get_c_output(), {2u, batch_size});
+
+                    ta.step(true);
+
+                    ta.update_c_output(std::vector<double>(batch_size, 0.));
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(isa(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(isa(1u, i), 10.));
+                    }
+
+                    ta.update_c_output(ta.get_time());
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                    }
+
+                    auto old_state1 = ta.get_state();
+                    auto ost1a = xt::adapt(old_state1, {2u, batch_size});
+                    auto old_time1 = ta.get_time();
+
+                    ta.step(true);
+
+                    ta.update_c_output(old_time1);
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(ost1a(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(ost1a(1u, i), 10.));
+                    }
+
+                    ta.update_c_output(ta.get_time());
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                    }
+
+                    auto old_state2 = ta.get_state();
+                    auto ost2a = xt::adapt(old_state2, {2u, batch_size});
+                    auto old_time2 = ta.get_time();
+
+                    ta.step(true);
+
+                    ta.update_c_output(old_time2);
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(ost2a(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(ost2a(1u, i), 10.));
+                    }
+
+                    ta.update_c_output(ta.get_time());
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10.));
+                        REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
+                    }
+
+                    for (auto i = 0; i < 100; ++i) {
+                        auto old_state = ta.get_state();
+                        auto osta = xt::adapt(old_state, {2u, batch_size});
+                        auto old_time = ta.get_time();
+
+                        ta.step(true);
+
+                        ta.update_c_output(old_time);
+                        for (auto i = 0u; i < batch_size; ++i) {
+                            REQUIRE(coa(0u, i) == approximately(osta(0u, i), 10000.));
+                            REQUIRE(coa(1u, i) == approximately(osta(1u, i), 10000.));
+                        }
+
+                        ta.update_c_output(ta.get_time());
+                        for (auto i = 0u; i < batch_size; ++i) {
+                            REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10000.));
+                            REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10000.));
+                        }
+                    }
                 }
             }
         }

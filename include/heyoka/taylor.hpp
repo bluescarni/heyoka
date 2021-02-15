@@ -652,6 +652,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // The function for computing the continuous output.
     using c_out_f_t = void (*)(T *, const T *, const T *);
     c_out_f_t m_c_out_f;
+    // The vector for the continuous output.
+    std::vector<T> m_c_out;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,
@@ -668,6 +670,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<T> m_pfor_ts;
+    // Temporary vector used in the continuous output implementation.
+    std::vector<T> m_c_out_time;
 
     HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, bool);
 
@@ -783,7 +787,11 @@ public:
         return m_last_h;
     }
 
-    void c_output(T *, const T *) const;
+    const std::vector<T> &get_c_output() const
+    {
+        return m_c_out;
+    }
+    const std::vector<T> &update_c_output(const std::vector<T> &);
 
     const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);
     const std::vector<std::tuple<taylor_outcome, T>> &step_backward(bool = false);

@@ -1399,11 +1399,18 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
 
+    // Add the function for the computation of
+    // the continuous output.
+    taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
+
     // Run the jit.
     m_llvm.compile();
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Fetch the function to compute the continuous output.
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -1421,6 +1428,11 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Setup m_last_h.
     m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
 
+    // Setup the vector for the continuous output.
+    // NOTE: the size of m_state.size() already takes
+    // into account the batch size.
+    m_c_out.resize(m_state.size());
+
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
@@ -1435,6 +1447,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_max_abs_h.resize(m_batch_size);
     m_cur_max_delta_ts.resize(m_batch_size);
     m_pfor_ts.resize(m_batch_size);
+
+    m_c_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
 }
 
 template <typename T>
@@ -1442,12 +1456,13 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
       m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_last_h(other.m_last_h), m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts),
-      m_step_res(other.m_step_res), m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count),
-      m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts),
-      m_pfor_ts(other.m_pfor_ts)
+      m_last_h(other.m_last_h), m_c_out(other.m_c_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
+      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_c_out_time(other.m_c_out_time)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 }
 
 template <typename T>
@@ -1734,6 +1749,32 @@ template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
 {
     return m_dim;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch_impl<T>::update_c_output(const std::vector<T> &time)
+{
+    // Check the dimensionality of time.
+    if (time.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid number of time coordinates specified for the continuous output in a Taylor integrator in batch "
+            "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
+    }
+
+    // NOTE: "time" needs to be translated
+    // because m_c_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, need to compute:
+    // time - (m_time - m_last_h);
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_c_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
+    }
+
+    m_c_out_f(m_c_out.data(), m_tc.data(), m_c_out_time.data());
+
+    return m_c_out;
 }
 
 // Explicit instantiation of the batch implementation classes.
