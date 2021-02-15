@@ -98,6 +98,23 @@ std::string taylor_mangle_suffix(llvm::Type *t)
 namespace
 {
 
+// RAII helper to temporarily set the opt level to 0 in an llvm_state.
+struct opt_disabler {
+    llvm_state &m_s;
+    unsigned m_orig_opt_level;
+
+    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
+    {
+        // Disable optimisations.
+        m_s.opt_level() = 0;
+    }
+    ~opt_disabler()
+    {
+        // Restore the original optimisation level.
+        m_s.opt_level() = m_orig_opt_level;
+    }
+};
+
 template <typename T>
 llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::uint32_t batch_size)
 {
@@ -1042,6 +1059,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the c_out.
+    std::optional<opt_disabler> od;
+    od.emplace(m_llvm);
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
@@ -1049,6 +1072,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Add the function for the computation of
     // the continuous output.
     taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, 1);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
 
     // Run the jit.
     m_llvm.compile();
@@ -1395,6 +1424,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the c_out.
+    std::optional<opt_disabler> od;
+    od.emplace(m_llvm);
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
@@ -1402,6 +1437,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Add the function for the computation of
     // the continuous output.
     taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
 
     // Run the jit.
     m_llvm.compile();
@@ -4035,23 +4076,6 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // NOTE: don't run the optimisation pass here, it will be
     // run from the main function below.
 }
-
-// RAII helper to temporarily set the opt level to 0 in an llvm_state.
-struct opt_disabler {
-    llvm_state &m_s;
-    unsigned m_orig_opt_level;
-
-    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
-    {
-        // Disable optimisations.
-        m_s.opt_level() = 0;
-    }
-    ~opt_disabler()
-    {
-        // Restore the original optimisation level.
-        m_s.opt_level() = m_orig_opt_level;
-    }
-};
 
 template <typename T, typename U>
 auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order,

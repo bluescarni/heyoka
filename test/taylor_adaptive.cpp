@@ -339,7 +339,7 @@ TEST_CASE("continuous output")
                         REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10.));
                     }
 
-                    for (auto i = 0; i < 100; ++i) {
+                    for (auto _ = 0; _ < 100; ++_) {
                         auto old_state = ta.get_state();
                         auto osta = xt::adapt(old_state, {2u, batch_size});
                         auto old_time = ta.get_time();
