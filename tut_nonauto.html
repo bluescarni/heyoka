@@ -38,7 +38,7 @@
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="next" title="Continuous output" href="tut_c_output.html" />
     <link rel="prev" title="Runtime parameters" href="tut_param.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -108,6 +108,11 @@
    <li class="toctree-l2 current active">
     <a class="current reference internal" href="#">
      Non-autonomous systems
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_c_output.html">
+     Continuous output
     </a>
    </li>
   </ul>
@@ -233,6 +238,9 @@
                 
   <div class="section" id="non-autonomous-systems">
 <span id="tut-nonauto"></span><h1>Non-autonomous systems<a class="headerlink" href="#non-autonomous-systems" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.3.0.</span></p>
+</div>
 <p>All the ODE systems we have used in the examples thus far belong to the class of autonomous systems.
 That is, the time variable <span class="math notranslate nohighlight">\(t\)</span> never appears explicitly in the expressions of the ODEs. In this
 section, we will see how non-autonomous systems can be defined and integrated in heyoka.</p>
@@ -373,7 +381,7 @@ the initial conditions might lead to a qualitatively-different long-term behavio
     <div class='prev-next-bottom'>
         
     <a class='left-prev' id="prev-link" href="tut_param.html" title="previous page">Runtime parameters</a>
-    <a class='right-next' id="next-link" href="ad_notes.html" title="next page">Notes on automatic differentiation</a>
+    <a class='right-next' id="next-link" href="tut_c_output.html" title="next page">Continuous output</a>
 
     </div>
     <footer class="footer mt-5 mt-md-0">

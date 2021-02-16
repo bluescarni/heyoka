@@ -3,6 +3,8 @@
 Runtime parameters
 ==================
 
+.. versionadded:: 0.2.0
+
 In all the examples we have seen so far, numerical constants
 have always been hard-coded to fixed values when constructing
 the expressions of the ODEs.

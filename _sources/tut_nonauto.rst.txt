@@ -3,6 +3,8 @@
 Non-autonomous systems
 ======================
 
+.. versionadded:: 0.3.0
+
 All the ODE systems we have used in the examples thus far belong to the class of autonomous systems.
 That is, the time variable :math:`t` never appears explicitly in the expressions of the ODEs. In this
 section, we will see how non-autonomous systems can be defined and integrated in heyoka.

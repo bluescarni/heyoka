@@ -28,3 +28,4 @@ of the source tree. The tutorials can be compiled by enabling the
   tut_adaptive_custom
   tut_param
   tut_nonauto
+  tut_c_output
