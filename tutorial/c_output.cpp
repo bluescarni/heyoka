@@ -29,8 +29,7 @@ int main()
 
     // Integrate for a single timestep, and store
     // the Taylor coefficients in the integrator.
-    auto [_, h] = ta.step(true);
-    std::cout << "Timestep size: " << h << '\n';
+    ta.step(true);
 
     // Fetch the Taylor coefficients of order 0
     // for x and v.
@@ -45,7 +44,7 @@ int main()
     // Compute the continuous output at the end of the
     // previous timestep and compare it to the current
     // state vector.
-    ta.update_c_output(h);
+    ta.update_c_output(ta.get_time());
     const auto &st = ta.get_state();
     std::cout << "x rel. difference: " << (co[0] - st[0]) / st[0] << '\n';
     std::cout << "v rel. difference: " << (co[1] - st[1]) / st[1] << '\n';

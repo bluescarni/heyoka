@@ -31,11 +31,7 @@ passing an extra boolean parameter set to ``true``:
 
 .. literalinclude:: ../tutorial/c_output.cpp
    :language: c++
-   :lines: 30-33
-
-.. code-block:: console
-
-   Timestep size: 0.216053
+   :lines: 30-32
 
 The extra ``true`` function argument instructs the integrator
 to record into an internal array the list of Taylor series
@@ -45,7 +41,7 @@ via the ``get_tc()`` member function:
 
 .. literalinclude:: ../tutorial/c_output.cpp
    :language: c++
-   :lines: 35-38
+   :lines: 34-37
 
 The Taylor coefficients are stored in row-major order,
 each row referring to a different state variable. The number
@@ -59,7 +55,7 @@ to the zero-order coefficient for the ``v`` variable:
    TC of order 0 for x: 0.05
    TC of order 0 for v: 0.025
 
-Indeed, the zero-order coefficients for the state variables are nothing but
+Indeed, the zero-order Taylor coefficients for the state variables are nothing but
 the initial conditions at the beginning of the timestep that was just taken.
 
 .. caution::
@@ -74,7 +70,7 @@ which is about halfway through the timestep that was just taken:
 
 .. literalinclude:: ../tutorial/c_output.cpp
    :language: c++
-   :lines: 40-43
+   :lines: 39-42
 
 .. code-block:: console
 
@@ -90,7 +86,7 @@ and let's compare it to the current state vector:
 
 .. literalinclude:: ../tutorial/c_output.cpp
    :language: c++
-   :lines: 45-51
+   :lines: 44-50
 
 .. code-block:: console
 
