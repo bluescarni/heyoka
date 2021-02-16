@@ -98,6 +98,23 @@ std::string taylor_mangle_suffix(llvm::Type *t)
 namespace
 {
 
+// RAII helper to temporarily set the opt level to 0 in an llvm_state.
+struct opt_disabler {
+    llvm_state &m_s;
+    unsigned m_orig_opt_level;
+
+    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
+    {
+        // Disable optimisations.
+        m_s.opt_level() = 0;
+    }
+    ~opt_disabler()
+    {
+        // Restore the original optimisation level.
+        m_s.opt_level() = m_orig_opt_level;
+    }
+};
+
 template <typename T>
 llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::uint32_t batch_size)
 {
@@ -217,6 +234,112 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
 
 namespace
 {
+
+// Add a function for computing the continuous output
+// via polynomial evaluation.
+template <typename T>
+void taylor_add_c_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size)
+{
+    assert(n_eq > 0u);
+    assert(order > 0u);
+    assert(batch_size > 0u);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // The function arguments:
+    // - the output pointer (read/write, used also for accumulation),
+    // - the pointer to the Taylor coefficients (read-only),
+    // - the pointer to the h values (read-only).
+    // No overlap is allowed.
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "c_out_f", &s.module());
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument(
+            "Unable to create a function for the continuous output in an adaptive Taylor integrator");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto tc_ptr = f->args().begin() + 1;
+    tc_ptr->setName("tc_ptr");
+    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    tc_ptr->addAttr(llvm::Attribute::NoAlias);
+    tc_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = f->args().begin() + 2;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Start by writing into out_ptr the coefficients of the highest-degree
+    // monomial in each polynomial.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+        // Load the coefficient from tc_ptr. The index is:
+        // batch_size * (order + 1u) * cur_var_idx + batch_size * order.
+        auto tc_idx = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                        builder.getInt32(batch_size * order));
+        auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+        // Store it in out_ptr. The index is:
+        // batch_size * cur_var_idx.
+        auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+    });
+
+    // Load the value of h.
+    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+
+    // Now let's run the Horner scheme.
+    llvm_loop_u32(
+        s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+        [&](llvm::Value *cur_order) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                // Load the current Taylor coefficient from tc_ptr.
+                // NOTE: we are loading the coefficients backwards wrt the order, hence
+                // we specify order - cur_order.
+                // NOTE: the index is:
+                // batch_size * (order + 1u) * cur_var_idx + batch_size * (order - cur_order).
+                auto tc_idx
+                    = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                        builder.CreateMul(builder.getInt32(batch_size),
+                                                          builder.CreateSub(builder.getInt32(order), cur_order)));
+                auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+                // Accumulate in out_ptr. The index is:
+                // batch_size * cur_var_idx.
+                auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+                auto out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                auto cur_out = load_vector_from_memory(builder, out_p, batch_size);
+                store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
+            });
+        });
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+}
 
 // Simplify a Taylor decomposition by removing
 // common subexpressions.
@@ -936,15 +1059,33 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the c_out.
+    std::optional<opt_disabler> od(m_llvm);
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
+
+    // Add the function for the computation of
+    // the continuous output.
+    taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, 1);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
 
     // Run the jit.
     m_llvm.compile();
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Fetch the function to compute the continuous output.
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -956,15 +1097,19 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // LCOV_EXCL_STOP
 
     m_tc.resize(m_state.size() * (m_order + 1u));
+
+    // Setup the vector for the continuous output.
+    m_c_out.resize(m_state.size());
 }
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointer.
+    // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc)
+      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_c_out(other.m_c_out)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 }
 
 template <typename T>
@@ -1012,6 +1157,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
     // Update the time.
     m_time += h;
+
+    // Store the last timestep.
+    m_last_h = h;
 
     // Check if the time or the state vector are non-finite at the
     // end of the timestep.
@@ -1144,6 +1292,20 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
     return m_dim;
 }
 
+template <typename T>
+const std::vector<T> &taylor_adaptive_impl<T>::update_c_output(T time)
+{
+    // NOTE: "time" needs to be translated
+    // because m_c_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, we need to compute:
+    const auto h = time - (m_time - m_last_h);
+
+    m_c_out_f(m_c_out.data(), m_tc.data(), &h);
+
+    return m_c_out;
+}
+
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
@@ -1261,15 +1423,33 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the c_out.
+    std::optional<opt_disabler> od(m_llvm);
+
     // Add the stepper function.
     std::tie(m_dc, m_order)
         = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
+
+    // Add the function for the computation of
+    // the continuous output.
+    taylor_add_c_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
 
     // Run the jit.
     m_llvm.compile();
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Fetch the function to compute the continuous output.
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 
     // Setup the vector for the Taylor coefficients.
     // LCOV_EXCL_START
@@ -1283,6 +1463,14 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // NOTE: the size of m_state.size() already takes
     // into account the batch size.
     m_tc.resize(m_state.size() * (m_order + 1u));
+
+    // Setup m_last_h.
+    m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
+
+    // Setup the vector for the continuous output.
+    // NOTE: the size of m_state.size() already takes
+    // into account the batch size.
+    m_c_out.resize(m_state.size());
 
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
@@ -1298,6 +1486,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_max_abs_h.resize(m_batch_size);
     m_cur_max_delta_ts.resize(m_batch_size);
     m_pfor_ts.resize(m_batch_size);
+
+    m_c_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
 }
 
 template <typename T>
@@ -1305,11 +1495,13 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
       m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_pinf(other.m_pinf), m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res),
-      m_prop_res(other.m_prop_res), m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h),
-      m_max_abs_h(other.m_max_abs_h), m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts)
+      m_last_h(other.m_last_h), m_c_out(other.m_c_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
+      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_c_out_time(other.m_c_out_time)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_c_out_f = reinterpret_cast<c_out_f_t>(m_llvm.jit_lookup("c_out_f"));
 }
 
 template <typename T>
@@ -1376,12 +1568,15 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, boo
         return false;
     };
 
-    // Update the times and write out the result.
+    // Update the times and the last timesteps, and write out the result.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         // The timestep that was actually used for
         // this batch element.
         const auto h = m_delta_ts[i];
         m_time[i] += h;
+
+        // Update the size of the last timestep.
+        m_last_h[i] = h;
 
         if (!isfinite(m_time[i]) || check_nf_batch(i)) {
             // Either the new time or state contain non-finite values,
@@ -1593,6 +1788,32 @@ template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
 {
     return m_dim;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch_impl<T>::update_c_output(const std::vector<T> &time)
+{
+    // Check the dimensionality of time.
+    if (time.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid number of time coordinates specified for the continuous output in a Taylor integrator in batch "
+            "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
+    }
+
+    // NOTE: "time" needs to be translated
+    // because m_c_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, we need to compute:
+    // time - (m_time - m_last_h);
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_c_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
+    }
+
+    m_c_out_f(m_c_out.data(), m_tc.data(), m_c_out_time.data());
+
+    return m_c_out;
 }
 
 // Explicit instantiation of the batch implementation classes.
@@ -3470,7 +3691,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // - pointer to the array of max timesteps (read & write),
     // - pointer to the Taylor coefficients output (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -3511,7 +3732,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     tc_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
@@ -3854,23 +4075,6 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // run from the main function below.
 }
 
-// RAII helper to temporarily set the opt level to 0 in an llvm_state.
-struct opt_disabler {
-    llvm_state &m_s;
-    unsigned m_orig_opt_level;
-
-    explicit opt_disabler(llvm_state &s) : m_s(s), m_orig_opt_level(s.opt_level())
-    {
-        // Disable optimisations.
-        m_s.opt_level() = 0;
-    }
-    ~opt_disabler()
-    {
-        // Restore the original optimisation level.
-        m_s.opt_level() = m_orig_opt_level;
-    }
-};
-
 template <typename T, typename U>
 auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order,
                                  std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
@@ -3881,8 +4085,7 @@ auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, 
     const auto n_vars = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Temporarily disable optimisations in s.
-    std::optional<opt_disabler> od;
-    od.emplace(s);
+    std::optional<opt_disabler> od(s);
 
     // Add the function for the computation of the jet of derivatives.
     auto dc = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode);
