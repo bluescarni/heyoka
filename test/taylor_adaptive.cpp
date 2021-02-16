@@ -231,7 +231,7 @@ TEST_CASE("last h")
         REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto x) { return x != 0.; }));
         lh = ta.get_last_h();
 
-        ta.step(1e-4);
+        ta.step(std::vector<double>(batch_size, 1e-4));
         for (auto i = 0u; i < batch_size; ++i) {
             REQUIRE(lh[i] != ta.get_last_h()[i]);
         }
