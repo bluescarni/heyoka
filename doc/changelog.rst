@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement support for continuous output
+  (`#92 <https://github.com/bluescarni/heyoka/pull/92>`__).
 - Add the ability to output the Taylor coefficients
   when invoking the single-step functions in the
   integrator classes
