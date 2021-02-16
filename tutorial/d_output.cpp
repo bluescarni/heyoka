@@ -36,16 +36,16 @@ int main()
     std::cout << "TC of order 0 for x: " << ta.get_tc()[0] << '\n';
     std::cout << "TC of order 0 for v: " << ta.get_tc()[ta.get_order() + 1u] << '\n';
 
-    // Compute and print the continuous output at t = 0.1.
-    auto &co = ta.update_c_output(0.1);
-    std::cout << "x(0.1) = " << co[0] << '\n';
-    std::cout << "y(0.1) = " << co[1] << '\n';
+    // Compute and print the dense output at t = 0.1.
+    auto &d_out = ta.update_d_output(0.1);
+    std::cout << "x(0.1) = " << d_out[0] << '\n';
+    std::cout << "y(0.1) = " << d_out[1] << '\n';
 
-    // Compute the continuous output at the end of the
+    // Compute the dense output at the end of the
     // previous timestep and compare it to the current
     // state vector.
-    ta.update_c_output(ta.get_time());
+    ta.update_d_output(ta.get_time());
     const auto &st = ta.get_state();
-    std::cout << "x rel. difference: " << (co[0] - st[0]) / st[0] << '\n';
-    std::cout << "v rel. difference: " << (co[1] - st[1]) / st[1] << '\n';
+    std::cout << "x rel. difference: " << (d_out[0] - st[0]) / st[0] << '\n';
+    std::cout << "v rel. difference: " << (d_out[1] - st[1]) / st[1] << '\n';
 }

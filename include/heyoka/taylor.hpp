@@ -424,11 +424,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     std::vector<T> m_tc;
     // Size of the last timestep taken.
     T m_last_h = T(0);
-    // The function for computing the continuous output.
-    using c_out_f_t = void (*)(T *, const T *, const T *);
-    c_out_f_t m_c_out_f;
-    // The vector for the continuous output.
-    std::vector<T> m_c_out;
+    // The function for computing the dense output.
+    using d_out_f_t = void (*)(T *, const T *, const T *);
+    d_out_f_t m_d_out_f;
+    // The vector for the dense output.
+    std::vector<T> m_d_out;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
@@ -539,11 +539,11 @@ public:
         return m_last_h;
     }
 
-    const std::vector<T> &get_c_output() const
+    const std::vector<T> &get_d_output() const
     {
-        return m_c_out;
+        return m_d_out;
     }
-    const std::vector<T> &update_c_output(T);
+    const std::vector<T> &update_d_output(T);
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
@@ -649,11 +649,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_tc;
     // The sizes of the last timesteps taken.
     std::vector<T> m_last_h;
-    // The function for computing the continuous output.
-    using c_out_f_t = void (*)(T *, const T *, const T *);
-    c_out_f_t m_c_out_f;
-    // The vector for the continuous output.
-    std::vector<T> m_c_out;
+    // The function for computing the dense output.
+    using d_out_f_t = void (*)(T *, const T *, const T *);
+    d_out_f_t m_d_out_f;
+    // The vector for the dense output.
+    std::vector<T> m_d_out;
     // Temporary vectors for use
     // in the timestepping functions.
     // These two are used as default values,
@@ -670,8 +670,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<T> m_pfor_ts;
-    // Temporary vector used in the continuous output implementation.
-    std::vector<T> m_c_out_time;
+    // Temporary vector used in the dense output implementation.
+    std::vector<T> m_d_out_time;
 
     HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, bool);
 
@@ -787,11 +787,11 @@ public:
         return m_last_h;
     }
 
-    const std::vector<T> &get_c_output() const
+    const std::vector<T> &get_d_output() const
     {
-        return m_c_out;
+        return m_d_out;
     }
-    const std::vector<T> &update_c_output(const std::vector<T> &);
+    const std::vector<T> &update_d_output(const std::vector<T> &);
 
     const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);
     const std::vector<std::tuple<taylor_outcome, T>> &step_backward(bool = false);
