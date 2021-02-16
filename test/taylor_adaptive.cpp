@@ -10,6 +10,8 @@
 #include <cmath>
 #include <initializer_list>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -420,6 +422,21 @@ TEST_CASE("continuous output")
                             REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10000.));
                         }
                     }
+
+                    using Catch::Matchers::Message;
+
+                    REQUIRE_THROWS_MATCHES(
+                        ta.update_c_output({}), std::invalid_argument,
+                        Message("Invalid number of time coordinates specified for the continuous output in a Taylor "
+                                "integrator in batch "
+                                "mode: the batch size is "
+                                + std::to_string(batch_size) + ", but the number of time coordinates is 0"));
+                    REQUIRE_THROWS_MATCHES(
+                        ta.update_c_output(std::vector<double>(123u)), std::invalid_argument,
+                        Message("Invalid number of time coordinates specified for the continuous output in a Taylor "
+                                "integrator in batch "
+                                "mode: the batch size is "
+                                + std::to_string(batch_size) + ", but the number of time coordinates is 123"));
                 }
             }
         }
