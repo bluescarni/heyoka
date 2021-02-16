@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Continuous output &#8212; heyoka 0.4.0 documentation</title>
+    <title>Dense output &#8212; heyoka 0.4.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
 
@@ -112,7 +112,7 @@
    </li>
    <li class="toctree-l2 current active">
     <a class="current reference internal" href="#">
-     Continuous output
+     Dense output
     </a>
    </li>
   </ul>
@@ -174,7 +174,7 @@
         <!-- ipynb file if we had a myst markdown file -->
         
         <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/tut_c_output.rst.txt"><button type="button"
+        <a class="dropdown-buttons" href="_sources/tut_d_output.rst.txt"><button type="button"
                 class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
                 data-placement="left">.rst</button></a>
         <!-- Download PDF via print -->
@@ -194,7 +194,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_c_output.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_d_output.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -236,22 +236,22 @@
         
               <div>
                 
-  <div class="section" id="continuous-output">
-<span id="tut-c-output"></span><h1>Continuous output<a class="headerlink" href="#continuous-output" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="dense-output">
+<span id="tut-d-output"></span><h1>Dense output<a class="headerlink" href="#dense-output" title="Permalink to this headline">¶</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.4.0.</span></p>
 </div>
 <p>One of the peculiar features of Taylor’s method is that it directly provides,
-via the Taylor series <a class="reference internal" href="tut_taylor_method.html#equation-tts-01">(4)</a>, <em>continuous</em> (or <em>dense</em>) output.
+via the Taylor series <a class="reference internal" href="tut_taylor_method.html#equation-tts-01">(4)</a>, <em>dense</em> (or <em>continuous</em>) output.
 That is, the Taylor series built by the integrator at each timestep can be used
 to compute the solution of the ODE system at <em>any time</em> within the timestep
 (and not only at the endpoint) via polynomial evaluation.</p>
 <p>Because the construction of the Taylor series is part of the timestepping algorithm,
-support for continuous output comes at essentially no extra
-cost. Additionally, because the continuous output is computed via the
+support for dense output comes at essentially no extra
+cost. Additionally, because the dense output is computed via the
 Taylor series of the solution of the ODE system, its accuracy
 is guaranteed to respect the error tolerance set in the integrator.</p>
-<p>In order to illustrate how to use continuous output in heyoka,
+<p>In order to illustrate how to use dense output in heyoka,
 we will keep things simple and go back to the simple pendulum:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
     <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
@@ -267,7 +267,7 @@ we will keep things simple and go back to the simple pendulum:</p>
                                       <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
 </pre></div>
 </div>
-<p>Enabling continuous output in heyoka is a two-step process.</p>
+<p>Enabling dense output in heyoka is a two-step process.</p>
 <p>The first step is to invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
 passing an extra boolean parameter set to <code class="docutils literal notranslate"><span class="pre">true</span></code>:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for a single timestep, and store</span>
@@ -307,51 +307,51 @@ step that the integrator might take.</p>
 <p>We are now ready to ask the integrator to compute the value of the solution at some
 arbitrary time. Let’s pick <span class="math notranslate nohighlight">\(t = 0.1\)</span>,
 which is about halfway through the timestep that was just taken:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Compute and print the continuous output at t = 0.1.</span>
-    <span class="k">auto</span> <span class="o">&amp;</span><span class="n">co</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">update_c_output</span><span class="p">(</span><span class="mf">0.1</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">co</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;y(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">co</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Compute and print the dense output at t = 0.1.</span>
+    <span class="k">auto</span> <span class="o">&amp;</span><span class="n">d_out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="mf">0.1</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;y(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">x(0.1) = 0.0500303</span>
 <span class="go">y(0.1) = -0.024398</span>
 </pre></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">update_c_output()</span></code> member function takes in input an <em>absolute</em> time coordinate
+<p>The <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code> member function takes in input an <em>absolute</em> time coordinate
 and returns a reference to an internal array that will contain the state of the system
 at the specified time coordinate, as computed by the evaluation of the Taylor series.</p>
-<p>Let’s now ask for the continuous output at the very end of the timestep that was just taken,
+<p>Let’s now ask for the dense output at the very end of the timestep that was just taken,
 and let’s compare it to the current state vector:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Compute the continuous output at the end of the</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Compute the dense output at the end of the</span>
     <span class="c1">// previous timestep and compare it to the current</span>
     <span class="c1">// state vector.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">update_c_output</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">());</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">());</span>
     <span class="k">const</span> <span class="k">auto</span> <span class="o">&amp;</span><span class="n">st</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">();</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">co</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">co</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">x rel. difference: 0</span>
 <span class="go">v rel. difference: -0</span>
 </pre></div>
 </div>
-<p>That is, as expected, the continuous output at the end of the previous timestep
+<p>That is, as expected, the dense output at the end of the previous timestep
 matches the current state of the system to machine precision.</p>
 <p>Before concluding, we need to highlight a couple of caveats regarding the
-use of continuous output.</p>
+use of dense output.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
 <p>First, it is the user’s responsibility to ensure that the array of Taylor
 coefficients contains up-to-date values. In other words, the user needs to remember
 to invoke the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions with the extra boolean argument set to <code class="docutils literal notranslate"><span class="pre">true</span></code>
-before invoking <code class="docutils literal notranslate"><span class="pre">update_c_output()</span></code>.
-Failure to do so will result in <code class="docutils literal notranslate"><span class="pre">update_c_output()</span></code> producing incorrect values.</p>
+before invoking <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code>.
+Failure to do so will result in <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code> producing incorrect values.</p>
 </div>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p>Second, the accuracy of continuous output is guaranteed to match the integrator’s
+<p>Second, the accuracy of dense output is guaranteed to match the integrator’s
 accuracy only if the time coordinate falls within the last step taken. Note that heyoka will
-<strong>not</strong> prevent the invocation of <code class="docutils literal notranslate"><span class="pre">update_c_output()</span></code> with time coordinates outside the
+<strong>not</strong> prevent the invocation of <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code> with time coordinates outside the
 guaranteed accuracy range - it is the user’s responsibility to be aware
 that doing so will produce results whose accuracy does not match the integrator’s
 error tolerance.</p>
@@ -388,18 +388,18 @@ error tolerance.</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;TC of order 0 for x: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_tc</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;TC of order 0 for v: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_tc</span><span class="p">()[</span><span class="n">ta</span><span class="p">.</span><span class="n">get_order</span><span class="p">()</span> <span class="o">+</span> <span class="mi">1u</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 
-    <span class="c1">// Compute and print the continuous output at t = 0.1.</span>
-    <span class="k">auto</span> <span class="o">&amp;</span><span class="n">co</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">update_c_output</span><span class="p">(</span><span class="mf">0.1</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">co</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;y(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">co</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="c1">// Compute and print the dense output at t = 0.1.</span>
+    <span class="k">auto</span> <span class="o">&amp;</span><span class="n">d_out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="mf">0.1</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;y(0.1) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 
-    <span class="c1">// Compute the continuous output at the end of the</span>
+    <span class="c1">// Compute the dense output at the end of the</span>
     <span class="c1">// previous timestep and compare it to the current</span>
     <span class="c1">// state vector.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">update_c_output</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">());</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">());</span>
     <span class="k">const</span> <span class="k">auto</span> <span class="o">&amp;</span><span class="n">st</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">();</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">co</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">co</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v rel. difference: &quot;</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 </div>
