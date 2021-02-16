@@ -58,7 +58,7 @@ to the zero-order coefficient for the ``v`` variable:
 Indeed, the zero-order Taylor coefficients for the state variables are nothing but
 the initial conditions at the beginning of the timestep that was just taken.
 
-.. caution::
+.. important::
 
    This last point is important and needs to be stressed again: the list of Taylor
    coefficients always refers to the **last** step taken and **not** to the next
@@ -99,7 +99,7 @@ matches the current state of the system to machine precision.
 Before concluding, we need to highlight a couple of caveats regarding the
 use of continuous output.
 
-.. caution::
+.. important::
 
    First, it is the user's responsibility to ensure that the array of Taylor
    coefficients contains up-to-date values. In other words, the user needs to remember
@@ -107,7 +107,7 @@ use of continuous output.
    before invoking ``update_c_output()``.
    Failure to do so will result in ``update_c_output()`` producing incorrect values.
 
-.. caution::
+.. important::
 
    Second, the accuracy of continuous output is guaranteed to match the integrator's
    accuracy only if the time coordinate falls within the last step taken. Note that heyoka will
