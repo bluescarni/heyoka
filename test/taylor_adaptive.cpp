@@ -176,6 +176,68 @@ TEST_CASE("param batch")
     REQUIRE(tad.get_state()[22 + 1] == approximately(0.));
 }
 
+// Make sure the last timestep is properly recorded when using the
+// step/propagate functions.
+TEST_CASE("last h")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // Scalar test.
+    {
+        auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+        REQUIRE(ta.get_last_h() == 0.);
+        auto lh = ta.get_last_h();
+
+        ta.step();
+
+        REQUIRE(ta.get_last_h() != 0.);
+        lh = ta.get_last_h();
+
+        ta.step(1e-4);
+
+        REQUIRE(ta.get_last_h() != lh);
+        lh = ta.get_last_h();
+
+        ta.step_backward();
+
+        REQUIRE(ta.get_last_h() != lh);
+        lh = ta.get_last_h();
+
+        ta.propagate_for(1.23);
+        REQUIRE(ta.get_last_h() != lh);
+        lh = ta.get_last_h();
+
+        ta.propagate_until(0.);
+        REQUIRE(ta.get_last_h() != lh);
+    }
+
+    // Batch test.
+    for (auto batch_size : {1u, 4u, 23u}) {
+        std::vector<double> init_state;
+        for (auto i = 0u; i < batch_size; ++i) {
+            init_state.push_back(0.05 + i / 100.);
+        }
+        for (auto i = 0u; i < batch_size; ++i) {
+            init_state.push_back(0.025 + i / 1000.);
+        }
+
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, init_state, batch_size};
+
+        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto x) { return x == 0.; }));
+        auto lh = ta.get_last_h();
+
+        ta.step();
+        REQUIRE(std::all_of(ta.get_last_h().begin(), ta.get_last_h().end(), [](auto x) { return x != 0.; }));
+        lh = ta.get_last_h();
+
+        ta.step(1e-4);
+        for (auto i = 0u; i < batch_size; ++i) {
+            REQUIRE(lh[i] != ta.get_last_h()[i]);
+        }
+    }
+}
+
 TEST_CASE("continuous output")
 {
     auto [x, v] = make_vars("x", "v");
