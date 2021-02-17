@@ -1327,7 +1327,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     // some dense output but we will exit before
     // performing the second step.
     ++step_counter;
-    const auto abs_h = abs(std::get<1>(oc));
+    auto abs_h = abs(std::get<1>(oc));
     min_h = std::min(min_h, abs_h);
     max_h = std::max(max_h, abs_h);
 
@@ -1389,7 +1389,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
 
         // Update step counter and min/max values.
         ++step_counter;
-        const auto abs_h = abs(std::get<1>(oc));
+        abs_h = abs(std::get<1>(oc));
         min_h = std::min(min_h, abs_h);
         max_h = std::max(max_h, abs_h);
     }
