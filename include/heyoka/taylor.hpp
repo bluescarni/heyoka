@@ -553,12 +553,15 @@ public:
     // - outcome,
     // - min abs(timestep),
     // - max abs(timestep),
-    // - total number of steps successfully
-    //   undertaken.
+    // - total number of nonzero steps
+    //   successfully undertaken,
+    // - grid of state vectors (only for propagate_grid()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &,
+                                                                                 std::size_t = 0);
 };
 
 } // namespace detail

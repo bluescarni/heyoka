@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -29,6 +31,8 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+std::mt19937 rng;
+
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -42,6 +46,103 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
     }
 
     return ret;
+}
+
+TEST_CASE("propagate grid scalar")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({}), std::invalid_argument,
+        Message("Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty"));
+
+    ta.set_time(std::numeric_limits<double>::infinity());
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0.}), std::invalid_argument,
+        Message("Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite"));
+
+    ta.set_time(0.);
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({std::numeric_limits<double>::infinity()}), std::invalid_argument,
+        Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+    // Set an infinity in the state.
+    ta.get_state_data()[0] = std::numeric_limits<double>::infinity();
+
+    auto out = ta.propagate_grid({.2});
+    REQUIRE(std::get<0>(out) == taylor_outcome::err_nf_state);
+
+    // Reset the integrator.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    // Propagate to the initial time.
+    out = ta.propagate_grid({0.});
+    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+    REQUIRE(std::get<1>(out) == std::get<2>(out));
+    REQUIRE(std::get<3>(out) == 1u);
+    REQUIRE(std::get<4>(out) == std::vector{0.05, 0.025});
+    REQUIRE(ta.get_time() > 0.);
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({2., std::numeric_limits<double>::infinity()}), std::invalid_argument,
+        Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+    // Switch to the harmonic oscillator.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+    // Integrate forward over a dense grid from 0 to 10.
+    std::vector<double> grid;
+    for (auto i = 0u; i < 1000u; ++i) {
+        grid.push_back(i / 100.);
+    }
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 10000.));
+    }
+
+    // Do the same backwards.
+    ta.set_time(10.);
+    ta.get_state_data()[0] = std::sin(10.);
+    ta.get_state_data()[1] = std::cos(10.);
+    std::reverse(grid.begin(), grid.end());
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 10000.));
+    }
+
+    // Random testing.
+    ta.set_time(0.);
+    ta.get_state_data()[0] = 0.;
+    ta.get_state_data()[1] = 1.;
+
+    std::uniform_real_distribution<double> rdist(-5., 5.);
+    for (auto i = 0u; i < 1000u; ++i) {
+        grid[i] = rdist(rng);
+    }
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
+    }
 }
 
 TEST_CASE("streaming op")
