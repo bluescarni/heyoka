@@ -214,35 +214,6 @@
     <!-- Table of contents -->
     <div class="d-none d-md-block col-md-2 bd-toc show">
         
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i> Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#quick-example">
-   Quick example
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#contents">
-   Contents
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#authors">
-   Authors
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#license">
-   License
-  </a>
- </li>
-</ul>
-
-        </nav>
-        
     </div>
 </div>
     <div id="main-content" class="row">
@@ -273,8 +244,6 @@ tens of billions of timesteps,</p></li>
 on automatic differentiation techniques and aggressive just-in-time
 compilation via <a class="reference external" href="https://llvm.org/">LLVM</a>.</p></li>
 </ul>
-<div class="section" id="quick-example">
-<h2>Quick example<a class="headerlink" href="#quick-example" title="Permalink to this headline">¶</a></h2>
 <p>As a simple example, consider the ODE system
 corresponding to the <a class="reference external" href="https://en.wikipedia.org/wiki/Pendulum_(mathematics)">pendulum</a>,</p>
 <div class="math notranslate nohighlight">
@@ -320,9 +289,11 @@ in heyoka:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="contents">
-<h2>Contents<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h2>
+<p>heyoka is released under the <a class="reference external" href="https://www.mozilla.org/en-US/MPL/2.0/FAQ/">MPL-2.0</a>
+license. The authors are Francesco Biscani (Max Planck Institute for Astronomy) and
+Dario Izzo (European Space Agency).</p>
+<p>If you prefer using Python rather than C++, heyoka can be used from Python via
+<a class="reference external" href="https://github.com/bluescarni/heyoka.py">heyoka.py</a>, its Python bindings.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
@@ -366,19 +337,6 @@ in heyoka:</p>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="bibliography.html">Bibliography</a></li>
 </ul>
-</div>
-</div>
-<div class="section" id="authors">
-<h2>Authors<a class="headerlink" href="#authors" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>Francesco Biscani (Max Planck Institute for Astronomy)</p></li>
-<li><p>Dario Izzo (European Space Agency)</p></li>
-</ul>
-</div>
-<div class="section" id="license">
-<h2>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h2>
-<p>heyoka is released under the <a class="reference external" href="https://www.mozilla.org/en-US/MPL/2.0/FAQ/">MPL-2.0</a>
-license.</p>
 </div>
 </div>
 
