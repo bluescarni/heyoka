@@ -26,9 +26,6 @@ heyoka is a C++ library for the integration of ordinary differential equations
   on automatic differentiation techniques and aggressive just-in-time
   compilation via `LLVM <https://llvm.org/>`__.
 
-Quick example
--------------
-
 As a simple example, consider the ODE system
 corresponding to the `pendulum <https://en.wikipedia.org/wiki/Pendulum_(mathematics)>`__,
 
@@ -55,8 +52,12 @@ in heyoka:
    :language: c++
    :lines: 9-
 
-Contents
---------
+heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`__
+license. The authors are Francesco Biscani (Max Planck Institute for Astronomy) and
+Dario Izzo (European Space Agency).
+
+If you prefer using Python rather than C++, heyoka can be used from Python via
+`heyoka.py <https://github.com/bluescarni/heyoka.py>`__, its Python bindings.
 
 .. toctree::
    :maxdepth: 2
@@ -66,15 +67,3 @@ Contents
    ad_notes.rst
    changelog.rst
    bibliography.rst
-
-Authors
--------
-
-* Francesco Biscani (Max Planck Institute for Astronomy)
-* Dario Izzo (European Space Agency)
-
-License
--------
-
-heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`__
-license.

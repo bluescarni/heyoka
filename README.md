@@ -47,6 +47,9 @@ heyoka is a C++ library for the integration of ordinary differential equations
   on automatic differentiation techniques and aggressive just-in-time
   compilation via [LLVM](https://llvm.org/).
 
+If you prefer using Python rather than C++, heyoka can be used from Python via
+[heyoka.py](https://github.com/bluescarni/heyoka.py), its Python bindings.
+
 Quick example
 -------------
 
