@@ -1221,9 +1221,13 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
-    // Initial values for the counters,
-    // the min/max abs of the integration
-    // timesteps, and min/max Taylor orders.
+    // NOTE: max_steps == 0 means there's no limit
+    // on the number of steps.
+    const auto has_step_limit = (max_steps != 0u);
+
+    // Initial values for the counters
+    // and the min/max abs of the integration
+    // timesteps.
     // NOTE: iter_counter is for keeping track of the max_steps
     // limits, step_counter counts the number of timesteps performed
     // with a non-zero h. Most of the time these two quantities
@@ -1251,6 +1255,9 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 
         // Break out if the time limit is reached,
         // *before* updating the min_h/max_h values.
+        // NOTE: the idea is that if we reached the time
+        // limit the timestep has been artificially
+        // reduced, thus we don't want to count it.
         if (res == taylor_outcome::time_limit) {
             return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
@@ -1262,10 +1269,133 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         max_h = std::max(max_h, abs_h);
 
         // Check the iteration limit.
-        if (max_steps != 0u && iter_counter == max_steps) {
+        if (has_step_limit && iter_counter == max_steps) {
             return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
         }
     }
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
+taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
+{
+    using std::abs;
+    using std::isfinite;
+
+    if (grid.empty()) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
+    }
+
+    if (!isfinite(m_time)) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
+    }
+
+    // Pre-allocate the return value.
+    std::vector<T> retval;
+    // LCOV_EXCL_START
+    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
+        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
+                                  "adaptive Taylor integrator");
+    }
+    // LCOV_EXCL_STOP
+    retval.reserve(grid.size() * get_dim());
+
+    // Initial values for the step counter and
+    // the min/max abs of the integration
+    // timesteps.
+    std::size_t step_counter = 0;
+    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+
+    // Do the first step, making sure to write the
+    // Taylor coefficients.
+    constexpr auto err_msg = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    if (!isfinite(grid[0])) {
+        throw std::invalid_argument(err_msg);
+    }
+    auto oc = (grid[0] >= m_time) ? step(true) : step_backward(true);
+    if (std::get<0>(oc) != taylor_outcome::success) {
+        // Something went wrong in the propagation of the timestep, exit.
+        return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+    }
+
+    // Update step counter and min/max values.
+    // NOTE: the step limit, if it exists, is at least 1,
+    // thus we will always do at least 1 timestep.
+    // If the step limit is 1, we may produce
+    // some dense output but we will exit before
+    // performing the second step.
+    ++step_counter;
+    auto abs_h = abs(std::get<1>(oc));
+    min_h = abs_h;
+    max_h = abs_h;
+
+    for (decltype(grid.size()) cur_grid_idx = 0;;) {
+        // Establish the time range of the last
+        // taken timestep.
+        // NOTE: t0 < t1.
+        const auto t0 = std::min(m_time, m_time - m_last_h);
+        const auto t1 = std::max(m_time, m_time - m_last_h);
+
+        while (true) {
+            // Fetch the current time target.
+            const auto cur_tt = grid[cur_grid_idx];
+
+            if (cur_tt >= t0 && cur_tt <= t1) {
+                // The current time target falls within the range of
+                // validity of the dense output. Compute the dense
+                // output in cur_tt.
+                update_d_output(cur_tt);
+
+                // Add the result to retval.
+                retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
+            } else {
+                // Cannot use dense output on the current time target,
+                // need to take another step.
+                break;
+            }
+
+            // Move to the next time target, or break out
+            // if we have no more.
+            if (++cur_grid_idx == grid.size()) {
+                break;
+            }
+        }
+
+        if (cur_grid_idx == grid.size()) {
+            // No more grid points, exit.
+            break;
+        }
+
+        // Need to take a new step to get closer to the
+        // next time target. But first, check the step limit.
+        // NOTE: max_steps == 0 means no step limit, and at this
+        // stage step_counter is always at least 1.
+        if (step_counter == max_steps) {
+            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Check finiteness of the current time target.
+        if (!isfinite(grid[cur_grid_idx])) {
+            throw std::invalid_argument(err_msg);
+        }
+        // Do the step towards the time target.
+        oc = (grid[cur_grid_idx] >= m_time) ? step(true) : step_backward(true);
+        if (std::get<0>(oc) != taylor_outcome::success) {
+            // Something went wrong in the propagation of the timestep, exit.
+            return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Update step counter and min/max values.
+        ++step_counter;
+        abs_h = abs(std::get<1>(oc));
+        min_h = std::min(min_h, abs_h);
+        max_h = std::max(max_h, abs_h);
+    }
+
+    // Everything went well, return success.
+    return std::tuple{taylor_outcome::success, min_h, max_h, step_counter, std::move(retval)};
 }
 
 template <typename T>

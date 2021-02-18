@@ -325,11 +325,11 @@ taylor_add_custom_step(llvm_state &s, const std::string &name, std::vector<std::
 
 // Enum to represent the outcome of a Taylor integration
 // stepping function.
-enum class taylor_outcome {
-    success,     // Integration step was successful, no time/step limits were reached.
-    step_limit,  // Maximum number of steps reached.
-    time_limit,  // Time limit reached.
-    err_nf_state // Non-finite state detected at the end of the timestep.
+enum class taylor_outcome : std::int64_t {
+    success = -1,     // Integration step was successful, no time/step limits were reached.
+    step_limit = -2,  // Maximum number of steps reached.
+    time_limit = -3,  // Time limit reached.
+    err_nf_state = -4 // Non-finite state detected at the end of the timestep.
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
@@ -553,12 +553,15 @@ public:
     // - outcome,
     // - min abs(timestep),
     // - max abs(timestep),
-    // - total number of steps successfully
-    //   undertaken.
+    // - total number of nonzero steps
+    //   successfully undertaken,
+    // - grid of state vectors (only for propagate_grid()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
     std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &,
+                                                                                 std::size_t = 0);
 };
 
 } // namespace detail

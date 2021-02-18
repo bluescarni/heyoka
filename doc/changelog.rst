@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement propagation over a time grid
+  (`#95 <https://github.com/bluescarni/heyoka/pull/95>`__).
 - Implement support for dense output
   (`#92 <https://github.com/bluescarni/heyoka/pull/92>`__).
 - Add the ability to output the Taylor coefficients
