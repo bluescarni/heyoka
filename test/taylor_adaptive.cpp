@@ -143,6 +143,19 @@ TEST_CASE("propagate grid scalar")
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
         REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
     }
+
+    // A test with a sparse grid.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+    out = ta.propagate_grid({.1, 10., 100.});
+
+    REQUIRE(std::get<4>(out).size() == 6u);
+    REQUIRE(std::get<4>(out)[0] == approximately(std::sin(.1), 100.));
+    REQUIRE(std::get<4>(out)[1] == approximately(std::cos(.1), 100.));
+    REQUIRE(std::get<4>(out)[2] == approximately(std::sin(10.), 100.));
+    REQUIRE(std::get<4>(out)[3] == approximately(std::cos(10.), 100.));
+    REQUIRE(std::get<4>(out)[4] == approximately(std::sin(100.), 1000.));
+    REQUIRE(std::get<4>(out)[5] == approximately(std::cos(100.), 1000.));
 }
 
 TEST_CASE("streaming op")
