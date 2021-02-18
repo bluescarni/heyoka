@@ -241,6 +241,11 @@
   </a>
  </li>
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#propagation-over-a-time-grid">
+   Propagation over a time grid
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#full-code-listing">
    Full code listing
   </a>
@@ -498,6 +503,56 @@ integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
 integration will be <code class="docutils literal notranslate"><span class="pre">err_nf_state</span></code>.</p>
 </div>
+<div class="section" id="propagation-over-a-time-grid">
+<h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Permalink to this headline">¶</a></h2>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.4.0.</span></p>
+</div>
+<p>Another way of propagating the state of a system in a <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
+integrator is over a time grid. In this mode, the integrator
+uses <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a> to compute the state of the system
+over a grid of time coordinates provided by the user. If the grid is denser
+than the typical timestep size, this can be noticeably more efficient than
+repeatedly calling <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> on the grid points, because
+propagating the system state via dense output is much faster than taking
+a full integration step.</p>
+<p>Let’s see a simple usage example:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the time and state to the initial values.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">;</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.025</span><span class="p">;</span>
+
+    <span class="c1">// Propagate over a time grid from 0 to 1</span>
+    <span class="c1">// at regular intervals.</span>
+    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">});</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> takes in input a grid of time points represented as a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>,
+and returns a tuple of 5 values. The first 4 values are the same
+as in the other <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions:</p>
+<ul class="simple">
+<li><p>the outcome of the integration,</p></li>
+<li><p>the minimum and maximum integration timesteps
+that were used in the propagation,</p></li>
+<li><p>the total number of steps that were taken.</p></li>
+</ul>
+<p>The fifth value returned by <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> is a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> containing
+the state of the system at the time points in the grid. The state vectors are stored
+contiguously in row-major order:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Print the state at t = 0.4 (index 3 in the time grid).</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.4) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">3</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v(0.4) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">x(0.4) = 0.0232578</span>
+<span class="go">v(0.4) = -0.14078</span>
+</pre></div>
+</div>
+<p>There are no special requirements on the time values in the grid (apart from the
+fact that they must be finite), or on their spacing/ordering. Note however that
+in order to maximise both precision and performance, the time points should be ordered
+monotonically.</p>
+</div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
@@ -596,6 +651,19 @@ integration will be <code class="docutils literal notranslate"><span class="pre"
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Reset the time and state to the initial values.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">;</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.025</span><span class="p">;</span>
+
+    <span class="c1">// Propagate over a time grid from 0 to 1</span>
+    <span class="c1">// at regular intervals.</span>
+    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">});</span>
+
+    <span class="c1">// Print the state at t = 0.4 (index 3 in the time grid).</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;x(0.4) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">3</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;v(0.4) = &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">3</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 </div>
