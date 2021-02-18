@@ -209,6 +209,53 @@ integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
 integration will be ``err_nf_state``.
 
+Propagation over a time grid
+----------------------------
+
+.. versionadded:: 0.4.0
+
+Another way of propagating the state of a system in a ``taylor_adaptive``
+integrator is over a time grid. In this mode, the integrator
+uses :ref:`dense output <tut_d_output>` to compute the state of the system
+over a grid of time coordinates provided by the user. If the grid is denser
+than the typical timestep size, this can be noticeably more efficient than
+repeatedly calling ``propagate_until()`` on the grid points, because
+propagating the system state via dense output is much faster than taking
+a full integration step.
+
+Let's see a simple usage example:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 106-113
+
+``propagate_grid()`` takes in input a grid of time points represented as a ``std::vector``,
+and returns a tuple of 5 values. The first 4 values are the same
+as in the other ``propagate_*()`` functions:
+
+* the outcome of the integration,
+* the minimum and maximum integration timesteps
+  that were used in the propagation,
+* the total number of steps that were taken.
+
+The fifth value returned by ``propagate_grid()`` is a ``std::vector`` containing
+the state of the system at the time points in the grid. The state vectors are stored
+contiguously in row-major order:
+
+.. literalinclude:: ../tutorial/adaptive_basic.cpp
+   :language: c++
+   :lines: 115-117
+
+.. code-block:: console
+
+   x(0.4) = 0.0232578
+   v(0.4) = -0.14078
+
+There are no special requirements on the time values in the grid (apart from the
+fact that they must be finite), or on their spacing/ordering. Note however that
+in order to maximise both precision and performance, the time points should be ordered
+monotonically.
+
 Full code listing
 -----------------
 
