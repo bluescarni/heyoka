@@ -1321,7 +1321,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     }
 
     // Update step counter and min/max values.
-    // NOTE: the step limit, if it exsists, is at least 1,
+    // NOTE: the step limit, if it exists, is at least 1,
     // thus we will always do at least 1 timestep.
     // If the step limit is 1, we may produce
     // some dense output but we will exit before
