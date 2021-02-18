@@ -1328,8 +1328,8 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     // performing the second step.
     ++step_counter;
     auto abs_h = abs(std::get<1>(oc));
-    min_h = std::min(min_h, abs_h);
-    max_h = std::max(max_h, abs_h);
+    min_h = abs_h;
+    max_h = abs_h;
 
     for (decltype(grid.size()) cur_grid_idx = 0;;) {
         // Establish the time range of the last
