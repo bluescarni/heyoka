@@ -86,6 +86,8 @@ HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
 
 #endif
 
+HEYOKA_DLL_PUBLIC expression powi(expression, std::uint32_t);
+
 } // namespace heyoka
 
 #endif

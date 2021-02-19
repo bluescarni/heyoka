@@ -37,6 +37,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -276,9 +277,6 @@ expression operator-(expression e1, expression e2)
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
 
-// NOTE: shuold we try to recognize and simplify
-// x * x -> square(x)? Is the cost of comparison worth
-// the increase in performance?
 expression operator*(expression e1, expression e2)
 {
     auto visitor = [](auto &&v1, auto &&v2) {
@@ -314,6 +312,11 @@ expression operator*(expression e1, expression e2)
         return expression{binary_operator{binary_operator::type::mul, expression{std::forward<decltype(v1)>(v1)},
                                           expression{std::forward<decltype(v2)>(v2)}}};
     };
+
+    // Simplify x*x -> square(x).
+    if (e1 == e2) {
+        return square(std::move(e1));
+    }
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
