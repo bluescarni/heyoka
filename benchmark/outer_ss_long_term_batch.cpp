@@ -321,7 +321,8 @@ void run_integration(const std::string &filename, T t_final, double perturb, std
         }
 
         // Run the timestep.
-        const auto &int_res = ta.step();
+        ta.step();
+        const auto &int_res = ta.get_step_res();
 
         // Check that no error was produced.
         if (std::any_of(int_res.begin(), int_res.end(),
