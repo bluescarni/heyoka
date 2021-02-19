@@ -16,6 +16,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 
 #include "catch.hpp"
@@ -111,6 +112,29 @@ TEST_CASE("pow expo 2")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, 21._rq) != square(x));
+
+#endif
+}
+
+TEST_CASE("pow expo .5")
+{
+    auto x = "x"_var;
+
+    REQUIRE(heyoka::pow(x, .5) == sqrt(x));
+    REQUIRE(heyoka::pow(x, .5l) == sqrt(x));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, .5_rq) == sqrt(x));
+
+#endif
+
+    REQUIRE(heyoka::pow(x, .51) != sqrt(x));
+    REQUIRE(heyoka::pow(x, .51l) != sqrt(x));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, .51_rq) != sqrt(x));
 
 #endif
 }

@@ -20,4 +20,5 @@ TEST_CASE("mul square simpl")
     REQUIRE(x * x == square(x));
     REQUIRE(x * y != square(x));
     REQUIRE((x + y) * (x + y) == square(x + y));
+    REQUIRE((y + x) * (x + y) != square(x + y));
 }

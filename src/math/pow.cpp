@@ -48,6 +48,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -638,7 +639,7 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0, 1 or 2.
+// It will special-case for e == 0, 1, 2 and 0.5.
 expression pow_wrapper_impl(expression b, expression e)
 {
     if (auto num_ptr = std::get_if<number>(&e.value())) {
@@ -652,6 +653,10 @@ expression pow_wrapper_impl(expression b, expression e)
 
         if (std::visit([](const auto &v) { return v == 2; }, num_ptr->value())) {
             return square(std::move(b));
+        }
+
+        if (std::visit([](const auto &v) { return v == .5; }, num_ptr->value())) {
+            return sqrt(std::move(b));
         }
     }
 
