@@ -191,6 +191,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acosh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atanh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
