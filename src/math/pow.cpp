@@ -639,7 +639,7 @@ namespace
 {
 
 // Wrapper for the implementation of the top-level pow() function.
-// It will special-case for e == 0, 1, 2 and 0.5.
+// It will special-case for e == 0, 1, 2, 3, 4 and 0.5.
 expression pow_wrapper_impl(expression b, expression e)
 {
     if (auto num_ptr = std::get_if<number>(&e.value())) {
@@ -653,6 +653,14 @@ expression pow_wrapper_impl(expression b, expression e)
 
         if (std::visit([](const auto &v) { return v == 2; }, num_ptr->value())) {
             return square(std::move(b));
+        }
+
+        if (std::visit([](const auto &v) { return v == 3; }, num_ptr->value())) {
+            return powi(std::move(b), 3);
+        }
+
+        if (std::visit([](const auto &v) { return v == 4; }, num_ptr->value())) {
+            return powi(std::move(b), 4);
         }
 
         if (std::visit([](const auto &v) { return v == .5; }, num_ptr->value())) {
@@ -690,5 +698,34 @@ expression pow(expression b, mppp::real128 e)
 }
 
 #endif
+
+// Natural power.
+expression powi(expression b, std::uint32_t e)
+{
+    switch (e) {
+        case 0u:
+            return 1_dbl;
+        case 1u:
+            return b;
+        case 2u:
+            return square(std::move(b));
+    }
+
+    // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
+    auto y = 1_dbl;
+
+    while (e > 1u) {
+        if (e % 2u == 0u) {
+            b = square(std::move(b));
+            e /= 2u;
+        } else {
+            y = b * std::move(y);
+            b = square(std::move(b));
+            e = (e - 1u) / 2u;
+        }
+    }
+
+    return std::move(b) * std::move(y);
+}
 
 } // namespace heyoka
