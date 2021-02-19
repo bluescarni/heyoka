@@ -16,6 +16,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
+#include <heyoka/math/square.hpp>
 
 #include "catch.hpp"
 
@@ -27,7 +28,7 @@ using namespace mppp::literals;
 
 #endif
 
-TEST_CASE("pow expo 1")
+TEST_CASE("pow expo 0")
 {
     auto x = "x"_var;
 
@@ -64,6 +65,52 @@ TEST_CASE("pow expo 1")
 #if defined(HEYOKA_HAVE_REAL128)
 
     REQUIRE(heyoka::pow(x, expression{1._rq}) != 1_dbl);
+
+#endif
+}
+
+TEST_CASE("pow expo 1")
+{
+    auto x = "x"_var;
+
+    REQUIRE(heyoka::pow(x, 1.) == x);
+    REQUIRE(heyoka::pow(x, 1.l) == x);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, 1._rq) == x);
+
+#endif
+
+    REQUIRE(heyoka::pow(x, 1.1) != x);
+    REQUIRE(heyoka::pow(x, 1.1l) != x);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, 1.1_rq) != x);
+
+#endif
+}
+
+TEST_CASE("pow expo 2")
+{
+    auto x = "x"_var;
+
+    REQUIRE(heyoka::pow(x, 2.) == square(x));
+    REQUIRE(heyoka::pow(x, 2.l) == square(x));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, 2._rq) == square(x));
+
+#endif
+
+    REQUIRE(heyoka::pow(x, 2.1) != square(x));
+    REQUIRE(heyoka::pow(x, 2.1l) != square(x));
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+    REQUIRE(heyoka::pow(x, 21._rq) != square(x));
 
 #endif
 }
