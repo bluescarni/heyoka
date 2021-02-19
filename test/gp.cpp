@@ -119,7 +119,7 @@ TEST_CASE("count_nodes")
     }
     {
         expression ex = x * x;
-        REQUIRE(count_nodes(ex) == 3);
+        REQUIRE(count_nodes(ex) == 2);
     }
     {
         expression ex = cos(x);
