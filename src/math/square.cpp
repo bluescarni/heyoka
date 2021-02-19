@@ -17,11 +17,12 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
@@ -228,8 +229,8 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_square_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    using namespace fmt::literals;
+    const auto fname = "heyoka_taylor_diff_square_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

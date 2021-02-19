@@ -7,6 +7,13 @@ Changelog
 New
 ~~~
 
+- Introduce a dedicated negation operator in the
+  expression system
+  (`#99 <https://github.com/bluescarni/heyoka/pull/99>`__).
+- Implement various new automatic simplifications
+  in the expression system, and introduce ``powi()`` as
+  an alternative exponentiation function for natural exponents
+  (`#98 <https://github.com/bluescarni/heyoka/pull/98>`__).
 - Implement propagation over a time grid
   (`#95 <https://github.com/bluescarni/heyoka/pull/95>`__).
 - Implement support for dense output
@@ -15,6 +22,13 @@ New
   when invoking the single-step functions in the
   integrator classes
   (`#91 <https://github.com/bluescarni/heyoka/pull/91>`__).
+
+Fix
+~~~
+
+- Avoid division by zero in certain corner cases
+  when using ``pow()`` with small natural exponents
+  (`#98 <https://github.com/bluescarni/heyoka/pull/98>`__).
 
 0.3.0 (2021-02-11)
 ------------------

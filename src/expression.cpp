@@ -37,6 +37,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -200,7 +201,11 @@ expression operator+(expression e)
 
 expression operator-(expression e)
 {
-    return expression{number{-1.}} * std::move(e);
+    if (auto num_ptr = std::get_if<number>(&e.value())) {
+        return expression{-std::move(*num_ptr)};
+    } else {
+        return neg(std::move(e));
+    }
 }
 
 expression operator+(expression e1, expression e2)
