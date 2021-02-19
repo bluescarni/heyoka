@@ -127,7 +127,8 @@ TEST_CASE("two body batch")
             bst_copy = bst;
             times_copy = tab.get_time();
 
-            const auto &res = tab.step();
+            tab.step();
+            const auto &res = tab.get_step_res();
 
             for (std::uint32_t i = 0; i < batch_size; ++i) {
                 // Evolve separately the scalar integrators.

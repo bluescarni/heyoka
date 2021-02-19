@@ -1666,8 +1666,7 @@ taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
 // vector, containing a flag describing the outcome of the integration
 // and the integration timestep that was used.
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
     using std::isfinite;
 
@@ -1716,25 +1715,22 @@ taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, boo
             m_step_res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
         }
     }
-
-    return m_step_res;
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step(bool wtc)
+void taylor_adaptive_batch_impl<T>::step(bool wtc)
 {
-    return step_impl(m_pinf, wtc);
+    step_impl(m_pinf, wtc);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
+void taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
 {
-    return step_impl(m_minf, wtc);
+    step_impl(m_minf, wtc);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T>> &
-taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
+void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
@@ -1754,12 +1750,11 @@ taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc
             "one of the max timesteps is nan");
     }
 
-    return step_impl(max_delta_ts, wtc);
+    step_impl(max_delta_ts, wtc);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &
-taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std::size_t max_steps)
+void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std::size_t max_steps)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -1773,12 +1768,11 @@ taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std
         m_pfor_ts[i] = m_time[i] + delta_ts[i];
     }
 
-    return propagate_until(m_pfor_ts, max_steps);
+    propagate_until(m_pfor_ts, max_steps);
 }
 
 template <typename T>
-const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &
-taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
+void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
 {
     using std::isfinite;
 
@@ -1885,8 +1879,6 @@ taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::si
             m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
         }
     }
-
-    return m_prop_res;
 }
 
 template <typename T>
