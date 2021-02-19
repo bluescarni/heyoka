@@ -229,8 +229,8 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_square_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    using namespace fmt::literals;
+    const auto fname = "heyoka_taylor_diff_square_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,
