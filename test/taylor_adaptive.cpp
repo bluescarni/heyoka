@@ -655,7 +655,8 @@ TEST_CASE("taylor tc basic")
                     auto isa = xt::adapt(init_state.data(), {2u, batch_size});
 
                     {
-                        auto &oc = ta.step(true);
+                        ta.step(true);
+                        auto &oc = ta.get_step_res();
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));
@@ -677,7 +678,8 @@ TEST_CASE("taylor tc basic")
                     init_state = ta.get_state();
 
                     {
-                        auto &oc = ta.step_backward(true);
+                        ta.step_backward(true);
+                        auto &oc = ta.get_step_res();
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));
@@ -704,7 +706,8 @@ TEST_CASE("taylor tc basic")
                             max_delta_t.push_back(1e-5 + i * 1e-5);
                         }
 
-                        auto &oc = ta.step(max_delta_t, true);
+                        ta.step(max_delta_t, true);
+                        auto &oc = ta.get_step_res();
 
                         for (auto i = 0u; i < batch_size; ++i) {
                             auto ret = xt::eval(xt::zeros<double>({2u}));

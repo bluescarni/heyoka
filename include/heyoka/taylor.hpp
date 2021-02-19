@@ -676,7 +676,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
 
-    HEYOKA_DLL_LOCAL const std::vector<std::tuple<taylor_outcome, T>> &step_impl(const std::vector<T> &, bool);
+    HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
@@ -796,14 +796,20 @@ public:
     }
     const std::vector<T> &update_d_output(const std::vector<T> &);
 
-    const std::vector<std::tuple<taylor_outcome, T>> &step(bool = false);
-    const std::vector<std::tuple<taylor_outcome, T>> &step_backward(bool = false);
-    const std::vector<std::tuple<taylor_outcome, T>> &step(const std::vector<T> &, bool = false);
+    void step(bool = false);
+    void step_backward(bool = false);
+    void step(const std::vector<T> &, bool = false);
+    const auto &get_step_res() const
+    {
+        return m_step_res;
+    }
 
-    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_for(const std::vector<T> &,
-                                                                                    std::size_t = 0);
-    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &propagate_until(const std::vector<T> &,
-                                                                                      std::size_t = 0);
+    void propagate_for(const std::vector<T> &, std::size_t = 0);
+    void propagate_until(const std::vector<T> &, std::size_t = 0);
+    const auto &get_propagate_res() const
+    {
+        return m_prop_res;
+    }
 };
 
 } // namespace detail
