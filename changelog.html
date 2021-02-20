@@ -229,6 +229,11 @@
      New
     </a>
    </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#fix">
+     Fix
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
@@ -247,36 +252,36 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#fix">
+    <a class="reference internal nav-link" href="#id3">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id3">
+  <a class="reference internal nav-link" href="#id4">
    0.2.0 (2021-01-13)
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id4">
+    <a class="reference internal nav-link" href="#id5">
      New
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id5">
+    <a class="reference internal nav-link" href="#id6">
      Changes
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id6">
+    <a class="reference internal nav-link" href="#id7">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id7">
+  <a class="reference internal nav-link" href="#id8">
    0.1.0 (2020-12-18)
   </a>
  </li>
@@ -298,6 +303,13 @@
 <div class="section" id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>Introduce a dedicated negation operator in the
+expression system
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/99">#99</a>).</p></li>
+<li><p>Implement various new automatic simplifications
+in the expression system, and introduce <code class="docutils literal notranslate"><span class="pre">powi()</span></code> as
+an alternative exponentiation function for natural exponents
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/98">#98</a>).</p></li>
 <li><p>Implement propagation over a time grid
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/95">#95</a>).</p></li>
 <li><p>Implement support for dense output
@@ -306,6 +318,14 @@
 when invoking the single-step functions in the
 integrator classes
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/91">#91</a>).</p></li>
+</ul>
+</div>
+<div class="section" id="fix">
+<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Avoid division by zero in certain corner cases
+when using <code class="docutils literal notranslate"><span class="pre">pow()</span></code> with small natural exponents
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/98">#98</a>).</p></li>
 </ul>
 </div>
 </div>
@@ -348,8 +368,8 @@ object code of a module
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/79">#79</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="fix">
-<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id3">
+<h3>Fix<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Ensure that <code class="docutils literal notranslate"><span class="pre">pow(x</span> <span class="pre">,0)</span></code> always simplifies to 1,
 rather than producing an expression with null exponent
@@ -367,10 +387,10 @@ rather than producing an expression with null exponent
 </ul>
 </div>
 </div>
-<div class="section" id="id3">
-<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="id4">
-<h3>New<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id5">
+<h3>New<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Extend the Taylor decomposition machinery to work
 on more general classes of functions, and add
@@ -384,23 +404,23 @@ on more general classes of functions, and add
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/63">#63</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id5">
-<h3>Changes<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id6">
+<h3>Changes<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends publicly on the Boost headers
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id6">
-<h3>Fix<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id7">
+<h3>Fix<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Fix potential name mangling issues in compact mode
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
 </div>
-<div class="section" id="id7">
-<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id8">
+<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h2>
 <p>Initial release.</p>
 </div>
 </div>
