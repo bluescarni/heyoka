@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <limits>
 #include <ostream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -24,6 +23,9 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -149,11 +151,10 @@ detail::prime_wrapper prime(expression e)
             if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
                 return detail::prime_wrapper{std::move(v.name())};
             } else {
-                std::ostringstream oss;
-                oss << e;
+                using namespace fmt::literals;
 
-                throw std::invalid_argument("Cannot apply the prime() operator to the non-variable expression '"
-                                            + oss.str() + "'");
+                throw std::invalid_argument(
+                    "Cannot apply the prime() operator to the non-variable expression '{}'"_format(e));
             }
         },
         e.value());
@@ -642,12 +643,10 @@ expression diff(const expression &e, const expression &x)
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                 return diff(e, v.name());
             } else {
-                std::ostringstream oss;
-                oss << e;
+                using namespace fmt::literals;
 
                 throw std::invalid_argument(
-                    "Cannot differentiate an expression with respect to the non-variable expression '" + oss.str()
-                    + "'");
+                    "Cannot differentiate an expression with respect to the non-variable expression '{}'"_format(e));
             }
         },
         x.value());
