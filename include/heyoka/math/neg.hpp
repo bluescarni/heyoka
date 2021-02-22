@@ -61,6 +61,8 @@ public:
 #endif
 };
 
+func *is_neg(expression &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression neg(expression);

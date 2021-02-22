@@ -10,6 +10,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/neg.hpp>
+#include <heyoka/math/sin.hpp>
 
 #include "catch.hpp"
 
@@ -47,4 +48,13 @@ TEST_CASE("unary minus simpl")
     auto [x] = make_vars("x");
 
     REQUIRE(-x == neg(x));
+}
+
+TEST_CASE("unary minus minus simpl")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(-(-(x + y)) == x + y);
+    REQUIRE(-(-sin(x + y)) == sin(x + y));
+    REQUIRE(-sin(x + y) == neg(sin(x + y)));
 }

@@ -205,7 +205,14 @@ expression operator-(expression e)
     if (auto num_ptr = std::get_if<number>(&e.value())) {
         return expression{-std::move(*num_ptr)};
     } else {
-        return neg(std::move(e));
+        if (auto fptr = detail::is_neg(e)) {
+            // Simplify -(-x) to x.
+            auto rng = fptr->get_mutable_args_it();
+            assert(rng.first != rng.second);
+            return std::move(*rng.first);
+        } else {
+            return neg(std::move(e));
+        }
     }
 }
 
