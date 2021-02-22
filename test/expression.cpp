@@ -406,3 +406,19 @@ TEST_CASE("binary simpls")
     REQUIRE(x + -1. == x - 1.);
     REQUIRE(y - -1. == y + 1.);
 }
+
+TEST_CASE("neg simpls")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(x + (-y) == x - y);
+    REQUIRE(x - (-y) == x + y);
+    REQUIRE(x + (neg(neg(y))) == x + y);
+    REQUIRE(x - (neg(neg(y))) == x - y);
+
+    REQUIRE((-x) * (-y) == x * y);
+    REQUIRE((-x) / (-y) == x / y);
+
+    REQUIRE(neg(neg(x)) * neg(neg(y)) == x * y);
+    REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
+}
