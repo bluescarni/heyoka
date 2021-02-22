@@ -61,6 +61,14 @@ void neg_impl::to_stream(std::ostream &os) const
     os << '-' << args()[0];
 }
 
+// Derivative.
+expression neg_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return -heyoka::diff(args()[0], s);
+}
+
 llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);

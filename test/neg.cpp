@@ -30,6 +30,15 @@ TEST_CASE("neg ostream")
     REQUIRE(oss.str() == "-x");
 }
 
+TEST_CASE("neg diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(neg(x + y), "x") == -1_dbl);
+    REQUIRE(diff(-(x + y), "x") == -1_dbl);
+    REQUIRE(diff(-(x * x + y * x), "x") == -(2. * x + y));
+}
+
 TEST_CASE("unary minus simpl")
 {
     REQUIRE(-1_dbl == expression{-1.});
