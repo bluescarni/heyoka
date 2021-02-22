@@ -415,10 +415,14 @@ TEST_CASE("neg simpls")
     REQUIRE(x - (-y) == x + y);
     REQUIRE(x + (neg(neg(y))) == x + y);
     REQUIRE(x - (neg(neg(y))) == x - y);
+    REQUIRE(x + (neg(neg(par[0]))) == x + par[0]);
+    REQUIRE(x - (neg(neg(par[0]))) == x - par[0]);
 
     REQUIRE((-x) * (-y) == x * y);
     REQUIRE((-x) / (-y) == x / y);
 
     REQUIRE(neg(neg(x)) * neg(neg(y)) == x * y);
     REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
+    REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
+    REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
 }

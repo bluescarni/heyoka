@@ -23,4 +23,5 @@ TEST_CASE("cos neg simpl")
     REQUIRE(cos(-(x + y)) == cos(x + y));
     REQUIRE(cos(neg(x + y)) == cos(x + y));
     REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
+    REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
 }
