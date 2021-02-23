@@ -1,6 +1,21 @@
 Changelog
 =========
 
+0.5.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Implement various missing symbolic derivatives
+  (`#100 <https://github.com/bluescarni/heyoka/pull/100>`__).
+- Implement additional automatic simplifications
+  in the expression system
+  (`#100 <https://github.com/bluescarni/heyoka/pull/100>`__).
+- Implement ``extract()`` for the ``func`` class, in order
+  to retrieve a pointer to the type-erased inner object
+  (`#100 <https://github.com/bluescarni/heyoka/pull/100>`__).
+
 0.4.0 (2021-02-20)
 ------------------
 

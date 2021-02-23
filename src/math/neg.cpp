@@ -313,7 +313,7 @@ llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 // Small helper to detect is an expression
 // is a neg function. Mutable so we can extract
-// the function arguments from the return valeu.
+// the function arguments from the return value.
 func *is_neg(expression &ex)
 {
     if (auto func_ptr = std::get_if<func>(&ex.value());
