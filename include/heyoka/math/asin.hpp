@@ -31,6 +31,8 @@ public:
     asin_impl();
     explicit asin_impl(expression);
 
+    expression diff(const std::string &) const;
+
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
