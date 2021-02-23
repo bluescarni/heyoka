@@ -49,6 +49,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/neg.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
@@ -485,7 +486,14 @@ expression cos_impl::diff(const std::string &s) const
 
 expression cos(expression e)
 {
-    return expression{func{detail::cos_impl(std::move(e))}};
+    if (auto fptr = detail::is_neg(e)) {
+        // Simplify cos(-x) to cos(x).
+        auto rng = fptr->get_mutable_args_it();
+        assert(rng.first != rng.second);
+        return cos(std::move(*rng.first));
+    } else {
+        return expression{func{detail::cos_impl(std::move(e))}};
+    }
 }
 
 } // namespace heyoka

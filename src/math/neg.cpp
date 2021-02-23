@@ -61,6 +61,14 @@ void neg_impl::to_stream(std::ostream &os) const
     os << '-' << args()[0];
 }
 
+// Derivative.
+expression neg_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return -heyoka::diff(args()[0], s);
+}
+
 llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
@@ -302,6 +310,19 @@ llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 }
 
 #endif
+
+// Small helper to detect is an expression
+// is a neg function. Mutable so we can extract
+// the function arguments from the return value.
+func *is_neg(expression &ex)
+{
+    if (auto func_ptr = std::get_if<func>(&ex.value());
+        func_ptr != nullptr && func_ptr->extract<neg_impl>() != nullptr) {
+        return func_ptr;
+    } else {
+        return nullptr;
+    }
+}
 
 } // namespace detail
 

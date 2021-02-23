@@ -670,3 +670,24 @@ TEST_CASE("func to_stream")
     oss << f2;
     REQUIRE(oss.str() == "Custom to stream");
 }
+
+TEST_CASE("func extract")
+{
+    auto f1 = func(func_15{{"x"_var, "y"_var}});
+
+    REQUIRE(f1.extract<func_15>() != nullptr);
+    REQUIRE(static_cast<const func &>(f1).extract<func_15>() != nullptr);
+
+    REQUIRE(f1.extract<func_16>() == nullptr);
+    REQUIRE(static_cast<const func &>(f1).extract<func_16>() == nullptr);
+
+#if !defined(_MSC_VER) || defined(__clang__)
+    // NOTE: vanilla MSVC does not like these extraction.
+    REQUIRE(f1.extract<const func_15>() == nullptr);
+    REQUIRE(static_cast<const func &>(f1).extract<const func_15>() == nullptr);
+
+    REQUIRE(f1.extract<int>() == nullptr);
+    REQUIRE(static_cast<const func &>(f1).extract<int>() == nullptr);
+
+#endif
+}

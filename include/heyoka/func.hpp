@@ -508,6 +508,27 @@ public:
 
     ~func();
 
+    // NOTE: like in pagmo, this may fail if invoked
+    // from different DLLs in certain situations (e.g.,
+    // Python bindings on OSX). I don't
+    // think this is currently an interesting use case
+    // for heyoka (as we don't provide a way of implementing
+    // new functions in Python), but, if it becomes a problem
+    // in the future, we can solve this in the same way as
+    // in pagmo.
+    template <typename T>
+    const T *extract() const noexcept
+    {
+        auto p = dynamic_cast<const detail::func_inner<T> *>(ptr());
+        return p == nullptr ? nullptr : &(p->m_value);
+    }
+    template <typename T>
+    T *extract() noexcept
+    {
+        auto p = dynamic_cast<detail::func_inner<T> *>(ptr());
+        return p == nullptr ? nullptr : &(p->m_value);
+    }
+
     std::type_index get_type_index() const;
     const void *get_ptr() const;
     void *get_ptr();

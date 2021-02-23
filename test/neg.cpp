@@ -10,6 +10,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/neg.hpp>
+#include <heyoka/math/sin.hpp>
 
 #include "catch.hpp"
 
@@ -30,6 +31,15 @@ TEST_CASE("neg ostream")
     REQUIRE(oss.str() == "-x");
 }
 
+TEST_CASE("neg diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(neg(x + y), "x") == -1_dbl);
+    REQUIRE(diff(-(x + y), "x") == -1_dbl);
+    REQUIRE(diff(-(x * x + y * x), "x") == -(2. * x + y));
+}
+
 TEST_CASE("unary minus simpl")
 {
     REQUIRE(-1_dbl == expression{-1.});
@@ -38,4 +48,13 @@ TEST_CASE("unary minus simpl")
     auto [x] = make_vars("x");
 
     REQUIRE(-x == neg(x));
+}
+
+TEST_CASE("unary minus minus simpl")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(-(-(x + y)) == x + y);
+    REQUIRE(-(-sin(x + y)) == sin(x + y));
+    REQUIRE(-sin(x + y) == neg(sin(x + y)));
 }

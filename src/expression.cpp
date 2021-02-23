@@ -13,7 +13,6 @@
 #include <cstdint>
 #include <limits>
 #include <ostream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -24,6 +23,9 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
+
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -149,11 +151,10 @@ detail::prime_wrapper prime(expression e)
             if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
                 return detail::prime_wrapper{std::move(v.name())};
             } else {
-                std::ostringstream oss;
-                oss << e;
+                using namespace fmt::literals;
 
-                throw std::invalid_argument("Cannot apply the prime() operator to the non-variable expression '"
-                                            + oss.str() + "'");
+                throw std::invalid_argument(
+                    "Cannot apply the prime() operator to the non-variable expression '{}'"_format(e));
             }
         },
         e.value());
@@ -204,12 +205,26 @@ expression operator-(expression e)
     if (auto num_ptr = std::get_if<number>(&e.value())) {
         return expression{-std::move(*num_ptr)};
     } else {
-        return neg(std::move(e));
+        if (auto fptr = detail::is_neg(e)) {
+            // Simplify -(-x) to x.
+            auto rng = fptr->get_mutable_args_it();
+            assert(rng.first != rng.second);
+            return std::move(*rng.first);
+        } else {
+            return neg(std::move(e));
+        }
     }
 }
 
 expression operator+(expression e1, expression e2)
 {
+    // Simplify x + (-y) to x - y.
+    if (auto fptr = detail::is_neg(e2)) {
+        auto rng = fptr->get_mutable_args_it();
+        assert(rng.first != rng.second);
+        return std::move(e1) - std::move(*rng.first);
+    }
+
     auto visitor = [](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
@@ -247,6 +262,13 @@ expression operator+(expression e1, expression e2)
 
 expression operator-(expression e1, expression e2)
 {
+    // Simplify x - (-y) to x + y.
+    if (auto fptr = detail::is_neg(e2)) {
+        auto rng = fptr->get_mutable_args_it();
+        assert(rng.first != rng.second);
+        return std::move(e1) + std::move(*rng.first);
+    }
+
     auto visitor = [](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
@@ -284,6 +306,20 @@ expression operator-(expression e1, expression e2)
 
 expression operator*(expression e1, expression e2)
 {
+    auto fptr1 = detail::is_neg(e1);
+    auto fptr2 = detail::is_neg(e2);
+
+    if (fptr1 != nullptr && fptr2 != nullptr) {
+        // Simplify (-x) * (-y) into x*y.
+        auto rng1 = fptr1->get_mutable_args_it();
+        auto rng2 = fptr2->get_mutable_args_it();
+
+        assert(rng1.first != rng1.second);
+        assert(rng2.first != rng2.second);
+
+        return std::move(*rng1.first) * std::move(*rng2.first);
+    }
+
     auto visitor = [](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
@@ -328,6 +364,20 @@ expression operator*(expression e1, expression e2)
 
 expression operator/(expression e1, expression e2)
 {
+    auto fptr1 = detail::is_neg(e1);
+    auto fptr2 = detail::is_neg(e2);
+
+    if (fptr1 != nullptr && fptr2 != nullptr) {
+        // Simplify (-x) / (-y) into x/y.
+        auto rng1 = fptr1->get_mutable_args_it();
+        auto rng2 = fptr2->get_mutable_args_it();
+
+        assert(rng1.first != rng1.second);
+        assert(rng2.first != rng2.second);
+
+        return std::move(*rng1.first) / std::move(*rng2.first);
+    }
+
     auto visitor = [](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
@@ -642,12 +692,10 @@ expression diff(const expression &e, const expression &x)
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                 return diff(e, v.name());
             } else {
-                std::ostringstream oss;
-                oss << e;
+                using namespace fmt::literals;
 
                 throw std::invalid_argument(
-                    "Cannot differentiate an expression with respect to the non-variable expression '" + oss.str()
-                    + "'");
+                    "Cannot differentiate an expression with respect to the non-variable expression '{}'"_format(e));
             }
         },
         x.value());

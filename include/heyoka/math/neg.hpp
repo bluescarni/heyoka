@@ -35,6 +35,8 @@ public:
 
     void to_stream(std::ostream &) const;
 
+    expression diff(const std::string &) const;
+
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -58,6 +60,8 @@ public:
     llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const;
 #endif
 };
+
+func *is_neg(expression &);
 
 } // namespace detail
 
