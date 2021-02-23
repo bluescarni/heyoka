@@ -101,7 +101,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
 
     std::cout << "Construction time: " << elapsed << "ms\n";
 
-    // Create xtensor views on the the state and mass vectors
+    // Create xtensor views on the state and mass vectors
     // for ease of indexing.
     auto s_array = xt::adapt(ta.get_state_data(), {6, 6});
     auto m_array = xt::adapt(masses.data(), {6});
