@@ -47,6 +47,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/asin.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
@@ -62,6 +63,13 @@ namespace detail
 asin_impl::asin_impl(expression e) : func_base("asin", std::vector{std::move(e)}) {}
 
 asin_impl::asin_impl() : asin_impl(0_dbl) {}
+
+expression asin_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return pow(1_dbl - square(args()[0]), -.5) * heyoka::diff(args()[0], s);
+}
 
 llvm::Value *asin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {

@@ -62,6 +62,13 @@ tanh_impl::tanh_impl(expression e) : func_base("tanh", std::vector{std::move(e)}
 
 tanh_impl::tanh_impl() : tanh_impl(0_dbl) {}
 
+expression tanh_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return (1_dbl - square(tanh(args()[0]))) * heyoka::diff(args()[0], s);
+}
+
 llvm::Value *tanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);

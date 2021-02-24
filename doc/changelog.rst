@@ -8,7 +8,8 @@ New
 ~~~
 
 - Implement various missing symbolic derivatives
-  (`#100 <https://github.com/bluescarni/heyoka/pull/100>`__).
+  (`#101 <https://github.com/bluescarni/heyoka/pull/101>`__,
+  `#100 <https://github.com/bluescarni/heyoka/pull/100>`__).
 - Implement additional automatic simplifications
   in the expression system
   (`#100 <https://github.com/bluescarni/heyoka/pull/100>`__).

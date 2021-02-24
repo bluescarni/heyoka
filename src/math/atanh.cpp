@@ -62,6 +62,13 @@ atanh_impl::atanh_impl(expression e) : func_base("atanh", std::vector{std::move(
 
 atanh_impl::atanh_impl() : atanh_impl(0_dbl) {}
 
+expression atanh_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+
+    return 1_dbl / (1_dbl - square(args()[0])) * heyoka::diff(args()[0], s);
+}
+
 llvm::Value *atanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);
