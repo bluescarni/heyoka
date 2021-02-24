@@ -799,14 +799,14 @@ public:
     void step(bool = false);
     void step_backward(bool = false);
     void step(const std::vector<T> &, bool = false);
-    const auto &get_step_res() const
+    const std::vector<std::tuple<taylor_outcome, T>> &get_step_res() const
     {
         return m_step_res;
     }
 
     void propagate_for(const std::vector<T> &, std::size_t = 0);
     void propagate_until(const std::vector<T> &, std::size_t = 0);
-    const auto &get_propagate_res() const
+    const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
         return m_prop_res;
     }
