@@ -48,6 +48,26 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
     return ret;
 }
 
+TEST_CASE("batch init outcome")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta
+        = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, std::vector<double>(46u, 0.), 23u};
+
+    REQUIRE(ta.get_step_res().size() == 23u);
+    REQUIRE(ta.get_propagate_res().size() == 23u);
+
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(), [](const auto &t) {
+        auto [oc, h] = t;
+        return oc == taylor_outcome::success && h == 0.;
+    }));
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(), [](const auto &t) {
+        auto [oc, min_h, max_h, steps] = t;
+        return oc == taylor_outcome::success && min_h == 0. && max_h == 0. && steps == 0u;
+    }));
+}
+
 TEST_CASE("propagate grid scalar")
 {
     using Catch::Matchers::Message;
