@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 
 #include <fmt/format.h>
@@ -106,7 +107,7 @@ target_features get_target_features_impl()
 
     const auto target_name = std::string{(*tm)->getTarget().getName()};
 
-    if (target_name == "x86-64" || target_name == "x86") {
+    if (boost::starts_with(target_name, "x86")) {
         const auto t_features = (*tm)->getTargetFeatureString();
 
         if (boost::algorithm::contains(t_features, "+avx512f")) {
