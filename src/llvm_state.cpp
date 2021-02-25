@@ -170,9 +170,11 @@ struct llvm_state::jit {
 
         // Create the target machine builder.
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+        // LCOV_EXCL_START
         if (!jtmb) {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
+        // LCOV_EXCL_STOP
         // Set the codegen optimisation level to aggressive.
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
@@ -185,25 +187,31 @@ struct llvm_state::jit {
 
         // Create the jit.
         auto lljit = lljit_builder.create();
+        // LCOV_EXCL_START
         if (!lljit) {
             throw std::invalid_argument("Error creating an LLJIT object");
         }
+        // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
 
         // Setup the jit so that it can look up symbols from the current process.
         auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
             m_lljit->getDataLayout().getGlobalPrefix());
+        // LCOV_EXCL_START
         if (!dlsg) {
             throw std::invalid_argument("Could not create the dynamic library search generator");
         }
+        // LCOV_EXCL_STOP
         m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
 
         // Keep a target machine around to fetch various
         // properties of the host CPU.
         auto tm = jtmb->createTargetMachine();
+        // LCOV_EXCL_START
         if (!tm) {
             throw std::invalid_argument("Error creating the target machine");
         }
+        // LCOV_EXCL_STOP
         m_tm = std::move(*tm);
 
         // Create the context.
