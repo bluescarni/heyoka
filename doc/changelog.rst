@@ -1,6 +1,24 @@
 Changelog
 =========
 
+0.6.0 (unreleased)
+------------------
+
+New
+~~~
+
+- Speed-up the deep copy of just-in-time-compiled
+  objects such as ``llvm_state`` and ``taylor_adaptive``
+  (`#102 <https://github.com/bluescarni/heyoka/pull/102>`__).
+
+Fix
+~~~
+
+- In the batch integrator class, the outcomes in the result vectors
+  are now initialised to ``taylor_outcome::success`` instead of
+  meaningless values
+  (`#102 <https://github.com/bluescarni/heyoka/pull/102>`__).
+
 0.5.0 (2021-02-25)
 ------------------
 
