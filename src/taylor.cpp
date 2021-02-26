@@ -1607,9 +1607,11 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
     m_delta_ts.resize(m_batch_size);
 
-    // NOTE: default init of these vectors is fine.
-    m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
-    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size));
+    // NOTE: init the outcome to success, the rest to zero.
+    m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
+                      std::tuple{taylor_outcome::success, T(0)});
+    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
+                      std::tuple{taylor_outcome::success, T(0), T(0), std::size_t(0)});
 
     m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
     m_min_abs_h.resize(m_batch_size);

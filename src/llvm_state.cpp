@@ -8,23 +8,25 @@
 
 #include <cassert>
 #include <cstdint>
+#include <fstream>
 #include <initializer_list>
+#include <ios>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <system_error>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
 
@@ -54,8 +56,8 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Pass.h>
-#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
@@ -93,20 +95,24 @@ static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent defin
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+    // LCOV_EXCL_START
     if (!jtmb) {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
+    // LCOV_EXCL_STOP
 
     auto tm = jtmb->createTargetMachine();
+    // LCOV_EXCL_START
     if (!tm) {
         throw std::invalid_argument("Error creating the target machine");
     }
+    // LCOV_EXCL_STOP
 
     target_features retval;
 
     const auto target_name = std::string{(*tm)->getTarget().getName()};
 
-    if (target_name == "x86-64" || target_name == "x86") {
+    if (boost::starts_with(target_name, "x86")) {
         const auto t_features = (*tm)->getTargetFeatureString();
 
         if (boost::algorithm::contains(t_features, "+avx512f")) {
@@ -157,6 +163,7 @@ struct llvm_state::jit {
 #if LLVM_VERSION_MAJOR == 10
     std::unique_ptr<llvm::Triple> m_triple;
 #endif
+    std::optional<std::string> m_object_file;
 
     jit()
     {
@@ -169,9 +176,11 @@ struct llvm_state::jit {
 
         // Create the target machine builder.
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+        // LCOV_EXCL_START
         if (!jtmb) {
             throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
         }
+        // LCOV_EXCL_STOP
         // Set the codegen optimisation level to aggressive.
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
@@ -184,25 +193,44 @@ struct llvm_state::jit {
 
         // Create the jit.
         auto lljit = lljit_builder.create();
+        // LCOV_EXCL_START
         if (!lljit) {
             throw std::invalid_argument("Error creating an LLJIT object");
         }
+        // LCOV_EXCL_STOP
         m_lljit = std::move(*lljit);
+
+        // Setup the machinery to cache the module's binary code
+        // when it is lazily generated.
+        m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer)
+                                                         -> llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> {
+            assert(obj_buffer);
+            assert(!m_object_file);
+
+            // Copy obj_buffer to the local m_object_file member.
+            m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
+
+            return obj_buffer;
+        });
 
         // Setup the jit so that it can look up symbols from the current process.
         auto dlsg = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
             m_lljit->getDataLayout().getGlobalPrefix());
+        // LCOV_EXCL_START
         if (!dlsg) {
             throw std::invalid_argument("Could not create the dynamic library search generator");
         }
+        // LCOV_EXCL_STOP
         m_lljit->getMainJITDylib().addGenerator(std::move(*dlsg));
 
         // Keep a target machine around to fetch various
         // properties of the host CPU.
         auto tm = jtmb->createTargetMachine();
+        // LCOV_EXCL_START
         if (!tm) {
             throw std::invalid_argument("Error creating the target machine");
         }
+        // LCOV_EXCL_STOP
         m_tm = std::move(*tm);
 
         // Create the context.
@@ -262,15 +290,19 @@ struct llvm_state::jit {
     {
         auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
 
+        // LCOV_EXCL_START
         if (err) {
+            using namespace fmt::literals;
+
             std::string err_report;
             llvm::raw_string_ostream ostr(err_report);
 
             ostr << err;
 
-            throw std::invalid_argument("The function for adding a module to the jit failed. The full error message:\n"
-                                        + ostr.str());
+            throw std::invalid_argument(
+                "The function for adding a module to the jit failed. The full error message:\n{}"_format(ostr.str()));
         }
+        // LCOV_EXCL_STOP
     }
 
     // Symbol lookup.
@@ -280,10 +312,33 @@ struct llvm_state::jit {
     }
 };
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup)
+// Small shared helper to setup the math flags in the builder at the
+// end of a constructor.
+void llvm_state::ctor_setup_math_flags()
+{
+    assert(m_builder);
+
+    llvm::FastMathFlags fmf;
+
+    if (m_fast_math) {
+        // Set flags for faster math at the
+        // price of potential change of semantics.
+        fmf.setFast();
+    } else {
+        // By default, allow only fp contraction.
+        // NOTE: if we ever implement double-double
+        // arithmetic, we must either revisit this
+        // or make sure that fp contraction is off
+        // for the double-double primitives.
+        fmf.setAllowContract();
+    }
+
+    m_builder->setFastMathFlags(fmf);
+}
+
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_save_object_code(std::get<3>(tup)),
-      m_inline_functions(std::get<4>(tup))
+      m_module_name(std::move(std::get<0>(tup))), m_inline_functions(std::get<3>(tup))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -294,22 +349,8 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
     // Create a new builder for the module.
     m_builder = std::make_unique<ir_builder>(context());
 
-    if (m_fast_math) {
-        // Set flags for faster math at the
-        // price of potential change of semantics.
-        llvm::FastMathFlags fmf;
-        fmf.setFast();
-        m_builder->setFastMathFlags(fmf);
-    } else {
-        // By default, allow only fp contraction.
-        // NOTE: if we ever implement double-double
-        // arithmetic, we must either revisit this
-        // or make sure that fp contraction is off
-        // for the double-double primitives.
-        llvm::FastMathFlags fmf;
-        fmf.setAllowContract();
-        m_builder->setFastMathFlags(fmf);
-    }
+    // Setup the math flags in the builder.
+    ctor_setup_math_flags();
 }
 
 // NOTE: this will ensure that all kwargs
@@ -317,52 +358,74 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&tup
 llvm_state::llvm_state() : llvm_state(kw_args_ctor_impl()) {}
 
 llvm_state::llvm_state(const llvm_state &other)
+    // NOTE: start off by:
+    // - creating a new jit,
+    // - copying over the options from other.
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
-      m_module_name(other.m_module_name), m_save_object_code(other.m_save_object_code),
-      m_object_code(other.m_object_code), m_inline_functions(other.m_inline_functions)
+      m_module_name(other.m_module_name), m_inline_functions(other.m_inline_functions)
 {
-    // Get the IR of other.
-    auto other_ir = other.get_ir();
+    using namespace fmt::literals;
 
-    // Create the corresponding memory buffer.
-    auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
+    if (other.is_compiled() && other.m_jitter->m_object_file) {
+        // 'other' was compiled and code was generated.
+        // We leave module and builder empty, copy over the
+        // IR snapshot and add the cached compiled module
+        // to the jit.
+        m_ir_snapshot = other.m_ir_snapshot;
 
-    // Construct a new module from the parsed IR.
-    llvm::SMDiagnostic err;
-    m_module = llvm::parseIR(*mb, err, context());
-    if (!m_module) {
-        std::string err_report;
-        llvm::raw_string_ostream ostr(err_report);
+        llvm::SmallVector<char, 0> buffer(other.m_jitter->m_object_file->begin(), other.m_jitter->m_object_file->end());
+        auto err = m_jitter->m_lljit->addObjectFile(std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buffer)));
 
-        err.print("", ostr);
+        // LCOV_EXCL_START
+        if (err) {
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
 
-        throw std::invalid_argument("Error parsing the IR while copying an llvm_state. The full error message:\n"
-                                    + ostr.str());
-    }
+            ostr << err;
 
-    // Create a new builder for the module.
-    m_builder = std::make_unique<ir_builder>(context());
-
-    if (m_fast_math) {
-        // Set flags for faster math at the
-        // price of potential change of semantics.
-        llvm::FastMathFlags fmf;
-        fmf.setFast();
-        m_builder->setFastMathFlags(fmf);
+            throw std::invalid_argument("The function for adding a compiled module to the jit during the deep copy of "
+                                        "an llvm_state failed. The full error message:\n{}"_format(ostr.str()));
+        }
+        // LCOV_EXCL_STOP
     } else {
-        // By default, allow only fp contraction.
-        // NOTE: if we ever implement double-double
-        // arithmetic, we must either revisit this
-        // or make sure that fp contraction is off
-        // for the double-double primitives.
-        llvm::FastMathFlags fmf;
-        fmf.setAllowContract();
-        m_builder->setFastMathFlags(fmf);
-    }
+        // 'other' has not been compiled yet, or
+        // it has been compiled but no code has been
+        // lazily generated yet.
+        // We will fetch its IR and reconstruct
+        // module and builder.
 
-    // Run the compilation if other was compiled.
-    if (!other.m_module) {
-        compile();
+        // Get the IR of other.
+        auto other_ir = other.get_ir();
+
+        // Create the corresponding memory buffer.
+        auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
+
+        // Construct a new module from the parsed IR.
+        llvm::SMDiagnostic err;
+        m_module = llvm::parseIR(*mb, err, context());
+        // LCOV_EXCL_START
+        if (!m_module) {
+            std::string err_report;
+            llvm::raw_string_ostream ostr(err_report);
+
+            err.print("", ostr);
+
+            throw std::invalid_argument(
+                "Error parsing the IR while deep-copying an llvm_state. The full error message:\n{}"_format(
+                    ostr.str()));
+        }
+        // LCOV_EXCL_STOP
+
+        // Create a new builder for the module.
+        m_builder = std::make_unique<ir_builder>(context());
+
+        // Setup the math flags in the builder.
+        ctor_setup_math_flags();
+
+        // Compile if needed.
+        if (other.is_compiled()) {
+            compile();
+        }
     }
 }
 
@@ -448,16 +511,20 @@ const bool &llvm_state::inline_functions() const
 void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
-        throw std::invalid_argument(std::string{"The function '"} + f
-                                    + "' can be invoked only if the module has not been compiled yet");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "The function '{}' can be invoked only if the module has not been compiled yet"_format(f));
     }
 }
 
 void llvm_state::check_compiled(const char *f) const
 {
     if (m_module) {
-        throw std::invalid_argument(std::string{"The function '"} + f
-                                    + "' can be invoked only after the module has been compiled");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "The function '{}' can be invoked only after the module has been compiled"_format(f));
     }
 }
 
@@ -472,11 +539,14 @@ void llvm_state::verify_function(llvm::Function *f)
     std::string err_report;
     llvm::raw_string_ostream ostr(err_report);
     if (llvm::verifyFunction(*f, &ostr)) {
+        using namespace fmt::literals;
+
         // Remove function before throwing.
         const auto fname = std::string(f->getName());
         f->eraseFromParent();
-        throw std::invalid_argument("The verification of the function '" + fname + "' failed. The full error message:\n"
-                                    + ostr.str());
+
+        throw std::invalid_argument(
+            "The verification of the function '{}' failed. The full error message:\n{}"_format(fname, ostr.str()));
     }
 }
 
@@ -487,7 +557,9 @@ void llvm_state::verify_function(const std::string &name)
     // Lookup the function in the module.
     auto f = m_module->getFunction(name);
     if (f == nullptr) {
-        throw std::invalid_argument("The function '" + name + "' does not exist in the module");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("The function '{}' does not exist in the module"_format(name));
     }
 
     // Run the actual check.
@@ -633,27 +705,6 @@ void llvm_state::compile()
     // Store a snapshot of the IR before compiling.
     m_ir_snapshot = get_ir();
 
-    // Store also the object code, if requested.
-    if (m_save_object_code) {
-        // Setup a buffer+stream for dumping the object code.
-        llvm::SmallVector<char, 0> buffer;
-        llvm::raw_svector_ostream buf_stream(buffer);
-
-        // Setup the machinery for dumping the object code.
-        llvm::legacy::PassManager pass;
-
-        if (m_jitter->m_tm->addPassesToEmitFile(pass, buf_stream, nullptr, llvm::CGFT_ObjectFile)) {
-            throw std::invalid_argument("The target machine can't emit a file of this type");
-        }
-
-        // Dump the object code.
-        pass.run(*m_module);
-
-        // Copy over to m_object_code.
-        auto str_ref = buf_stream.str();
-        m_object_code.assign(str_ref.begin(), str_ref.end());
-    }
-
     m_jitter->add_module(std::move(m_module));
 }
 
@@ -671,7 +722,9 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
     auto sym = m_jitter->lookup(name);
     if (!sym) {
-        throw std::invalid_argument("Could not find the symbol '" + name + "' in the compiled module");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Could not find the symbol '{}' in the compiled module"_format(name));
     }
 
     return static_cast<std::uintptr_t>((*sym).getAddress());
@@ -694,47 +747,41 @@ std::string llvm_state::get_ir() const
     }
 }
 
+// LCOV_EXCL_START
+
 void llvm_state::dump_object_code(const std::string &filename) const
 {
-    const auto compiled = !m_module;
+    const auto &oc = get_object_code();
 
-    if (compiled && !m_save_object_code) {
-        throw std::invalid_argument("Cannot dump the object code after compilation if the 'save_object_code' "
-                                    "keyword argument was not set to true when constructing the llvm_state object");
-    }
+    std::ofstream ofs;
+    // NOTE: turn on exceptions, and overwrite any existing content.
+    ofs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    ofs.open(filename, std::ios_base::out | std::ios::trunc);
 
-    std::error_code ec;
-    llvm::raw_fd_ostream dest(filename, ec, llvm::sys::fs::OF_None);
-
-    if (ec) {
-        throw std::invalid_argument("Could not open the file '" + filename
-                                    + "' for dumping object code. The full error message:\n" + ec.message());
-    }
-
-    if (compiled) {
-        // The module has been compiled already, dump the saved
-        // object code image.
-        dest << m_object_code;
-    } else {
-        // The module has not been compiled yet, run the JIT
-        // and dump the object code.
-        llvm::legacy::PassManager pass;
-
-        if (m_jitter->m_tm->addPassesToEmitFile(pass, dest, nullptr, llvm::CGFT_ObjectFile)) {
-            // Close and remove the file before throwing.
-            dest.close();
-            boost::filesystem::remove(boost::filesystem::path{filename});
-
-            throw std::invalid_argument("The target machine can't emit a file of this type");
-        }
-
-        pass.run(*m_module);
-    }
+    // Write out the binary data to ofs.
+    ofs.write(oc.data(), boost::numeric_cast<std::streamsize>(oc.size()));
 }
+
+// LCOV_EXCL_STOP
 
 const std::string &llvm_state::get_object_code() const
 {
-    return m_object_code;
+    if (!is_compiled()) {
+        throw std::invalid_argument(
+            "Cannot extract the object code from an llvm_state which has not been compiled yet");
+    }
+
+    if (!m_jitter->m_object_file) {
+        throw std::invalid_argument(
+            "Cannot extract the object code from an llvm_state if the binary code has not been generated yet");
+    }
+
+    return *m_jitter->m_object_file;
+}
+
+const std::string &llvm_state::module_name() const
+{
+    return m_module_name;
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)

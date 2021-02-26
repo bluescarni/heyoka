@@ -7,6 +7,8 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <iostream>
+#include <stdexcept>
+#include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -16,23 +18,130 @@
 
 using namespace heyoka;
 
-TEST_CASE("basic")
+TEST_CASE("copy semantics")
 {
-    std::cout << llvm_state{kw::mname = "sample state"} << '\n';
-
-    llvm_state s;
     auto [x, y] = make_vars("x", "y");
-    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 21, 1, true, false);
+
+    // Copy without compilation.
+    {
+        std::vector<double> jet{2, 3, 0, 0};
+
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
+                     kw::inline_functions = false};
+
+        REQUIRE(s.module_name() == "sample state");
+        REQUIRE(s.opt_level() == 2u);
+        REQUIRE(s.fast_math());
+        REQUIRE(s.inline_functions() == false);
+        REQUIRE(!s.is_compiled());
+
+        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+
+        auto s2 = s;
+
+        REQUIRE(s2.module_name() == "sample state");
+        REQUIRE(s2.opt_level() == 2u);
+        REQUIRE(s2.fast_math());
+        REQUIRE(s2.inline_functions() == false);
+        REQUIRE(!s2.is_compiled());
+
+        s2.compile();
+
+        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
+
+        jptr(jet.data(), nullptr, nullptr);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == 6);
+        REQUIRE(jet[3] == 6);
+    }
+
+    // Compile, but don't generate code, and copy.
+    {
+        std::vector<double> jet{2, 3, 0, 0};
+
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
+                     kw::inline_functions = false};
+
+        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+
+        s.compile();
+
+        auto s2 = s;
+
+        REQUIRE(s2.module_name() == "sample state");
+        REQUIRE(s2.opt_level() == 2u);
+        REQUIRE(s2.fast_math());
+        REQUIRE(s2.inline_functions() == false);
+        REQUIRE(s2.is_compiled());
+
+        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
+
+        jptr(jet.data(), nullptr, nullptr);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == 6);
+        REQUIRE(jet[3] == 6);
+    }
+
+    // Compile, generate code, and copy.
+    {
+        std::vector<double> jet{2, 3, 0, 0};
+
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
+                     kw::inline_functions = false};
+
+        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+
+        s.compile();
+
+        auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+
+        auto s2 = s;
+
+        REQUIRE(s2.module_name() == "sample state");
+        REQUIRE(s2.opt_level() == 2u);
+        REQUIRE(s2.fast_math());
+        REQUIRE(s2.inline_functions() == false);
+        REQUIRE(s2.is_compiled());
+
+        jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
+
+        jptr(jet.data(), nullptr, nullptr);
+
+        REQUIRE(jet[0] == 2);
+        REQUIRE(jet[1] == 3);
+        REQUIRE(jet[2] == 6);
+        REQUIRE(jet[3] == 6);
+    }
 }
 
-TEST_CASE("save object code")
+TEST_CASE("get object code")
 {
-    llvm_state s{kw::save_object_code = true};
+    using Catch::Matchers::Message;
+
     auto [x, y] = make_vars("x", "y");
-    taylor_add_jet_dbl(s, "foo", {prime(x) = y, prime(y) = (1_dbl - x * x) * y - x}, 21, 1, true, false);
-    s.compile();
 
-    REQUIRE(!s.get_object_code().empty());
+    {
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
+                     kw::inline_functions = false};
 
-    std::cout << "The object code size is: " << s.get_object_code().size() << '\n';
+        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+
+        REQUIRE_THROWS_MATCHES(
+            s.get_object_code(), std::invalid_argument,
+            Message("Cannot extract the object code from an llvm_state which has not been compiled yet"));
+
+        s.compile();
+
+        REQUIRE_THROWS_MATCHES(
+            s.get_object_code(), std::invalid_argument,
+            Message("Cannot extract the object code from an llvm_state if the binary code has not been generated yet"));
+
+        s.jit_lookup("jet");
+
+        REQUIRE(!s.get_object_code().empty());
+    }
 }
