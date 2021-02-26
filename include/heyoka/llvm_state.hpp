@@ -52,7 +52,6 @@ namespace kw
 IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
-IGOR_MAKE_NAMED_ARGUMENT(save_object_code);
 IGOR_MAKE_NAMED_ARGUMENT(inline_functions);
 
 } // namespace kw
@@ -72,8 +71,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_ir_snapshot;
     bool m_fast_math;
     std::string m_module_name;
-    bool m_save_object_code;
-    std::string m_object_code;
     bool m_inline_functions;
 
     // Check functions.
@@ -118,15 +115,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            // Save object code (defaults to false).
-            auto socode = [&p]() -> bool {
-                if constexpr (p.has(kw::save_object_code)) {
-                    return std::forward<decltype(p(kw::save_object_code))>(p(kw::save_object_code));
-                } else {
-                    return false;
-                }
-            }();
-
             // Inline functions (defaults to true).
             auto i_func = [&p]() -> bool {
                 if constexpr (p.has(kw::inline_functions)) {
@@ -136,10 +124,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            return std::tuple{std::move(mod_name), opt_level, fmath, socode, i_func};
+            return std::tuple{std::move(mod_name), opt_level, fmath, i_func};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
 
 public:
     llvm_state();
@@ -169,6 +157,7 @@ public:
     bool &fast_math();
     bool &inline_functions();
 
+    const std::string &module_name() const;
     const llvm::Module &module() const;
     const ir_builder &builder() const;
     const llvm::LLVMContext &context() const;

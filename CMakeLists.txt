@@ -311,12 +311,10 @@ find_package(fmt REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE fmt::fmt)
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED COMPONENTS filesystem)
+find_package(Boost 1.60 REQUIRED)
 
-# Public dependency on the headers, private dependency
-# on filesystem.
+# Public dependency on the headers.
 target_link_libraries(heyoka PUBLIC Boost::boost)
-target_link_libraries(heyoka PRIVATE Boost::filesystem)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
