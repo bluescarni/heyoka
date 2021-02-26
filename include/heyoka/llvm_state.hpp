@@ -129,6 +129,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
     }
     explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
 
+    // Small shared helper to setup the math flags in the builder at the
+    // end of a constructor.
+    HEYOKA_DLL_LOCAL void ctor_setup_math_flags();
+
 public:
     llvm_state();
     // NOTE: enable the kwargs ctor only if:

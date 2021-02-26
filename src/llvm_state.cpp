@@ -311,6 +311,30 @@ struct llvm_state::jit {
     }
 };
 
+// Small shared helper to setup the math flags in the builder at the
+// end of a constructor.
+void llvm_state::ctor_setup_math_flags()
+{
+    assert(m_builder);
+
+    llvm::FastMathFlags fmf;
+
+    if (m_fast_math) {
+        // Set flags for faster math at the
+        // price of potential change of semantics.
+        fmf.setFast();
+    } else {
+        // By default, allow only fp contraction.
+        // NOTE: if we ever implement double-double
+        // arithmetic, we must either revisit this
+        // or make sure that fp contraction is off
+        // for the double-double primitives.
+        fmf.setAllowContract();
+    }
+
+    m_builder->setFastMathFlags(fmf);
+}
+
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
       m_module_name(std::move(std::get<0>(tup))), m_inline_functions(std::get<3>(tup))
@@ -324,22 +348,8 @@ llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     // Create a new builder for the module.
     m_builder = std::make_unique<ir_builder>(context());
 
-    if (m_fast_math) {
-        // Set flags for faster math at the
-        // price of potential change of semantics.
-        llvm::FastMathFlags fmf;
-        fmf.setFast();
-        m_builder->setFastMathFlags(fmf);
-    } else {
-        // By default, allow only fp contraction.
-        // NOTE: if we ever implement double-double
-        // arithmetic, we must either revisit this
-        // or make sure that fp contraction is off
-        // for the double-double primitives.
-        llvm::FastMathFlags fmf;
-        fmf.setAllowContract();
-        m_builder->setFastMathFlags(fmf);
-    }
+    // Setup the math flags in the builder.
+    ctor_setup_math_flags();
 }
 
 // NOTE: this will ensure that all kwargs
@@ -408,22 +418,8 @@ llvm_state::llvm_state(const llvm_state &other)
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
 
-        if (m_fast_math) {
-            // Set flags for faster math at the
-            // price of potential change of semantics.
-            llvm::FastMathFlags fmf;
-            fmf.setFast();
-            m_builder->setFastMathFlags(fmf);
-        } else {
-            // By default, allow only fp contraction.
-            // NOTE: if we ever implement double-double
-            // arithmetic, we must either revisit this
-            // or make sure that fp contraction is off
-            // for the double-double primitives.
-            llvm::FastMathFlags fmf;
-            fmf.setAllowContract();
-            m_builder->setFastMathFlags(fmf);
-        }
+        // Setup the math flags in the builder.
+        ctor_setup_math_flags();
 
         // Compile if needed.
         if (other.is_compiled()) {
