@@ -514,16 +514,20 @@ const bool &llvm_state::inline_functions() const
 void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
-        throw std::invalid_argument(std::string{"The function '"} + f
-                                    + "' can be invoked only if the module has not been compiled yet");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "The function '{}' can be invoked only if the module has not been compiled yet"_format(f));
     }
 }
 
 void llvm_state::check_compiled(const char *f) const
 {
     if (m_module) {
-        throw std::invalid_argument(std::string{"The function '"} + f
-                                    + "' can be invoked only after the module has been compiled");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "The function '{}' can be invoked only after the module has been compiled"_format(f));
     }
 }
 
@@ -556,7 +560,9 @@ void llvm_state::verify_function(const std::string &name)
     // Lookup the function in the module.
     auto f = m_module->getFunction(name);
     if (f == nullptr) {
-        throw std::invalid_argument("The function '" + name + "' does not exist in the module");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("The function '{}' does not exist in the module"_format(name));
     }
 
     // Run the actual check.
