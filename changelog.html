@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Changelog &#8212; heyoka 0.5.0 documentation</title>
+    <title>Changelog &#8212; heyoka 0.6.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
 
@@ -60,7 +60,7 @@
   <img src="_static/white_logo.png" class="logo" alt="logo">
   
   
-  <h1 class="site-logo" id="site-title">heyoka 0.5.0 documentation</h1>
+  <h1 class="site-logo" id="site-title">heyoka 0.6.0 documentation</h1>
   
 </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -220,24 +220,12 @@
         <nav id="bd-toc-nav">
             <ul class="nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id1">
-   0.5.0 (2021-02-25)
+  <a class="reference internal nav-link" href="#unreleased">
+   0.6.0 (unreleased)
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
     <a class="reference internal nav-link" href="#new">
-     New
-    </a>
-   </li>
-  </ul>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id2">
-   0.4.0 (2021-02-20)
-  </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id3">
      New
     </a>
    </li>
@@ -249,12 +237,41 @@
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id4">
+  <a class="reference internal nav-link" href="#id1">
+   0.5.0 (2021-02-25)
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id2">
+     New
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#id3">
+   0.4.0 (2021-02-20)
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id4">
+     New
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id5">
+     Fix
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#id6">
    0.3.0 (2021-02-11)
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id5">
+    <a class="reference internal nav-link" href="#id7">
      New
     </a>
    </li>
@@ -264,36 +281,36 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id6">
+    <a class="reference internal nav-link" href="#id8">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id7">
+  <a class="reference internal nav-link" href="#id9">
    0.2.0 (2021-01-13)
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id8">
+    <a class="reference internal nav-link" href="#id10">
      New
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id9">
+    <a class="reference internal nav-link" href="#id11">
      Changes
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id10">
+    <a class="reference internal nav-link" href="#id12">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id11">
+  <a class="reference internal nav-link" href="#id13">
    0.1.0 (2020-12-18)
   </a>
  </li>
@@ -310,10 +327,30 @@
                 
   <div class="section" id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="id1">
-<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="unreleased">
+<h2>0.6.0 (unreleased)<a class="headerlink" href="#unreleased" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Speed-up the deep copy of just-in-time-compiled
+objects such as <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> and <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/102">#102</a>).</p></li>
+</ul>
+</div>
+<div class="section" id="fix">
+<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>In the batch integrator class, the outcomes in the result vectors
+are now initialised to <code class="docutils literal notranslate"><span class="pre">taylor_outcome::success</span></code> instead of
+meaningless values
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/102">#102</a>).</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="id1">
+<h2>0.5.0 (2021-02-25)<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id2">
+<h3>New<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Implement various missing symbolic derivatives
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/101">#101</a>,
@@ -327,10 +364,10 @@ to retrieve a pointer to the type-erased inner object
 </ul>
 </div>
 </div>
-<div class="section" id="id2">
-<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="id3">
-<h3>New<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h3>
+<h2>0.4.0 (2021-02-20)<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id4">
+<h3>New<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Introduce a dedicated negation operator in the
 expression system
@@ -349,8 +386,8 @@ integrator classes
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/91">#91</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="fix">
-<h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id5">
+<h3>Fix<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Avoid division by zero in certain corner cases
 when using <code class="docutils literal notranslate"><span class="pre">pow()</span></code> with small natural exponents
@@ -358,10 +395,10 @@ when using <code class="docutils literal notranslate"><span class="pre">pow()</s
 </ul>
 </div>
 </div>
-<div class="section" id="id4">
-<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id5">
-<h3>New<a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id6">
+<h2>0.3.0 (2021-02-11)<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id7">
+<h3>New<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Implement the error function
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/89">#89</a>).</p></li>
@@ -397,8 +434,8 @@ object code of a module
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/79">#79</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id6">
-<h3>Fix<a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id8">
+<h3>Fix<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Ensure that <code class="docutils literal notranslate"><span class="pre">pow(x</span> <span class="pre">,0)</span></code> always simplifies to 1,
 rather than producing an expression with null exponent
@@ -416,10 +453,10 @@ rather than producing an expression with null exponent
 </ul>
 </div>
 </div>
-<div class="section" id="id7">
-<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id8">
-<h3>New<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id9">
+<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id10">
+<h3>New<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Extend the Taylor decomposition machinery to work
 on more general classes of functions, and add
@@ -433,23 +470,23 @@ on more general classes of functions, and add
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/63">#63</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id9">
-<h3>Changes<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id11">
+<h3>Changes<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends publicly on the Boost headers
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id10">
-<h3>Fix<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id12">
+<h3>Fix<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Fix potential name mangling issues in compact mode
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
 </div>
-<div class="section" id="id11">
-<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id13">
+<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
 <p>Initial release.</p>
 </div>
 </div>
