@@ -93,14 +93,18 @@ static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent defin
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
+    // LCOV_EXCL_START
     if (!jtmb) {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
+    // LCOV_EXCL_STOP
 
     auto tm = jtmb->createTargetMachine();
+    // LCOV_EXCL_START
     if (!tm) {
         throw std::invalid_argument("Error creating the target machine");
     }
+    // LCOV_EXCL_STOP
 
     target_features retval;
 
@@ -270,15 +274,19 @@ struct llvm_state::jit {
     {
         auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
 
+        // LCOV_EXCL_START
         if (err) {
+            using namespace fmt::literals;
+
             std::string err_report;
             llvm::raw_string_ostream ostr(err_report);
 
             ostr << err;
 
-            throw std::invalid_argument("The function for adding a module to the jit failed. The full error message:\n"
-                                        + ostr.str());
+            throw std::invalid_argument(
+                "The function for adding a module to the jit failed. The full error message:\n{}"_format(ostr.str()));
         }
+        // LCOV_EXCL_STOP
     }
 
     // Symbol lookup.
@@ -679,7 +687,9 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
     auto sym = m_jitter->lookup(name);
     if (!sym) {
-        throw std::invalid_argument("Could not find the symbol '" + name + "' in the compiled module");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Could not find the symbol '{}' in the compiled module"_format(name));
     }
 
     return static_cast<std::uintptr_t>((*sym).getAddress());
