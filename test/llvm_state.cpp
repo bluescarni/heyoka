@@ -35,7 +35,7 @@ TEST_CASE("copy semantics")
         REQUIRE(s.inline_functions() == false);
         REQUIRE(!s.is_compiled());
 
-        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         auto s2 = s;
 
@@ -64,7 +64,7 @@ TEST_CASE("copy semantics")
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
                      kw::inline_functions = false};
 
-        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         s.compile();
 
@@ -93,7 +93,7 @@ TEST_CASE("copy semantics")
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
                      kw::inline_functions = false};
 
-        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         s.compile();
 
@@ -128,7 +128,7 @@ TEST_CASE("get object code")
         llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
                      kw::inline_functions = false};
 
-        taylor_add_jet_dbl(s, "jet", {x * y, y * x}, 1, 1, true, false);
+        taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
         REQUIRE_THROWS_MATCHES(
             s.get_object_code(), std::invalid_argument,
