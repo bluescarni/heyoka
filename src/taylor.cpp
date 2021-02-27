@@ -38,6 +38,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -837,6 +838,8 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_decompose(std::vector<std::pair<expression, expression>> sys)
 {
+    using namespace fmt::literals;
+
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -873,16 +876,13 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
-                            "Error in the Taylor decomposition of a system of equations: the variable '" + v.name()
-                            + "' appears in the left-hand side twice");
+                            "Error in the Taylor decomposition of a system of equations: the variable '{}' appears in the left-hand side twice"_format(
+                                v.name()));
                     }
                 } else {
-                    std::ostringstream oss;
-                    oss << lhs;
-
-                    throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the "
-                                                "left-hand side contains the expression '"
-                                                + oss.str() + "', which is not a variable");
+                    throw std::invalid_argument(
+                        "Error in the Taylor decomposition of a system of equations: the "
+                        "left-hand side contains the expression '{}', which is not a variable"_format(lhs));
                 }
             },
             lhs.value());
@@ -897,8 +897,8 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     // Check that all variables in the rhs appear in the lhs.
     for (const auto &var : rhs_vars_set) {
         if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
-            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '"
-                                        + var + "' appears in the right-hand side but not in the left-hand side");
+            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                                        "appears in the right-hand side but not in the left-hand side"_format(var));
         }
     }
 
