@@ -806,6 +806,10 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
             // of the equation in v_ex_copy
             // so that it points to the u variable
             // that now represents it.
+            // NOTE: all functions are forced to return dres != 0
+            // in the func API, so the only entities that
+            // can return dres == 0 are const/params or
+            // variables.
             v_ex_copy[i] = expression{variable{"u_{}"_format(dres)}};
         }
     }

@@ -332,6 +332,10 @@ func::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32
 {
     auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
 
+    if (ret == 0u) {
+        throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
+    }
+
     if (ret >= u_vars_defs.size()) {
         using namespace fmt::literals;
 
