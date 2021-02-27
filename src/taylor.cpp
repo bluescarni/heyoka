@@ -823,6 +823,7 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
 #endif
 
+    // Run the breadth-first topological sort on the decomposition.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
 
 #if !defined(NDEBUG)
@@ -973,6 +974,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
 #endif
 
+    // Run the breadth-first topological sort on the decomposition.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
 
 #if !defined(NDEBUG)
