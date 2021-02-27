@@ -22,6 +22,7 @@
 #include <numeric>
 #include <optional>
 #include <ostream>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -742,14 +743,12 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     }
 
     // Determine the variables in the system of equations.
-    std::vector<std::string> vars;
+    std::set<std::string> vars;
     for (const auto &ex : v_ex) {
-        auto ex_vars = get_variables(ex);
-        vars.insert(vars.end(), std::make_move_iterator(ex_vars.begin()), std::make_move_iterator(ex_vars.end()));
-        std::sort(vars.begin(), vars.end());
-        vars.erase(std::unique(vars.begin(), vars.end()), vars.end());
+        for (const auto &var : get_variables(ex)) {
+            vars.emplace(var);
+        }
     }
-
     if (vars.size() != v_ex.size()) {
         throw std::invalid_argument(
             "The number of deduced variables for a Taylor decomposition ({}) differs from the number of equations ({})"_format(
@@ -763,9 +762,12 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     // Create the map for renaming the variables to u_i.
     // The renaming will be done in alphabetical order.
     std::unordered_map<std::string, std::string> repl_map;
-    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(vars[i], "u_{}"_format(i));
-        assert(eres.second);
+    {
+        decltype(vars.size()) var_idx = 0;
+        for (const auto &var : vars) {
+            [[maybe_unused]] const auto eres = repl_map.emplace(var, "u_{}"_format(var_idx++));
+            assert(eres.second);
+        }
     }
 
 #if !defined(NDEBUG)
