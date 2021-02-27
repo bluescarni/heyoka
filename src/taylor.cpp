@@ -734,6 +734,8 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 // of a u variable depends only on numbers/params.
 std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(std::vector<expression> v_ex)
 {
+    using namespace fmt::literals;
+
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -748,9 +750,9 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     }
 
     if (vars.size() != v_ex.size()) {
-        throw std::invalid_argument("The number of deduced variables for a Taylor decomposition ("
-                                    + std::to_string(vars.size()) + ") differs from the number of equations ("
-                                    + std::to_string(v_ex.size()) + ")");
+        throw std::invalid_argument(
+            "The number of deduced variables for a Taylor decomposition ({}) differs from the number of equations ({})"_format(
+                vars.size(), v_ex.size()));
     }
 
     // Cache the number of equations/variables
@@ -761,7 +763,7 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     // The renaming will be done in alphabetical order.
     std::unordered_map<std::string, std::string> repl_map;
     for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(vars[i], "u_" + detail::li_to_string(i));
+        [[maybe_unused]] const auto eres = repl_map.emplace(vars[i], "u_{}"_format(i));
         assert(eres.second);
     }
 
@@ -797,7 +799,7 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
             // of the equation in v_ex_copy
             // so that it points to the u variable
             // that now represents it.
-            v_ex_copy[i] = expression{variable{"u_" + detail::li_to_string(dres)}};
+            v_ex_copy[i] = expression{variable{"u_{}"_format(dres)}};
         }
     }
 
