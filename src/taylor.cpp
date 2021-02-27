@@ -89,7 +89,8 @@ std::string taylor_mangle_suffix(llvm::Type *t)
     if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        return llvm_type_name(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
+        using namespace fmt::literals;
+        return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
@@ -352,6 +353,8 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
+    using namespace fmt::literals;
+
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
     // n_eq variables at the end and possibly
@@ -400,8 +403,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
             // elements of v_ex will be renamed to 'u_j'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(retval.size() - 1u));
+            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(retval.size() - 1u));
             assert(res.second);
         } else {
             // ex is redundant. This means
@@ -409,8 +411,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
             // it->second. Don't add anything to retval,
             // and remap the variable name 'u_i' to
             // 'u_{it->second}'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(it->second));
+            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(it->second));
             assert(res.second);
         }
     }
@@ -438,7 +439,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
     // for the renaming of the uvars.
     for (auto &[_, deps] : retval) {
         for (auto &idx : deps) {
-            auto it = uvars_rename.find("u_" + li_to_string(idx));
+            auto it = uvars_rename.find("u_{}"_format(idx));
             assert(it != uvars_rename.end());
             idx = uname_to_index(it->second);
         }
@@ -468,6 +469,8 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // n_eq variables at the end and possibly
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
+
+    using namespace fmt::literals;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -593,7 +596,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
     for (decltype(v_idx.size()) i = n_eq; i < v_idx.size() - n_eq; ++i) {
-        [[maybe_unused]] const auto res = remap.emplace("u_" + li_to_string(v_idx[i]), "u_" + li_to_string(i));
+        [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(v_idx[i]), "u_{}"_format(i));
         assert(res.second);
     }
 
@@ -604,7 +607,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
 
         // Remap the hidden dependencies.
         for (auto &idx : it->second) {
-            auto it_remap = remap.find("u_" + li_to_string(idx));
+            auto it_remap = remap.find("u_{}"_format(idx));
             assert(it_remap != remap.end());
             idx = uname_to_index(it_remap->second);
         }
@@ -626,6 +629,8 @@ void verify_taylor_dec(const std::vector<expression> &orig,
                        const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc)
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
+
+    using namespace fmt::literals;
 
     const auto n_eq = orig.size();
 
@@ -706,7 +711,7 @@ void verify_taylor_dec(const std::vector<expression> &orig,
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (idx_t i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_" + li_to_string(i), subs(dc[i].first, subs_map));
+        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the right-hand sides of the system
@@ -913,7 +918,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     // variables.
     std::unordered_map<std::string, std::string> repl_map;
     for (decltype(lhs_vars.size()) i = 0; i < lhs_vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_" + detail::li_to_string(i));
+        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_{}"_format(i));
         assert(eres.second);
     }
 
@@ -952,7 +957,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
             // of the equation in sys_copy
             // so that it points to the u variable
             // that now represents it.
-            sys_copy[i].second = expression{variable{"u_" + detail::li_to_string(dres)}};
+            sys_copy[i].second = expression{variable{"u_{}"_format(dres)}};
         }
     }
 
@@ -1018,6 +1023,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
+    using namespace fmt::literals;
 
     // Assign the data members.
     m_state = std::move(state);
@@ -1038,14 +1044,14 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
 
     if (!isfinite(m_time)) {
-        throw std::invalid_argument("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of "
-                                    + detail::li_to_string(m_time));
+        throw std::invalid_argument(
+            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
     }
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Fix m_pars' size, if necessary.
@@ -1489,6 +1495,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
+    using namespace fmt::literals;
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -1534,8 +1541,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Fix m_pars' size, if necessary.
@@ -3768,6 +3775,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     using std::exp;
     using std::isfinite;
     using std::log;
+    using namespace fmt::literals;
 
     if (s.is_compiled()) {
         throw std::invalid_argument("An adaptive Taylor stepper cannot be added to an llvm_state after compilation");
@@ -3779,8 +3787,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor stepper must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor stepper must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Determine the order from the tolerance.
