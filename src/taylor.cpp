@@ -810,7 +810,7 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            v_ex_copy[i] = expression{variable{"u_{}"_format(dres)}};
+            v_ex_copy[i] = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -961,7 +961,11 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
             // of the equation in sys_copy
             // so that it points to the u variable
             // that now represents it.
-            sys_copy[i].second = expression{variable{"u_{}"_format(dres)}};
+            // NOTE: all functions are forced to return dres != 0
+            // in the func API, so the only entities that
+            // can return dres == 0 are const/params or
+            // variables.
+            sys_copy[i].second = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -1518,24 +1522,24 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     }
 
     if (m_state.size() % m_batch_size != 0u) {
-        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a size of "
-                                    + std::to_string(m_state.size()) + ", which is not a multiple of the batch size ("
-                                    + std::to_string(m_batch_size) + ")");
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})"_format(
+                m_state.size(), m_batch_size));
     }
 
     if (m_state.size() / m_batch_size != sys.size()) {
-        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a dimension of "
-                                    + std::to_string(m_state.size() / m_batch_size)
-                                    + ", while the number of equations is " + std::to_string(sys.size()));
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size() / m_batch_size, sys.size()));
     }
 
     if (m_time.size() != m_batch_size) {
-        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the time vector has a size of "
-                                    + std::to_string(m_time.size()) + ", which is not equal to the batch size ("
-                                    + std::to_string(m_batch_size) + ")");
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
+                m_time.size(), m_batch_size));
     }
 
     if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
