@@ -1045,10 +1045,10 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
 
     if (m_state.size() != sys.size()) {
-        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a dimension of "
-                                    + std::to_string(m_state.size()) + ", while the number of equations is "
-                                    + std::to_string(sys.size()));
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size(), sys.size()));
     }
 
     if (!isfinite(m_time)) {
@@ -1756,10 +1756,11 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified timesteps is "
-            + std::to_string(max_delta_ts.size()));
+            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
+            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
     }
 
     // Make sure no values in max_delta_ts are nan.
@@ -1780,10 +1781,11 @@ void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            "Invalid number of time intervals specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified time intervals is "
-            + std::to_string(delta_ts.size()));
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
+                                    "the batch size is {}, but the number of specified time intervals is {}"_format(
+                                        m_batch_size, delta_ts.size()));
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -1800,10 +1802,11 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
 
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified time limits is "
-            + std::to_string(ts.size()));
+            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
     }
 
     // Check the current times.
@@ -2635,10 +2638,12 @@ auto taylor_build_function_maps(llvm_state &s,
             const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
-                throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
-                                            "mode: the same function is being called with both "
-                                            + std::to_string(it->second.back().size() - 1u) + " and "
-                                            + std::to_string(cdiff_args.size()) + " arguments");
+                using namespace fmt::literals;
+
+                throw std::invalid_argument(
+                    "Inconsistent arity detected in a Taylor derivative function in compact "
+                    "mode: the same function is being called with both {} and {} arguments"_format(
+                        it->second.back().size() - 1u, cdiff_args.size()));
             }
 
             // Add the new set of arguments.
@@ -3006,9 +3011,11 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Unable to create a function for the computation of the jet of Taylor derivatives with name '" + name
-            + "'");
+            "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'"_format(
+                name));
     }
 
     // Set the names/attributes of the function arguments.
@@ -3843,8 +3850,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for an adaptive Taylor stepper with name '" + name
-                                    + "'");
+        throw std::invalid_argument(
+            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
     }
 
     // Set the names/attributes of the function arguments.
@@ -4179,7 +4186,10 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for a Taylor state updater with name '" + name + "'");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Unable to create a function for a Taylor state updater with name '{}'"_format(name));
     }
 
     // Set the name/attributes of the function argument.
