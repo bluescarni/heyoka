@@ -349,6 +349,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
 // purposes, only the actual subexpressions.
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &v_ex,
+                     std::vector<std::uint32_t> &sv_funcs_dc,
                      std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type n_eq)
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
@@ -381,6 +382,12 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
         // NOTE: no hidden deps allowed here.
         assert(v_ex[i].second.empty());
         retval.push_back(std::move(v_ex[i]));
+
+        // NOTE: the u vars that correspond to state
+        // variables are never simplified,
+        // thus map them onto themselves.
+        [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(i));
+        assert(res.second);
     }
 
     // Handle the u variables which do not correspond to state variables.
@@ -434,8 +441,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
         retval.emplace_back(std::move(ex), std::move(deps));
     }
 
-    // The last step is to re-adjust all indices
-    // in the hidden dependencies in order to account
+    // Re-adjust all indices in the hidden dependencies in order to account
     // for the renaming of the uvars.
     for (auto &[_, deps] : retval) {
         for (auto &idx : deps) {
@@ -443,6 +449,13 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
             assert(it != uvars_rename.end());
             idx = uname_to_index(it->second);
         }
+    }
+
+    // Same for the indices in sv_funcs_dc.
+    for (auto &idx : sv_funcs_dc) {
+        auto it = uvars_rename.find("u_{}"_format(idx));
+        assert(it != uvars_rename.end());
+        idx = uname_to_index(it->second);
     }
 
     return retval;
@@ -462,6 +475,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
 // sort, this time based on breadth-first search, we determine another valid
 // sorting in which independent operations tend to be clustered together.
 auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
+                    std::vector<std::uint32_t> &sv_funcs_dc,
                     std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type n_eq)
 {
     // A Taylor decomposition is supposed
@@ -595,12 +609,23 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
 
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
+    // NOTE: the u vars that correspond to state
+    // variables were inserted into v_idx in the original
+    // order, thus they are not re-sorted and they do not
+    // need renaming.
+    for (decltype(v_idx.size()) i = 0; i < n_eq; ++i) {
+        [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(i), "u_{}"_format(i));
+        assert(res.second);
+    }
+    // Establish the remapping for the u variables that are not
+    // state variables.
     for (decltype(v_idx.size()) i = n_eq; i < v_idx.size() - n_eq; ++i) {
         [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(v_idx[i]), "u_{}"_format(i));
         assert(res.second);
     }
 
-    // Do the remap.
+    // Do the remap for the definitions of the u variables, the
+    // derivatives and the hidden deps.
     for (auto it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
         rename_variables(it->first, remap);
@@ -611,6 +636,13 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
             assert(it_remap != remap.end());
             idx = uname_to_index(it_remap->second);
         }
+    }
+
+    // Do the remap for sv_funcs.
+    for (auto &idx : sv_funcs_dc) {
+        auto it_remap = remap.find("u_{}"_format(idx));
+        assert(it_remap != remap.end());
+        idx = uname_to_index(it_remap->second);
     }
 
     // Reorder the decomposition.
@@ -721,6 +753,32 @@ void verify_taylor_dec(const std::vector<expression> &orig,
     }
 }
 
+// Helper to verify the decomposition of the sv funcs.
+void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, const std::vector<expression> &sv_funcs,
+                                const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
+                                std::vector<expression>::size_type n_eq)
+{
+    using namespace fmt::literals;
+
+    std::unordered_map<std::string, expression> subs_map;
+
+    // For each u variable, expand its definition
+    // in terms of state variables or other u variables,
+    // and store it in subs_map.
+    for (decltype(dc.size()) i = 0; i < dc.size() - n_eq; ++i) {
+        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
+    }
+
+    // Reconstruct the sv functions and compare them to the
+    // original ones.
+    for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
+        assert(sv_funcs_dc[i] < dc.size());
+
+        auto sv_func = subs(dc[sv_funcs_dc[i]].first, subs_map);
+        assert(sv_func == sv_funcs[i]);
+    }
+}
+
 #endif
 
 } // namespace
@@ -738,7 +796,8 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 // is a number/param, not when, e.g., the argument is par[0] + par[1] - in
 // order to simplify this out, it should be recognized that the definition
 // of a u variable depends only on numbers/params.
-std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(std::vector<expression> v_ex)
+std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
+taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
 {
     using namespace fmt::literals;
 
@@ -759,6 +818,17 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
                 vars.size(), v_ex.size()));
     }
 
+    // Check that the expressions in sv_funcs contain only
+    // state variables.
+    for (const auto &ex : sv_funcs) {
+        for (const auto &var : get_variables(ex)) {
+            if (vars.find(var) == vars.end()) {
+                throw std::invalid_argument("The extra functions in a Taylor decomposition contain the variable '{}', "
+                                            "which is not a state variable"_format(var));
+            }
+        }
+    }
+
     // Cache the number of equations/variables
     // for later use.
     const auto n_eq = v_ex.size();
@@ -775,8 +845,10 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     }
 
 #if !defined(NDEBUG)
-    // Store a copy of the original system for checking later.
+    // Store a copy of the original system and
+    // sv_funcs for checking later.
     const auto orig_v_ex = v_ex;
+    const auto orig_sv_funcs = sv_funcs;
 #endif
 
     // Rename the variables in the original equations.
@@ -784,8 +856,12 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
         rename_variables(ex, repl_map);
     }
 
-    // Init the vector containing the definitions
-    // of the u variables. It begins with a list
+    // Rename the variables in sv_funcs.
+    for (auto &ex : sv_funcs) {
+        rename_variables(ex, repl_map);
+    }
+
+    // Init the decomposition. It begins with a list
     // of the original variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : vars) {
@@ -814,6 +890,26 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
         }
     }
 
+    // Decompose sv_funcs, and write into sv_funcs_dc the index
+    // of the u variable which each sv_func corresponds to.
+    std::vector<std::uint32_t> sv_funcs_dc;
+    for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
+        if (const auto var_ptr = std::get_if<variable>(&sv_funcs[i].value())) {
+            // The current sv_func is a variable, add its index to sv_funcs_dc.
+            sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
+        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_funcs[i]), u_vars_defs)) {
+            // The sv_func was decomposed, add to sv_funcs_dc
+            // the index of the u variable which represents
+            // the result of the decomposition.
+            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(dres));
+        } else {
+            // The sv_func was not decomposed, meaning it's a const/param.
+            throw std::invalid_argument(
+                "The extra functions in a Taylor decomposition cannot be constants or parameters");
+        }
+    }
+    assert(sv_funcs_dc.size() == sv_funcs.size());
+
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
     for (auto &ex : v_ex_copy) {
@@ -823,31 +919,34 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
 #if !defined(NDEBUG)
     // Verify the decomposition.
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
-    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, n_eq);
+    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
-    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
+    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
-    return u_vars_defs;
+    return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
 }
 
 // Taylor decomposition from lhs and rhs
 // of a system of equations.
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_decompose(std::vector<std::pair<expression, expression>> sys)
+std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
+taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector<expression> sv_funcs)
 {
     using namespace fmt::literals;
 
@@ -887,8 +986,8 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
-                            "Error in the Taylor decomposition of a system of equations: the variable '{}' appears in the left-hand side twice"_format(
-                                v.name()));
+                            "Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                            "appears in the left-hand side twice"_format(v.name()));
                     }
                 } else {
                     throw std::invalid_argument(
@@ -913,6 +1012,17 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
         }
     }
 
+    // Check that the expressions in sv_funcs contain only
+    // state variables.
+    for (const auto &ex : sv_funcs) {
+        for (const auto &var : get_variables(ex)) {
+            if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
+                throw std::invalid_argument("The extra functions in a Taylor decomposition contain the variable '{}', "
+                                            "which is not a state variable"_format(var));
+            }
+        }
+    }
+
     // Cache the number of equations/variables.
     const auto n_eq = sys.size();
     assert(n_eq == lhs_vars.size());
@@ -927,11 +1037,13 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     }
 
 #if !defined(NDEBUG)
-    // Store a copy of the original rhs for checking later.
+    // Store a copy of the original rhs and sv_funcs
+    // for checking later.
     std::vector<expression> orig_rhs;
     for (const auto &[_, rhs_ex] : sys) {
         orig_rhs.push_back(rhs_ex);
     }
+    const auto orig_sv_funcs = sv_funcs;
 #endif
 
     // Rename the variables in the original equations.
@@ -939,8 +1051,12 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
         rename_variables(rhs_ex, repl_map);
     }
 
-    // Init the vector containing the definitions
-    // of the u variables. It begins with a list
+    // Rename the variables in sv_funcs.
+    for (auto &ex : sv_funcs) {
+        rename_variables(ex, repl_map);
+    }
+
+    // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : lhs_vars) {
@@ -969,6 +1085,26 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
         }
     }
 
+    // Decompose sv_funcs, and write into sv_funcs_dc the index
+    // of the u variable which each sv_func corresponds to.
+    std::vector<std::uint32_t> sv_funcs_dc;
+    for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
+        if (const auto var_ptr = std::get_if<variable>(&sv_funcs[i].value())) {
+            // The current sv_func is a variable, add its index to sv_funcs_dc.
+            sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
+        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_funcs[i]), u_vars_defs)) {
+            // The sv_func was decomposed, add to sv_funcs_dc
+            // the index of the u variable which represents
+            // the result of the decomposition.
+            sv_funcs_dc.push_back(boost::numeric_cast<std::uint32_t>(dres));
+        } else {
+            // The sv_func was not decomposed, meaning it's a const/param.
+            throw std::invalid_argument(
+                "The extra functions in a Taylor decomposition cannot be constants or parameters");
+        }
+    }
+    assert(sv_funcs_dc.size() == sv_funcs.size());
+
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
     for (auto &[_, rhs] : sys_copy) {
@@ -978,25 +1114,28 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
 #if !defined(NDEBUG)
     // Verify the decomposition.
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
     // Simplify the decomposition.
-    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, n_eq);
+    u_vars_defs = detail::taylor_decompose_cse(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the simplified decomposition.
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
     // Run the breadth-first topological sort on the decomposition.
-    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
+    u_vars_defs = detail::taylor_sort_dc(u_vars_defs, sv_funcs_dc, n_eq);
 
 #if !defined(NDEBUG)
     // Verify the reordered decomposition.
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
+    detail::verify_taylor_dec_sv_funcs(sv_funcs_dc, orig_sv_funcs, u_vars_defs, n_eq);
 #endif
 
-    return u_vars_defs;
+    return std::make_pair(std::move(u_vars_defs), std::move(sv_funcs_dc));
 }
 
 namespace detail
@@ -2974,7 +3113,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
-                         bool, bool compact_mode)
+                         bool, bool compact_mode, std::vector<expression> sv_funcs)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -2995,7 +3134,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto dc = taylor_decompose(std::move(sys));
+    // TODO fix.
+    auto [dc, _] = taylor_decompose(std::move(sys), std::move(sv_funcs));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -3111,54 +3251,59 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-                   std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                   std::uint32_t batch_size, bool high_accuracy, bool compact_mode, std::vector<expression> sv_funcs)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
+                                               std::move(sv_funcs));
 }
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_ldbl(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-                    std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                    std::uint32_t batch_size, bool high_accuracy, bool compact_mode, std::vector<expression> sv_funcs)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                    compact_mode);
+                                                    compact_mode, std::move(sv_funcs));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_f128(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-                    std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                    std::uint32_t batch_size, bool high_accuracy, bool compact_mode, std::vector<expression> sv_funcs)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                      compact_mode);
+                                                      compact_mode, std::move(sv_funcs));
 }
 
 #endif
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_dbl(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                   std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                   std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                   std::vector<expression> sv_funcs)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
+                                               std::move(sv_funcs));
 }
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_ldbl(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                    std::vector<expression> sv_funcs)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                    compact_mode);
+                                                    compact_mode, std::move(sv_funcs));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_jet_f128(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
+                    std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                    std::vector<expression> sv_funcs)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                      compact_mode);
+                                                      compact_mode, std::move(sv_funcs));
 }
 
 #endif
@@ -3827,7 +3972,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto dc = taylor_decompose(std::move(sys));
+    // TODO fix.
+    auto [dc, _] = taylor_decompose(std::move(sys), {});
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -4243,7 +4389,9 @@ auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, 
     std::optional<opt_disabler> od(s);
 
     // Add the function for the computation of the jet of derivatives.
-    auto dc = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode);
+    // TODO fix.
+    auto dc
+        = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode, {});
 
     // Add the function for the state update.
     taylor_add_state_updater_impl<T>(s, name + "_updater", n_vars, order, batch_size, high_accuracy, compact_mode);
