@@ -189,9 +189,9 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> empty;
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>> dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::move(f).taylor_decompose(empty);
+    std::move(f).taylor_decompose(dec);
 }
 
 struct func_02 : func_base {
@@ -387,23 +387,42 @@ struct func_10a : func_base {
     }
 };
 
+struct func_10b : func_base {
+    func_10b() : func_base("f", {}) {}
+    explicit func_10b(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+    {
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
+
+        return 0;
+    }
+};
+
 TEST_CASE("func taylor_decompose")
 {
     using Catch::Matchers::Message;
 
     auto f = func(func_10{{"x"_var}});
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
-    REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 0u);
-    REQUIRE(u_vars_defs == std::vector{std::pair{"foo"_var, std::vector<std::uint32_t>{}}});
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs{{"x"_var, {}}};
+    REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 1u);
+    REQUIRE(u_vars_defs
+            == std::vector<std::pair<expression, std::vector<std::uint32_t>>>{{"x"_var, {}}, {"foo"_var, {}}});
 
     f = func(func_10a{{"x"_var}});
 
     REQUIRE_THROWS_MATCHES(
         std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
         Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
-                "the return value is 2, which is not less than the current size of the decomposition "
-                "(2)"));
+                "the return value is 3, which is not less than the current size of the decomposition "
+                "(3)"));
+
+    f = func(func_10b{{"x"_var}});
+
+    REQUIRE_THROWS_MATCHES(std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+                           Message("The return value for the Taylor decomposition of a function can never be zero"));
 }
 
 struct func_12 : func_base {

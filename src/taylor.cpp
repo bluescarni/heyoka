@@ -16,12 +16,12 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
-#include <iterator>
 #include <limits>
 #include <locale>
 #include <numeric>
 #include <optional>
 #include <ostream>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -38,6 +38,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -88,7 +89,8 @@ std::string taylor_mangle_suffix(llvm::Type *t)
     if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        return llvm_type_name(v_t->getElementType()) + "_" + li_to_string(v_t->getNumElements());
+        using namespace fmt::literals;
+        return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
@@ -351,6 +353,8 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
+    using namespace fmt::literals;
+
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
     // n_eq variables at the end and possibly
@@ -399,8 +403,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
             // Update uvars_rename. This will ensure that
             // occurrences of the variable 'u_i' in the next
             // elements of v_ex will be renamed to 'u_j'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(retval.size() - 1u));
+            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(retval.size() - 1u));
             assert(res.second);
         } else {
             // ex is redundant. This means
@@ -408,8 +411,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
             // it->second. Don't add anything to retval,
             // and remap the variable name 'u_i' to
             // 'u_{it->second}'.
-            [[maybe_unused]] const auto res
-                = uvars_rename.emplace("u_" + li_to_string(i), "u_" + li_to_string(it->second));
+            [[maybe_unused]] const auto res = uvars_rename.emplace("u_{}"_format(i), "u_{}"_format(it->second));
             assert(res.second);
         }
     }
@@ -437,7 +439,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
     // for the renaming of the uvars.
     for (auto &[_, deps] : retval) {
         for (auto &idx : deps) {
-            auto it = uvars_rename.find("u_" + li_to_string(idx));
+            auto it = uvars_rename.find("u_{}"_format(idx));
             assert(it != uvars_rename.end());
             idx = uname_to_index(it->second);
         }
@@ -467,6 +469,8 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // n_eq variables at the end and possibly
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
+
+    using namespace fmt::literals;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -592,7 +596,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // Create the remapping dictionary.
     std::unordered_map<std::string, std::string> remap;
     for (decltype(v_idx.size()) i = n_eq; i < v_idx.size() - n_eq; ++i) {
-        [[maybe_unused]] const auto res = remap.emplace("u_" + li_to_string(v_idx[i]), "u_" + li_to_string(i));
+        [[maybe_unused]] const auto res = remap.emplace("u_{}"_format(v_idx[i]), "u_{}"_format(i));
         assert(res.second);
     }
 
@@ -603,7 +607,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
 
         // Remap the hidden dependencies.
         for (auto &idx : it->second) {
-            auto it_remap = remap.find("u_" + li_to_string(idx));
+            auto it_remap = remap.find("u_{}"_format(idx));
             assert(it_remap != remap.end());
             idx = uname_to_index(it_remap->second);
         }
@@ -625,6 +629,8 @@ void verify_taylor_dec(const std::vector<expression> &orig,
                        const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc)
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
+
+    using namespace fmt::literals;
 
     const auto n_eq = orig.size();
 
@@ -705,7 +711,7 @@ void verify_taylor_dec(const std::vector<expression> &orig,
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (idx_t i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_" + li_to_string(i), subs(dc[i].first, subs_map));
+        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the right-hand sides of the system
@@ -734,23 +740,23 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 // of a u variable depends only on numbers/params.
 std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(std::vector<expression> v_ex)
 {
+    using namespace fmt::literals;
+
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
 
     // Determine the variables in the system of equations.
-    std::vector<std::string> vars;
+    std::set<std::string> vars;
     for (const auto &ex : v_ex) {
-        auto ex_vars = get_variables(ex);
-        vars.insert(vars.end(), std::make_move_iterator(ex_vars.begin()), std::make_move_iterator(ex_vars.end()));
-        std::sort(vars.begin(), vars.end());
-        vars.erase(std::unique(vars.begin(), vars.end()), vars.end());
+        for (const auto &var : get_variables(ex)) {
+            vars.emplace(var);
+        }
     }
-
     if (vars.size() != v_ex.size()) {
-        throw std::invalid_argument("The number of deduced variables for a Taylor decomposition ("
-                                    + std::to_string(vars.size()) + ") differs from the number of equations ("
-                                    + std::to_string(v_ex.size()) + ")");
+        throw std::invalid_argument(
+            "The number of deduced variables for a Taylor decomposition ({}) differs from the number of equations ({})"_format(
+                vars.size(), v_ex.size()));
     }
 
     // Cache the number of equations/variables
@@ -760,9 +766,12 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     // Create the map for renaming the variables to u_i.
     // The renaming will be done in alphabetical order.
     std::unordered_map<std::string, std::string> repl_map;
-    for (decltype(vars.size()) i = 0; i < vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(vars[i], "u_" + detail::li_to_string(i));
-        assert(eres.second);
+    {
+        decltype(vars.size()) var_idx = 0;
+        for (const auto &var : vars) {
+            [[maybe_unused]] const auto eres = repl_map.emplace(var, "u_{}"_format(var_idx++));
+            assert(eres.second);
+        }
     }
 
 #if !defined(NDEBUG)
@@ -797,7 +806,11 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
             // of the equation in v_ex_copy
             // so that it points to the u variable
             // that now represents it.
-            v_ex_copy[i] = expression{variable{"u_" + detail::li_to_string(dres)}};
+            // NOTE: all functions are forced to return dres != 0
+            // in the func API, so the only entities that
+            // can return dres == 0 are const/params or
+            // variables.
+            v_ex_copy[i] = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -820,6 +833,7 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
     detail::verify_taylor_dec(orig_v_ex, u_vars_defs);
 #endif
 
+    // Run the breadth-first topological sort on the decomposition.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
 
 #if !defined(NDEBUG)
@@ -835,6 +849,8 @@ std::vector<std::pair<expression, std::vector<std::uint32_t>>> taylor_decompose(
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_decompose(std::vector<std::pair<expression, expression>> sys)
 {
+    using namespace fmt::literals;
+
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -871,16 +887,13 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
                     } else {
                         // Duplicate, error out.
                         throw std::invalid_argument(
-                            "Error in the Taylor decomposition of a system of equations: the variable '" + v.name()
-                            + "' appears in the left-hand side twice");
+                            "Error in the Taylor decomposition of a system of equations: the variable '{}' appears in the left-hand side twice"_format(
+                                v.name()));
                     }
                 } else {
-                    std::ostringstream oss;
-                    oss << lhs;
-
-                    throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the "
-                                                "left-hand side contains the expression '"
-                                                + oss.str() + "', which is not a variable");
+                    throw std::invalid_argument(
+                        "Error in the Taylor decomposition of a system of equations: the "
+                        "left-hand side contains the expression '{}', which is not a variable"_format(lhs));
                 }
             },
             lhs.value());
@@ -895,8 +908,8 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     // Check that all variables in the rhs appear in the lhs.
     for (const auto &var : rhs_vars_set) {
         if (lhs_vars_set.find(var) == lhs_vars_set.end()) {
-            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '"
-                                        + var + "' appears in the right-hand side but not in the left-hand side");
+            throw std::invalid_argument("Error in the Taylor decomposition of a system of equations: the variable '{}' "
+                                        "appears in the right-hand side but not in the left-hand side"_format(var));
         }
     }
 
@@ -909,7 +922,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     // variables.
     std::unordered_map<std::string, std::string> repl_map;
     for (decltype(lhs_vars.size()) i = 0; i < lhs_vars.size(); ++i) {
-        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_" + detail::li_to_string(i));
+        [[maybe_unused]] const auto eres = repl_map.emplace(lhs_vars[i], "u_{}"_format(i));
         assert(eres.second);
     }
 
@@ -948,7 +961,11 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
             // of the equation in sys_copy
             // so that it points to the u variable
             // that now represents it.
-            sys_copy[i].second = expression{variable{"u_" + detail::li_to_string(dres)}};
+            // NOTE: all functions are forced to return dres != 0
+            // in the func API, so the only entities that
+            // can return dres == 0 are const/params or
+            // variables.
+            sys_copy[i].second = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -971,6 +988,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys)
     detail::verify_taylor_dec(orig_rhs, u_vars_defs);
 #endif
 
+    // Run the breadth-first topological sort on the decomposition.
     u_vars_defs = detail::taylor_sort_dc(u_vars_defs, n_eq);
 
 #if !defined(NDEBUG)
@@ -1013,6 +1031,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
+    using namespace fmt::literals;
 
     // Assign the data members.
     m_state = std::move(state);
@@ -1026,21 +1045,21 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
 
     if (m_state.size() != sys.size()) {
-        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a dimension of "
-                                    + std::to_string(m_state.size()) + ", while the number of equations is "
-                                    + std::to_string(sys.size()));
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size(), sys.size()));
     }
 
     if (!isfinite(m_time)) {
-        throw std::invalid_argument("Cannot initialise an adaptive Taylor integrator with a non-finite initial time of "
-                                    + detail::li_to_string(m_time));
+        throw std::invalid_argument(
+            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
     }
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Fix m_pars' size, if necessary.
@@ -1484,6 +1503,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
+    using namespace fmt::literals;
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -1502,24 +1522,24 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     }
 
     if (m_state.size() % m_batch_size != 0u) {
-        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a size of "
-                                    + std::to_string(m_state.size()) + ", which is not a multiple of the batch size ("
-                                    + std::to_string(m_batch_size) + ")");
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})"_format(
+                m_state.size(), m_batch_size));
     }
 
     if (m_state.size() / m_batch_size != sys.size()) {
-        throw std::invalid_argument("Inconsistent sizes detected in the initialization of an adaptive Taylor "
-                                    "integrator: the state vector has a dimension of "
-                                    + std::to_string(m_state.size() / m_batch_size)
-                                    + ", while the number of equations is " + std::to_string(sys.size()));
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size() / m_batch_size, sys.size()));
     }
 
     if (m_time.size() != m_batch_size) {
-        throw std::invalid_argument("Invalid size detected in the initialization of an adaptive Taylor "
-                                    "integrator: the time vector has a size of "
-                                    + std::to_string(m_time.size()) + ", which is not equal to the batch size ("
-                                    + std::to_string(m_batch_size) + ")");
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
+                m_time.size(), m_batch_size));
     }
 
     if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
@@ -1529,8 +1549,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Fix m_pars' size, if necessary.
@@ -1736,10 +1756,11 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified timesteps is "
-            + std::to_string(max_delta_ts.size()));
+            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
+            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
     }
 
     // Make sure no values in max_delta_ts are nan.
@@ -1760,10 +1781,11 @@ void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            "Invalid number of time intervals specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified time intervals is "
-            + std::to_string(delta_ts.size()));
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
+                                    "the batch size is {}, but the number of specified time intervals is {}"_format(
+                                        m_batch_size, delta_ts.size()));
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -1780,10 +1802,11 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
 
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the batch size is "
-            + std::to_string(m_batch_size) + ", but the number of specified time limits is "
-            + std::to_string(ts.size()));
+            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
     }
 
     // Check the current times.
@@ -2615,10 +2638,12 @@ auto taylor_build_function_maps(llvm_state &s,
             const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
-                throw std::invalid_argument("Inconsistent arity detected in a Taylor derivative function in compact "
-                                            "mode: the same function is being called with both "
-                                            + std::to_string(it->second.back().size() - 1u) + " and "
-                                            + std::to_string(cdiff_args.size()) + " arguments");
+                using namespace fmt::literals;
+
+                throw std::invalid_argument(
+                    "Inconsistent arity detected in a Taylor derivative function in compact "
+                    "mode: the same function is being called with both {} and {} arguments"_format(
+                        it->second.back().size() - 1u, cdiff_args.size()));
             }
 
             // Add the new set of arguments.
@@ -2986,9 +3011,11 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
+        using namespace fmt::literals;
+
         throw std::invalid_argument(
-            "Unable to create a function for the computation of the jet of Taylor derivatives with name '" + name
-            + "'");
+            "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'"_format(
+                name));
     }
 
     // Set the names/attributes of the function arguments.
@@ -3763,6 +3790,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     using std::exp;
     using std::isfinite;
     using std::log;
+    using namespace fmt::literals;
 
     if (s.is_compiled()) {
         throw std::invalid_argument("An adaptive Taylor stepper cannot be added to an llvm_state after compilation");
@@ -3774,8 +3802,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     if (!isfinite(tol) || tol <= 0) {
         throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor stepper must be finite and positive, but it is " + li_to_string(tol)
-            + " instead");
+            "The tolerance in an adaptive Taylor stepper must be finite and positive, but it is {} instead"_format(
+                tol));
     }
 
     // Determine the order from the tolerance.
@@ -3822,8 +3850,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for an adaptive Taylor stepper with name '" + name
-                                    + "'");
+        throw std::invalid_argument(
+            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
     }
 
     // Set the names/attributes of the function arguments.
@@ -4158,7 +4186,10 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for a Taylor state updater with name '" + name + "'");
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Unable to create a function for a Taylor state updater with name '{}'"_format(name));
     }
 
     // Set the name/attributes of the function argument.
