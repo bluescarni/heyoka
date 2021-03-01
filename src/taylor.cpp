@@ -2923,7 +2923,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         for (const auto &map : f_maps) {
             for (const auto &p : map) {
                 // The LLVM function for the computation of the
-                // derivative in compact mpde.
+                // derivative in compact mode.
                 const auto &func = p.first;
 
                 // The number of func calls.
