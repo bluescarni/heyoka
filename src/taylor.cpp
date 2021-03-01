@@ -3010,6 +3010,8 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 // order0 is a pointer to an array of (at least) n_eq * batch_size scalar elements
 // containing the derivatives of order 0. par_ptr is a pointer to an array containing
 // the numerical values of the parameters, time_ptr a pointer to the time value(s).
+// sv_funcs are the indices, in the decomposition, of the functions of state
+// variables.
 //
 // The return value is a variant containing either:
 // - in compact mode, the array containing the derivatives of all u variables,
@@ -3017,18 +3019,20 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                   const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc, std::uint32_t n_eq,
-                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
+                   const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
+                   const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq, std::uint32_t n_uvars,
+                   std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
 {
     assert(batch_size > 0u);
     assert(n_eq > 0u);
     assert(order > 0u);
 
-    // Make sure we can represent a size of n_uvars * order + n_eq as a 32-bit
-    // unsigned integer. This is the total number of derivatives we will have to compute
-    // and store.
-    if (n_uvars > std::numeric_limits<std::uint32_t>::max() / order
-        || n_uvars * order > std::numeric_limits<std::uint32_t>::max() - n_eq) {
+    // Make sure we can represent n_uvars * (order + 1) as a 32-bit
+    // unsigned integer. This is the maximum total number of derivatives we will have to compute
+    // and store, with the +1 taking into account the extra slots that might be needed by sv_funcs_dc.
+    // If sv_funcs_dc is empty, we need only n_uvars * order + n_eq derivatives.
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || n_uvars > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
         throw std::overflow_error(
             "An overflow condition was detected in the computation of a jet of Taylor derivatives");
     }
@@ -3089,13 +3093,45 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, order, batch_size));
         }
 
-        assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
+        // If there are sv funcs, we need to compute their last-order derivatives too.
+        if (!sv_funcs_dc.empty()) {
+            // We will need to compute the derivatives of the u variables up to
+            // the maximum index in sv_funcs_dc.
+            const auto max_svf_idx = *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+            if (max_svf_idx == std::numeric_limits<std::uint32_t>::max()) {
+                throw std::overflow_error(
+                    "An overflow condition was detected in the computation of a jet of Taylor derivatives");
+            }
 
-        // Extract the derivatives of the state variables from diff_arr.
+            // NOTE: <= because max_svf_idx is an index, not a size.
+            for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
+                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                                  order, i, batch_size));
+            }
+        }
+
+#if !defined(NDEBUG)
+        if (sv_funcs_dc.empty()) {
+            assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
+        } else {
+            const auto max_svf_idx = *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+            // NOTE: we use std::max<std::uint32_t>(n_eq, max_svf_idx + 1u) here because
+            // the sv funcs could all be aliases of the state variables themselves,
+            // in which case in the previous loop we ended up appending nothing.
+            assert(diff_arr.size()
+                   == static_cast<decltype(diff_arr.size())>(n_uvars) * order
+                          + std::max<std::uint32_t>(n_eq, max_svf_idx + 1u));
+        }
+#endif
+
+        // Extract the derivatives of the state variables and sv_funcs from diff_arr.
         std::vector<llvm::Value *> retval;
         for (std::uint32_t o = 0; o <= order; ++o) {
             for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
                 retval.push_back(taylor_fetch_diff(diff_arr, var_idx, o, n_uvars));
+            }
+            for (auto idx : sv_funcs_dc) {
+                retval.push_back(taylor_fetch_diff(diff_arr, idx, o, n_uvars));
             }
         }
 
@@ -3133,9 +3169,11 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Record the number of sv_funcs before consuming it.
+    const auto n_sv_funcs = sv_funcs.size();
+
     // Decompose the system of equations.
-    // TODO fix.
-    auto [dc, _] = taylor_decompose(std::move(sys), std::move(sv_funcs));
+    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), std::move(sv_funcs));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -3182,15 +3220,18 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     s.builder().SetInsertPoint(bb);
 
     // Compute the jet of derivatives.
-    auto diff_variant
-        = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
+    auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
+                                              batch_size, compact_mode);
 
     // Write the derivatives to in_out.
-    // NOTE: overflow checking. We need to be able to index into the jet array (size n_eq * (order + 1) * batch_size)
+    // NOTE: overflow checking. We need to be able to index into the jet array
+    // (size (n_eq + n_sv_funcs) * (order + 1) * batch_size)
     // using uint32_t.
     if (order == std::numeric_limits<std::uint32_t>::max()
         || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
-        || n_eq > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
+        || n_sv_funcs > std::numeric_limits<std::uint32_t>::max()
+        || n_eq > std::numeric_limits<std::uint32_t>::max() - n_sv_funcs
+        || n_eq + n_sv_funcs > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
         throw std::overflow_error("An overflow condition was detected while adding a Taylor jet");
     }
 
@@ -3215,17 +3256,48 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     } else {
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
+        // Write the order 0 of the sv_funcs.
+        for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
+            // Index in the jet of derivatives.
+            // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+            // state variables and sv_funcs (not all u vars), hence the indexing is
+            // n_eq + j.
+            const auto arr_idx = n_eq + j;
+            assert(arr_idx < diff_arr.size());
+            const auto val = diff_arr[arr_idx];
+
+            // Index in the output array.
+            const auto out_idx = (n_eq + j) * batch_size;
+
+            auto out_ptr = builder.CreateInBoundsGEP(in_out, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+            store_vector_to_memory(builder, out_ptr, val);
+        }
+
         for (decltype(diff_arr.size()) cur_order = 1; cur_order <= order; ++cur_order) {
             for (std::uint32_t j = 0; j < n_eq; ++j) {
                 // Index in the jet of derivatives.
                 // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
-                // state variables (not all u vars), hence the indexing is cur_order * n_eq + j.
-                const auto arr_idx = cur_order * n_eq + j;
+                // state variables and sv_funcs (not all u vars), hence the indexing is
+                // cur_order * (n_eq + n_sv_funcs) + j.
+                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
                 assert(arr_idx < diff_arr.size());
                 const auto val = diff_arr[arr_idx];
 
                 // Index in the output array.
-                const auto out_idx = n_eq * batch_size * cur_order + j * batch_size;
+                const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + j * batch_size;
+
+                auto out_ptr
+                    = builder.CreateInBoundsGEP(in_out, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                store_vector_to_memory(builder, out_ptr, val);
+            }
+
+            for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
+                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + n_eq + j;
+                assert(arr_idx < diff_arr.size());
+                const auto val = diff_arr[arr_idx];
+
+                const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + (n_eq + j) * batch_size;
+
                 auto out_ptr
                     = builder.CreateInBoundsGEP(in_out, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
                 store_vector_to_memory(builder, out_ptr, val);
@@ -3973,7 +4045,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
 
     // Decompose the system of equations.
     // TODO fix.
-    auto [dc, _] = taylor_decompose(std::move(sys), {});
+    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -4037,8 +4109,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     // Compute the jet of derivatives at the given order.
     // NOTE: in taylor_compute_jet() we ensure that n_uvars * order + n_eq
     // is representable as a 32-bit unsigned integer.
-    auto diff_variant
-        = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size, compact_mode);
+    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
+                                              batch_size, compact_mode);
 
     llvm::Value *max_abs_state, *max_abs_diff_o, *max_abs_diff_om1;
 
