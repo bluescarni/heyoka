@@ -2869,8 +2869,8 @@ template <typename T>
 llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
                                              llvm::Value *time_ptr,
                                              const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
-                                             std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
-                                             std::uint32_t batch_size)
+                                             const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
+                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &builder = s.builder();
 
@@ -2884,17 +2884,29 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // of the state variables.
     const auto sv_diff_gl = taylor_c_make_sv_diff_globals<T>(s, dc, n_uvars);
 
+    // Determine the maximum u variable index appearing in sv_funcs_dc, or zero
+    // if sv_funcs_dc is empty.
+    const auto max_svf_idx
+        = sv_funcs_dc.empty() ? std::uint32_t(0) : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
+
     // Prepare the array that will contain the jet of derivatives.
     // We will be storing all the derivatives of the u variables
-    // up to order 'order - 1', plus the derivatives of order
-    // 'order' of the state variables only.
+    // up to order 'order - 1', the derivatives of order
+    // 'order' of the state variables and the derivatives
+    // of order 'order' of the sv_funcs.
     // NOTE: the array size is specified as a 64-bit integer in the
     // LLVM API.
     // NOTE: fp_type is the original, scalar floating-point type.
     // It will be turned into a vector type (if necessary) by
     // make_vector_type() below.
+    // NOTE: if sv_funcs_dc is empty, or if all its indices are not greater
+    // than the indices of the state variables, then we don't need additional
+    // slots after the sv derivatives. If we need additional slots, allocate
+    // another full column of derivatives, as it is complicated at this stage
+    // to know exactly how many slots we will need.
     auto fp_type = llvm::cast<llvm::PointerType>(order0->getType())->getElementType();
-    auto array_type = llvm::ArrayType::get(make_vector_type(fp_type, batch_size), n_uvars * order + n_eq);
+    auto array_type = llvm::ArrayType::get(make_vector_type(fp_type, batch_size),
+                                           (max_svf_idx < n_eq) ? (n_uvars * order + n_eq) : (n_uvars * (order + 1u)));
 
     // Make the global array and fetch a pointer to its first element.
     // NOTE: we use a global array rather than a local one here because
@@ -2978,6 +2990,52 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute the last-order derivatives for the state variables.
     taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
 
+    if (!sv_funcs_dc.empty() && max_svf_idx >= n_eq) {
+        // sv_funcs contains one or more indices past the
+        // state variables.
+
+        // Iterate over the segments and compute the derivatives of order
+        // 'order' of the u variables until necessary (i.e., until we have
+        // the derivatives for all sv_funcs).
+
+        // Monitor the starting index of the current
+        // segment.
+        auto cur_u_idx = n_eq;
+
+        // NOTE: this is a slight repetition of compute_u_diffs() with a minor modification.
+        for (const auto &map : f_maps) {
+            for (const auto &p : map) {
+                const auto &func = p.first;
+                const auto ncalls = p.second.first;
+                const auto &gens = p.second.second;
+
+                assert(ncalls > 0u);
+                assert(!gens.empty());
+                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                    auto u_idx = gens[0](cur_call_idx);
+
+                    std::vector<llvm::Value *> args{builder.getInt32(order), u_idx, diff_arr, par_ptr, time_ptr};
+
+                    for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                        args.push_back(gens[i](cur_call_idx));
+                    }
+
+                    taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
+                                        builder.CreateCall(func, args));
+                });
+
+                cur_u_idx += ncalls;
+            }
+
+            if (cur_u_idx > max_svf_idx) {
+                // We computed all the necessary derivatives, break out.
+                break;
+            }
+        }
+    }
+
     // Return the array of derivatives of the u variables.
     return diff_arr;
 }
@@ -3057,7 +3115,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
         }
 
-        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, n_eq, n_uvars, order, batch_size);
+        return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
+                                                  batch_size);
     } else {
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
@@ -3165,6 +3224,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     }
 
     auto &builder = s.builder();
+    auto &context = s.context();
+    auto &module = s.module();
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -3237,21 +3298,80 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     if (compact_mode) {
         auto diff_arr = std::get<llvm::Value *>(diff_variant);
 
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                      [&](llvm::Value *cur_order) {
-                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
-                              // Load the derivative value from diff_arr.
-                              auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+        // Create a global read-only array containing the values in sv_funcs_dc, if any
+        // (otherwise, svf_ptr will be null).
+        auto svf_ptr = [&]() -> llvm::Value * {
+            if (n_sv_funcs > 0u) {
+                auto arr_type = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), n_sv_funcs);
+                std::vector<llvm::Constant *> sv_funcs_dc_const;
+                for (auto idx : sv_funcs_dc) {
+                    sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
+                }
+                auto sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
+                auto g_sv_funcs_dc = new llvm::GlobalVariable(module, sv_funcs_dc_arr->getType(), true,
+                                                              llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
 
-                              // Compute the index in the output pointer.
-                              auto out_idx
-                                  = builder.CreateAdd(builder.CreateMul(builder.getInt32(n_eq * batch_size), cur_order),
-                                                      builder.CreateMul(cur_idx, builder.getInt32(batch_size)));
+                // Get out a pointer to the beginning of the array.
+                return builder.CreateInBoundsGEP(g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
+            } else {
+                return nullptr;
+            }
+        }();
 
-                              // Store into in_out.
-                              store_vector_to_memory(builder, builder.CreateInBoundsGEP(in_out, {out_idx}), diff_val);
-                          });
-                      });
+        // Write the order 0 of the sv_funcs, if needed.
+        if (svf_ptr != nullptr) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
+                // Fetch the u var index from svf_ptr.
+                auto cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(svf_ptr, {arr_idx}));
+
+                // Load the derivative value from diff_arr.
+                auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx);
+
+                // Compute the index in the output pointer.
+                auto out_idx = builder.CreateMul(builder.CreateAdd(builder.getInt32(n_eq), arr_idx),
+                                                 builder.getInt32(batch_size));
+
+                // Store into in_out.
+                store_vector_to_memory(builder, builder.CreateInBoundsGEP(in_out, {out_idx}), diff_val);
+            });
+        }
+
+        // Write the other orders.
+        llvm_loop_u32(
+            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+            [&](llvm::Value *cur_order) {
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
+                    // Load the derivative value from diff_arr.
+                    auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+
+                    // Compute the index in the output pointer.
+                    auto out_idx = builder.CreateAdd(
+                        builder.CreateMul(builder.getInt32((n_eq + n_sv_funcs) * batch_size), cur_order),
+                        builder.CreateMul(cur_idx, builder.getInt32(batch_size)));
+
+                    // Store into in_out.
+                    store_vector_to_memory(builder, builder.CreateInBoundsGEP(in_out, {out_idx}), diff_val);
+                });
+
+                if (svf_ptr != nullptr) {
+                    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
+                        // Fetch the u var index from svf_ptr.
+                        auto cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(svf_ptr, {arr_idx}));
+
+                        // Load the derivative value from diff_arr.
+                        auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+
+                        // Compute the index in the output pointer.
+                        auto out_idx = builder.CreateAdd(
+                            builder.CreateMul(builder.getInt32((n_eq + n_sv_funcs) * batch_size), cur_order),
+                            builder.CreateMul(builder.CreateAdd(builder.getInt32(n_eq), arr_idx),
+                                              builder.getInt32(batch_size)));
+
+                        // Store into in_out.
+                        store_vector_to_memory(builder, builder.CreateInBoundsGEP(in_out, {out_idx}), diff_val);
+                    });
+                }
+            });
     } else {
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
