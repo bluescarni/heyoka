@@ -3170,7 +3170,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Record the number of sv_funcs before consuming it.
-    const auto n_sv_funcs = sv_funcs.size();
+    const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs.size());
 
     // Decompose the system of equations.
     auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), std::move(sv_funcs));
@@ -3229,7 +3229,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // using uint32_t.
     if (order == std::numeric_limits<std::uint32_t>::max()
         || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
-        || n_sv_funcs > std::numeric_limits<std::uint32_t>::max()
         || n_eq > std::numeric_limits<std::uint32_t>::max() - n_sv_funcs
         || n_eq + n_sv_funcs > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
         throw std::overflow_error("An overflow condition was detected while adding a Taylor jet");
