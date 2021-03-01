@@ -3234,7 +3234,9 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs.size());
 
     // Decompose the system of equations.
-    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), std::move(sv_funcs));
+    const auto td_res = taylor_decompose(std::move(sys), std::move(sv_funcs));
+    const auto &dc = td_res.first;
+    const auto &sv_funcs_dc = td_res.second;
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
