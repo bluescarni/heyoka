@@ -41,6 +41,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -1020,6 +1021,36 @@ std::uint32_t get_param_size(const expression &ex)
         ex.value());
 
     return retval;
+}
+
+// Determine if an expression contains the time function.
+bool has_time(const expression &ex)
+{
+    // If the expression itself is a time function,
+    // return true.
+    if (detail::is_time(ex)) {
+        return true;
+    }
+
+    // Otherwise:
+    // - if ex is a function, check if any of its arguments
+    //   contains the time function,
+    // - otherwise, return false.
+    return std::visit(
+        [](const auto &v) {
+            using type = detail::uncvref_t<decltype(v)>;
+
+            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+                for (const auto &a : v.args()) {
+                    if (has_time(a)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        },
+        ex.value());
 }
 
 } // namespace heyoka

@@ -120,6 +120,14 @@ TEST_CASE("stream output")
     REQUIRE(oss.str() == "(x + t)");
 }
 
+TEST_CASE("is_time")
+{
+    REQUIRE(!detail::is_time(1_dbl));
+    REQUIRE(!detail::is_time("x"_var));
+    REQUIRE(!detail::is_time(1_dbl + hy::time));
+    REQUIRE(detail::is_time(hy::time));
+}
+
 TEST_CASE("taylor time")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {

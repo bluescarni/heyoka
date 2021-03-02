@@ -358,6 +358,8 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, s
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
 
+HEYOKA_DLL_PUBLIC bool has_time(const expression &);
+
 namespace detail
 {
 

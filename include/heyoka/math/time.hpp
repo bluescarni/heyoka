@@ -51,6 +51,8 @@ public:
 #endif
 };
 
+HEYOKA_DLL_PUBLIC bool is_time(const expression &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC extern const expression time;
