@@ -2992,9 +2992,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     if (!sv_funcs_dc.empty() && max_svf_idx >= n_eq) {
         // sv_funcs contains one or more indices past the
-        // state variables.
-
-        // Iterate over the segments and compute the derivatives of order
+        // state variables. We will have to iterate over the
+        // segments and compute the derivatives of order
         // 'order' of the u variables until necessary (i.e., until we have
         // the derivatives for all sv_funcs).
 
