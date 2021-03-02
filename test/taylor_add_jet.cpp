@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cmath>
 #include <initializer_list>
 #include <vector>
 
@@ -16,6 +17,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
@@ -278,6 +280,45 @@ TEST_CASE("add jet sv_funcs")
                     REQUIRE(jet[21] == -4);
                     REQUIRE(jet[22] == 8);
                     REQUIRE(jet[23] == -4);
+                }
+
+                // Run an example in which the last sv func is not at the end of the decomposition.
+                {
+                    llvm_state s{kw::opt_level = opt_level};
+
+                    taylor_add_jet<double>(s, "jet", {prime(x) = cos(x) + x}, 3, 1, cm, ha, {cos(x)});
+
+                    s.compile();
+
+                    auto jptr
+                        = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
+
+                    std::vector<double> jet{-6};
+                    jet.resize((3 + 1) * 2);
+
+                    jptr(jet.data(), nullptr, nullptr);
+
+                    REQUIRE(jet[0] == -6);
+                    REQUIRE(jet[1] == approximately(std::cos(-6)));
+
+                    REQUIRE(jet[2] == approximately(std::cos(-6) - 6));
+                    REQUIRE(jet[3] == approximately(-std::sin(-6) * jet[2]));
+
+                    REQUIRE(jet[4] == approximately(.5 * (jet[2] - jet[2] * std::sin(jet[0]))));
+                    REQUIRE(
+                        jet[5]
+                        == approximately(.5 * (-(jet[2] * jet[2]) * std::cos(jet[0]) - std::sin(jet[0]) * jet[4] * 2)));
+
+                    REQUIRE(jet[6]
+                            == approximately(
+                                1 / 6.
+                                * (2 * jet[4] - 2 * jet[4] * std::sin(jet[0]) - jet[2] * jet[2] * std::cos(jet[0]))));
+                    REQUIRE(
+                        jet[7]
+                        == approximately(1 / 6.
+                                         * (-2 * jet[2] * 2 * jet[4] * std::cos(jet[0])
+                                            + jet[2] * jet[2] * jet[2] * std::sin(jet[0])
+                                            - jet[2] * std::cos(jet[0]) * 2 * jet[4] - std::sin(jet[0]) * 6 * jet[6])));
                 }
             }
         }
