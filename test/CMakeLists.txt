@@ -16,7 +16,7 @@ set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
 
 function(ADD_HEYOKA_TESTCASE arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas)
+  target_link_libraries(${arg1} PRIVATE heyoka_test heyoka xtensor xtensor-blas fmt::fmt)
   target_compile_definitions(${arg1} PRIVATE XTENSOR_USE_FLENS_BLAS)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
@@ -36,6 +36,8 @@ ADD_HEYOKA_TESTCASE(math_functions)
 ADD_HEYOKA_TESTCASE(func)
 ADD_HEYOKA_TESTCASE(gp)
 ADD_HEYOKA_TESTCASE(taylor_adaptive)
+ADD_HEYOKA_TESTCASE(taylor_decompose)
+ADD_HEYOKA_TESTCASE(taylor_add_jet)
 ADD_HEYOKA_TESTCASE(taylor_div)
 ADD_HEYOKA_TESTCASE(taylor_erf)
 ADD_HEYOKA_TESTCASE(taylor_exp)
