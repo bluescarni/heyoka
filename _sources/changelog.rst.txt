@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Provide the ability to compute the jet of derivatives
+  of arbitrary functions of the state variables
+  (`#104 <https://github.com/bluescarni/heyoka/pull/104>`__).
 - Speed-up the deep copy of just-in-time-compiled
   objects such as ``llvm_state`` and ``taylor_adaptive``
   (`#102 <https://github.com/bluescarni/heyoka/pull/102>`__).
