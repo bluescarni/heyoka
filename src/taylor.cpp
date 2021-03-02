@@ -3156,28 +3156,24 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, order, batch_size));
         }
 
-        // If there are sv funcs, we need to compute their last-order derivatives too.
-        if (!sv_funcs_dc.empty()) {
-            // We will need to compute the derivatives of the u variables up to
-            // the maximum index in sv_funcs_dc.
-            const auto max_svf_idx = *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
-            if (max_svf_idx == std::numeric_limits<std::uint32_t>::max()) {
-                throw std::overflow_error(
-                    "An overflow condition was detected in the computation of a jet of Taylor derivatives");
-            }
+        // If there are sv funcs, we need to compute their last-order derivatives too:
+        // we will need to compute the derivatives of the u variables up to
+        // the maximum index in sv_funcs_dc.
+        const auto max_svf_idx
+            = sv_funcs_dc.empty() ? std::uint32_t(0) : *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
 
-            // NOTE: <= because max_svf_idx is an index, not a size.
-            for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
-                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
-                                                  order, i, batch_size));
-            }
+        // NOTE: if there are no sv_funcs, max_svf_idx is set to zero
+        // above, thus we never enter the loop.
+        // NOTE: <= because max_svf_idx is an index, not a size.
+        for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
+            diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, order,
+                                              i, batch_size));
         }
 
 #if !defined(NDEBUG)
         if (sv_funcs_dc.empty()) {
             assert(diff_arr.size() == static_cast<decltype(diff_arr.size())>(n_uvars) * order + n_eq);
         } else {
-            const auto max_svf_idx = *std::max_element(sv_funcs_dc.begin(), sv_funcs_dc.end());
             // NOTE: we use std::max<std::uint32_t>(n_eq, max_svf_idx + 1u) here because
             // the sv funcs could all be aliases of the state variables themselves,
             // in which case in the previous loop we ended up appending nothing.
@@ -3238,6 +3234,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs.size());
 
     // Decompose the system of equations.
+    // NOTE: don't use structured bindings due to the
+    // usual issues with lambdas.
     const auto td_res = taylor_decompose(std::move(sys), std::move(sv_funcs));
     const auto &dc = td_res.first;
     const auto &sv_funcs_dc = td_res.second;
