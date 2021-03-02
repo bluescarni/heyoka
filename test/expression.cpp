@@ -426,3 +426,23 @@ TEST_CASE("neg simpls")
     REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
     REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
 }
+
+TEST_CASE("has time")
+{
+    namespace hy = heyoka;
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(!has_time(x));
+    REQUIRE(!has_time(y));
+    REQUIRE(!has_time(x + y));
+    REQUIRE(!has_time(1_dbl));
+    REQUIRE(!has_time(par[0]));
+    REQUIRE(!has_time(2_dbl - par[0]));
+
+    REQUIRE(has_time(hy::time));
+    REQUIRE(has_time(hy::time + 1_dbl));
+    REQUIRE(has_time(par[42] + hy::time));
+    REQUIRE(has_time((x + y) * (hy::time + 1_dbl)));
+    REQUIRE(has_time((x + y) * (par[0] * hy::time + 1_dbl)));
+}

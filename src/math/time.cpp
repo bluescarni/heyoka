@@ -225,6 +225,18 @@ llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t,
 
 #endif
 
+// Small helper to detect if an expression
+// is a time function.
+bool is_time(const expression &ex)
+{
+    if (auto func_ptr = std::get_if<func>(&ex.value());
+        func_ptr != nullptr && func_ptr->extract<time_impl>() != nullptr) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 } // namespace detail
 
 const expression time{func{detail::time_impl{}}};

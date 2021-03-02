@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add a couple of utilities to detect the presence of the time
+  function in an expression
+  (`#105 <https://github.com/bluescarni/heyoka/pull/105>`__).
 - Provide the ability to compute the jet of derivatives
   of arbitrary functions of the state variables
   (`#104 <https://github.com/bluescarni/heyoka/pull/104>`__).
