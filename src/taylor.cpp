@@ -2990,48 +2990,53 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute the last-order derivatives for the state variables.
     taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
 
-    if (!sv_funcs_dc.empty() && max_svf_idx >= n_eq) {
-        // sv_funcs contains one or more indices past the
-        // state variables. We will have to iterate over the
-        // segments and compute the derivatives of order
-        // 'order' of the u variables until necessary (i.e., until we have
-        // the derivatives for all sv_funcs).
+    // Compute the last-order derivatives for the sv_funcs, if any. Because the sv funcs
+    // correspond to u variables in the decomposition, we will have to compute the
+    // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
+    // have been properly computed.
 
-        // Monitor the starting index of the current
-        // segment.
-        auto cur_u_idx = n_eq;
+    // Monitor the starting index of the current
+    // segment while iterating on f_maps.
+    auto cur_start_u_idx = n_eq;
 
-        // NOTE: this is a slight repetition of compute_u_diffs() with a minor modification.
-        for (const auto &map : f_maps) {
-            for (const auto &p : map) {
-                const auto &func = p.first;
-                const auto ncalls = p.second.first;
-                const auto &gens = p.second.second;
+    // NOTE: this is a slight repetition of compute_u_diffs() with minor modifications.
+    for (const auto &map : f_maps) {
+        if (cur_start_u_idx > max_svf_idx) {
+            // We computed all the necessary derivatives, break out.
+            // NOTE: if we did not have sv_funcs to begin with,
+            // max_svf_idx is zero and we exit at the first iteration
+            // without doing anything. If all sv funcs alias state variables,
+            // then max_svf_idx < n_eq and thus we also exit immediately
+            // at the first iteration.
+            break;
+        }
 
-                assert(ncalls > 0u);
-                assert(!gens.empty());
-                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        for (const auto &p : map) {
+            const auto &func = p.first;
+            const auto ncalls = p.second.first;
+            const auto &gens = p.second.second;
 
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                    auto u_idx = gens[0](cur_call_idx);
+            assert(ncalls > 0u);
+            assert(!gens.empty());
+            assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
 
-                    std::vector<llvm::Value *> args{builder.getInt32(order), u_idx, diff_arr, par_ptr, time_ptr};
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                auto u_idx = gens[0](cur_call_idx);
 
-                    for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                        args.push_back(gens[i](cur_call_idx));
-                    }
+                std::vector<llvm::Value *> args{builder.getInt32(order), u_idx, diff_arr, par_ptr, time_ptr};
 
-                    taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
-                                        builder.CreateCall(func, args));
-                });
+                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                    args.push_back(gens[i](cur_call_idx));
+                }
 
-                cur_u_idx += ncalls;
-            }
+                taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
+                                    builder.CreateCall(func, args));
+            });
 
-            if (cur_u_idx > max_svf_idx) {
-                // We computed all the necessary derivatives, break out.
-                break;
-            }
+            // Update cur_start_u_idx taking advantage of the fact
+            // that each block in a segment processes the derivatives
+            // of exactly ncalls u variables.
+            cur_start_u_idx += ncalls;
         }
     }
 
