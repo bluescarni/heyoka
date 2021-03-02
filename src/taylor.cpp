@@ -4167,7 +4167,8 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    // TODO fix.
+    // NOTE: this will have to be adapted to support
+    // sv_funcs.
     auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
 
     // Compute the number of u variables.
@@ -4584,7 +4585,8 @@ auto taylor_add_custom_step_impl(llvm_state &s, const std::string &name, U sys, 
     std::optional<opt_disabler> od(s);
 
     // Add the function for the computation of the jet of derivatives.
-    // TODO fix.
+    // NOTE: this will have to be adapted to support
+    // sv_funcs.
     auto dc
         = taylor_add_jet_impl<T>(s, name + "_jet", std::move(sys), order, batch_size, high_accuracy, compact_mode, {});
 
