@@ -64,6 +64,7 @@ If you prefer using Python rather than C++, heyoka can be used from Python via
 
    install.rst
    basic_tutorials.rst
+   advanced_tutorials.rst
    ad_notes.rst
    changelog.rst
    bibliography.rst
