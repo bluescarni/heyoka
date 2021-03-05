@@ -71,7 +71,7 @@ int main()
 
     // Iterate over the vector of outcomes
     // and print them to screen.
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         auto [oc, h] = ta.get_step_res()[i];
 
         std::cout << "Batch index " << i << ": (" << oc << ", " << h << ")\n";
@@ -85,7 +85,7 @@ int main()
     // of the timesteps.
     ta.step({0.010, 0.011, 0.012, 0.013});
 
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         auto [oc, h] = ta.get_step_res()[i];
 
         std::cout << "Batch index " << i << ": (" << oc << ", " << h << ")\n";
@@ -96,7 +96,7 @@ int main()
 
     // Propagate for different time intervals.
     ta.propagate_for({10., 11., 12., 13.});
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         auto [oc, min_h, max_h, nsteps] = ta.get_propagate_res()[i];
 
         std::cout << "Batch index " << i << ": (" << oc << ", " << min_h << ", " << max_h << ", " << nsteps << ")\n";
@@ -106,7 +106,7 @@ int main()
 
     // Propagate up to different time coordinates.
     ta.propagate_until({20., 21., 22., 23.});
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         auto [oc, min_h, max_h, nsteps] = ta.get_propagate_res()[i];
 
         std::cout << "Batch index " << i << ": (" << oc << ", " << min_h << ", " << max_h << ", " << nsteps << ")\n";
