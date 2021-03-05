@@ -50,7 +50,7 @@ TEST_CASE("batch consistency")
     t_arr = xt::xarray<double>{0.1, 0.2, 0.3, 0.4};
 
     std::vector<taylor_adaptive<double>> t_scal;
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         t_scal.push_back(taylor_adaptive<double>({prime(x) = v, prime(v) = cos(hy::time) - par[0] * v - sin(x)},
                                                  {s_arr(0, i), s_arr(1, i)}, kw::pars = {p_arr(0, i)}));
 
@@ -59,7 +59,7 @@ TEST_CASE("batch consistency")
 
     ta.propagate_until({20, 21, 22, 23});
 
-    for (auto i = 0; i < batch_size; ++i) {
+    for (auto i = 0u; i < batch_size; ++i) {
         t_scal[i].propagate_until(20 + i);
 
         REQUIRE(t_scal[i].get_state()[0] == approximately(s_arr(0, i)));
