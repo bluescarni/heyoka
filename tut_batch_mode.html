@@ -1,0 +1,797 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Batch mode &#8212; heyoka 0.6.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.37f24b989f4638ff9c27c22dc7559d4f.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="prev" title="Advanced tutorials" href="advanced_tutorials.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  <img src="_static/white_logo.png" class="logo" alt="logo">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.6.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_param.html">
+     Runtime parameters
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_nonauto.html">
+     Non-autonomous systems
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_d_output.html">
+     Dense output
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <ul class="current collapse-ul">
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Batch mode
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ad_notes.html">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_batch_mode.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_batch_mode.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                    title="Fullscreen mode"><i
+                        class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#the-adaptive-batch-integrator">
+   The adaptive batch integrator
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#full-code-listing">
+   Full code listing
+  </a>
+ </li>
+</ul>
+
+        </nav>
+        
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="batch-mode">
+<span id="tut-batch-mode"></span><h1>Batch mode<a class="headerlink" href="#batch-mode" title="Permalink to this headline">¶</a></h1>
+<p>heyoka’s API supports a mode of operation called <em>batch mode</em>.
+In batch mode, all the scalar quantities appearing in a system of ODEs
+(i.e., state variables, time coordinate, parameters, etc.)
+are formally replaced by small vectors of fixed size <span class="math notranslate nohighlight">\(n\)</span>, so that,
+effectively, multiple ODE systems sharing the same mathematical formulation
+are being integrated simultaneously using different sets of numerical values.</p>
+<p>Because modern CPUs support <a class="reference external" href="https://en.wikipedia.org/wiki/SIMD">SIMD instructions</a>,
+the runtime cost of operating on a vector of <span class="math notranslate nohighlight">\(n\)</span> scalar values is roughly
+equivalent to the cost of operating on a single scalar value, and thus the use of
+batch mode can lead to an increase in floating-point throughput up to a factor of <span class="math notranslate nohighlight">\(n\)</span>.</p>
+<p>It is important to emphasise that batch mode does not reduce
+the CPU time required to integrate a system of ODEs. Rather, as a fine-grained
+form of data parallelism, batch mode allows to integrate multiple ODE systems in parallel
+at no additional cost, and it is thus most useful when the need arise
+to integrate the same ODE system with different initial conditions and parameters.</p>
+<p>Although batch mode can in principle be used with all floating-point types supported
+by heyoka, in practice at this time no CPU provides SIMD instructions for extended-precision
+datatypes. Thus, here we will consider the application of batch mode only to
+standard <code class="docutils literal notranslate"><span class="pre">double</span></code> precision computations.</p>
+<p>The value of the batch size <span class="math notranslate nohighlight">\(n\)</span> can be freely chosen by the user. In order
+to achieve optimal performance, however, <span class="math notranslate nohighlight">\(n\)</span> should match the SIMD width of the
+processor in use. Because at this time the most widespread SIMD instruction set is
+<a class="reference external" href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">AVX</a> (available on
+most x86 processors sold since 2011), in this tutorial we will be using a
+batch size <span class="math notranslate nohighlight">\(n=4\)</span>.</p>
+<div class="section" id="the-adaptive-batch-integrator">
+<h2>The adaptive batch integrator<a class="headerlink" href="#the-adaptive-batch-integrator" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code> class is the batch mode counterpart of the adaptive
+(scalar) integrator <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">described earlier</span></a>. Although at a high-level
+the API of <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code> is quite similar to the API of
+<code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>, there are also some important differences that need to be
+pointed out.</p>
+<p>In order to present a comprehensive example, we will consider again the integration
+of the <a class="reference internal" href="tut_nonauto.html#tut-nonauto"><span class="std std-ref">forced damped pendulum</span></a>, with a small modification:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = \cos t - \alpha v - \sin(x)
+\end{cases}.\end{split}\]</div>
+<p>Here <span class="math notranslate nohighlight">\(\alpha\)</span> is an air friction coefficient whose value is left undefined
+(i.e., <span class="math notranslate nohighlight">\(\alpha\)</span> is a <a class="reference internal" href="tut_param.html#tut-param"><span class="std std-ref">runtime parameter</span></a>).</p>
+<p>Let us take a look at the first few lines of the C++ code:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// We will be using a batch size of 4.</span>
+    <span class="k">const</span> <span class="k">auto</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>As usual, we begin by creating the symbolic state variables <code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code>.
+We also store in a constant the value of the batch size <span class="math notranslate nohighlight">\(n = 4\)</span> for later use.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create flat 1D vectors to hold the system state</span>
+    <span class="c1">// and the runtime parameters.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">state</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">batch_size</span><span class="p">),</span> <span class="n">pars</span><span class="p">(</span><span class="mi">1</span> <span class="o">*</span> <span class="n">batch_size</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>We then create two memory buffers to hold, respectively, the state of the
+system and the values of the runtime parameter <span class="math notranslate nohighlight">\(\alpha\)</span>. Because we are operating
+in batch mode, we need to store <span class="math notranslate nohighlight">\(2\times n\)</span> values for the state variables
+and <span class="math notranslate nohighlight">\(1\times n\)</span> values for the (only) runtime parameter.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create xtensor adaptors on the state and</span>
+    <span class="c1">// parameters vectors for ease of indexing.</span>
+    <span class="k">auto</span> <span class="n">s_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">state</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+    <span class="k">auto</span> <span class="n">p_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">pars</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+</pre></div>
+</div>
+<p>Next, we create two <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor</a> adaptors
+on the memory buffers that we just created. These adaptors will allow us
+to index into the state and parameters vectors as if they were 2D arrays. Note that these
+adaptors do not perform any copy of the original data, rather they just provide
+an alternative view of the underlying memory buffers. Because heyoka requires elements
+of a batch to be stored contiguously, the adaptors are set up with, respectively, 2 and 1
+rows, and <span class="math notranslate nohighlight">\(n\)</span> columns.</p>
+<p>The next step is the setup of the initial conditions and of the values of the parameter <span class="math notranslate nohighlight">\(\alpha\)</span>:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Setup the initial conditions.</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">s_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">,</span> <span class="mf">0.04</span><span class="p">};</span> <span class="c1">// x_0</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">s_arr</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">1.85</span><span class="p">,</span> <span class="mf">1.86</span><span class="p">,</span> <span class="mf">1.87</span><span class="p">,</span> <span class="mf">1.88</span><span class="p">};</span> <span class="c1">// v_0</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Setup the parameter values.</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">p_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.11</span><span class="p">,</span> <span class="mf">0.12</span><span class="p">,</span> <span class="mf">0.13</span><span class="p">};</span> <span class="c1">// alpha</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Parameters array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">p_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Here we are using xtensor’s indexing capabilities to assign the batch of initial values
+<span class="math notranslate nohighlight">\(x_0=\left( 0.01, 0.02, 0.03, 0.04 \right)\)</span> and
+<span class="math notranslate nohighlight">\(v_0=\left( 1.85, 1.86, 1.87, 1.88 \right)\)</span>, and the values for the parameter
+<span class="math notranslate nohighlight">\(\alpha = \left( 0.10, 0.11, 0.12, 0.13 \right)\)</span>. Note the the syntax
+<code class="docutils literal notranslate"><span class="pre">xt::view(s_arr,</span> <span class="pre">0,</span> <span class="pre">xt::all())</span></code> would be equivalent, in NumPy, to <code class="docutils literal notranslate"><span class="pre">s_arr[0,</span> <span class="pre">:]</span></code>.
+We can verify that the values were correctly assigned by printing to screen the contents
+of the arrays:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">State array:</span>
+<span class="go">{{ 0.01,  0.02,  0.03,  0.04},</span>
+<span class="go"> { 1.85,  1.86,  1.87,  1.88}}</span>
+
+<span class="go">Parameters array:</span>
+<span class="go">{{ 0.1 ,  0.11,  0.12,  0.13}}</span>
+</pre></div>
+</div>
+<p>We are now ready to create the integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                            <span class="c1">// x&#39; = v</span>
+                                            <span class="c1">// v&#39; = cos(t) - alpha*v - sin(x)</span>
+                                            <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="n">cos</span><span class="p">(</span><span class="n">hy</span><span class="o">::</span><span class="n">time</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                            <span class="c1">// Initial conditions</span>
+                                            <span class="c1">// for x and v.</span>
+                                            <span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">state</span><span class="p">),</span>
+                                            <span class="c1">// The batch size.</span>
+                                            <span class="n">batch_size</span><span class="p">,</span>
+                                            <span class="c1">// The vector of parameters.</span>
+                                            <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">pars</span><span class="p">)};</span>
+</pre></div>
+</div>
+<p>The constructor of <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code> is very similar to the constructor of
+<code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>: it has the same mandatory and optional arguments, plus an extra
+mandatory argument representing the batch size. Note that it is important that
+<code class="docutils literal notranslate"><span class="pre">state</span></code> and <code class="docutils literal notranslate"><span class="pre">pars</span></code> are moved into the constructor (rather than merely copied),
+so that the adaptors <code class="docutils literal notranslate"><span class="pre">s_arr</span></code> and <code class="docutils literal notranslate"><span class="pre">p_arr</span></code> will now refer to the state
+and parameters vectors stored inside the integrator object. These vectors can
+also be accessed directly using member functions such as <code class="docutils literal notranslate"><span class="pre">get_state()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code>, <code class="docutils literal notranslate"><span class="pre">get_pars()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code>, as showed
+in previous tutorials.</p>
+<p>Because we didn’t provide values for the initial times, the time coordinates are
+all initialised to zero, as we can verify by printing to screen the time array:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create an adaptor for the time array and</span>
+    <span class="c1">// print its contents.</span>
+    <span class="k">auto</span> <span class="n">t_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time_data</span><span class="p">(),</span> <span class="p">{</span><span class="n">batch_size</span><span class="p">});</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Time array: { 0.,  0.,  0.,  0.}</span>
+</pre></div>
+</div>
+<p>We are now ready to start integrating. Like <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>, <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code>
+provides <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions for integrating forward or backward in time step-by-step.
+One important difference is that, in order to avoid costly memory allocations,
+the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions of the batch integrator do not return anything. Rather, the
+batch integrator maintains an internal vector of outcomes which is updated at the
+end of each timestep. Let’s take a look:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Perform a single step forward in time.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+
+    <span class="c1">// Iterate over the vector of outcomes</span>
+    <span class="c1">// and print them to screen.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_step_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Batch index 0: (taylor_outcome::success, 0.205801)</span>
+<span class="go">Batch index 1: (taylor_outcome::success, 0.20587)</span>
+<span class="go">Batch index 2: (taylor_outcome::success, 0.204791)</span>
+<span class="go">Batch index 3: (taylor_outcome::success, 0.203963)</span>
+</pre></div>
+</div>
+<p>We can see how the integration timestep was successful for all elements of the batch,
+and how slightly different timesteps were chosen for each element of the batch.</p>
+<p>Let’s also print to screen the updated state and time arrays:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">State array:</span>
+<span class="go">{{ 0.404885,  0.416439,  0.425714,  0.435479},</span>
+<span class="go"> { 1.973176,  1.976935,  1.980292,  1.983766}}</span>
+
+<span class="go">Time array:</span>
+<span class="go">{ 0.205801,  0.20587 ,  0.204791,  0.203963}</span>
+</pre></div>
+</div>
+<p>Note that because the initial conditions were all set to similar values,
+the state of the system after a single timestep also does not change much
+across the batch elements.</p>
+<p>Like for <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>, the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function can be invoked with
+a vector of time limits: if the adaptive timesteps
+selected by heyoka are larger (in absolute value) than the specified limits,
+then the timesteps will be clamped.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Perform a single step forward in time</span>
+    <span class="c1">// clamping the maximum absolute values</span>
+    <span class="c1">// of the timesteps.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">({</span><span class="mf">0.010</span><span class="p">,</span> <span class="mf">0.011</span><span class="p">,</span> <span class="mf">0.012</span><span class="p">,</span> <span class="mf">0.013</span><span class="p">});</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_step_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Batch index 0: (taylor_outcome::time_limit, 0.01)</span>
+<span class="go">Batch index 1: (taylor_outcome::time_limit, 0.011)</span>
+<span class="go">Batch index 2: (taylor_outcome::time_limit, 0.012)</span>
+<span class="go">Batch index 3: (taylor_outcome::time_limit, 0.013)</span>
+
+<span class="go">State array:</span>
+<span class="go">{{ 0.424636,  0.438206,  0.449501,  0.461293},</span>
+<span class="go"> { 1.97695 ,  1.980738,  1.984087,  1.987488}}</span>
+
+<span class="go">Time array:</span>
+<span class="go">{ 0.215801,  0.21687 ,  0.216791,  0.216963}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions are also available for the
+batch integrator. Similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions, the outcomes of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code>
+functions are stored in internal vectors of tuples, with the tuple elements representing:</p>
+<ul class="simple">
+<li><p>the outcome of the integration,</p></li>
+<li><p>the minimum and maximum integration timesteps
+that were used in the propagation,</p></li>
+<li><p>the total number of steps that were taken.</p></li>
+</ul>
+<p>Let’s see a couple of examples:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for different time intervals.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">10.</span><span class="p">,</span> <span class="mf">11.</span><span class="p">,</span> <span class="mf">12.</span><span class="p">,</span> <span class="mf">13.</span><span class="p">});</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_propagate_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate up to different time coordinates.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">({</span><span class="mf">20.</span><span class="p">,</span> <span class="mf">21.</span><span class="p">,</span> <span class="mf">22.</span><span class="p">,</span> <span class="mf">23.</span><span class="p">});</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_propagate_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Batch index 0: (taylor_outcome::time_limit, 0.197348, 0.428668, 34)</span>
+<span class="go">Batch index 1: (taylor_outcome::time_limit, 0.191913, 0.429224, 38)</span>
+<span class="go">Batch index 2: (taylor_outcome::time_limit, 0.188229, 0.433903, 41)</span>
+<span class="go">Batch index 3: (taylor_outcome::time_limit, 0.184475, 0.464741, 44)</span>
+
+<span class="go">State array:</span>
+<span class="go">{{ 4.612543,  2.727621,  1.123953,  0.173771},</span>
+<span class="go"> {-2.246896, -1.917584, -1.783502, -1.11716 }}</span>
+
+<span class="go">Time array:</span>
+<span class="go">{ 10.215801,  11.21687 ,  12.216791,  13.216963}</span>
+
+<span class="go">Batch index 0: (taylor_outcome::time_limit, 0.204735, 0.307217, 40)</span>
+<span class="go">Batch index 1: (taylor_outcome::time_limit, 0.211805, 0.317214, 38)</span>
+<span class="go">Batch index 2: (taylor_outcome::time_limit, 0.224914, 0.410416, 35)</span>
+<span class="go">Batch index 3: (taylor_outcome::time_limit, 0.213014, 0.371655, 34)</span>
+
+<span class="go">State array:</span>
+<span class="go">{{ 1.801537,  2.833631,  3.399033,  6.072237},</span>
+<span class="go"> { 1.36256 ,  0.503107, -0.06062 ,  0.81854 }}</span>
+
+<span class="go">Time array:</span>
+<span class="go">{ 20.,  21.,  22.,  23.}</span>
+</pre></div>
+</div>
+<p>The batch integrator also supports <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. Like for <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>,
+enabling dense output is a two-step process. First we invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
+with the optional flag set to <code class="docutils literal notranslate"><span class="pre">True</span></code>. This will write the Taylor coefficients that were
+used to propagate the last timestep into an internal vector. Let’s also create an adaptor
+over this vector for ease of indexing:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for another timestep, making</span>
+    <span class="c1">// sure the Taylor coefficients are recorded.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="nb">true</span><span class="p">);</span>
+
+    <span class="c1">// Create an xtensor adaptor over the</span>
+    <span class="c1">// vector of Taylor coefficients.</span>
+    <span class="k">auto</span> <span class="n">tc_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_tc</span><span class="p">(),</span> <span class="p">{</span><span class="c1">// First dimension: number of state variables.</span>
+                                          <span class="mi">2</span><span class="p">,</span>
+                                          <span class="c1">// Second dimension: total number of orders for</span>
+                                          <span class="c1">// the Taylor coefficients.</span>
+                                          <span class="kt">int</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_order</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                                          <span class="c1">// Third dimension: batch size.</span>
+                                          <span class="n">batch_size</span><span class="p">});</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Array of Taylor coefficients:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">tc_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Array of Taylor coefficients:</span>
+<span class="go">{{{ 1.801537e+00,  2.833631e+00,  3.399033e+00,  6.072237e+00},</span>
+<span class="go">  { 1.362560e+00,  5.031073e-01, -6.062030e-02,  8.185404e-01},</span>
+<span class="go">  {-3.508356e-01, -4.530940e-01, -3.690403e-01, -2.149280e-01},</span>
+<span class="go">  {-8.852698e-02, -4.292286e-02,  6.466405e-03,  1.695101e-02},</span>
+<span class="go">  { 5.383037e-02, -8.782188e-03,  1.169218e-02,  3.331864e-02},</span>
+<span class="go">  {-2.257045e-02,  6.540328e-04, -3.247063e-04, -2.436106e-03},</span>
+<span class="go">  {-2.741537e-03,  1.561782e-03, -1.558171e-03, -4.247622e-03},</span>
+<span class="go">  { 5.787575e-03, -1.040219e-03,  1.346095e-04,  5.888381e-04},</span>
+<span class="go">  {-1.631527e-03,  1.131481e-04,  1.576557e-04,  3.288048e-04},</span>
+<span class="go">  {-5.334194e-04,  6.543342e-05, -9.001253e-06, -1.209411e-04},</span>
+<span class="go">  { 5.504048e-04, -8.585946e-06, -6.654560e-06, -8.597949e-06},</span>
+<span class="go">  {-1.163014e-04,  9.694202e-06,  3.026559e-07,  1.801841e-05},</span>
+<span class="go">  {-7.225493e-05, -2.188738e-06,  4.551510e-07, -3.366484e-06},</span>
+<span class="go">  { 5.707623e-05,  2.686672e-08, -4.619774e-08, -1.767741e-06},</span>
+<span class="go">  {-7.955589e-06,  2.877763e-07, -3.207529e-08,  8.982967e-07},</span>
+<span class="go">  {-9.701333e-06, -1.598994e-07,  1.713127e-10,  4.169540e-08},</span>
+<span class="go">  { 6.053724e-06,  2.748795e-08, -9.273869e-10, -1.395324e-07},</span>
+<span class="go">  {-3.664674e-07, -3.468361e-09,  5.812755e-10,  2.711640e-08},</span>
+<span class="go">  {-1.269841e-06, -3.437010e-09,  2.916397e-10,  1.403129e-08},</span>
+<span class="go">  { 6.459461e-07,  1.941421e-09, -6.667302e-11, -7.361741e-09},</span>
+<span class="go">  { 1.902250e-08, -7.307133e-10, -3.357923e-11, -3.211871e-10}},</span>
+<span class="go"> {{ 1.362560e+00,  5.031073e-01, -6.062030e-02,  8.185404e-01},</span>
+<span class="go">  {-7.016711e-01, -9.061880e-01, -7.380806e-01, -4.298560e-01},</span>
+<span class="go">  {-2.655809e-01, -1.287686e-01,  1.939922e-02,  5.085302e-02},</span>
+<span class="go">  { 2.153215e-01, -3.512875e-02,  4.676871e-02,  1.332746e-01},</span>
+<span class="go">  {-1.128522e-01,  3.270164e-03, -1.623531e-03, -1.218053e-02},</span>
+<span class="go">  {-1.644922e-02,  9.370692e-03, -9.349029e-03, -2.548573e-02},</span>
+<span class="go">  { 4.051302e-02, -7.281531e-03,  9.422663e-04,  4.121867e-03},</span>
+<span class="go">  {-1.305222e-02,  9.051852e-04,  1.261245e-03,  2.630438e-03},</span>
+<span class="go">  {-4.800774e-03,  5.889008e-04, -8.101127e-05, -1.088470e-03},</span>
+<span class="go">  { 5.504048e-03, -8.585946e-05, -6.654560e-05, -8.597949e-05},</span>
+<span class="go">  {-1.279316e-03,  1.066362e-04,  3.329215e-06,  1.982025e-04},</span>
+<span class="go">  {-8.670591e-04, -2.626486e-05,  5.461812e-06, -4.039781e-05},</span>
+<span class="go">  { 7.419910e-04,  3.492673e-07, -6.005706e-07, -2.298064e-05},</span>
+<span class="go">  {-1.113782e-04,  4.028868e-06, -4.490541e-07,  1.257615e-05},</span>
+<span class="go">  {-1.455200e-04, -2.398491e-06,  2.569691e-09,  6.254310e-07},</span>
+<span class="go">  { 9.685958e-05,  4.398072e-07, -1.483819e-08, -2.232518e-06},</span>
+<span class="go">  {-6.229946e-06, -5.896214e-08,  9.881684e-09,  4.609788e-07},</span>
+<span class="go">  {-2.285714e-05, -6.186618e-08,  5.249515e-09,  2.525632e-07},</span>
+<span class="go">  { 1.227298e-05,  3.688699e-08, -1.266787e-09, -1.398731e-07},</span>
+<span class="go">  { 3.804500e-07, -1.461427e-08, -6.715846e-10, -6.423741e-09},</span>
+<span class="go">  {-3.444138e-06,  2.634318e-09,  1.671414e-10,  2.478574e-08}}}</span>
+</pre></div>
+</div>
+<p>Quite a mouthful! Let’s print to screen the order-0 Taylor coefficients
+of <code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code> for all batch elements:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Order-0 x: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">tc_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Order-0 v: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">tc_arr</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Order-0 x: { 1.801537,  2.833631,  3.399033,  6.072237}</span>
+<span class="go">Order-0 v: { 1.36256 ,  0.503107, -0.06062 ,  0.81854 }</span>
+</pre></div>
+</div>
+<p>Indeed, as expected the order-0 Taylor coefficients correspond to the initial
+conditions at the beginning of the previous timestep (see earlier screen output).</p>
+<p>After computing the Taylor coefficients, we can ask for the dense output
+at different time coordinates:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Compute the dense output at different time coordinates,</span>
+    <span class="c1">// and create an xtensor adaptor on the dense output</span>
+    <span class="c1">// for ease of indexing.</span>
+    <span class="k">auto</span> <span class="n">d_out_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">({</span><span class="mf">20.1</span><span class="p">,</span> <span class="mf">21.1</span><span class="p">,</span> <span class="mf">22.1</span><span class="p">,</span> <span class="mf">23.1</span><span class="p">}),</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">Dense output:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Dense output:</span>
+<span class="go">{{ 1.934202,  2.879367,  3.389288,  6.151962},</span>
+<span class="go"> { 1.289941,  0.411166, -0.134188,  0.776195}}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="full-code-listing">
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;cstddef&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;utility&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;xtensor/xadapt.hpp&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;xtensor/xarray.hpp&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;xtensor/xio.hpp&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;xtensor/xview.hpp&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+<span class="k">namespace</span> <span class="n">hy</span> <span class="o">=</span> <span class="n">heyoka</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// We will be using a batch size of 4.</span>
+    <span class="k">const</span> <span class="k">auto</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+
+    <span class="c1">// Create flat 1D vectors to hold the system state</span>
+    <span class="c1">// and the runtime parameters.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">state</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">batch_size</span><span class="p">),</span> <span class="n">pars</span><span class="p">(</span><span class="mi">1</span> <span class="o">*</span> <span class="n">batch_size</span><span class="p">);</span>
+
+    <span class="c1">// Create xtensor adaptors on the state and</span>
+    <span class="c1">// parameters vectors for ease of indexing.</span>
+    <span class="k">auto</span> <span class="n">s_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">state</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+    <span class="k">auto</span> <span class="n">p_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">pars</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+
+    <span class="c1">// Setup the initial conditions.</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">s_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">,</span> <span class="mf">0.04</span><span class="p">};</span> <span class="c1">// x_0</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">s_arr</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">1.85</span><span class="p">,</span> <span class="mf">1.86</span><span class="p">,</span> <span class="mf">1.87</span><span class="p">,</span> <span class="mf">1.88</span><span class="p">};</span> <span class="c1">// v_0</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Setup the parameter values.</span>
+    <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">p_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">xarray</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="mf">0.10</span><span class="p">,</span> <span class="mf">0.11</span><span class="p">,</span> <span class="mf">0.12</span><span class="p">,</span> <span class="mf">0.13</span><span class="p">};</span> <span class="c1">// alpha</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Parameters array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">p_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                            <span class="c1">// x&#39; = v</span>
+                                            <span class="c1">// v&#39; = cos(t) - alpha*v - sin(x)</span>
+                                            <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="n">cos</span><span class="p">(</span><span class="n">hy</span><span class="o">::</span><span class="n">time</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                            <span class="c1">// Initial conditions</span>
+                                            <span class="c1">// for x and v.</span>
+                                            <span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">state</span><span class="p">),</span>
+                                            <span class="c1">// The batch size.</span>
+                                            <span class="n">batch_size</span><span class="p">,</span>
+                                            <span class="c1">// The vector of parameters.</span>
+                                            <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">pars</span><span class="p">)};</span>
+
+    <span class="c1">// Create an adaptor for the time array and</span>
+    <span class="c1">// print its contents.</span>
+    <span class="k">auto</span> <span class="n">t_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_time_data</span><span class="p">(),</span> <span class="p">{</span><span class="n">batch_size</span><span class="p">});</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a single step forward in time.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+
+    <span class="c1">// Iterate over the vector of outcomes</span>
+    <span class="c1">// and print them to screen.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_step_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Perform a single step forward in time</span>
+    <span class="c1">// clamping the maximum absolute values</span>
+    <span class="c1">// of the timesteps.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">({</span><span class="mf">0.010</span><span class="p">,</span> <span class="mf">0.011</span><span class="p">,</span> <span class="mf">0.012</span><span class="p">,</span> <span class="mf">0.013</span><span class="p">});</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_step_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate for different time intervals.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">10.</span><span class="p">,</span> <span class="mf">11.</span><span class="p">,</span> <span class="mf">12.</span><span class="p">,</span> <span class="mf">13.</span><span class="p">});</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_propagate_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate up to different time coordinates.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">({</span><span class="mf">20.</span><span class="p">,</span> <span class="mf">21.</span><span class="p">,</span> <span class="mf">22.</span><span class="p">,</span> <span class="mf">23.</span><span class="p">});</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">auto</span> <span class="p">[</span><span class="n">oc</span><span class="p">,</span> <span class="n">min_h</span><span class="p">,</span> <span class="n">max_h</span><span class="p">,</span> <span class="n">nsteps</span><span class="p">]</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_propagate_res</span><span class="p">()[</span><span class="n">i</span><span class="p">];</span>
+
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Batch index &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;: (&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">min_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">max_h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">nsteps</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">State array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">s_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Time array:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Propagate for another timestep, making</span>
+    <span class="c1">// sure the Taylor coefficients are recorded.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">(</span><span class="nb">true</span><span class="p">);</span>
+
+    <span class="c1">// Create an xtensor adaptor over the</span>
+    <span class="c1">// vector of Taylor coefficients.</span>
+    <span class="k">auto</span> <span class="n">tc_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_tc</span><span class="p">(),</span> <span class="p">{</span><span class="c1">// First dimension: number of state variables.</span>
+                                          <span class="mi">2</span><span class="p">,</span>
+                                          <span class="c1">// Second dimension: total number of orders for</span>
+                                          <span class="c1">// the Taylor coefficients.</span>
+                                          <span class="kt">int</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_order</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                                          <span class="c1">// Third dimension: batch size.</span>
+                                          <span class="n">batch_size</span><span class="p">});</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Array of Taylor coefficients:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">tc_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Order-0 x: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">tc_arr</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Order-0 v: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">xt</span><span class="o">::</span><span class="n">view</span><span class="p">(</span><span class="n">tc_arr</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">xt</span><span class="o">::</span><span class="n">all</span><span class="p">())</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Compute the dense output at different time coordinates,</span>
+    <span class="c1">// and create an xtensor adaptor on the dense output</span>
+    <span class="c1">// for ease of indexing.</span>
+    <span class="k">auto</span> <span class="n">d_out_arr</span> <span class="o">=</span> <span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">({</span><span class="mf">20.1</span><span class="p">,</span> <span class="mf">21.1</span><span class="p">,</span> <span class="mf">22.1</span><span class="p">,</span> <span class="mf">23.1</span><span class="p">}),</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">});</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">Dense output:</span><span class="se">\n</span><span class="s">&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">d_out_arr</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        
+        <div class='prev-next-bottom'>
+            
+    <a class='left-prev' id="prev-link" href="advanced_tutorials.html" title="previous page">Advanced tutorials</a>
+    <a class='right-next' id="next-link" href="ad_notes.html" title="next page">Notes on automatic differentiation</a>
+
+        </div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
+
+
+    
+  </body>
+</html>

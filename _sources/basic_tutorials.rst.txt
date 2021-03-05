@@ -1,9 +1,9 @@
-.. _tutorial:
+.. _basic_tutorials:
 
-Tutorial
-========
+Basic tutorials
+===============
 
-The code snippets in this tutorial assume the inclusion of the
+The code snippets in these tutorials assume the inclusion of the
 global header ``heyoka/heyoka.hpp``, and the use of
 
 .. code-block:: c++

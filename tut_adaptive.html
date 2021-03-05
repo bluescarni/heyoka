@@ -76,8 +76,8 @@
   </a>
  </li>
  <li class="toctree-l1 current active collapsible-parent">
-  <a class="reference internal" href="tutorial.html">
-   Tutorial
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
   </a>
   <ul class="current collapse-ul">
    <li class="toctree-l2">
@@ -113,6 +113,20 @@
    <li class="toctree-l2">
     <a class="reference internal" href="tut_d_output.html">
      Dense output
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
     </a>
    </li>
   </ul>
@@ -347,7 +361,7 @@ while the second value is the step size that was selected by heyoka in order
 to respect the desired error tolerance. We print both to screen, and we also
 print again the <code class="docutils literal notranslate"><span class="pre">ta</span></code> object in order to inspect how state and time have changed.
 The screen output will look something like this:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : success</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : taylor_outcome::success</span>
 <span class="go">Timestep: 0.216053</span>
 
 <span class="go">Taylor order: 20</span>
@@ -366,7 +380,7 @@ via the <code class="docutils literal notranslate"><span class="pre">step_backwa
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : success</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : taylor_outcome::success</span>
 <span class="go">Timestep: -0.213123</span>
 </pre></div>
 </div>
@@ -391,14 +405,14 @@ then the timestep will be clamped to <code class="docutils literal notranslate">
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Timestep: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">h</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : time_limit</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : taylor_outcome::time_limit</span>
 <span class="go">Timestep: 0.01</span>
 
-<span class="go">Outcome : time_limit</span>
+<span class="go">Outcome : taylor_outcome::time_limit</span>
 <span class="go">Timestep: -0.02</span>
 </pre></div>
 </div>
-<p>Note that the integration outcome is now <code class="docutils literal notranslate"><span class="pre">time_limit</span></code>, instead of <code class="docutils literal notranslate"><span class="pre">success</span></code>.</p>
+<p>Note that the integration outcome is now <code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>, instead of <code class="docutils literal notranslate"><span class="pre">taylor_outcome::success</span></code>.</p>
 </div>
 <div class="section" id="accessing-state-and-time">
 <h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Permalink to this headline">¶</a></h2>
@@ -451,13 +465,13 @@ propagates the state up to a specified epoch.</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Current time : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : time_limit</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : taylor_outcome::time_limit</span>
 <span class="go">Min. timestep: 0.202133</span>
 <span class="go">Max. timestep: 0.218136</span>
 <span class="go">Num. of steps: 24</span>
 <span class="go">Current time : 5</span>
 
-<span class="go">Outcome      : time_limit</span>
+<span class="go">Outcome      : taylor_outcome::time_limit</span>
 <span class="go">Min. timestep: 0.202122</span>
 <span class="go">Max. timestep: 0.218139</span>
 <span class="go">Num. of steps: 72</span>
@@ -468,7 +482,7 @@ propagates the state up to a specified epoch.</p>
 a tuple of 4 values, which represent, respectively:</p>
 <ul class="simple">
 <li><p>the outcome of the integration (which will always be
-<code class="docutils literal notranslate"><span class="pre">time_limit</span></code>, unless error conditions arise),</p></li>
+<code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>, unless error conditions arise),</p></li>
 <li><p>the minimum and maximum integration timesteps
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken.</p></li>
@@ -487,7 +501,7 @@ to propagate both forward and backward in time:</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : time_limit</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome      : taylor_outcome::time_limit</span>
 <span class="go">Min. timestep: 0.202078</span>
 <span class="go">Max. timestep: 0.21819</span>
 <span class="go">Num. of steps: 97</span>
@@ -502,7 +516,7 @@ to propagate both forward and backward in time:</p>
 <p>Note also that the time-limited propagation functions will stop
 integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
-integration will be <code class="docutils literal notranslate"><span class="pre">err_nf_state</span></code>.</p>
+integration will be <code class="docutils literal notranslate"><span class="pre">taylor_outcome::err_nf_state</span></code>.</p>
 </div>
 <div class="section" id="propagation-over-a-time-grid">
 <h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Permalink to this headline">¶</a></h2>

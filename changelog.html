@@ -75,8 +75,8 @@
   </a>
  </li>
  <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="tutorial.html">
-   Tutorial
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
   </a>
   <ul class="collapse-ul">
    <li class="toctree-l2">
@@ -112,6 +112,20 @@
    <li class="toctree-l2">
     <a class="reference internal" href="tut_d_output.html">
      Dense output
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
     </a>
    </li>
   </ul>
@@ -230,6 +244,11 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#changes">
+     Changes
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
     <a class="reference internal nav-link" href="#fix">
      Fix
     </a>
@@ -276,41 +295,41 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#changes">
+    <a class="reference internal nav-link" href="#id8">
      Changes
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id8">
+    <a class="reference internal nav-link" href="#id9">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id9">
+  <a class="reference internal nav-link" href="#id10">
    0.2.0 (2021-01-13)
   </a>
   <ul class="nav section-nav flex-column">
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id10">
+    <a class="reference internal nav-link" href="#id11">
      New
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id11">
+    <a class="reference internal nav-link" href="#id12">
      Changes
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#id12">
+    <a class="reference internal nav-link" href="#id13">
      Fix
     </a>
    </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id13">
+  <a class="reference internal nav-link" href="#id14">
    0.1.0 (2020-12-18)
   </a>
  </li>
@@ -333,6 +352,8 @@
 <div class="section" id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>Add a tutorial chapter for batch mode
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/106">#106</a>).</p></li>
 <li><p>Add a couple of utilities to detect the presence of the time
 function in an expression
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/105">#105</a>).</p></li>
@@ -342,6 +363,13 @@ of arbitrary functions of the state variables
 <li><p>Speed-up the deep copy of just-in-time-compiled
 objects such as <code class="docutils literal notranslate"><span class="pre">llvm_state</span></code> and <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/102">#102</a>).</p></li>
+</ul>
+</div>
+<div class="section" id="changes">
+<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Change the screen output format for <code class="docutils literal notranslate"><span class="pre">taylor_outcome</span></code>
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/106">#106</a>).</p></li>
 </ul>
 </div>
 <div class="section" id="fix">
@@ -425,8 +453,8 @@ more extensively
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/73">#73</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="changes">
-<h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id8">
+<h3>Changes<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Small optimisations in the automatic differentiation
 formulae
@@ -441,8 +469,8 @@ object code of a module
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/79">#79</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id8">
-<h3>Fix<a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id9">
+<h3>Fix<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Ensure that <code class="docutils literal notranslate"><span class="pre">pow(x</span> <span class="pre">,0)</span></code> always simplifies to 1,
 rather than producing an expression with null exponent
@@ -460,10 +488,10 @@ rather than producing an expression with null exponent
 </ul>
 </div>
 </div>
-<div class="section" id="id9">
-<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="id10">
-<h3>New<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h3>
+<h2>0.2.0 (2021-01-13)<a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id11">
+<h3>New<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Extend the Taylor decomposition machinery to work
 on more general classes of functions, and add
@@ -477,23 +505,23 @@ on more general classes of functions, and add
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/63">#63</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id11">
-<h3>Changes<a class="headerlink" href="#id11" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id12">
+<h3>Changes<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>heyoka now depends publicly on the Boost headers
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
-<div class="section" id="id12">
-<h3>Fix<a class="headerlink" href="#id12" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id13">
+<h3>Fix<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
 <li><p>Fix potential name mangling issues in compact mode
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/68">#68</a>).</p></li>
 </ul>
 </div>
 </div>
-<div class="section" id="id13">
-<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id13" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="id14">
+<h2>0.1.0 (2020-12-18)<a class="headerlink" href="#id14" title="Permalink to this headline">¶</a></h2>
 <p>Initial release.</p>
 </div>
 </div>

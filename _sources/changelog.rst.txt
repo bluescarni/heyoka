@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a tutorial chapter for batch mode
+  (`#106 <https://github.com/bluescarni/heyoka/pull/106>`__).
 - Add a couple of utilities to detect the presence of the time
   function in an expression
   (`#105 <https://github.com/bluescarni/heyoka/pull/105>`__).
@@ -16,6 +18,12 @@ New
 - Speed-up the deep copy of just-in-time-compiled
   objects such as ``llvm_state`` and ``taylor_adaptive``
   (`#102 <https://github.com/bluescarni/heyoka/pull/102>`__).
+
+Changes
+~~~~~~~
+
+- Change the screen output format for ``taylor_outcome``
+  (`#106 <https://github.com/bluescarni/heyoka/pull/106>`__).
 
 Fix
 ~~~

@@ -76,8 +76,8 @@
   </a>
  </li>
  <li class="toctree-l1 current active collapsible-parent">
-  <a class="reference internal" href="tutorial.html">
-   Tutorial
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
   </a>
   <ul class="current collapse-ul">
    <li class="toctree-l2">
@@ -113,6 +113,20 @@
    <li class="toctree-l2">
     <a class="reference internal" href="tut_d_output.html">
      Dense output
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
     </a>
    </li>
   </ul>
@@ -248,7 +262,7 @@ section, we will see how non-autonomous systems can be defined and integrated in
 <p>The dynamical system we will be focusing on is, again, a pendulum, but this time we will
 spice things up a little by introducing a velocity-dependent damping effect and a time-dependent
 external forcing. These additional effects create a rich and complex dynamical picture
-which is highly sensitive to the initial conditions. See <span id="id1">[<a class="reference internal" href="bibliography.html#id7"><span>Hub99</span></a>]</span>
+which is highly sensitive to the initial conditions. See <span id="id1">[<a class="reference internal" href="bibliography.html#id7">Hub99</a>]</span>
 for a detailed analysis of this dynamical system.</p>
 <p>The ODE system of the forced damped pendulum reads:</p>
 <div class="math notranslate nohighlight">
@@ -257,7 +271,7 @@ x^\prime = v \\
 v^\prime = \cos t - 0.1v - \sin(x)
 \end{cases}.\end{split}\]</div>
 <p>The <span class="math notranslate nohighlight">\(\cos t\)</span> term represents a periodic time-dependent forcing, while <span class="math notranslate nohighlight">\(-0.1v\)</span>
-is a linear drag representing the effect of air on the pendulum’s bob. Following <span id="id2">[<a class="reference internal" href="bibliography.html#id7"><span>Hub99</span></a>]</span>,
+is a linear drag representing the effect of air on the pendulum’s bob. Following <span id="id2">[<a class="reference internal" href="bibliography.html#id7">Hub99</a>]</span>,
 we take as initial conditions</p>
 <div class="math notranslate nohighlight">
 \[\begin{split}\begin{cases}

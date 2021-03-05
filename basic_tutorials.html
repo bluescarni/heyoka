@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Search &#8212; heyoka 0.6.0 documentation</title>
+    <title>Basic tutorials &#8212; heyoka 0.6.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
 
@@ -30,22 +30,18 @@
     
   <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
 
-    
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
-    <script src="_static/searchtools.js"></script>
-    <script src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="#" />
-  <script src="searchindex.js" defer></script>
-  
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Taylor’s method" href="tut_taylor_method.html" />
+    <link rel="prev" title="Installation" href="install.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
-
 
 
 
@@ -67,19 +63,19 @@
   <h1 class="site-logo" id="site-title">heyoka 0.6.0 documentation</h1>
   
 </a>
-</div><form class="bd-search d-flex align-items-center" action="#" method="get">
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
   <i class="icon fas fa-search"></i>
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
 </form>
 <nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="nav sidenav_l1">
+    <ul class="current nav sidenav_l1">
  <li class="toctree-l1">
   <a class="reference internal" href="install.html">
    Installation
   </a>
  </li>
- <li class="toctree-l1 collapsible-parent">
-  <a class="reference internal" href="basic_tutorials.html">
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="current reference internal" href="#">
    Basic tutorials
   </a>
   <ul class="collapse-ul">
@@ -183,6 +179,23 @@
             </button>
             
             
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/basic_tutorials.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
             <!-- Source interaction buttons -->
 
 <div class="dropdown-buttons-trigger">
@@ -194,7 +207,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fsearch.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbasic_tutorials.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -223,33 +236,41 @@
         
               <div>
                 
-  <h1 id="search-documentation">Search</h1>
-  <div id="fallback" class="admonition warning">
-  <script>$('#fallback').hide();</script>
-  <p>
-    Please activate JavaScript to enable the search
-    functionality.
-  </p>
-  </div>
-  <p>
-    Searching for multiple words only shows matches that contain
-    all words.
-  </p>
-  <form action="" method="get">
-    <input type="text" name="q" aria-labelledby="search-documentation" value="" />
-    <input type="submit" value="search" />
-    <span id="search-progress" style="padding-left: 10px"></span>
-  </form>
-  
-  <div id="search-results">
-  
-  </div>
+  <div class="section" id="basic-tutorials">
+<span id="id1"></span><h1>Basic tutorials<a class="headerlink" href="#basic-tutorials" title="Permalink to this headline">¶</a></h1>
+<p>The code snippets in these tutorials assume the inclusion of the
+global header <code class="docutils literal notranslate"><span class="pre">heyoka/heyoka.hpp</span></code>, and the use of</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+<span class="k">namespace</span> <span class="n">hy</span> <span class="o">=</span> <span class="n">heyoka</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>to import all names from the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace, and to provide
+a handy shortcut <code class="docutils literal notranslate"><span class="pre">hy</span></code> to the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace.</p>
+<p>The tutorials’ code is available in the <code class="docutils literal notranslate"><span class="pre">tutorials/</span></code> subdirectory
+of the source tree. The tutorials can be compiled by enabling the
+<code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TUTORIALS</span></code> option when
+<a class="reference internal" href="install.html#installation-from-source"><span class="std std-ref">compiling from source</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tut_d_output.html">Dense output</a></li>
+</ul>
+</div>
+</div>
+
 
               </div>
               
         
         <div class='prev-next-bottom'>
             
+    <a class='left-prev' id="prev-link" href="install.html" title="previous page">Installation</a>
+    <a class='right-next' id="next-link" href="tut_taylor_method.html" title="next page">Taylor’s method</a>
 
         </div>
         
