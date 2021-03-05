@@ -63,7 +63,8 @@ If you prefer using Python rather than C++, heyoka can be used from Python via
    :maxdepth: 2
 
    install.rst
-   tutorial.rst
+   basic_tutorials.rst
+   advanced_tutorials.rst
    ad_notes.rst
    changelog.rst
    bibliography.rst

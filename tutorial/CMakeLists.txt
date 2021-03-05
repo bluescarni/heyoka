@@ -1,6 +1,9 @@
+# Find the xtensor bits.
+find_package(xtensor REQUIRED CONFIG)
+
 function(ADD_HEYOKA_TUTORIAL arg1)
   add_executable(${arg1} ${arg1}.cpp)
-  target_link_libraries(${arg1} PRIVATE heyoka)
+  target_link_libraries(${arg1} PRIVATE heyoka xtensor)
   target_compile_options(${arg1} PRIVATE
     "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
     "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
@@ -19,3 +22,4 @@ ADD_HEYOKA_TUTORIAL(adaptive_opt)
 ADD_HEYOKA_TUTORIAL(pendulum_param)
 ADD_HEYOKA_TUTORIAL(forced_damped_pendulum)
 ADD_HEYOKA_TUTORIAL(d_output)
+ADD_HEYOKA_TUTORIAL(batch_mode)
