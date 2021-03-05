@@ -77,7 +77,7 @@ int main()
         std::cout << "Batch index " << i << ": (" << oc << ", " << h << ")\n";
     }
 
-    std::cout << "State array:\n" << s_arr << "\n\n";
+    std::cout << "\nState array:\n" << s_arr << "\n\n";
     std::cout << "Time array:\n" << t_arr << "\n\n";
 
     // Perform a single step forward in time
@@ -113,4 +113,30 @@ int main()
     }
     std::cout << "\nState array:\n" << s_arr << "\n\n";
     std::cout << "Time array:\n" << t_arr << "\n\n";
+
+    // Propagate for another timestep, making
+    // sure the Taylor coefficients are recorded.
+    ta.step(true);
+
+    // Create an xtensor adaptor over the
+    // vector of Taylor coefficients.
+    auto tc_arr = xt::adapt(ta.get_tc(), {// First dimension: number of state variables.
+                                          2,
+                                          // Second dimension: total number of orders for
+                                          // the Taylor coefficients.
+                                          int(ta.get_order()) + 1,
+                                          // Third dimension: batch size.
+                                          batch_size});
+
+    std::cout << "Array of Taylor coefficients:\n" << tc_arr << "\n\n";
+
+    std::cout << "Order-0 x: " << xt::view(tc_arr, 0, 0, xt::all()) << '\n';
+    std::cout << "Order-0 v: " << xt::view(tc_arr, 1, 0, xt::all()) << '\n';
+
+    // Compute the dense output at different time coordinates,
+    // and create an xtensor adaptor on the dense output
+    // for ease of indexing.
+    auto d_out_arr = xt::adapt(ta.update_d_output({20.1, 21.1, 22.1, 23.1}), {2, batch_size});
+
+    std::cout << "\nDense output:\n" << d_out_arr << "\n\n";
 }
