@@ -89,7 +89,7 @@ The screen output will look something like this:
 
 .. code-block:: console
 
-   Outcome : success
+   Outcome : taylor_outcome::success
    Timestep: 0.216053
    
    Taylor order: 20
@@ -106,7 +106,7 @@ via the ``step_backward()`` function:
 
 .. code-block:: console
 
-   Outcome : success
+   Outcome : taylor_outcome::success
    Timestep: -0.213123
 
 The ``step()`` function can also be called with an argument representing
@@ -120,13 +120,13 @@ then the timestep will be clamped to ``max_delta_t``:
 
 .. code-block:: console
 
-   Outcome : time_limit
+   Outcome : taylor_outcome::time_limit
    Timestep: 0.01
 
-   Outcome : time_limit
+   Outcome : taylor_outcome::time_limit
    Timestep: -0.02
 
-Note that the integration outcome is now ``time_limit``, instead of ``success``.
+Note that the integration outcome is now ``taylor_outcome::time_limit``, instead of ``taylor_outcome::success``.
 
 Accessing state and time
 ------------------------
@@ -163,13 +163,13 @@ Let's see a couple of usage examples:
 
 .. code-block:: console
 
-   Outcome      : time_limit
+   Outcome      : taylor_outcome::time_limit
    Min. timestep: 0.202133
    Max. timestep: 0.218136
    Num. of steps: 24
    Current time : 5
 
-   Outcome      : time_limit
+   Outcome      : taylor_outcome::time_limit
    Min. timestep: 0.202122
    Max. timestep: 0.218139
    Num. of steps: 72
@@ -179,7 +179,7 @@ The time-limited propagation functions return
 a tuple of 4 values, which represent, respectively:
 
 * the outcome of the integration (which will always be
-  ``time_limit``, unless error conditions arise),
+  ``taylor_outcome::time_limit``, unless error conditions arise),
 * the minimum and maximum integration timesteps
   that were used in the propagation,
 * the total number of steps that were taken.
@@ -193,7 +193,7 @@ to propagate both forward and backward in time:
 
 .. code-block:: console
 
-   Outcome      : time_limit
+   Outcome      : taylor_outcome::time_limit
    Min. timestep: 0.202078
    Max. timestep: 0.21819
    Num. of steps: 97
@@ -207,7 +207,7 @@ to propagate both forward and backward in time:
 Note also that the time-limited propagation functions will stop
 integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
-integration will be ``err_nf_state``.
+integration will be ``taylor_outcome::err_nf_state``.
 
 Propagation over a time grid
 ----------------------------
