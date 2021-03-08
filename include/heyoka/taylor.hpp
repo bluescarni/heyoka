@@ -805,28 +805,12 @@ public:
 
 } // namespace detail
 
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_dbl : public detail::taylor_adaptive_batch_impl<double>
-{
-public:
-    using base = detail::taylor_adaptive_batch_impl<double>;
-    using base::base;
-};
-
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_ldbl : public detail::taylor_adaptive_batch_impl<long double>
-{
-public:
-    using base = detail::taylor_adaptive_batch_impl<long double>;
-    using base::base;
-};
+using taylor_adaptive_batch_dbl = detail::taylor_adaptive_batch_impl<double>;
+using taylor_adaptive_batch_ldbl = detail::taylor_adaptive_batch_impl<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_f128 : public detail::taylor_adaptive_batch_impl<mppp::real128>
-{
-public:
-    using base = detail::taylor_adaptive_batch_impl<mppp::real128>;
-    using base::base;
-};
+using taylor_adaptive_batch_f128 = detail::taylor_adaptive_batch_impl<mppp::real128>;
 
 #endif
 
