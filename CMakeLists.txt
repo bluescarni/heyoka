@@ -161,6 +161,7 @@ endif()
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
@@ -327,6 +328,16 @@ if(HEYOKA_WITH_MPPP)
         message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
     endif()
     target_link_libraries(heyoka PUBLIC mp++::mp++)
+endif()
+
+if(YACMA_COMPILER_IS_GNUCXX AND HEYOKA_WITH_MPPP AND mp++_WITH_QUADMATH)
+    # NOTE: this hack is needed because we need to use Boost's float128 wrapper
+    # for event detection, and that requires the extended literals provided
+    # by GCC. Supposedly the "-fext-numeric-literals" should also be enough,
+    # but alas it does not seem to work.
+    # Down the line perhaps we should try to adapt mp++ so that we can use
+    # real128 directly.
+    set_property(SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp" PROPERTY COMPILE_FLAGS -std=gnu++17)
 endif()
 
 # Optional dependency on SLEEF.

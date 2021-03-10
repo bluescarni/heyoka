@@ -59,6 +59,7 @@
 #endif
 
 #include <heyoka/binary_operator.hpp>
+#include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/sleef.hpp>
@@ -232,6 +233,36 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
     auto ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
 
     return load_vector_from_memory(builder, ptr, batch_size);
+}
+
+// Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
+// derivative array 'arr'. The total number of u variables is n_uvars.
+llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
+                               std::uint32_t n_uvars)
+{
+    // Sanity check.
+    assert(u_idx < n_uvars);
+
+    // Compute the index.
+    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
+    assert(idx < arr.size());
+
+    return arr[idx];
+}
+
+// Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
+// n_uvars is the total number of u variables.
+llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                                llvm::Value *u_idx)
+{
+    auto &builder = s.builder();
+
+    // NOTE: overflow check has already been done to ensure that the
+    // total size of diff_arr fits in a 32-bit unsigned integer.
+    auto ptr = builder.CreateInBoundsGEP(
+        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
+
+    return builder.CreateLoad(ptr);
 }
 
 namespace
@@ -1144,1033 +1175,366 @@ namespace detail
 namespace
 {
 
-// Small helper to deduce the number of parameters
-// present in the rhs of an ODE.
+// Helper to determine the optimal Taylor order for a given tolerance,
+// following Jorba's prescription.
 template <typename T>
-std::uint32_t n_pars_in_sys(const T &sys)
+std::uint32_t taylor_order_from_tol(T tol)
 {
-    std::uint32_t retval = 0;
-
-    for (const auto &p : sys) {
-        if constexpr (std::is_same_v<uncvref_t<decltype(p)>, expression>) {
-            retval = std::max(retval, get_param_size(p));
-        } else {
-            retval = std::max(retval, get_param_size(p.second));
-        }
-    }
-
-    return retval;
-}
-
-} // namespace
-
-template <typename T>
-template <typename U>
-void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                                 bool compact_mode, std::vector<T> pars)
-{
-    using std::isfinite;
     using namespace fmt::literals;
-
-    // Assign the data members.
-    m_state = std::move(state);
-    m_time = time;
-    m_pars = std::move(pars);
-
-    // Check input params.
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
-    }
-
-    if (m_state.size() != sys.size()) {
-        throw std::invalid_argument(
-            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
-                m_state.size(), sys.size()));
-    }
-
-    if (!isfinite(m_time)) {
-        throw std::invalid_argument(
-            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
-    }
-
-    if (!isfinite(tol) || tol <= 0) {
-        throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
-                tol));
-    }
-
-    // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_sys(sys);
-    if (m_pars.size() < npars) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
-    } else if (m_pars.size() > npars) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
-                m_pars.size(), npars));
-    }
-
-    // Store the dimension of the system.
-    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
-
-    // Temporarily disable optimisations in s, so that
-    // we don't optimise twice when adding the step
-    // and then the d_out.
-    std::optional<opt_disabler> od(m_llvm);
-
-    // Add the stepper function.
-    std::tie(m_dc, m_order)
-        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
-
-    // Add the function for the computation of
-    // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1);
-
-    // Restore the original optimisation level in s.
-    od.reset();
-
-    // Run the optimisation pass manually.
-    m_llvm.optimise();
-
-    // Run the jit.
-    m_llvm.compile();
-
-    // Fetch the stepper.
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-
-    // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-
-    // Setup the vector for the Taylor coefficients.
-    // LCOV_EXCL_START
-    if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-
-    m_tc.resize(m_state.size() * (m_order + 1u));
-
-    // Setup the vector for the dense output.
-    m_d_out.resize(m_state.size());
-}
-
-template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out)
-{
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-}
-
-template <typename T>
-taylor_adaptive_impl<T>::taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept = default;
-
-template <typename T>
-taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(const taylor_adaptive_impl &other)
-{
-    if (this != &other) {
-        *this = taylor_adaptive_impl(other);
-    }
-
-    return *this;
-}
-
-template <typename T>
-taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl &&) noexcept = default;
-
-template <typename T>
-taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
-
-// Implementation detail to make a single integration timestep.
-// The magnitude of the timestep is automatically deduced, but it will
-// always be not greater than abs(max_delta_t). The propagation
-// is done forward in time if max_delta_t >= 0, backwards in
-// time otherwise.
-//
-// The function will return a pair, containing
-// a flag describing the outcome of the integration,
-// and the integration timestep that was used.
-template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
-{
+    using std::ceil;
     using std::isfinite;
+    using std::log;
 
-#if !defined(NDEBUG)
-    // NOTE: this is the only precondition on max_delta_t.
-    using std::isnan;
-    assert(!isnan(max_delta_t));
-#endif
-
-    // Invoke the stepper.
-    auto h = max_delta_t;
-    m_step_f(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
-
-    // Update the time.
-    m_time += h;
-
-    // Store the last timestep.
-    m_last_h = h;
-
-    // Check if the time or the state vector are non-finite at the
-    // end of the timestep.
-    if (!isfinite(m_time)
-        || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-        return std::tuple{taylor_outcome::err_nf_state, h};
-    }
-
-    return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(bool wtc)
-{
-    // NOTE: time limit +inf means integration forward in time
-    // and no time limit.
-    return step_impl(std::numeric_limits<T>::infinity(), wtc);
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(bool wtc)
-{
-    return step_impl(-std::numeric_limits<T>::infinity(), wtc);
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool wtc)
-{
-    using std::isnan;
-
-    if (isnan(max_delta_t)) {
+    // Determine the order from the tolerance.
+    auto order_f = ceil(-log(tol) / 2 + 1);
+    if (!isfinite(order_f)) {
         throw std::invalid_argument(
-            "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
+            "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
     }
+    // NOTE: min order is 2.
+    order_f = std::max(T(2), order_f);
 
-    return step_impl(max_delta_t, wtc);
+    // NOTE: cast to double as that ensures that the
+    // max of std::uint32_t is exactly representable.
+    if (order_f > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
+        throw std::overflow_error("The computation of the Taylor order in an adaptive Taylor stepper resulted "
+                                  "in an overflow condition");
+    }
+    return static_cast<std::uint32_t>(order_f);
 }
 
-template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
+// Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
+llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-    return propagate_until(m_time + delta_t, max_steps);
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
-{
-    using std::isfinite;
-
-    // Check the current time.
-    if (!isfinite(m_time)) {
-        throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
-                                    "the current time is not finite");
-    }
-
-    // Check the final time.
-    if (!isfinite(t)) {
-        throw std::invalid_argument(
-            "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
-    }
-
-    // NOTE: max_steps == 0 means there's no limit
-    // on the number of steps.
-    const auto has_step_limit = (max_steps != 0u);
-
-    // Initial values for the counters
-    // and the min/max abs of the integration
-    // timesteps.
-    // NOTE: iter_counter is for keeping track of the max_steps
-    // limits, step_counter counts the number of timesteps performed
-    // with a non-zero h. Most of the time these two quantities
-    // will be identical, apart from corner cases.
-    std::size_t iter_counter = 0, step_counter = 0;
-    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
-
-    while (true) {
-        // NOTE: t - m_time is guaranteed not to be nan: t is never non-finite,
-        // and at the first iteration we have checked above the value of m_time.
-        // At successive iterations, we know that m_time must be finite because
-        // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(t - m_time, false);
-
-        if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
-            // Something went wrong in the propagation of the timestep, exit.
-            return std::tuple{res, min_h, max_h, step_counter};
-        }
-
-        // Update the number of iterations.
-        ++iter_counter;
-
-        // Update the number of steps.
-        step_counter += static_cast<std::size_t>(h != 0);
-
-        // Break out if the time limit is reached,
-        // *before* updating the min_h/max_h values.
-        // NOTE: the idea is that if we reached the time
-        // limit the timestep has been artificially
-        // reduced, thus we don't want to count it.
-        if (res == taylor_outcome::time_limit) {
-            return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
-        }
-
-        // Update min_h/max_h.
-        using std::abs;
-        const auto abs_h = abs(h);
-        min_h = std::min(min_h, abs_h);
-        max_h = std::max(max_h, abs_h);
-
-        // Check the iteration limit.
-        if (has_step_limit && iter_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
-        }
-    }
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
-{
-    using std::abs;
-    using std::isfinite;
-
-    if (grid.empty()) {
-        throw std::invalid_argument(
-            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
-    }
-
-    if (!isfinite(m_time)) {
-        throw std::invalid_argument(
-            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
-    }
-
-    // Pre-allocate the return value.
-    std::vector<T> retval;
-    // LCOV_EXCL_START
-    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
-        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
-                                  "adaptive Taylor integrator");
-    }
-    // LCOV_EXCL_STOP
-    retval.reserve(grid.size() * get_dim());
-
-    // Initial values for the step counter and
-    // the min/max abs of the integration
-    // timesteps.
-    std::size_t step_counter = 0;
-    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
-
-    // Do the first step, making sure to write the
-    // Taylor coefficients.
-    constexpr auto err_msg = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
-    if (!isfinite(grid[0])) {
-        throw std::invalid_argument(err_msg);
-    }
-    auto oc = (grid[0] >= m_time) ? step(true) : step_backward(true);
-    if (std::get<0>(oc) != taylor_outcome::success) {
-        // Something went wrong in the propagation of the timestep, exit.
-        return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
-    }
-
-    // Update step counter and min/max values.
-    // NOTE: the step limit, if it exists, is at least 1,
-    // thus we will always do at least 1 timestep.
-    // If the step limit is 1, we may produce
-    // some dense output but we will exit before
-    // performing the second step.
-    ++step_counter;
-    auto abs_h = abs(std::get<1>(oc));
-    min_h = abs_h;
-    max_h = abs_h;
-
-    for (decltype(grid.size()) cur_grid_idx = 0;;) {
-        // Establish the time range of the last
-        // taken timestep.
-        // NOTE: t0 < t1.
-        const auto t0 = std::min(m_time, m_time - m_last_h);
-        const auto t1 = std::max(m_time, m_time - m_last_h);
-
-        while (true) {
-            // Fetch the current time target.
-            const auto cur_tt = grid[cur_grid_idx];
-
-            if (cur_tt >= t0 && cur_tt <= t1) {
-                // The current time target falls within the range of
-                // validity of the dense output. Compute the dense
-                // output in cur_tt.
-                update_d_output(cur_tt);
-
-                // Add the result to retval.
-                retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
-            } else {
-                // Cannot use dense output on the current time target,
-                // need to take another step.
-                break;
-            }
-
-            // Move to the next time target, or break out
-            // if we have no more.
-            if (++cur_grid_idx == grid.size()) {
-                break;
-            }
-        }
-
-        if (cur_grid_idx == grid.size()) {
-            // No more grid points, exit.
-            break;
-        }
-
-        // Need to take a new step to get closer to the
-        // next time target. But first, check the step limit.
-        // NOTE: max_steps == 0 means no step limit, and at this
-        // stage step_counter is always at least 1.
-        if (step_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, std::move(retval)};
-        }
-
-        // Check finiteness of the current time target.
-        if (!isfinite(grid[cur_grid_idx])) {
-            throw std::invalid_argument(err_msg);
-        }
-        // Do the step towards the time target.
-        oc = (grid[cur_grid_idx] >= m_time) ? step(true) : step_backward(true);
-        if (std::get<0>(oc) != taylor_outcome::success) {
-            // Something went wrong in the propagation of the timestep, exit.
-            return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
-        }
-
-        // Update step counter and min/max values.
-        ++step_counter;
-        abs_h = abs(std::get<1>(oc));
-        min_h = std::min(min_h, abs_h);
-        max_h = std::max(max_h, abs_h);
-    }
-
-    // Everything went well, return success.
-    return std::tuple{taylor_outcome::success, min_h, max_h, step_counter, std::move(retval)};
-}
-
-template <typename T>
-const llvm_state &taylor_adaptive_impl<T>::get_llvm_state() const
-{
-    return m_llvm;
-}
-
-template <typename T>
-const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &taylor_adaptive_impl<T>::get_decomposition() const
-{
-    return m_dc;
-}
-
-template <typename T>
-std::uint32_t taylor_adaptive_impl<T>::get_order() const
-{
-    return m_order;
-}
-
-template <typename T>
-std::uint32_t taylor_adaptive_impl<T>::get_dim() const
-{
-    return m_dim;
-}
-
-template <typename T>
-const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
-{
-    // NOTE: "time" needs to be translated
-    // because m_d_out_f expects a time coordinate
-    // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, we need to compute:
-    const auto h = time - (m_time - m_last_h);
-
-    m_d_out_f(m_d_out.data(), m_tc.data(), &h);
-
-    return m_d_out;
-}
-
-// Explicit instantiation of the implementation classes/functions.
-// NOTE: on Windows apparently it is necessary to declare that
-// these instantiations are meant to be dll-exported.
-template class taylor_adaptive_impl<double>;
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
-                                                                                 std::vector<double>, double, double,
-                                                                                 bool, bool, std::vector<double>);
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
-                                                 double, double, bool, bool, std::vector<double>);
-
-template class taylor_adaptive_impl<long double>;
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>,
-                                                                                      std::vector<long double>,
-                                                                                      long double, long double, bool,
-                                                                                      bool, std::vector<long double>);
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                      std::vector<long double>, long double, long double, bool, bool,
-                                                      std::vector<long double>);
-
 #if defined(HEYOKA_HAVE_REAL128)
-
-template class taylor_adaptive_impl<mppp::real128>;
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>,
-                                                                                        std::vector<mppp::real128>,
-                                                                                        mppp::real128, mppp::real128,
-                                                                                        bool, bool,
-                                                                                        std::vector<mppp::real128>);
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                        std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
-                                                        bool, std::vector<mppp::real128>);
-
-#endif
-
-} // namespace detail
-
-namespace detail
-{
-
-template <typename T>
-template <typename U>
-void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, std::uint32_t batch_size,
-                                                       std::vector<T> time, T tol, bool high_accuracy,
-                                                       bool compact_mode, std::vector<T> pars)
-{
-    using std::isfinite;
-    using namespace fmt::literals;
-
-    // Init the data members.
-    m_batch_size = batch_size;
-    m_state = std::move(state);
-    m_time = std::move(time);
-    m_pars = std::move(pars);
-
-    // Check input params.
-    if (m_batch_size == 0u) {
-        throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
-    }
-
-    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
-    }
-
-    if (m_state.size() % m_batch_size != 0u) {
-        throw std::invalid_argument(
-            "Invalid size detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})"_format(
-                m_state.size(), m_batch_size));
-    }
-
-    if (m_state.size() / m_batch_size != sys.size()) {
-        throw std::invalid_argument(
-            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
-                m_state.size() / m_batch_size, sys.size()));
-    }
-
-    if (m_time.size() != m_batch_size) {
-        throw std::invalid_argument(
-            "Invalid size detected in the initialization of an adaptive Taylor "
-            "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
-                m_time.size(), m_batch_size));
-    }
-
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
-        throw std::invalid_argument(
-            "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
-    }
-
-    if (!isfinite(tol) || tol <= 0) {
-        throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
-                tol));
-    }
-
-    // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_sys(sys);
-    if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
-        throw std::overflow_error(
-            "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
-    }
-    if (m_pars.size() < npars * m_batch_size) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
-    } else if (m_pars.size() > npars * m_batch_size) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
-            "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
-    }
-
-    // Store the dimension of the system.
-    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
-
-    // Temporarily disable optimisations in s, so that
-    // we don't optimise twice when adding the step
-    // and then the d_out.
-    std::optional<opt_disabler> od(m_llvm);
-
-    // Add the stepper function.
-    std::tie(m_dc, m_order)
-        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
-
-    // Add the function for the computation of
-    // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
-
-    // Restore the original optimisation level in s.
-    od.reset();
-
-    // Run the optimisation pass manually.
-    m_llvm.optimise();
-
-    // Run the jit.
-    m_llvm.compile();
-
-    // Fetch the stepper.
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-
-    // Fetch the function to compute the dense output.
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-
-    // Setup the vector for the Taylor coefficients.
-    // LCOV_EXCL_START
-    if (m_order == std::numeric_limits<std::uint32_t>::max()
-        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
-    }
-    // LCOV_EXCL_STOP
-
-    // NOTE: the size of m_state.size() already takes
-    // into account the batch size.
-    m_tc.resize(m_state.size() * (m_order + 1u));
-
-    // Setup m_last_h.
-    m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
-
-    // Setup the vector for the dense output.
-    // NOTE: the size of m_state.size() already takes
-    // into account the batch size.
-    m_d_out.resize(m_state.size());
-
-    // Prepare the temp vectors.
-    m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
-    m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
-    m_delta_ts.resize(m_batch_size);
-
-    // NOTE: init the outcome to success, the rest to zero.
-    m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0)});
-    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
-                      std::tuple{taylor_outcome::success, T(0), T(0), std::size_t(0)});
-
-    m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
-    m_min_abs_h.resize(m_batch_size);
-    m_max_abs_h.resize(m_batch_size);
-    m_cur_max_delta_ts.resize(m_batch_size);
-    m_pfor_ts.resize(m_batch_size);
-
-    m_d_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
-}
-
-template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
-      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
-      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_d_out_time(other.m_d_out_time)
-{
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-}
-
-template <typename T>
-taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept = default;
-
-template <typename T>
-taylor_adaptive_batch_impl<T> &taylor_adaptive_batch_impl<T>::operator=(const taylor_adaptive_batch_impl &other)
-{
-    if (this != &other) {
-        *this = taylor_adaptive_batch_impl(other);
-    }
-
-    return *this;
-}
-
-template <typename T>
-taylor_adaptive_batch_impl<T> &
-taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept = default;
-
-template <typename T>
-taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
-
-// Implementation detail to make a single integration timestep.
-// The magnitude of the timestep is automatically deduced for each
-// state vector, but it will always be not greater than
-// the absolute value of the corresponding element in max_delta_ts.
-// For each state vector, the propagation
-// is done forward in time if max_delta_t >= 0, backwards in
-// time otherwise.
-//
-// The function will write to res a pair for each state
-// vector, containing a flag describing the outcome of the integration
-// and the integration timestep that was used.
-template <typename T>
-void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
-{
-    using std::isfinite;
-
-    // Check preconditions.
-    assert(max_delta_ts.size() == m_batch_size);
-    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
-        using std::isnan;
-        return isnan(x);
-    }));
-
-    // Sanity check.
-    assert(m_step_res.size() == m_batch_size);
-
-    // Copy max_delta_ts to the tmp buffer.
-    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
-
-    // Invoke the stepper.
-    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
-
-    // Helper to check if the state vector of a batch element
-    // contains a non-finite value.
-    auto check_nf_batch = [this](std::uint32_t batch_idx) {
-        for (std::uint32_t i = 0; i < m_dim; ++i) {
-            if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    // Update the times and the last timesteps, and write out the result.
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        // The timestep that was actually used for
-        // this batch element.
-        const auto h = m_delta_ts[i];
-        m_time[i] += h;
-
-        // Update the size of the last timestep.
-        m_last_h[i] = h;
-
-        if (!isfinite(m_time[i]) || check_nf_batch(i)) {
-            // Either the new time or state contain non-finite values,
-            // return an error condition.
-            m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
-        } else {
-            m_step_res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
-        }
-    }
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::step(bool wtc)
-{
-    step_impl(m_pinf, wtc);
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
-{
-    step_impl(m_minf, wtc);
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
-{
-    // Check the dimensionality of max_delta_ts.
-    if (max_delta_ts.size() != m_batch_size) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument(
-            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
-            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
-    }
-
-    // Make sure no values in max_delta_ts are nan.
-    if (std::any_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
-            using std::isnan;
-            return isnan(x);
-        })) {
-        throw std::invalid_argument(
-            "Cannot invoke the step() function of an adaptive Taylor integrator in batch mode if "
-            "one of the max timesteps is nan");
-    }
-
-    step_impl(max_delta_ts, wtc);
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std::size_t max_steps)
-{
-    // Check the dimensionality of delta_ts.
-    if (delta_ts.size() != m_batch_size) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
-                                    "the batch size is {}, but the number of specified time intervals is {}"_format(
-                                        m_batch_size, delta_ts.size()));
-    }
-
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = m_time[i] + delta_ts[i];
-    }
-
-    propagate_until(m_pfor_ts, max_steps);
-}
-
-template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
-{
-    using std::isfinite;
-
-    // Check the dimensionality of ts.
-    if (ts.size() != m_batch_size) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
-            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
-    }
-
-    // Check the current times.
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !isfinite(t); })) {
-        throw std::invalid_argument(
-            "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
-            "one of the current times is not finite");
-    }
-
-    // Check the final times.
-    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !isfinite(t); })) {
-        throw std::invalid_argument("A non-finite time was passed to the propagate_until() function of an adaptive "
-                                    "Taylor integrator in batch mode");
-    }
-
-    // Reset the counters and the min/max abs(h) vectors.
-    std::size_t iter_counter = 0;
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_ts_count[i] = 0;
-        m_min_abs_h[i] = std::numeric_limits<T>::infinity();
-        m_max_abs_h[i] = 0;
-    }
-
-    while (true) {
-        // Compute the max integration times for this timestep.
-        // NOTE: ts[i] - m_time[i] is guaranteed not to be nan: ts[i] is never non-finite,
-        // and at the first iteration we have checked above the value of m_time.
-        // At successive iterations, we know that m_time[i] must be finite because
-        // otherwise we would have exited the loop when checking m_step_res.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_cur_max_delta_ts[i] = ts[i] - m_time[i];
+    // Determine the scalar type of the vector arguments.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_maxabs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_maxabs128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
         }
 
-        // Run the integration timestep.
-        step_impl(m_cur_max_delta_ts, false);
-
-        // Check if the integration timestep produced an error condition.
-        if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {
-                return std::get<0>(tup) != taylor_outcome::success && std::get<0>(tup) != taylor_outcome::time_limit;
-            })) {
-            break;
-        }
-
-        // Update the iteration counter.
-        ++iter_counter;
-
-        // Update the local step counters.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // NOTE: the local step counters increase only if we integrated
-            // for a non-zero time.
-            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
-        }
-
-        // Break out if we have reached the time limit for all
-        // batch elements.
-        if (std::all_of(m_step_res.begin(), m_step_res.end(),
-                        [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::time_limit; })) {
-            break;
-        }
-
-        // Update min_h/max_h.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // Don't update if we reached the time limit.
-            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit) {
-                continue;
-            }
-
-            using std::abs;
-            const auto abs_h = abs(std::get<1>(m_step_res[i]));
-            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
-            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
-        }
-
-        // Check the iteration limit.
-        if (max_steps != 0u && iter_counter == max_steps) {
-            break;
-        }
-    }
-
-    // Assemble the return value.
-    if (max_steps != 0u && iter_counter == max_steps) {
-        // We exited because we reached the max_steps limit: if the last integration step was successful
-        // return step_limit, otherwise time_limit.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_prop_res[i]
-                = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                   : taylor_outcome::time_limit,
-                             m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
-        }
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
     } else {
-        // We exited either because of an error, or because all the batch
-        // elements reached the time limits. In this case, we just use the
-        // outcome of the last timestep.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+#endif
+        // Compute abs(b).
+        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        // Return max(a, abs(b)).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, abs_y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
+llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minabs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minabs128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Compute abs(b).
+        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        // Return min(a, abs(b)).
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minnum128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the pow() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_pow128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // If we are operating on SIMD vectors, try to see if we have a sleef
+        // function available for pow().
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
+            // NOTE: if sfn ends up empty, we will be falling through
+            // below and use the LLVM intrinsic instead.
+            if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x_v, y_v},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+
+        return llvm_invoke_intrinsic(s, "llvm.pow", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to compute abs(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector argument.
+    auto x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the heyoka_abs128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (auto x_scal : x_scalars) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_abs128", x_t, {x_scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
+// following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
+// the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
+// the clamping values for the timesteps.
+template <typename T>
+llvm::Value *taylor_determine_h(llvm_state &s,
+                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+                                const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *h_ptr, std::uint32_t n_eq,
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+{
+    using std::exp;
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    llvm::Value *max_abs_state, *max_abs_diff_o, *max_abs_diff_om1;
+
+    if (diff_variant.index() == 0u) {
+        // Compact mode.
+
+        auto diff_arr = std::get<llvm::Value *>(diff_variant);
+
+        // Compute the norm infinity of the state vector and the norm infinity of the derivatives
+        // at orders order and order - 1.
+        max_abs_state = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
+        max_abs_diff_o = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
+        max_abs_diff_om1 = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
+
+        // Initialise with the abs(derivatives) of the first state variable at orders 0, 'order' and 'order - 1'.
+        builder.CreateStore(
+            taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {builder.getInt32(0)}))),
+            max_abs_state);
+        // NOTE: in compact mode diff_arr contains the derivatives for *all* uvars,
+        // hence the indexing is order * n_uvars.
+        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
+                                                   diff_arr, {builder.getInt32(order * n_uvars)}))),
+                            max_abs_diff_o);
+        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
+                                                   diff_arr, {builder.getInt32((order - 1u) * n_uvars)}))),
+                            max_abs_diff_om1);
+
+        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
+            builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(max_abs_state),
+                                                   builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {cur_idx}))),
+                                max_abs_state);
+            builder.CreateStore(
+                taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_o),
+                                   builder.CreateLoad(builder.CreateInBoundsGEP(
+                                       diff_arr, {builder.CreateAdd(builder.getInt32(order * n_uvars), cur_idx)}))),
+                max_abs_diff_o);
+            builder.CreateStore(
+                taylor_step_maxabs(
+                    s, builder.CreateLoad(max_abs_diff_om1),
+                    builder.CreateLoad(builder.CreateInBoundsGEP(
+                        diff_arr, {builder.CreateAdd(builder.getInt32((order - 1u) * n_uvars), cur_idx)}))),
+                max_abs_diff_om1);
+        });
+
+        // Load the values for later use.
+        max_abs_state = builder.CreateLoad(max_abs_state);
+        max_abs_diff_o = builder.CreateLoad(max_abs_diff_o);
+        max_abs_diff_om1 = builder.CreateLoad(max_abs_diff_om1);
+    } else {
+        // Non-compact mode.
+
+        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
+
+        const auto n_sv_funcs = static_cast<std::uint32_t>(sv_funcs_dc.size());
+
+        // Compute the norm infinity of the state vector and the norm infinity of the derivatives
+        // at orders order and order - 1.
+        max_abs_state = taylor_step_abs(s, diff_arr[0]);
+        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+        // state variables and sv funcs (not all u vars), hence the indexing is
+        // order * (n_eq + n_sv_funcs).
+        max_abs_diff_o = taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs)]);
+        max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs)]);
+        for (std::uint32_t i = 1; i < n_eq; ++i) {
+            max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
+            max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * (n_eq + n_sv_funcs) + i]);
+            max_abs_diff_om1
+                = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]);
         }
     }
+
+    // Determine if we are in absolute or relative tolerance mode.
+    auto abs_or_rel
+        = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+
+    // Estimate rho at orders order - 1 and order.
+    auto num_rho
+        = builder.CreateSelect(abs_or_rel, vector_splat(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
+    auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
+                                 vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
+    auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
+                                   vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
+
+    // Take the minimum.
+    auto rho_m = taylor_step_min(s, rho_o, rho_om1);
+
+    // Compute the scaling + safety factor.
+    const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
+
+    // Determine the step size in absolute value.
+    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
+
+    // Ensure that the step size does not exceed the limit in absolute value.
+    auto max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
+    h = taylor_step_minabs(s, h, max_h_vec);
+
+    // Handle backwards propagation.
+    auto backward = builder.CreateFCmpOLT(max_h_vec, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+    auto h_fac = builder.CreateSelect(backward, vector_splat(builder, codegen<T>(s, number{-1.}), batch_size),
+                                      vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+    h = builder.CreateFMul(h_fac, h);
+
+    return h;
 }
-
-template <typename T>
-const llvm_state &taylor_adaptive_batch_impl<T>::get_llvm_state() const
-{
-    return m_llvm;
-}
-
-template <typename T>
-const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &
-taylor_adaptive_batch_impl<T>::get_decomposition() const
-{
-    return m_dc;
-}
-
-template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
-{
-    return m_order;
-}
-
-template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
-{
-    return m_batch_size;
-}
-
-template <typename T>
-std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
-{
-    return m_dim;
-}
-
-template <typename T>
-const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::vector<T> &time)
-{
-    // Check the dimensionality of time.
-    if (time.size() != m_batch_size) {
-        using namespace fmt::literals;
-
-        throw std::invalid_argument(
-            "Invalid number of time coordinates specified for the dense output in a Taylor integrator in batch "
-            "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
-    }
-
-    // NOTE: "time" needs to be translated
-    // because m_d_out_f expects a time coordinate
-    // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, we need to compute:
-    // time - (m_time - m_last_h);
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_d_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
-    }
-
-    m_d_out_f(m_d_out.data(), m_tc.data(), m_d_out_time.data());
-
-    return m_d_out;
-}
-
-// Explicit instantiation of the batch implementation classes.
-template class taylor_adaptive_batch_impl<double>;
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, std::uint32_t,
-                                                       std::vector<double>, double, bool, bool, std::vector<double>);
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
-                                                       std::vector<double>, std::uint32_t, std::vector<double>, double,
-                                                       bool, bool, std::vector<double>);
-
-template class taylor_adaptive_batch_impl<long double>;
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
-                                                            std::uint32_t, std::vector<long double>, long double, bool,
-                                                            bool, std::vector<long double>);
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<long double>, std::uint32_t, std::vector<long double>,
-    long double, bool, bool, std::vector<long double>);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template class taylor_adaptive_batch_impl<mppp::real128>;
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>, std::vector<mppp::real128>,
-                                                              std::uint32_t, std::vector<mppp::real128>, mppp::real128,
-                                                              bool, bool, std::vector<mppp::real128>);
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, std::uint32_t,
-    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>);
-
-#endif
-
-} // namespace detail
-
-namespace detail
-{
-
-// Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
-// derivative array 'arr'. The total number of u variables is n_uvars.
-llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
-                               std::uint32_t n_uvars)
-{
-    // Sanity check.
-    assert(u_idx < n_uvars);
-
-    // Compute the index.
-    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
-    assert(idx < arr.size());
-
-    return arr[idx];
-}
-
-// Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
-// n_uvars is the total number of u variables.
-llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                                llvm::Value *u_idx)
-{
-    auto &builder = s.builder();
-
-    // NOTE: overflow check has already been done to ensure that the
-    // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto ptr = builder.CreateInBoundsGEP(
-        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
-
-    return builder.CreateLoad(ptr);
-}
-
-namespace
-{
 
 // Store the value val as the derivative of order 'order' of the u variable u_idx
 // into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
@@ -3077,7 +2441,8 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
 //
 // The return value is a variant containing either:
 // - in compact mode, the array containing the derivatives of all u variables,
-// - otherwise, the jet of derivatives of the state variables up to order 'order'.
+// - otherwise, the jet of derivatives of the state variables and sv_funcs
+//   up to order 'order'.
 template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
@@ -3198,6 +2563,1389 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     }
 }
 
+// Create a global read-only array containing the values in sv_funcs_dc, if any
+// (otherwise, the return value will be null). This is for use in the adaptive steppers
+// when employing compact mode.
+llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::uint32_t> &sv_funcs_dc)
+{
+    auto &builder = s.builder();
+
+    if (sv_funcs_dc.empty()) {
+        return nullptr;
+    } else {
+        auto arr_type = llvm::ArrayType::get(llvm::Type::getInt32Ty(s.context()),
+                                             boost::numeric_cast<std::uint64_t>(sv_funcs_dc.size()));
+        std::vector<llvm::Constant *> sv_funcs_dc_const;
+        for (auto idx : sv_funcs_dc) {
+            sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
+        }
+        auto sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
+        auto g_sv_funcs_dc = new llvm::GlobalVariable(s.module(), sv_funcs_dc_arr->getType(), true,
+                                                      llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
+
+        // Get out a pointer to the beginning of the array.
+        return builder.CreateInBoundsGEP(g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
+    }
+}
+
+// Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
+// the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
+// first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
+void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+                     const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *tc_ptr, std::uint32_t n_eq,
+                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    assert(batch_size != 0u);
+
+    // Convert to std::uint32_t for overflow checking and use below.
+    const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs_dc.size());
+
+    // Overflow checking: ensure we can index into
+    // tc_ptr using std::uint32_t.
+    // NOTE: this is the same check done in taylor_add_jet_impl().
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || n_eq > std::numeric_limits<std::uint32_t>::max() - n_sv_funcs
+        || n_eq + n_sv_funcs > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
+        throw std::overflow_error("An overflow condition was detected while generating the code for writing the Taylor "
+                                  "polynomials of an ODE system into the output array");
+    }
+
+    if (diff_variant.index() == 0u) {
+        // Compact mode.
+
+        auto diff_arr = std::get<llvm::Value *>(diff_variant);
+
+        // Create a global read-only array containing the values in sv_funcs_dc, if any
+        // (otherwise, svf_ptr will be null).
+        auto svf_ptr = taylor_c_make_sv_funcs_arr(s, sv_funcs_dc);
+
+        // Write out the Taylor coefficients for the state variables.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                          [&](llvm::Value *cur_order) {
+                              // Load the value of the derivative from diff_arr.
+                              auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
+
+                              // Compute the index in the output pointer.
+                              auto out_idx = builder.CreateAdd(
+                                  builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
+                                  builder.CreateMul(cur_order, builder.getInt32(batch_size)));
+
+                              // Store into tc_ptr.
+                              store_vector_to_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {out_idx}), diff_val);
+                          });
+        });
+
+        // Write out the Taylor coefficients for the sv funcs, if necessary.
+        if (svf_ptr != nullptr) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
+                // Fetch the u var index from svf_ptr.
+                auto cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(svf_ptr, {arr_idx}));
+
+                llvm_loop_u32(
+                    s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                    [&](llvm::Value *cur_order) {
+                        // Load the derivative value from diff_arr.
+                        auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+
+                        // Compute the index in the output pointer.
+                        auto out_idx
+                            = builder.CreateAdd(builder.CreateMul(builder.getInt32((order + 1u) * batch_size),
+                                                                  builder.CreateAdd(builder.getInt32(n_eq), arr_idx)),
+                                                builder.CreateMul(cur_order, builder.getInt32(batch_size)));
+
+                        // Store into tc_ptr.
+                        store_vector_to_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {out_idx}), diff_val);
+                    });
+            });
+        }
+    } else {
+        // Non-compact mode.
+
+        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
+
+        for (std::uint32_t j = 0; j < n_eq; ++j) {
+            for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
+                // Index in the jet of derivatives.
+                // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+                // state variables and sv_variable (not all u vars), hence the indexing
+                // is cur_order * (n_eq + n_sv_funcs) + j.
+                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
+                assert(arr_idx < diff_arr.size());
+                const auto val = diff_arr[arr_idx];
+
+                // Index in tc_ptr.
+                const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
+
+                // Write to tc_ptr.
+                auto out_ptr
+                    = builder.CreateInBoundsGEP(tc_ptr, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                store_vector_to_memory(builder, out_ptr, val);
+            }
+        }
+
+        for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
+            for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
+                // Index in the jet of derivatives.
+                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + n_eq + j;
+                assert(arr_idx < diff_arr.size());
+                const auto val = diff_arr[arr_idx];
+
+                // Index in tc_ptr.
+                const auto out_idx = (order + 1u) * batch_size * (n_eq + j) + cur_order * batch_size;
+
+                // Write to tc_ptr.
+                auto out_ptr
+                    = builder.CreateInBoundsGEP(tc_ptr, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                store_vector_to_memory(builder, out_ptr, val);
+            }
+        }
+    }
+}
+
+// Add to s an adaptive timestepper function with support for events. This timestepper will *not*
+// propagate the state of the system. Instead, its output will be the jet of derivatives
+// of all state variables and event equations, and the deduced timestep value(s).
+template <typename T, typename U>
+auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, U sys, T tol,
+                                          std::uint32_t batch_size, bool, bool compact_mode,
+                                          std::vector<expression> ntes)
+{
+    using namespace fmt::literals;
+    using std::isfinite;
+
+    assert(!s.is_compiled());
+    assert(batch_size != 0u);
+    assert(isfinite(tol) && tol > 0);
+
+    // Determine the order from the tolerance.
+    const auto order = taylor_order_from_tol(tol);
+
+    // Record the number of equations/variables.
+    const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Decompose the system of equations.
+    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(ntes));
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Prepare the function prototype. The arguments are:
+    // - pointer to the output jet of derivative (write only),
+    // - pointer to the current state vector (read only),
+    // - pointer to the parameters (read only),
+    // - pointer to the time value(s) (read only),
+    // - pointer to the array of max timesteps (read & write).
+    // These pointers cannot overlap.
+    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        throw std::invalid_argument(
+            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
+    }
+
+    // Set the names/attributes of the function arguments.
+    auto jet_ptr = f->args().begin();
+    jet_ptr->setName("jet_ptr");
+    jet_ptr->addAttr(llvm::Attribute::NoCapture);
+    jet_ptr->addAttr(llvm::Attribute::NoAlias);
+    jet_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto state_ptr = jet_ptr + 1;
+    state_ptr->setName("state_ptr");
+    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    state_ptr->addAttr(llvm::Attribute::NoAlias);
+    state_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto par_ptr = state_ptr + 1;
+    par_ptr->setName("par_ptr");
+    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    par_ptr->addAttr(llvm::Attribute::NoAlias);
+    par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto time_ptr = par_ptr + 1;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = time_ptr + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Compute the jet of derivatives at the given order.
+    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
+                                              batch_size, compact_mode);
+
+    // Determine the integration timestep.
+    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, h_ptr, n_eq, n_uvars, order, batch_size);
+
+    // Store h to memory.
+    store_vector_to_memory(builder, h_ptr, h);
+
+    // Copy the jet of derivatives to jet_ptr.
+    taylor_write_tc(s, diff_variant, ev_dc, jet_ptr, n_eq, n_uvars, order, batch_size);
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+
+    return std::tuple{std::move(dc), order};
+}
+
+// Small helper to deduce the number of parameters
+// present in the rhs of an ODE.
+template <typename T>
+std::uint32_t n_pars_in_sys(const T &sys)
+{
+    std::uint32_t retval = 0;
+
+    for (const auto &p : sys) {
+        if constexpr (std::is_same_v<uncvref_t<decltype(p)>, expression>) {
+            retval = std::max(retval, get_param_size(p));
+        } else {
+            retval = std::max(retval, get_param_size(p.second));
+        }
+    }
+
+    return retval;
+}
+
+} // namespace
+
+template <typename T>
+template <typename U>
+void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
+                                                 bool compact_mode, std::vector<T> pars, std::vector<t_event> tes,
+                                                 std::vector<nt_event> ntes)
+{
+    using std::isfinite;
+    using namespace fmt::literals;
+
+    // Assign the data members.
+    m_state = std::move(state);
+    m_time = time;
+    m_pars = std::move(pars);
+    m_tes = std::move(tes);
+    m_ntes = std::move(ntes);
+
+    // Check input params.
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
+    }
+
+    if (m_state.size() != sys.size()) {
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size(), sys.size()));
+    }
+
+    if (!isfinite(m_time)) {
+        throw std::invalid_argument(
+            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
+    }
+
+    if (!isfinite(tol) || tol <= 0) {
+        throw std::invalid_argument(
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
+    }
+
+    // NOTE: we need to be able to index into the events
+    // using 32-bit ints.
+    // LCOV_EXCL_START
+    if (m_tes.size() > std::numeric_limits<std::uint32_t>::max()
+        || m_ntes.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::invalid_argument(
+            "The number of non-terminal events is too large, and it results in an overflow condition");
+    }
+    // LCOV_EXCL_STOP
+
+    const auto with_events = !m_tes.empty() || !m_ntes.empty();
+
+    // Fix m_pars' size, if necessary.
+    const auto npars = n_pars_in_sys(sys);
+    if (m_pars.size() < npars) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    } else if (m_pars.size() > npars) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
+                m_pars.size(), npars));
+    }
+
+    // Store the dimension of the system.
+    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the d_out.
+    std::optional<opt_disabler> od(m_llvm);
+
+    // Add the stepper function.
+    if (with_events) {
+        std::vector<expression> ee;
+        for (const auto x : m_tes) {
+            ee.push_back(x.eq);
+        }
+        for (const auto x : m_ntes) {
+            ee.push_back(x.eq);
+        }
+
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", std::move(sys), tol, 1,
+                                                                          high_accuracy, compact_mode, std::move(ee));
+    } else {
+        std::tie(m_dc, m_order)
+            = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
+    }
+
+    // Add the function for the computation of
+    // the dense output.
+    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
+
+    // Run the jit.
+    m_llvm.compile();
+
+    // Fetch the stepper.
+    if (with_events) {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    }
+
+    // Fetch the function to compute the dense output.
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // Setup the vector for the Taylor coefficients.
+    // LCOV_EXCL_START
+    if (m_order == std::numeric_limits<std::uint32_t>::max()
+        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                                  "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+
+    m_tc.resize(m_state.size() * (m_order + 1u));
+
+    // Setup the vector for the dense output.
+    m_d_out.resize(m_state.size());
+
+    // If we have events, we need to setup
+    // m_ev_jet.
+    if (with_events) {
+        const auto n_tes = static_cast<std::uint32_t>(m_tes.size());
+        const auto n_ntes = static_cast<std::uint32_t>(m_ntes.size());
+
+        // NOTE: check that we can represent
+        // the requested size for m_ev_jet using
+        // both its size type and std::uint32_t.
+        // LCOV_EXCL_START
+        if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes
+            || m_order == std::numeric_limits<std::uint32_t>::max()
+            || m_dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
+            || m_dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (m_order + 1u)
+            || m_dim + (n_tes + n_ntes) > std::numeric_limits<decltype(m_ev_jet.size())>::max() / (m_order + 1u)) {
+            throw std::overflow_error(
+                "Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                "or the state size is too large");
+        }
+        // LCOV_EXCL_STOP
+
+        m_ev_jet.resize((m_dim + (n_tes + n_ntes)) * (m_order + 1u));
+    }
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
+    // NOTE: make a manual copy of all members, apart from the function pointers.
+    // NOTE: no need to copy m_d_ntes, which is used only as scratch
+    // temporary space during event detection.
+    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
+      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
+      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet)
+{
+    if (m_tes.empty() && m_ntes.empty()) {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    }
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl(taylor_adaptive_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(const taylor_adaptive_impl &other)
+{
+    if (this != &other) {
+        *this = taylor_adaptive_impl(other);
+    }
+
+    return *this;
+}
+
+template <typename T>
+taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
+
+// Implementation detail to make a single integration timestep.
+// The magnitude of the timestep is automatically deduced, but it will
+// always be not greater than abs(max_delta_t). The propagation
+// is done forward in time if max_delta_t >= 0, backwards in
+// time otherwise.
+//
+// The function will return a pair, containing
+// a flag describing the outcome of the integration,
+// and the integration timestep that was used.
+template <typename T>
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
+{
+    using std::isfinite;
+
+#if !defined(NDEBUG)
+    // NOTE: this is the only precondition on max_delta_t.
+    using std::isnan;
+    assert(!isnan(max_delta_t));
+#endif
+
+    auto h = max_delta_t;
+
+    // Invoke the stepper.
+    if (m_step_f.index() == 0u) {
+        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
+
+        // Update the time.
+        m_time += h;
+
+        // Store the last timestep.
+        m_last_h = h;
+
+        // Check if the time or the state vector are non-finite at the
+        // end of the timestep.
+        if (!isfinite(m_time)
+            || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
+            return std::tuple{taylor_outcome::err_nf_state, h};
+        }
+
+        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+    } else {
+        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time, &h);
+
+        // Write unconditionally the tcs.
+        std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
+
+        // TODO need to check h for non-finite value? Or check non-finiteness later?
+
+        // TODO terminal events detection.
+
+        // Update the state.
+        m_d_out_f(m_state.data(), m_ev_jet.data(), &h);
+
+        // Update the time.
+        m_time += h;
+
+        // Store the last timestep.
+        m_last_h = h;
+
+        // Check if the time or the state vector are non-finite at the
+        // end of the timestep.
+        if (!isfinite(m_time)
+            || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
+            return std::tuple{taylor_outcome::err_nf_state, h};
+        }
+
+        // Detect the non-terminal events.
+        if (!taylor_detect_ntes<T>(m_d_ntes, h, m_ev_jet, m_order, m_dim, static_cast<std::uint32_t>(m_tes.size()),
+                                   static_cast<std::uint32_t>(m_ntes.size()))) {
+            // Non-finite values were generated during
+            // the detection of non-terminal events. This could be
+            // because of non-finite coefficients
+            // in the Taylor polynomials for the event equations,
+            // or numerical issues when doing the poly transformations
+            // inside event detection.
+            return std::tuple{taylor_outcome::err_nf_state, h};
+        }
+
+        // Sort the events by time.
+        std::sort(m_d_ntes.begin(), m_d_ntes.end(),
+                  [](const auto &ev0, const auto &ev1) { return std::get<1>(ev0) < std::get<1>(ev1); });
+
+        // Invoke the callbacks.
+        for (const auto &t : m_d_ntes) {
+            m_ntes[std::get<0>(t)].callback(*this, m_time - m_last_h + std::get<1>(t), std::get<0>(t));
+        }
+
+        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+    }
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(bool wtc)
+{
+    // NOTE: time limit +inf means integration forward in time
+    // and no time limit.
+    return step_impl(std::numeric_limits<T>::infinity(), wtc);
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_backward(bool wtc)
+{
+    return step_impl(-std::numeric_limits<T>::infinity(), wtc);
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool wtc)
+{
+    using std::isnan;
+
+    if (isnan(max_delta_t)) {
+        throw std::invalid_argument(
+            "A NaN max_delta_t was passed to the step() function of an adaptive Taylor integrator");
+    }
+
+    return step_impl(max_delta_t, wtc);
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
+{
+    return propagate_until(m_time + delta_t, max_steps);
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+{
+    using std::isfinite;
+
+    // Check the current time.
+    if (!isfinite(m_time)) {
+        throw std::invalid_argument("Cannot invoke the propagate_until() function of an adaptive Taylor integrator if "
+                                    "the current time is not finite");
+    }
+
+    // Check the final time.
+    if (!isfinite(t)) {
+        throw std::invalid_argument(
+            "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
+    }
+
+    // NOTE: max_steps == 0 means there's no limit
+    // on the number of steps.
+    const auto has_step_limit = (max_steps != 0u);
+
+    // Initial values for the counters
+    // and the min/max abs of the integration
+    // timesteps.
+    // NOTE: iter_counter is for keeping track of the max_steps
+    // limits, step_counter counts the number of timesteps performed
+    // with a non-zero h. Most of the time these two quantities
+    // will be identical, apart from corner cases.
+    std::size_t iter_counter = 0, step_counter = 0;
+    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+
+    while (true) {
+        // NOTE: t - m_time is guaranteed not to be nan: t is never non-finite,
+        // and at the first iteration we have checked above the value of m_time.
+        // At successive iterations, we know that m_time must be finite because
+        // otherwise we would have exited the loop when checking res.
+        const auto [res, h] = step_impl(t - m_time, false);
+
+        if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
+            // Something went wrong in the propagation of the timestep, exit.
+            return std::tuple{res, min_h, max_h, step_counter};
+        }
+
+        // Update the number of iterations.
+        ++iter_counter;
+
+        // Update the number of steps.
+        step_counter += static_cast<std::size_t>(h != 0);
+
+        // Break out if the time limit is reached,
+        // *before* updating the min_h/max_h values.
+        // NOTE: the idea is that if we reached the time
+        // limit the timestep has been artificially
+        // reduced, thus we don't want to count it.
+        if (res == taylor_outcome::time_limit) {
+            return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
+        }
+
+        // Update min_h/max_h.
+        using std::abs;
+        const auto abs_h = abs(h);
+        min_h = std::min(min_h, abs_h);
+        max_h = std::max(max_h, abs_h);
+
+        // Check the iteration limit.
+        if (has_step_limit && iter_counter == max_steps) {
+            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
+        }
+    }
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
+taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
+{
+    using std::abs;
+    using std::isfinite;
+
+    if (grid.empty()) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
+    }
+
+    if (!isfinite(m_time)) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
+    }
+
+    // Pre-allocate the return value.
+    std::vector<T> retval;
+    // LCOV_EXCL_START
+    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
+        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
+                                  "adaptive Taylor integrator");
+    }
+    // LCOV_EXCL_STOP
+    retval.reserve(grid.size() * get_dim());
+
+    // Initial values for the step counter and
+    // the min/max abs of the integration
+    // timesteps.
+    std::size_t step_counter = 0;
+    T min_h = std::numeric_limits<T>::infinity(), max_h(0);
+
+    // Do the first step, making sure to write the
+    // Taylor coefficients.
+    constexpr auto err_msg = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    if (!isfinite(grid[0])) {
+        throw std::invalid_argument(err_msg);
+    }
+    auto oc = (grid[0] >= m_time) ? step(true) : step_backward(true);
+    if (std::get<0>(oc) != taylor_outcome::success) {
+        // Something went wrong in the propagation of the timestep, exit.
+        return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+    }
+
+    // Update step counter and min/max values.
+    // NOTE: the step limit, if it exists, is at least 1,
+    // thus we will always do at least 1 timestep.
+    // If the step limit is 1, we may produce
+    // some dense output but we will exit before
+    // performing the second step.
+    ++step_counter;
+    auto abs_h = abs(std::get<1>(oc));
+    min_h = abs_h;
+    max_h = abs_h;
+
+    for (decltype(grid.size()) cur_grid_idx = 0;;) {
+        // Establish the time range of the last
+        // taken timestep.
+        // NOTE: t0 < t1.
+        const auto t0 = std::min(m_time, m_time - m_last_h);
+        const auto t1 = std::max(m_time, m_time - m_last_h);
+
+        while (true) {
+            // Fetch the current time target.
+            const auto cur_tt = grid[cur_grid_idx];
+
+            if (cur_tt >= t0 && cur_tt <= t1) {
+                // The current time target falls within the range of
+                // validity of the dense output. Compute the dense
+                // output in cur_tt.
+                update_d_output(cur_tt);
+
+                // Add the result to retval.
+                retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
+            } else {
+                // Cannot use dense output on the current time target,
+                // need to take another step.
+                break;
+            }
+
+            // Move to the next time target, or break out
+            // if we have no more.
+            if (++cur_grid_idx == grid.size()) {
+                break;
+            }
+        }
+
+        if (cur_grid_idx == grid.size()) {
+            // No more grid points, exit.
+            break;
+        }
+
+        // Need to take a new step to get closer to the
+        // next time target. But first, check the step limit.
+        // NOTE: max_steps == 0 means no step limit, and at this
+        // stage step_counter is always at least 1.
+        if (step_counter == max_steps) {
+            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Check finiteness of the current time target.
+        if (!isfinite(grid[cur_grid_idx])) {
+            throw std::invalid_argument(err_msg);
+        }
+        // Do the step towards the time target.
+        oc = (grid[cur_grid_idx] >= m_time) ? step(true) : step_backward(true);
+        if (std::get<0>(oc) != taylor_outcome::success) {
+            // Something went wrong in the propagation of the timestep, exit.
+            return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Update step counter and min/max values.
+        ++step_counter;
+        abs_h = abs(std::get<1>(oc));
+        min_h = std::min(min_h, abs_h);
+        max_h = std::max(max_h, abs_h);
+    }
+
+    // Everything went well, return success.
+    return std::tuple{taylor_outcome::success, min_h, max_h, step_counter, std::move(retval)};
+}
+
+template <typename T>
+const llvm_state &taylor_adaptive_impl<T>::get_llvm_state() const
+{
+    return m_llvm;
+}
+
+template <typename T>
+const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &taylor_adaptive_impl<T>::get_decomposition() const
+{
+    return m_dc;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_impl<T>::get_order() const
+{
+    return m_order;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_impl<T>::get_dim() const
+{
+    return m_dim;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
+{
+    // NOTE: "time" needs to be translated
+    // because m_d_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, we need to compute:
+    const auto h = time - (m_time - m_last_h);
+
+    m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+
+    return m_d_out;
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
+{
+    if (!callback) {
+        throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
+    }
+}
+
+// Explicit instantiation of the implementation classes/functions.
+// NOTE: on Windows apparently it is necessary to declare that
+// these instantiations are meant to be dll-exported.
+template class taylor_adaptive_impl<double>;
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
+                                                                                 std::vector<double>, double, double,
+                                                                                 bool, bool, std::vector<double>,
+                                                                                 std::vector<t_event>,
+                                                                                 std::vector<nt_event>);
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
+                                                 double, double, bool, bool, std::vector<double>, std::vector<t_event>,
+                                                 std::vector<nt_event>);
+
+template class taylor_adaptive_impl<long double>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
+                                                      long double, bool, bool, std::vector<long double>,
+                                                      std::vector<t_event>, std::vector<nt_event>);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<long double>, long double, long double, bool, bool,
+    std::vector<long double>, std::vector<t_event>, std::vector<nt_event>);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class taylor_adaptive_impl<mppp::real128>;
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
+    std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
+    std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event>);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
+    bool, std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event>);
+
+#endif
+
+} // namespace detail
+
+namespace detail
+{
+
+template <typename T>
+template <typename U>
+void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, std::uint32_t batch_size,
+                                                       std::vector<T> time, T tol, bool high_accuracy,
+                                                       bool compact_mode, std::vector<T> pars)
+{
+    using std::isfinite;
+    using namespace fmt::literals;
+
+    // Init the data members.
+    m_batch_size = batch_size;
+    m_state = std::move(state);
+    m_time = std::move(time);
+    m_pars = std::move(pars);
+
+    // Check input params.
+    if (m_batch_size == 0u) {
+        throw std::invalid_argument("The batch size in an adaptive Taylor integrator cannot be zero");
+    }
+
+    if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite value was detected in the initial state of an adaptive Taylor integrator");
+    }
+
+    if (m_state.size() % m_batch_size != 0u) {
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a size of {}, which is not a multiple of the batch size ({})"_format(
+                m_state.size(), m_batch_size));
+    }
+
+    if (m_state.size() / m_batch_size != sys.size()) {
+        throw std::invalid_argument(
+            "Inconsistent sizes detected in the initialization of an adaptive Taylor "
+            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
+                m_state.size() / m_batch_size, sys.size()));
+    }
+
+    if (m_time.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid size detected in the initialization of an adaptive Taylor "
+            "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
+                m_time.size(), m_batch_size));
+    }
+
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
+        throw std::invalid_argument(
+            "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
+    }
+
+    if (!isfinite(tol) || tol <= 0) {
+        throw std::invalid_argument(
+            "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
+                tol));
+    }
+
+    // Fix m_pars' size, if necessary.
+    const auto npars = n_pars_in_sys(sys);
+    if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
+        throw std::overflow_error(
+            "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
+    }
+    if (m_pars.size() < npars * m_batch_size) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
+    } else if (m_pars.size() > npars * m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
+            "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
+    }
+
+    // Store the dimension of the system.
+    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the d_out.
+    std::optional<opt_disabler> od(m_llvm);
+
+    // Add the stepper function.
+    std::tie(m_dc, m_order)
+        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
+
+    // Add the function for the computation of
+    // the dense output.
+    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
+
+    // Restore the original optimisation level in s.
+    od.reset();
+
+    // Run the optimisation pass manually.
+    m_llvm.optimise();
+
+    // Run the jit.
+    m_llvm.compile();
+
+    // Fetch the stepper.
+    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+
+    // Fetch the function to compute the dense output.
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // Setup the vector for the Taylor coefficients.
+    // LCOV_EXCL_START
+    if (m_order == std::numeric_limits<std::uint32_t>::max()
+        || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                                  "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+
+    // NOTE: the size of m_state.size() already takes
+    // into account the batch size.
+    m_tc.resize(m_state.size() * (m_order + 1u));
+
+    // Setup m_last_h.
+    m_last_h.resize(boost::numeric_cast<decltype(m_last_h.size())>(batch_size));
+
+    // Setup the vector for the dense output.
+    // NOTE: the size of m_state.size() already takes
+    // into account the batch size.
+    m_d_out.resize(m_state.size());
+
+    // Prepare the temp vectors.
+    m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
+    m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
+    m_delta_ts.resize(m_batch_size);
+
+    // NOTE: init the outcome to success, the rest to zero.
+    m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
+                      std::tuple{taylor_outcome::success, T(0)});
+    m_prop_res.resize(boost::numeric_cast<decltype(m_prop_res.size())>(m_batch_size),
+                      std::tuple{taylor_outcome::success, T(0), T(0), std::size_t(0)});
+
+    m_ts_count.resize(boost::numeric_cast<decltype(m_ts_count.size())>(m_batch_size));
+    m_min_abs_h.resize(m_batch_size);
+    m_max_abs_h.resize(m_batch_size);
+    m_cur_max_delta_ts.resize(m_batch_size);
+    m_pfor_ts.resize(m_batch_size);
+
+    m_d_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
+    // NOTE: make a manual copy of all members, apart from the function pointers.
+    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
+      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
+      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
+      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_d_out_time(other.m_d_out_time)
+{
+    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(taylor_adaptive_batch_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T> &taylor_adaptive_batch_impl<T>::operator=(const taylor_adaptive_batch_impl &other)
+{
+    if (this != &other) {
+        *this = taylor_adaptive_batch_impl(other);
+    }
+
+    return *this;
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T> &
+taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+// Implementation detail to make a single integration timestep.
+// The magnitude of the timestep is automatically deduced for each
+// state vector, but it will always be not greater than
+// the absolute value of the corresponding element in max_delta_ts.
+// For each state vector, the propagation
+// is done forward in time if max_delta_t >= 0, backwards in
+// time otherwise.
+//
+// The function will write to res a pair for each state
+// vector, containing a flag describing the outcome of the integration
+// and the integration timestep that was used.
+template <typename T>
+void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
+{
+    using std::isfinite;
+
+    // Check preconditions.
+    assert(max_delta_ts.size() == m_batch_size);
+    assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
+        using std::isnan;
+        return isnan(x);
+    }));
+
+    // Sanity check.
+    assert(m_step_res.size() == m_batch_size);
+
+    // Copy max_delta_ts to the tmp buffer.
+    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
+
+    // Invoke the stepper.
+    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
+
+    // Helper to check if the state vector of a batch element
+    // contains a non-finite value.
+    auto check_nf_batch = [this](std::uint32_t batch_idx) {
+        for (std::uint32_t i = 0; i < m_dim; ++i) {
+            if (!isfinite(m_state[i * m_batch_size + batch_idx])) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // Update the times and the last timesteps, and write out the result.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        // The timestep that was actually used for
+        // this batch element.
+        const auto h = m_delta_ts[i];
+        m_time[i] += h;
+
+        // Update the size of the last timestep.
+        m_last_h[i] = h;
+
+        if (!isfinite(m_time[i]) || check_nf_batch(i)) {
+            // Either the new time or state contain non-finite values,
+            // return an error condition.
+            m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+        } else {
+            m_step_res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        }
+    }
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::step(bool wtc)
+{
+    step_impl(m_pinf, wtc);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::step_backward(bool wtc)
+{
+    step_impl(m_minf, wtc);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, bool wtc)
+{
+    // Check the dimensionality of max_delta_ts.
+    if (max_delta_ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
+            "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
+    }
+
+    // Make sure no values in max_delta_ts are nan.
+    if (std::any_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
+            using std::isnan;
+            return isnan(x);
+        })) {
+        throw std::invalid_argument(
+            "Cannot invoke the step() function of an adaptive Taylor integrator in batch mode if "
+            "one of the max timesteps is nan");
+    }
+
+    step_impl(max_delta_ts, wtc);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts, std::size_t max_steps)
+{
+    // Check the dimensionality of delta_ts.
+    if (delta_ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
+                                    "the batch size is {}, but the number of specified time intervals is {}"_format(
+                                        m_batch_size, delta_ts.size()));
+    }
+
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_pfor_ts[i] = m_time[i] + delta_ts[i];
+    }
+
+    propagate_until(m_pfor_ts, max_steps);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
+{
+    using std::isfinite;
+
+    // Check the dimensionality of ts.
+    if (ts.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
+    }
+
+    // Check the current times.
+    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !isfinite(t); })) {
+        throw std::invalid_argument(
+            "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
+            "one of the current times is not finite");
+    }
+
+    // Check the final times.
+    if (std::any_of(ts.begin(), ts.end(), [](const auto &t) { return !isfinite(t); })) {
+        throw std::invalid_argument("A non-finite time was passed to the propagate_until() function of an adaptive "
+                                    "Taylor integrator in batch mode");
+    }
+
+    // Reset the counters and the min/max abs(h) vectors.
+    std::size_t iter_counter = 0;
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_ts_count[i] = 0;
+        m_min_abs_h[i] = std::numeric_limits<T>::infinity();
+        m_max_abs_h[i] = 0;
+    }
+
+    while (true) {
+        // Compute the max integration times for this timestep.
+        // NOTE: ts[i] - m_time[i] is guaranteed not to be nan: ts[i] is never non-finite,
+        // and at the first iteration we have checked above the value of m_time.
+        // At successive iterations, we know that m_time[i] must be finite because
+        // otherwise we would have exited the loop when checking m_step_res.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_cur_max_delta_ts[i] = ts[i] - m_time[i];
+        }
+
+        // Run the integration timestep.
+        step_impl(m_cur_max_delta_ts, false);
+
+        // Check if the integration timestep produced an error condition.
+        if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {
+                return std::get<0>(tup) != taylor_outcome::success && std::get<0>(tup) != taylor_outcome::time_limit;
+            })) {
+            break;
+        }
+
+        // Update the iteration counter.
+        ++iter_counter;
+
+        // Update the local step counters.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: the local step counters increase only if we integrated
+            // for a non-zero time.
+            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
+        }
+
+        // Break out if we have reached the time limit for all
+        // batch elements.
+        if (std::all_of(m_step_res.begin(), m_step_res.end(),
+                        [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::time_limit; })) {
+            break;
+        }
+
+        // Update min_h/max_h.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Don't update if we reached the time limit.
+            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit) {
+                continue;
+            }
+
+            using std::abs;
+            const auto abs_h = abs(std::get<1>(m_step_res[i]));
+            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+        }
+
+        // Check the iteration limit.
+        if (max_steps != 0u && iter_counter == max_steps) {
+            break;
+        }
+    }
+
+    // Assemble the return value.
+    if (max_steps != 0u && iter_counter == max_steps) {
+        // We exited because we reached the max_steps limit: if the last integration step was successful
+        // return step_limit, otherwise time_limit.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_prop_res[i]
+                = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
+                                                                                   : taylor_outcome::time_limit,
+                             m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        }
+    } else {
+        // We exited either because of an error, or because all the batch
+        // elements reached the time limits. In this case, we just use the
+        // outcome of the last timestep.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        }
+    }
+}
+
+template <typename T>
+const llvm_state &taylor_adaptive_batch_impl<T>::get_llvm_state() const
+{
+    return m_llvm;
+}
+
+template <typename T>
+const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &
+taylor_adaptive_batch_impl<T>::get_decomposition() const
+{
+    return m_dc;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
+{
+    return m_order;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
+{
+    return m_batch_size;
+}
+
+template <typename T>
+std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
+{
+    return m_dim;
+}
+
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::vector<T> &time)
+{
+    // Check the dimensionality of time.
+    if (time.size() != m_batch_size) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid number of time coordinates specified for the dense output in a Taylor integrator in batch "
+            "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
+    }
+
+    // NOTE: "time" needs to be translated
+    // because m_d_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep. Thus, we need to compute:
+    // time - (m_time - m_last_h);
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_d_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
+    }
+
+    m_d_out_f(m_d_out.data(), m_tc.data(), m_d_out_time.data());
+
+    return m_d_out;
+}
+
+// Explicit instantiation of the batch implementation classes.
+template class taylor_adaptive_batch_impl<double>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, std::uint32_t,
+                                                       std::vector<double>, double, bool, bool, std::vector<double>);
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+                                                       std::vector<double>, std::uint32_t, std::vector<double>, double,
+                                                       bool, bool, std::vector<double>);
+
+template class taylor_adaptive_batch_impl<long double>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
+                                                            std::uint32_t, std::vector<long double>, long double, bool,
+                                                            bool, std::vector<long double>);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<long double>, std::uint32_t, std::vector<long double>,
+    long double, bool, bool, std::vector<long double>);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class taylor_adaptive_batch_impl<mppp::real128>;
+
+template HEYOKA_DLL_PUBLIC void
+taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>, std::vector<mppp::real128>,
+                                                              std::uint32_t, std::vector<mppp::real128>, mppp::real128,
+                                                              bool, bool, std::vector<mppp::real128>);
+
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, std::uint32_t,
+    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>);
+
+#endif
+
+} // namespace detail
+
+namespace detail
+{
+
+namespace
+{
+
 // NOTE: in compact mode, care must be taken when adding multiple jet functions to the same llvm state
 // with the same floating-point type, batch size and number of u variables. The potential issue there
 // is that when the first jet is added, the compact mode AD functions are created and then optimised.
@@ -3224,8 +3972,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     }
 
     auto &builder = s.builder();
-    auto &context = s.context();
-    auto &module = s.module();
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -3239,6 +3985,8 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     const auto td_res = taylor_decompose(std::move(sys), std::move(sv_funcs));
     const auto &dc = td_res.first;
     const auto &sv_funcs_dc = td_res.second;
+
+    assert(sv_funcs_dc.size() == n_sv_funcs);
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -3304,23 +4052,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
         // Create a global read-only array containing the values in sv_funcs_dc, if any
         // (otherwise, svf_ptr will be null).
-        auto svf_ptr = [&]() -> llvm::Value * {
-            if (n_sv_funcs > 0u) {
-                auto arr_type = llvm::ArrayType::get(llvm::Type::getInt32Ty(context), n_sv_funcs);
-                std::vector<llvm::Constant *> sv_funcs_dc_const;
-                for (auto idx : sv_funcs_dc) {
-                    sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
-                }
-                auto sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
-                auto g_sv_funcs_dc = new llvm::GlobalVariable(module, sv_funcs_dc_arr->getType(), true,
-                                                              llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
-
-                // Get out a pointer to the beginning of the array.
-                return builder.CreateInBoundsGEP(g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
-            } else {
-                return nullptr;
-            }
-        }();
+        auto svf_ptr = taylor_c_make_sv_funcs_arr(s, sv_funcs_dc);
 
         // Write the order 0 of the sv_funcs, if needed.
         if (svf_ptr != nullptr) {
@@ -3508,220 +4240,6 @@ namespace detail
 
 namespace
 {
-
-// Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
-llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_maxabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_maxabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        // Compute abs(b).
-        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
-        // Return max(a, abs(b)).
-        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, abs_y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
-llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        // Compute abs(b).
-        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
-        // Return min(a, abs(b)).
-        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minnum128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the pow() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_pow128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        // If we are operating on SIMD vectors, try to see if we have a sleef
-        // function available for pow().
-        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
-            // NOTE: if sfn ends up empty, we will be falling through
-            // below and use the LLVM intrinsic instead.
-            if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-                !sfn.empty()) {
-                return llvm_invoke_external(
-                    s, sfn, vec_t, {x_v, y_v},
-                    // NOTE: in theory we may add ReadNone here as well,
-                    // but for some reason, at least up to LLVM 10,
-                    // this causes strange codegen issues. Revisit
-                    // in the future.
-                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-            }
-        }
-
-        return llvm_invoke_intrinsic(s, "llvm.pow", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute abs(x_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector argument.
-    auto x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v);
-
-        // Execute the heyoka_abs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (auto x_scal : x_scalars) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_abs128", x_t, {x_scal},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
 
 // Run the Horner scheme to propagate an ODE state via the evaluation of the Taylor polynomials.
 // diff_var contains either the derivatives for all u variables (in compact mode) or only
@@ -4118,19 +4636,15 @@ void taylor_run_ceval_state_updater(llvm_state &s, llvm::Value *jet_ptr, llvm::V
 // The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
 // uses in the second stepper (e.g., an argument might be removed from the signature because it is a
 // compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
-// in the state, add the 2 steppers and then run a single optimisation pass.
+// in the state, add the 2 steppers and then run a single optimisation pass. This is what we do
+// in the integrators' ctors.
 // NOTE: document this eventually.
-// NOTE: this is not an issue in the Taylor integrators, where we are certain that only 1 stepper
-// is ever added to the LLVM state.
 template <typename T, typename U>
 auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
                                    bool high_accuracy, bool compact_mode)
 {
-    using std::ceil;
-    using std::exp;
-    using std::isfinite;
-    using std::log;
     using namespace fmt::literals;
+    using std::isfinite;
 
     if (s.is_compiled()) {
         throw std::invalid_argument("An adaptive Taylor stepper cannot be added to an llvm_state after compilation");
@@ -4147,29 +4661,16 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     }
 
     // Determine the order from the tolerance.
-    auto order_f = ceil(-log(tol) / 2 + 1);
-    if (!isfinite(order_f)) {
-        throw std::invalid_argument(
-            "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
-    }
-    // NOTE: min order is 2.
-    order_f = std::max(T(2), order_f);
-
-    // NOTE: static cast is safe because we know that T is at least
-    // a double-precision IEEE type.
-    if (order_f > static_cast<T>(std::numeric_limits<std::uint32_t>::max())) {
-        throw std::overflow_error("The computation of the Taylor order in an adaptive Taylor stepper resulted "
-                                  "in an overflow condition");
-    }
-    const auto order = static_cast<std::uint32_t>(order_f);
+    const auto order = taylor_order_from_tol(tol);
 
     // Record the number of equations/variables.
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    // NOTE: this will have to be adapted to support
-    // sv_funcs.
+    // NOTE: no sv_funcs needed for this stepper.
     auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
+
+    assert(sv_funcs_dc.empty());
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -4231,103 +4732,11 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives at the given order.
-    // NOTE: in taylor_compute_jet() we ensure that n_uvars * order + n_eq
-    // is representable as a 32-bit unsigned integer.
-    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode);
+    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
+                                              compact_mode);
 
-    llvm::Value *max_abs_state, *max_abs_diff_o, *max_abs_diff_om1;
-
-    if (compact_mode) {
-        auto diff_arr = std::get<llvm::Value *>(diff_variant);
-
-        // Compute the norm infinity of the state vector and the norm infinity of the derivatives
-        // at orders order and order - 1.
-        max_abs_state = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
-        max_abs_diff_o = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
-        max_abs_diff_om1 = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
-
-        // Initialise with the abs(derivatives) of the first state variable at orders 0, 'order' and 'order - 1'.
-        builder.CreateStore(
-            taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {builder.getInt32(0)}))),
-            max_abs_state);
-        // NOTE: in compact mode diff_arr contains the derivatives for *all* uvars,
-        // hence the indexing is order * n_uvars.
-        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
-                                                   diff_arr, {builder.getInt32(order * n_uvars)}))),
-                            max_abs_diff_o);
-        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
-                                                   diff_arr, {builder.getInt32((order - 1u) * n_uvars)}))),
-                            max_abs_diff_om1);
-
-        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
-            builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(max_abs_state),
-                                                   builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {cur_idx}))),
-                                max_abs_state);
-            builder.CreateStore(
-                taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_o),
-                                   builder.CreateLoad(builder.CreateInBoundsGEP(
-                                       diff_arr, {builder.CreateAdd(builder.getInt32(order * n_uvars), cur_idx)}))),
-                max_abs_diff_o);
-            builder.CreateStore(
-                taylor_step_maxabs(
-                    s, builder.CreateLoad(max_abs_diff_om1),
-                    builder.CreateLoad(builder.CreateInBoundsGEP(
-                        diff_arr, {builder.CreateAdd(builder.getInt32((order - 1u) * n_uvars), cur_idx)}))),
-                max_abs_diff_om1);
-        });
-
-        // Load the values for later use.
-        max_abs_state = builder.CreateLoad(max_abs_state);
-        max_abs_diff_o = builder.CreateLoad(max_abs_diff_o);
-        max_abs_diff_om1 = builder.CreateLoad(max_abs_diff_om1);
-    } else {
-        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
-
-        // Compute the norm infinity of the state vector and the norm infinity of the derivatives
-        // at orders order and order - 1.
-        max_abs_state = taylor_step_abs(s, diff_arr[0]);
-        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
-        // state variables (not all u vars), hence the indexing is order * n_eq.
-        max_abs_diff_o = taylor_step_abs(s, diff_arr[order * n_eq]);
-        max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * n_eq]);
-        for (std::uint32_t i = 1; i < n_eq; ++i) {
-            max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
-            max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * n_eq + i]);
-            max_abs_diff_om1 = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * n_eq + i]);
-        }
-    }
-
-    // Determine if we are in absolute or relative tolerance mode.
-    auto abs_or_rel
-        = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
-
-    // Estimate rho at orders order - 1 and order.
-    auto num_rho
-        = builder.CreateSelect(abs_or_rel, vector_splat(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
-    auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                                 vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
-    auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                                   vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
-
-    // Take the minimum.
-    auto rho_m = taylor_step_min(s, rho_o, rho_om1);
-
-    // Compute the scaling + safety factor.
-    const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
-
-    // Determine the step size in absolute value.
-    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
-
-    // Ensure that the step size does not exceed the limit in absolute value.
-    auto max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
-    h = taylor_step_minabs(s, h, max_h_vec);
-
-    // Handle backwards propagation.
-    auto backward = builder.CreateFCmpOLT(max_h_vec, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-    auto h_fac = builder.CreateSelect(backward, vector_splat(builder, codegen<T>(s, number{-1.}), batch_size),
-                                      vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
-    h = builder.CreateFMul(h_fac, h);
+    // Determine the integration timestep.
+    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, h_ptr, n_eq, n_uvars, order, batch_size);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
@@ -4370,47 +4779,7 @@ auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys
         [&]() {
             // tc_ptr is not null: copy the Taylor coefficients
             // for the state variables.
-            if (compact_mode) {
-                auto diff_arr = std::get<llvm::Value *>(diff_variant);
-
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
-                    llvm_loop_u32(
-                        s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                        [&](llvm::Value *cur_order) {
-                            // Load the value of the derivative from diff_arr.
-                            auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
-
-                            // Compute the index in the output pointer.
-                            auto out_idx = builder.CreateAdd(
-                                builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
-                                builder.CreateMul(cur_order, builder.getInt32(batch_size)));
-
-                            // Store into tc_ptr.
-                            store_vector_to_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {out_idx}), diff_val);
-                        });
-                });
-            } else {
-                const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
-
-                for (std::uint32_t j = 0; j < n_eq; ++j) {
-                    for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
-                        // Index in the jet of derivatives.
-                        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
-                        // state variables (not all u vars), hence the indexing is cur_order * n_eq + j.
-                        const auto arr_idx = cur_order * n_eq + j;
-                        assert(arr_idx < diff_arr.size());
-                        const auto val = diff_arr[arr_idx];
-
-                        // Index in tc_ptr.
-                        const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
-
-                        // Write to tc_ptr.
-                        auto out_ptr = builder.CreateInBoundsGEP(
-                            tc_ptr, {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
-                        store_vector_to_memory(builder, out_ptr, val);
-                    }
-                }
-            }
+            taylor_write_tc(s, diff_variant, {}, tc_ptr, n_eq, n_uvars, order, batch_size);
         },
         [&]() {
             // Taylor coefficients were not requested,

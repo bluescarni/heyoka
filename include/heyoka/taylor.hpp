@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <ostream>
 #include <string>
@@ -20,6 +21,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -349,6 +351,8 @@ IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(pars);
+IGOR_MAKE_NAMED_ARGUMENT(nt_events);
+IGOR_MAKE_NAMED_ARGUMENT(t_events);
 
 } // namespace kw
 
@@ -410,6 +414,22 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
+public:
+    struct nt_event {
+        using callback_t = std::function<void(taylor_adaptive_impl &, T, std::uint32_t)>;
+
+        explicit nt_event(expression, callback_t);
+
+        expression eq;
+        callback_t callback;
+    };
+    struct t_event {
+        explicit t_event(expression);
+
+        expression eq;
+    };
+
+private:
     // State vector.
     std::vector<T> m_state;
     // Time.
@@ -422,9 +442,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> m_dc;
     // Taylor order.
     std::uint32_t m_order;
-    // The stepper.
+    // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    step_f_t m_step_f;
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *);
+    std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -436,6 +457,16 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     d_out_f_t m_d_out_f;
     // The vector for the dense output.
     std::vector<T> m_d_out;
+    // The vector of terminal events.
+    std::vector<t_event> m_tes;
+    // The vector of non-terminal events.
+    std::vector<nt_event> m_ntes;
+    // The jet of derivatives for the state variables
+    // and the events. This is used only if there
+    // are events, otherwise it stays empty.
+    std::vector<T> m_ev_jet;
+    // Vector of detected non-terminal events.
+    std::vector<std::tuple<std::uint32_t, T, T>> m_d_ntes;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
@@ -443,7 +474,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>, std::vector<t_event>,
+                                              std::vector<nt_event>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -466,8 +498,30 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
             auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
+            // NOTE: perhaps the handling of the events kwargs can end up in
+            // taylor_adaptive_common_ops()
+            // once we implement event detection in the batch integrator too.
+
+            // Extract the terminal events, if any.
+            auto tes = [&p]() -> std::vector<t_event> {
+                if constexpr (p.has(kw::t_events)) {
+                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                } else {
+                    return {};
+                }
+            }();
+
+            // Extract the non-terminal events, if any.
+            auto ntes = [&p]() -> std::vector<nt_event> {
+                if constexpr (p.has(kw::nt_events)) {
+                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                } else {
+                    return {};
+                }
+            }();
+
             finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy, compact_mode,
-                               std::move(pars));
+                               std::move(pars), std::move(tes), std::move(ntes));
         }
     }
 

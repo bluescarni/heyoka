@@ -1,0 +1,587 @@
+// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+//
+// This file is part of the heyoka library.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#include <heyoka/config.hpp>
+
+#include <algorithm>
+#include <cassert>
+#include <cerrno>
+#include <cmath>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/iterator/filter_iterator.hpp>
+#include <boost/math/policies/policy.hpp>
+#include <boost/math/special_functions/binomial.hpp>
+#include <boost/math/tools/toms748_solve.hpp>
+#include <boost/numeric/conversion/cast.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <boost/multiprecision/float128.hpp>
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#include <heyoka/detail/event_detection.hpp>
+
+namespace heyoka::detail
+{
+
+namespace
+{
+
+#if !defined(NDEBUG)
+
+// Debug functions to check the computation of
+// the binomial coefficients.
+
+template <typename T>
+auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
+{
+    auto n = boost::numeric_cast<unsigned>(n_);
+    auto k = boost::numeric_cast<unsigned>(k_);
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if constexpr (std::is_same_v<T, mppp::real128>) {
+        using bf128 = boost::multiprecision::float128;
+
+        return mppp::real128{boost::math::binomial_coefficient<bf128>(n, k).backend().value()};
+    } else {
+#endif
+        return boost::math::binomial_coefficient<T>(n, k);
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+#endif
+
+// Helper to fetch the global poly cache.
+template <typename T>
+auto &get_poly_cache()
+{
+    thread_local std::vector<std::vector<std::vector<T>>> ret;
+
+    return ret;
+}
+
+// Extract a poly of order n from the cache (or create a new one).
+template <typename T>
+auto get_poly_from_cache(std::uint32_t n)
+{
+    // Get/create the thread-local cache.
+    auto &cache = get_poly_cache<T>();
+
+    // Look if we have inited the cache for order n.
+    if (n >= cache.size()) {
+        // The cache was never used for polynomials of order
+        // n, add the necessary entries.
+
+        // NOTE: no overflow check needed here, cause the order
+        // is always overflow checked in the integrator machinery.
+        cache.resize(boost::numeric_cast<decltype(cache.size())>(n + 1u));
+    }
+
+    auto &pcache = cache[n];
+
+    if (pcache.empty()) {
+        // No polynomials are available, create a new one.
+        return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(n + 1u));
+    } else {
+        // Extract an existing polynomial from the cache.
+        auto retval = std::move(pcache.back());
+        pcache.pop_back();
+
+        return retval;
+    }
+}
+
+// Insert a poly into the cache.
+template <typename T>
+void put_poly_in_cache(std::vector<T> &&v)
+{
+    // Get/create the thread-local cache.
+    auto &cache = get_poly_cache<T>();
+
+    // Fetch the order of the polynomial.
+    // NOTE: the order is the size - 1.
+    assert(!v.empty());
+    const auto n = v.size() - 1u;
+
+    // Look if we have inited the cache for order n.
+    if (n >= cache.size()) {
+        // The cache was never used for polynomials of order
+        // n, add the necessary entries.
+
+        if (n == std::numeric_limits<decltype(cache.size())>::max()) {
+            throw std::overflow_error("An overflow was detected in the polynomial cache");
+        }
+        cache.resize(n + 1u);
+    }
+
+    // Move v in.
+    cache[n].push_back(std::move(v));
+}
+
+// Helper to fetch the global working list used in
+// poly root finding.
+template <typename T>
+auto &get_wlist()
+{
+    thread_local std::vector<std::tuple<std::uint32_t, std::uint32_t, std::vector<T>>> w_list;
+
+    return w_list;
+}
+
+// Compute and return all binomial coefficients (n choose k)
+// up to n = max_n.
+template <typename T>
+auto make_binomial_coefficients(std::uint32_t max_n)
+{
+    assert(max_n >= 2u);
+
+    if (max_n > std::numeric_limits<std::uint32_t>::max() - 2u
+        || (max_n + 1u) > std::numeric_limits<std::uint32_t>::max() / (max_n + 2u)) {
+        throw std::overflow_error("An overflow was detected while generating a list of binomial coefficients");
+    }
+
+    std::vector<T> retval;
+    retval.resize(boost::numeric_cast<decltype(retval.size())>(((max_n + 1u) * (max_n + 2u)) / 2u));
+
+    // Fill up to n = 2.
+
+    // 0 choose 0.
+    retval[0] = 1;
+
+    // 1 choose 0.
+    retval[1] = 1;
+    // 1 choose 1.
+    retval[2] = 1;
+
+    // 2 choose 0.
+    retval[3] = 1;
+    // 2 choose 1.
+    retval[4] = 2;
+    // 2 choose 2.
+    retval[5] = 1;
+
+    // Iterate using the recursion formula.
+    std::uint32_t base_idx = 6;
+    for (std::uint32_t n = 3; n <= max_n; base_idx += ++n) {
+        // n choose 0 = 1.
+        retval[base_idx] = 1;
+
+        // NOTE: the recursion formula is valid up to k = n - 1.
+        const auto prev_base_idx = base_idx - n;
+        for (std::uint32_t k = 1; k < n; ++k) {
+            retval[base_idx + k] = retval[prev_base_idx + k] + retval[prev_base_idx + k - 1u];
+        }
+
+        // n choose n = 1.
+        retval[base_idx + n] = 1;
+    }
+
+    return retval;
+}
+
+// Fetch the index of (n choose k) in a vector produced by
+// make_binomial_coefficients().
+std::uint32_t bc_idx(std::uint32_t n, std::uint32_t k)
+{
+    assert(k <= n);
+
+    return (n * (n + 1u)) / 2u + k;
+}
+
+// Helper to fetch the global cache of binomial coefficients.
+template <typename T>
+auto &get_bc_cache()
+{
+    thread_local std::vector<std::vector<T>> ret;
+
+    return ret;
+}
+
+// Fetch from the cache the list of all binomial
+// coefficients (n choose k) up to n = max_n.
+template <typename T>
+const auto &get_bc_up_to(std::uint32_t max_n)
+{
+    auto &cache = get_bc_cache<T>();
+
+    if (max_n >= cache.size()) {
+        cache.resize(boost::numeric_cast<decltype(cache.size())>(max_n + 1u));
+    }
+
+    auto &bcache = cache[max_n];
+
+    if (bcache.empty()) {
+        // NOTE: here, in principle, rather than computing all
+        // binomial coefficients for each different value of max_n,
+        // we could re-use the coefficients computed for lower values
+        // of max_n. I don't think this makes much of a difference in practice,
+        // as the computation is done once per thread and most likely with
+        // not many different values of max_n. Keep this in mind
+        // in any case.
+        bcache = make_binomial_coefficients<T>(max_n);
+    }
+
+    return bcache;
+}
+
+// Given an input polynomial a(x), substitute
+// x with x_1 * h and write to ret the resulting
+// polynomial in the new variable x_1. Requires
+// random-access iterators.
+// NOTE: aliasing allowed.
+template <typename OutputIt, typename InputIt, typename T>
+void poly_rescale2(OutputIt ret, InputIt a, const T &scal, std::uint32_t n)
+{
+    T cur_f(1);
+
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        ret[i] = cur_f * a[i];
+        cur_f *= scal;
+    }
+}
+
+// Substitute the polynomial variable x with x_1 + 1,
+// and write the resulting polynomial in ret. bcs
+// is a vector containing the binomial coefficients
+// up to to (n choose n) in the format returned
+// by make_binomial_coefficients().
+// Requires random-access iterators.
+// NOTE: aliasing NOT allowed.
+template <typename OutputIt, typename InputIt, typename BCs>
+void poly_translate_1(OutputIt ret, InputIt a, std::uint32_t n, const BCs &bcs)
+{
+    using value_type [[maybe_unused]] = typename std::iterator_traits<InputIt>::value_type;
+
+    // Zero out the return value.
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        ret[i] = 0;
+    }
+
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        const auto ai = a[i];
+        for (std::uint32_t k = 0; k <= i; ++k) {
+            assert(bc_idx(i, k) < bcs.size());
+
+#if !defined(NDEBUG)
+            // In debug mode check that the binomial coefficient
+            // was computed correctly.
+            using std::abs;
+
+            auto cmp = boost_math_bc<value_type>(i, k);
+            auto bc = bcs[bc_idx(i, k)];
+            assert(abs((bc - cmp) / cmp) < std::numeric_limits<value_type>::epsilon() * 1e4);
+#endif
+
+            ret[k] += ai * bcs[bc_idx(i, k)];
+        }
+    }
+}
+
+// Count the number of sign changes in the coefficients of polynomial a.
+// Zero coefficients are skipped. Requires random-access iterator.
+template <typename InputIt>
+std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
+{
+    using value_type = typename std::iterator_traits<InputIt>::value_type;
+
+    struct zero_filter {
+        bool operator()(const value_type &x) const
+        {
+            return x != 0;
+        }
+    };
+
+    // Create iterators for skipping zero coefficients in the polynomial.
+    auto begin = boost::make_filter_iterator<zero_filter>(a, a + n + 1u);
+    const auto end = boost::make_filter_iterator<zero_filter>(a + n + 1u, a + n + 1u);
+
+    if (begin == end) {
+        return 0;
+    }
+
+    std::uint32_t retval = 0;
+
+    auto prev = begin;
+    for (++begin; begin != end; ++begin, ++prev) {
+        retval += (*begin > 0) != (*prev > 0);
+    }
+
+    return retval;
+}
+
+// Evaluate the first derivative of a polynomial.
+// Requires random-access iterator.
+template <typename InputIt, typename T>
+auto poly_eval_1(InputIt a, T x, std::uint32_t n)
+{
+    assert(n >= 2u);
+
+    // Init the return value.
+    auto ret1 = a[n] * n;
+
+    for (std::uint32_t i = 1; i <= n - 1u; ++i) {
+        ret1 = a[n - i] * (n - i) + ret1 * x;
+    }
+
+    return ret1;
+}
+
+// Evaluate polynomial.
+// Requires random-access iterator.
+template <typename InputIt, typename T>
+auto poly_eval(InputIt a, T x, std::uint32_t n)
+{
+    auto ret = a[n];
+
+    for (std::uint32_t i = 1; i <= n; ++i) {
+        ret = a[n - i] + ret * x;
+    }
+
+    return ret;
+}
+
+// Check if a polynomial has non-finite coefficients.
+// Requires random-access iterator.
+template <typename InputIt>
+auto poly_nf(InputIt a, std::uint32_t n)
+{
+    return std::any_of(a, a + n, [](const auto &x) {
+        using std::isfinite;
+
+        return !isfinite(x);
+    });
+}
+
+// A RAII helper to extract polys from the cache and
+// return them to the cache upon destruction.
+template <typename T>
+struct pwrap {
+    explicit pwrap(std::uint32_t n) : v(get_poly_from_cache<T>(n)) {}
+
+    pwrap(const pwrap &) = delete;
+    pwrap(pwrap &&) = delete;
+    pwrap &operator=(const pwrap &) = delete;
+    pwrap &operator=(pwrap &&) = delete;
+
+    ~pwrap()
+    {
+        put_poly_in_cache(std::move(v));
+    }
+
+    std::vector<T> v;
+};
+
+// Find the only existing root for the polynomial poly of the given order
+// existing in [lb, ub].
+template <typename T>
+std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
+{
+    // NOTE: perhaps this should depend on T?
+    constexpr boost::uintmax_t iter_limit = 100;
+    boost::uintmax_t max_iter = iter_limit;
+
+    // Ensure that root finding does not throw on error,
+    // rather it will write something to errno instead.
+    // https://www.boost.org/doc/libs/1_75_0/libs/math/doc/html/math_toolkit/pol_tutorial/namespace_policies.html
+    using boost::math::policies::domain_error;
+    using boost::math::policies::errno_on_error;
+    using boost::math::policies::evaluation_error;
+    using boost::math::policies::overflow_error;
+    using boost::math::policies::pole_error;
+    using boost::math::policies::policy;
+
+    using pol = policy<domain_error<errno_on_error>, pole_error<errno_on_error>, overflow_error<errno_on_error>,
+                       evaluation_error<errno_on_error>>;
+
+    // Clear out errno before running the root finding.
+    errno = 0;
+
+    // Prepare the return value.
+    T ret;
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if constexpr (std::is_same_v<T, mppp::real128>) {
+        // NOTE: currently in order to use Boost's root finding
+        // we need to also use their own float128 wrapper. In the long run we should
+        // perhaps try to adapt mp++ so that this is not necessary
+        // and we can use directly real128.
+        using bf128 = boost::multiprecision::float128;
+
+        // Transform the poly coefficients to bf128.
+        pwrap<bf128> tmp(order);
+        std::transform(poly.v.begin(), poly.v.end(), tmp.v.begin(), [](auto x) { return bf128(x.m_value); });
+
+        auto p = boost::math::tools::toms748_solve(
+            [d = std::as_const(tmp.v).data(), order](bf128 x) { return poly_eval(d, x, order); }, bf128(lb.m_value),
+            bf128(ub.m_value), boost::math::tools::eps_tolerance<bf128>(), max_iter, pol{});
+
+        ret = mppp::real128(((p.first + p.second) / 2).backend().value());
+    } else {
+#endif
+        auto p = boost::math::tools::toms748_solve([d = poly.v.data(), order](T x) { return poly_eval(d, x, order); },
+                                                   lb, ub, boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
+
+        ret = (p.first + p.second) / 2;
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+
+    if (errno != 0) {
+        // Some error condition arose during root finding,
+        // return zero and flag 1.
+        return std::tuple{T(0), 1};
+    }
+
+    if (max_iter < iter_limit) {
+        // Root finding terminated within the
+        // iteration limit, return ret and success.
+        return std::tuple{ret, 0};
+    } else {
+        // Root finding needed too many iterations,
+        // return the (possibly wrong) result
+        // and flag 2.
+        return std::tuple{ret, 2};
+    }
+}
+
+// Implementation of the detection of non-terminal events.
+template <typename T>
+bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_ntes, T h, const std::vector<T> &ev_jet,
+                             std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes, std::uint32_t n_ntes)
+{
+    assert(order >= 2u);
+
+    // Clear the vector of detected non-terminal events.
+    d_ntes.clear();
+
+    // Helper to reset the working list for the current thread.
+    auto reset_w_list = []() {
+        auto &wl = get_wlist<T>();
+
+        // Move all the polys from the wlist into the cache.
+        for (auto &item : wl) {
+            put_poly_in_cache<T>(std::move(std::get<2>(item)));
+        }
+
+        // Clear out.
+        wl.clear();
+    };
+
+    // Prepare the cache of binomial coefficients.
+    const auto &bc = get_bc_up_to<T>(order);
+
+    for (std::uint32_t i = 0; i < n_ntes; ++i) {
+        // Extract the pointer to the Taylor polynomial for the
+        // current event.
+        auto ptr = ev_jet.data() + (dim + n_tes + i) * (order + 1u);
+
+        // Rescale it so that the range [0, h)
+        // becomes [0, 1).
+        pwrap<T> tmp1(order);
+        poly_rescale2(tmp1.v.data(), ptr, h, order);
+
+        // Check for an event at the beginning of the
+        // timestep.
+        if (tmp1.v[0] == T(0)) {
+            d_ntes.emplace_back(i, T(0), tmp1.v[1]);
+        }
+
+        // Reverse it.
+        pwrap<T> tmp2(order);
+        std::copy(tmp1.v.rbegin(), tmp1.v.rend(), tmp2.v.data());
+
+        // Translate it.
+        pwrap<T> tmp3(order);
+        poly_translate_1(tmp3.v.data(), tmp2.v.data(), order, bc);
+
+        // Check non-finiteness.
+        if (poly_nf(tmp3.v.data(), order)) {
+            return false;
+        }
+
+        // Count the sign changes.
+        const auto n_sc = count_sign_changes(tmp3.v.data(), order);
+
+        if (n_sc == 0u) {
+            // No sign changes, no event. Continue to the next
+            // event.
+        } else if (n_sc == 1u) {
+            // A single zero was found, locate it.
+            // NOTE: the root finding is done on the original
+            // poly after rescaling.
+            auto [root, cflag] = bracketed_root_find(tmp1, order, T(0), T(1));
+
+            if (cflag == 0) {
+                // Root finding finished successfully, record the event.
+                d_ntes.emplace_back(i, root * h, poly_eval_1(ptr, root * h, order));
+            } else {
+                // Root finding encountered some issue.
+                // NOTE: in the future we probably want to log this somewhere,
+                // rather than just ignoring the event.
+            }
+        } else {
+            // TODO
+            throw;
+
+            // No isolating interval found. Bisect the interval,
+            // place the new intervals in the working list and
+            // run the Collins-Akritas algorithm.
+
+            // Make sure to reset the working list first.
+            reset_w_list();
+        }
+    }
+
+    return true;
+}
+
+} // namespace
+
+template <>
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, double, double>> &d_ntes, double h,
+                        const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes,
+                        std::uint32_t n_ntes)
+{
+    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+}
+
+template <>
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, long double, long double>> &d_ntes, long double h,
+                        const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim,
+                        std::uint32_t n_tes, std::uint32_t n_ntes)
+{
+    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, mppp::real128, mppp::real128>> &d_ntes, mppp::real128 h,
+                        const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim,
+                        std::uint32_t n_tes, std::uint32_t n_ntes)
+{
+    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+}
+
+#endif
+
+} // namespace heyoka::detail
