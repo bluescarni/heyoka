@@ -415,7 +415,7 @@ template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
 public:
-    struct nt_event {
+    struct HEYOKA_DLL_PUBLIC nt_event {
         using callback_t = std::function<void(taylor_adaptive_impl &, T, std::uint32_t)>;
 
         explicit nt_event(expression, callback_t);
@@ -423,7 +423,7 @@ public:
         expression eq;
         callback_t callback;
     };
-    struct t_event {
+    struct HEYOKA_DLL_PUBLIC t_event {
         explicit t_event(expression);
 
         expression eq;
