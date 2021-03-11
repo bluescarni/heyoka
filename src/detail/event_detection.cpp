@@ -70,7 +70,7 @@ auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
 
 #endif
 
-// Helper to fetch the global poly cache.
+// Helper to fetch the per-thread poly cache.
 template <typename T>
 auto &get_poly_cache()
 {
@@ -137,16 +137,6 @@ void put_poly_in_cache(std::vector<T> &&v)
     cache[n].push_back(std::move(v));
 }
 
-// Helper to fetch the global working list used in
-// poly root finding.
-template <typename T>
-auto &get_wlist()
-{
-    thread_local std::vector<std::tuple<std::uint32_t, std::uint32_t, std::vector<T>>> w_list;
-
-    return w_list;
-}
-
 // Compute and return all binomial coefficients (n choose k)
 // up to n = max_n.
 template <typename T>
@@ -207,7 +197,7 @@ std::uint32_t bc_idx(std::uint32_t n, std::uint32_t k)
     return (n * (n + 1u)) / 2u + k;
 }
 
-// Helper to fetch the global cache of binomial coefficients.
+// Helper to fetch the per-thread cache of binomial coefficients.
 template <typename T>
 auto &get_bc_cache()
 {
@@ -249,13 +239,29 @@ const auto &get_bc_up_to(std::uint32_t max_n)
 // random-access iterators.
 // NOTE: aliasing allowed.
 template <typename OutputIt, typename InputIt, typename T>
-void poly_rescale2(OutputIt ret, InputIt a, const T &scal, std::uint32_t n)
+void poly_rescale(OutputIt ret, InputIt a, const T &scal, std::uint32_t n)
 {
     T cur_f(1);
 
     for (std::uint32_t i = 0; i <= n; ++i) {
         ret[i] = cur_f * a[i];
         cur_f *= scal;
+    }
+}
+
+// Transform the polynomial a(x) into 2**n * a(x / 2).
+// Requires random-access iterators.
+// NOTE: aliasing allowed.
+template <typename OutputIt, typename InputIt>
+void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
+{
+    using value_type = typename std::iterator_traits<InputIt>::value_type;
+
+    value_type cur_f(1);
+
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        ret[n - i] = cur_f * a[n - i];
+        cur_f *= 2;
     }
 }
 
@@ -338,7 +344,7 @@ auto poly_eval_1(InputIt a, T x, std::uint32_t n)
     // Init the return value.
     auto ret1 = a[n] * n;
 
-    for (std::uint32_t i = 1; i <= n - 1u; ++i) {
+    for (std::uint32_t i = 1; i < n; ++i) {
         ret1 = a[n - i] * (n - i) + ret1 * x;
     }
 
@@ -377,14 +383,22 @@ template <typename T>
 struct pwrap {
     explicit pwrap(std::uint32_t n) : v(get_poly_from_cache<T>(n)) {}
 
+    // NOTE: upon move, the v of other is guaranteed
+    // to become empty().
+    pwrap(pwrap &&) noexcept = default;
+
+    // Delete the rest.
     pwrap(const pwrap &) = delete;
-    pwrap(pwrap &&) = delete;
     pwrap &operator=(const pwrap &) = delete;
     pwrap &operator=(pwrap &&) = delete;
 
     ~pwrap()
     {
-        put_poly_in_cache(std::move(v));
+        // NOTE: put back into cache only
+        // if this was not moved-from.
+        if (!v.empty()) {
+            put_poly_in_cache(std::move(v));
+        }
     }
 
     std::vector<T> v;
@@ -463,6 +477,25 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     }
 }
 
+// Helper to fetch the per-thread working list used in
+// poly root finding.
+template <typename T>
+auto &get_wlist()
+{
+    thread_local std::vector<std::tuple<T, T, pwrap<T>>> w_list;
+
+    return w_list;
+}
+
+// Helper to fetch the per-thread list of isolating intervals.
+template <typename T>
+auto &get_isol()
+{
+    thread_local std::vector<std::tuple<T, T>> isol;
+
+    return isol;
+}
+
 // Implementation of the detection of non-terminal events.
 template <typename T>
 bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_ntes, T h, const std::vector<T> &ev_jet,
@@ -473,81 +506,105 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
     // Clear the vector of detected non-terminal events.
     d_ntes.clear();
 
-    // Helper to reset the working list for the current thread.
-    auto reset_w_list = []() {
-        auto &wl = get_wlist<T>();
+    // Fetch a reference to the list of isolating intervals.
+    auto &isol = get_isol<T>();
 
-        // Move all the polys from the wlist into the cache.
-        for (auto &item : wl) {
-            put_poly_in_cache<T>(std::move(std::get<2>(item)));
-        }
-
-        // Clear out.
-        wl.clear();
-    };
+    // Fetch a reference to the wlist.
+    auto &wl = get_wlist<T>();
 
     // Prepare the cache of binomial coefficients.
     const auto &bc = get_bc_up_to<T>(order);
 
     for (std::uint32_t i = 0; i < n_ntes; ++i) {
+        // Clear out the list of isolating intervals.
+        isol.clear();
+
+        // Reset the working list.
+        wl.clear();
+
         // Extract the pointer to the Taylor polynomial for the
         // current event.
         auto ptr = ev_jet.data() + (dim + n_tes + i) * (order + 1u);
 
         // Rescale it so that the range [0, h)
         // becomes [0, 1).
+        pwrap<T> tmp(order);
+        poly_rescale(tmp.v.data(), ptr, h, order);
+
+        // Place the first element in the working list.
+        wl.emplace_back(0, 1, std::move(tmp));
+
+        do {
+            // Fetch the current inverval and polynomial from the working list.
+            // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
+            // be looking for. lb and ub represent what 0 and 1 correspond to in the original
+            // range.
+            auto [lb, ub, q] = std::move(wl.back());
+            wl.pop_back();
+
+            // Check for an event at the lower bound.
+            if (q.v[0] == T(0)) {
+                // NOTE: the original range had been rescaled wrt to h.
+                // Thus, we need to rescale back when adding the detected
+                // event.
+                d_ntes.emplace_back(i, lb * h, poly_eval_1(ptr, lb * h, order));
+            }
+
+            // Reverse it.
+            pwrap<T> tmp1(order);
+            std::copy(q.v.rbegin(), q.v.rend(), tmp1.v.data());
+
+            // Translate it.
+            pwrap<T> tmp2(order);
+            poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
+
+            // Check non-finiteness.
+            if (poly_nf(tmp2.v.data(), order)) {
+                return false;
+            }
+
+            // Count the sign changes.
+            const auto n_sc = count_sign_changes(tmp2.v.data(), order);
+
+            if (n_sc == 1u) {
+                // Found isolating interval, add it to isol.
+                isol.emplace_back(lb, ub);
+            } else if (n_sc > 1u) {
+                // No isolating interval found, bisect.
+
+                // First we transform q into 2**n * q(x/2) and store the result
+                // into tmp1.
+                poly_rescale_p2(tmp1.v.data(), q.v.data(), order);
+                // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
+                poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
+
+                // Finally we add tmp1 and tmp2 to the working list.
+                const auto mid = (lb + ub) / 2;
+                wl.emplace_back(lb, mid, std::move(tmp1));
+                wl.emplace_back(mid, ub, std::move(tmp2));
+            }
+        } while (!wl.empty());
+
+        // Reconstruct a version of the original event polynomial
+        // in which the range [0, h) is rescaled to [0, 1). We need
+        // to do root finding on the rescaled polynomial because the
+        // isolating intervals are also rescaled to [0, 1).
         pwrap<T> tmp1(order);
-        poly_rescale2(tmp1.v.data(), ptr, h, order);
+        poly_rescale(tmp1.v.data(), ptr, h, order);
 
-        // Check for an event at the beginning of the
-        // timestep.
-        if (tmp1.v[0] == T(0)) {
-            d_ntes.emplace_back(i, T(0), tmp1.v[1]);
-        }
-
-        // Reverse it.
-        pwrap<T> tmp2(order);
-        std::copy(tmp1.v.rbegin(), tmp1.v.rend(), tmp2.v.data());
-
-        // Translate it.
-        pwrap<T> tmp3(order);
-        poly_translate_1(tmp3.v.data(), tmp2.v.data(), order, bc);
-
-        // Check non-finiteness.
-        if (poly_nf(tmp3.v.data(), order)) {
-            return false;
-        }
-
-        // Count the sign changes.
-        const auto n_sc = count_sign_changes(tmp3.v.data(), order);
-
-        if (n_sc == 0u) {
-            // No sign changes, no event. Continue to the next
-            // event.
-        } else if (n_sc == 1u) {
-            // A single zero was found, locate it.
-            // NOTE: the root finding is done on the original
-            // poly after rescaling.
-            auto [root, cflag] = bracketed_root_find(tmp1, order, T(0), T(1));
+        // Run the root finding in the isolating intervals.
+        for (const auto &ival : isol) {
+            auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
 
             if (cflag == 0) {
                 // Root finding finished successfully, record the event.
+                // The found root needs to be rescaled by h.
                 d_ntes.emplace_back(i, root * h, poly_eval_1(ptr, root * h, order));
             } else {
                 // Root finding encountered some issue.
                 // NOTE: in the future we probably want to log this somewhere,
                 // rather than just ignoring the event.
             }
-        } else {
-            // TODO
-            throw;
-
-            // No isolating interval found. Bisect the interval,
-            // place the new intervals in the working list and
-            // run the Collins-Akritas algorithm.
-
-            // Make sure to reset the working list first.
-            reset_w_list();
         }
     }
 
