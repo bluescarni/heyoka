@@ -425,6 +425,11 @@ public:
     explicit nt_event(expression, callback_t);
     explicit nt_event(expression, callback_t, event_direction);
 
+    nt_event(const nt_event &);
+    nt_event(nt_event &&) noexcept;
+
+    ~nt_event();
+
     expression eq;
     callback_t callback;
     event_direction dir = event_direction::any;

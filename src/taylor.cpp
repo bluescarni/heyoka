@@ -3392,6 +3392,15 @@ nt_event<T>::nt_event(expression e, callback_t f, event_direction d) : nt_event(
     dir = d;
 }
 
+template <typename T>
+nt_event<T>::nt_event(const nt_event &) = default;
+
+template <typename T>
+nt_event<T>::nt_event(nt_event &&) noexcept = default;
+
+template <typename T>
+nt_event<T>::~nt_event() = default;
+
 namespace
 {
 
