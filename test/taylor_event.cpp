@@ -46,7 +46,7 @@ TEST_CASE("taylor nte stream")
 {
     auto [v] = make_vars("v");
 
-    using ev_t = taylor_adaptive<double>::nt_event;
+    using ev_t = taylor_adaptive<double>::nt_event_t;
 
     std::ostringstream oss;
     oss << ev_t(v * v - 1e-10, [](taylor_adaptive<double> &, double, std::uint32_t) {});
@@ -81,7 +81,7 @@ TEST_CASE("taylor glancing blow test")
 
         using fp_t = decltype(fp_x);
 
-        using ev_t = typename taylor_adaptive<fp_t>::nt_event;
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
         auto counter = 0u;
 
@@ -132,7 +132,7 @@ TEST_CASE("taylor nte negative timestep")
 
         auto [x, v] = make_vars("x", "v");
 
-        using ev_t = typename taylor_adaptive<fp_t>::nt_event;
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
         auto counter = 0u;
 
@@ -202,7 +202,7 @@ TEST_CASE("taylor nte multizero")
 
         auto [x, v] = make_vars("x", "v");
 
-        using ev_t = typename taylor_adaptive<fp_t>::nt_event;
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
         auto counter = 0u;
 
@@ -272,7 +272,7 @@ TEST_CASE("taylor nte basic")
 
         auto [x, v] = make_vars("x", "v");
 
-        using ev_t = typename taylor_adaptive<fp_t>::nt_event;
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
         auto counter = 0u;
 

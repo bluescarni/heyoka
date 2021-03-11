@@ -417,28 +417,44 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
 }
 
 template <typename T>
+struct HEYOKA_DLL_PUBLIC nt_event {
+    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, std::uint32_t)>;
+
+    explicit nt_event(expression, callback_t);
+    explicit nt_event(expression, callback_t, event_direction);
+
+    expression eq;
+    callback_t callback;
+    event_direction dir = event_direction::any;
+};
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const nt_event<T> &)
+{
+    static_assert(always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<mppp::real128> &);
+
+#endif
+
+template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
 public:
-    struct HEYOKA_DLL_PUBLIC nt_event {
-        using callback_t = std::function<void(taylor_adaptive_impl &, T, std::uint32_t)>;
+    using nt_event_t = nt_event<T>;
 
-        explicit nt_event(expression, callback_t);
-        explicit nt_event(expression, callback_t, event_direction);
-
-        friend std::ostream &operator<<(std::ostream &os, const nt_event &e)
-        {
-            os << "Event type     : non-terminal\n";
-            os << "Event equation : " << e.eq << '\n';
-            os << "Event direction: " << e.dir << '\n';
-
-            return os;
-        }
-
-        expression eq;
-        callback_t callback;
-        event_direction dir = event_direction::any;
-    };
     struct HEYOKA_DLL_PUBLIC t_event {
         explicit t_event(expression);
 
@@ -476,7 +492,7 @@ private:
     // The vector of terminal events.
     std::vector<t_event> m_tes;
     // The vector of non-terminal events.
-    std::vector<nt_event> m_ntes;
+    std::vector<nt_event<T>> m_ntes;
     // The jet of derivatives for the state variables
     // and the events. This is used only if there
     // are events, otherwise it stays empty.
@@ -491,7 +507,7 @@ private:
     // here that this is going to be dll-exported.
     template <typename U>
     HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>, std::vector<t_event>,
-                                              std::vector<nt_event>);
+                                              std::vector<nt_event<T>>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -528,7 +544,7 @@ private:
             }();
 
             // Extract the non-terminal events, if any.
-            auto ntes = [&p]() -> std::vector<nt_event> {
+            auto ntes = [&p]() -> std::vector<nt_event<T>> {
                 if constexpr (p.has(kw::nt_events)) {
                     return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
                 } else {

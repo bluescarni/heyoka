@@ -22,6 +22,17 @@ class param;
 
 class llvm_state;
 
+namespace detail
+{
+
+template <typename>
+class taylor_adaptive_impl;
+
+template <typename>
+struct nt_event;
+
+} // namespace detail
+
 } // namespace heyoka
 
 #endif

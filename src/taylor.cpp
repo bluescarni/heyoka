@@ -2839,7 +2839,7 @@ template <typename T>
 template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event> tes,
-                                                 std::vector<nt_event> ntes)
+                                                 std::vector<nt_event<T>> ntes)
 {
     using std::isfinite;
     using namespace fmt::literals;
@@ -3379,7 +3379,7 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
+nt_event<T>::nt_event(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
 {
     if (!callback) {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
@@ -3387,50 +3387,89 @@ taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f) : eq(std
 }
 
 template <typename T>
-taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f, event_direction d)
-    : nt_event(std::move(e), std::move(f))
+nt_event<T>::nt_event(expression e, callback_t f, event_direction d) : nt_event(std::move(e), std::move(f))
 {
     dir = d;
 }
+
+namespace
+{
+
+// Implementation of stream insertion for the non-terminal event class.
+std::ostream &nt_event_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
+{
+    os << "Event type     : non-terminal\n";
+    os << "Event equation : " << eq << '\n';
+    os << "Event direction: " << dir << '\n';
+
+    return os;
+}
+
+} // namespace
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event<double> &e)
+{
+    return nt_event_stream_impl(os, e.eq, e.dir);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event<long double> &e)
+{
+    return nt_event_stream_impl(os, e.eq, e.dir);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event<mppp::real128> &e)
+{
+    return nt_event_stream_impl(os, e.eq, e.dir);
+}
+
+#endif
 
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
+template class nt_event<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,
                                                                                  bool, bool, std::vector<double>,
                                                                                  std::vector<t_event>,
-                                                                                 std::vector<nt_event>);
+                                                                                 std::vector<nt_event<double>>);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
                                                  double, double, bool, bool, std::vector<double>, std::vector<t_event>,
-                                                 std::vector<nt_event>);
+                                                 std::vector<nt_event<double>>);
 
 template class taylor_adaptive_impl<long double>;
+template class nt_event<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
                                                       long double, bool, bool, std::vector<long double>,
-                                                      std::vector<t_event>, std::vector<nt_event>);
+                                                      std::vector<t_event>, std::vector<nt_event<long double>>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
     std::vector<std::pair<expression, expression>>, std::vector<long double>, long double, long double, bool, bool,
-    std::vector<long double>, std::vector<t_event>, std::vector<nt_event>);
+    std::vector<long double>, std::vector<t_event>, std::vector<nt_event<long double>>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
+template class nt_event<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
-    std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event>);
+    std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event<mppp::real128>>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
-    bool, std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event>);
+    bool, std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event<mppp::real128>>);
 
 #endif
 
