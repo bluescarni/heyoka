@@ -29,7 +29,7 @@ template <typename>
 class taylor_adaptive_impl;
 
 template <typename>
-struct nt_event;
+class nt_event;
 
 } // namespace detail
 

@@ -417,7 +417,9 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
 }
 
 template <typename T>
-struct HEYOKA_DLL_PUBLIC nt_event {
+class HEYOKA_DLL_PUBLIC nt_event
+{
+public:
     using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, std::uint32_t)>;
 
     explicit nt_event(expression, callback_t);
