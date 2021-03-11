@@ -3433,7 +3433,7 @@ std::ostream &operator<<(std::ostream &os, const nt_event<mppp::real128> &e)
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
-template class nt_event<double>;
+template struct nt_event<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,
@@ -3447,7 +3447,7 @@ taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expressio
                                                  std::vector<nt_event<double>>);
 
 template class taylor_adaptive_impl<long double>;
-template class nt_event<long double>;
+template struct nt_event<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
@@ -3461,7 +3461,7 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
-template class nt_event<mppp::real128>;
+template struct nt_event<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
