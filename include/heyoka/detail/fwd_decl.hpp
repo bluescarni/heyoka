@@ -9,27 +9,29 @@
 #ifndef HEYOKA_DETAIL_FWD_DECL_HPP
 #define HEYOKA_DETAIL_FWD_DECL_HPP
 
+#include <heyoka/detail/visibility.hpp>
+
 namespace heyoka
 {
 
 // Fwd declaration of heyoka classes.
-class expression;
-class variable;
-class number;
-class binary_operator;
-class func;
-class param;
+class HEYOKA_DLL_PUBLIC expression;
+class HEYOKA_DLL_PUBLIC variable;
+class HEYOKA_DLL_PUBLIC number;
+class HEYOKA_DLL_PUBLIC binary_operator;
+class HEYOKA_DLL_PUBLIC func;
+class HEYOKA_DLL_PUBLIC param;
 
-class llvm_state;
+class HEYOKA_DLL_PUBLIC llvm_state;
 
 namespace detail
 {
 
 template <typename>
-class taylor_adaptive_impl;
+class HEYOKA_DLL_PUBLIC taylor_adaptive_impl;
 
 template <typename>
-class nt_event;
+class HEYOKA_DLL_PUBLIC nt_event;
 
 } // namespace detail
 
