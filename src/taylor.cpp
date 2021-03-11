@@ -3386,6 +3386,13 @@ taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f) : eq(std
     }
 }
 
+template <typename T>
+taylor_adaptive_impl<T>::nt_event::nt_event(expression e, callback_t f, event_direction d)
+    : nt_event(std::move(e), std::move(f))
+{
+    dir = d;
+}
+
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
@@ -5164,7 +5171,7 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 } // namespace detail
 
-#define HEYOKA_TAYLOR_OUTCOME_STREAM_CASE(val)                                                                         \
+#define HEYOKA_TAYLOR_ENUM_STREAM_CASE(val)                                                                            \
     case val:                                                                                                          \
         os << #val;                                                                                                    \
         break
@@ -5172,10 +5179,21 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
 {
     switch (oc) {
-        HEYOKA_TAYLOR_OUTCOME_STREAM_CASE(taylor_outcome::success);
-        HEYOKA_TAYLOR_OUTCOME_STREAM_CASE(taylor_outcome::step_limit);
-        HEYOKA_TAYLOR_OUTCOME_STREAM_CASE(taylor_outcome::time_limit);
-        HEYOKA_TAYLOR_OUTCOME_STREAM_CASE(taylor_outcome::err_nf_state);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::success);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::step_limit);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
+    }
+
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, event_direction dir)
+{
+    switch (dir) {
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::any);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::positive);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::negative);
     }
 
     return os;

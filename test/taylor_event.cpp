@@ -12,8 +12,10 @@
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <sstream>
 #include <tuple>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -24,6 +26,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -38,6 +41,89 @@ const auto fp_types = std::tuple<double, long double
                                  mppp::real128
 #endif
                                  >{};
+
+TEST_CASE("taylor nte stream")
+{
+    auto [v] = make_vars("v");
+
+    using ev_t = taylor_adaptive<double>::nt_event;
+
+    std::ostringstream oss;
+    oss << ev_t(v * v - 1e-10, [](taylor_adaptive<double> &, double, std::uint32_t) {});
+    REQUIRE(boost::algorithm::contains(oss.str(), "direction::any"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    oss << ev_t(
+        v * v - 1e-10, [](taylor_adaptive<double> &, double, std::uint32_t) {}, event_direction::positive);
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    oss << ev_t(
+        v * v - 1e-10, [](taylor_adaptive<double> &, double, std::uint32_t) {}, event_direction::negative);
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+}
+
+TEST_CASE("taylor glancing blow test")
+{
+    // NOTE: in this test two spherical particles are
+    // "colliding" in a glancing fashion, meaning that
+    // the polynomial representing the evolution in time
+    // of the mutual distance has a repeated root at
+    // t = collision time.
+
+    auto tester = [](auto fp_x) {
+        auto [x0, vx0, x1, vx1] = make_vars("x0", "vx0", "x1", "vx1");
+        auto [y0, vy0, y1, vy1] = make_vars("y0", "vy0", "y1", "vy1");
+
+        using fp_t = decltype(fp_x);
+
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event;
+
+        auto counter = 0u;
+
+        // First setup: one particle still, the other moving with uniform velocity.
+        auto ta = taylor_adaptive<fp_t>{
+            {prime(x0) = vx0, prime(y0) = vy0, prime(x1) = vx1, prime(y1) = vy1, prime(vx0) = 0_dbl, prime(vy0) = 0_dbl,
+             prime(vx1) = 0_dbl, prime(vy1) = 0_dbl},
+            {fp_t(0.), fp_t(0.), fp_t(-10.), fp_t(2), fp_t(0.), fp_t(0.), fp_t(1.), fp_t(0.)},
+            kw::nt_events
+            = {ev_t(square(x0 - x1) + square(y0 - y1) - 4., [&counter](taylor_adaptive<fp_t> &, fp_t t, std::uint32_t) {
+                  REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
+
+                  ++counter;
+              })}};
+
+        for (auto i = 0; i < 20; ++i) {
+            ta.step(fp_t(1.3));
+        }
+
+        // Any number of events up to 2 is acceptable here.
+        REQUIRE(counter <= 2u);
+
+        counter = 0;
+
+        // Second setup: one particle still, the other accelerating towards positive
+        // x direction with constant acceleration.
+        ta = taylor_adaptive<fp_t>{{prime(x0) = vx0, prime(y0) = vy0, prime(x1) = vx1, prime(y1) = vy1,
+                                    prime(vx0) = 0_dbl, prime(vy0) = 0_dbl, prime(vx1) = .1_dbl, prime(vy1) = 0_dbl},
+                                   {fp_t(0.), fp_t(0.), fp_t(-10.), fp_t(2), fp_t(0.), fp_t(0.), fp_t(1.), fp_t(0.)},
+                                   kw::nt_events
+                                   = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                                           [&counter](taylor_adaptive<fp_t> &, fp_t, std::uint32_t) { ++counter; })}};
+
+        for (auto i = 0; i < 20; ++i) {
+            ta.step(fp_t(1.3));
+        }
+
+        REQUIRE(counter <= 2u);
+    };
+
+    tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
+}
 
 TEST_CASE("taylor nte negative timestep")
 {

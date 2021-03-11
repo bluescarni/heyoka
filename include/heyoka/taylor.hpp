@@ -343,6 +343,11 @@ enum class taylor_outcome : std::int64_t {
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
+// Enum to represent the direction of an event.
+enum class event_direction { any, positive, negative };
+
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
+
 namespace kw
 {
 
@@ -419,9 +424,20 @@ public:
         using callback_t = std::function<void(taylor_adaptive_impl &, T, std::uint32_t)>;
 
         explicit nt_event(expression, callback_t);
+        explicit nt_event(expression, callback_t, event_direction);
+
+        friend std::ostream &operator<<(std::ostream &os, const nt_event &e)
+        {
+            os << "Event type     : non-terminal\n";
+            os << "Event equation : " << e.eq << '\n';
+            os << "Event direction: " << e.dir << '\n';
+
+            return os;
+        }
 
         expression eq;
         callback_t callback;
+        event_direction dir = event_direction::any;
     };
     struct HEYOKA_DLL_PUBLIC t_event {
         explicit t_event(expression);
