@@ -535,7 +535,7 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
         wl.emplace_back(0, 1, std::move(tmp));
 
         do {
-            // Fetch the current inverval and polynomial from the working list.
+            // Fetch the current interval and polynomial from the working list.
             // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
             // be looking for. lb and ub represent what 0 and 1 correspond to in the original
             // range.
