@@ -2880,8 +2880,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // LCOV_EXCL_START
     if (m_tes.size() > std::numeric_limits<std::uint32_t>::max()
         || m_ntes.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::invalid_argument(
-            "The number of non-terminal events is too large, and it results in an overflow condition");
+        throw std::invalid_argument("The number of events is too large, and it results in an overflow condition");
     }
     // LCOV_EXCL_STOP
 
