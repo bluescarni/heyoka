@@ -37,6 +37,7 @@
 #endif
 
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
 {
@@ -498,8 +499,9 @@ auto &get_isol()
 
 // Implementation of the detection of non-terminal events.
 template <typename T>
-bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_ntes, T h, const std::vector<T> &ev_jet,
-                             std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes, std::uint32_t n_ntes)
+bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<nt_event<T>> &ntes,
+                             T h, const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim,
+                             std::uint32_t n_tes)
 {
     assert(order >= 2u);
 
@@ -515,7 +517,7 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
     // Prepare the cache of binomial coefficients.
     const auto &bc = get_bc_up_to<T>(order);
 
-    for (std::uint32_t i = 0; i < n_ntes; ++i) {
+    for (std::uint32_t i = 0; i < ntes.size(); ++i) {
         // Clear out the list of isolating intervals.
         isol.clear();
 
@@ -525,6 +527,25 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
         // Extract the pointer to the Taylor polynomial for the
         // current event.
         auto ptr = ev_jet.data() + (dim + n_tes + i) * (order + 1u);
+
+        // Helper to add a detected event to d_ntes.
+        // NOTE: the root here is expected to be in the [0, h) range.
+        auto add_d_event = [&d_ntes, i, ptr, order, dir = ntes[i].dir](T root) {
+            if (dir == event_direction::any) {
+                // If the event direction does not
+                // matter, just add it.
+                d_ntes.emplace_back(i, root);
+            } else {
+                // Otherwise, we need to compute the derivative
+                // and record the event only if its direction
+                // matches the sign of the derivative.
+                const auto der = poly_eval_1(ptr, root, order);
+
+                if ((der >= 0 && dir == event_direction::positive) || (der <= 0 && dir == event_direction::negative)) {
+                    d_ntes.emplace_back(i, root);
+                }
+            }
+        };
 
         // Rescale it so that the range [0, h)
         // becomes [0, 1).
@@ -547,7 +568,7 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
                 // NOTE: the original range had been rescaled wrt to h.
                 // Thus, we need to rescale back when adding the detected
                 // event.
-                d_ntes.emplace_back(i, lb * h, poly_eval_1(ptr, lb * h, order));
+                add_d_event(lb * h);
             }
 
             // Reverse it.
@@ -599,7 +620,7 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
             if (cflag == 0) {
                 // Root finding finished successfully, record the event.
                 // The found root needs to be rescaled by h.
-                d_ntes.emplace_back(i, root * h, poly_eval_1(ptr, root * h, order));
+                add_d_event(root * h);
             } else {
                 // Root finding encountered some issue.
                 // NOTE: in the future we probably want to log this somewhere,
@@ -614,29 +635,31 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T, T>> &d_nte
 } // namespace
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, double, double>> &d_ntes, double h,
-                        const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes,
-                        std::uint32_t n_ntes)
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
+                        const std::vector<nt_event<double>> &ntes, double h, const std::vector<double> &ev_jet,
+                        std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes)
 {
-    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
 }
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, long double, long double>> &d_ntes, long double h,
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
+                        const std::vector<nt_event<long double>> &ntes, long double h,
                         const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                        std::uint32_t n_tes, std::uint32_t n_ntes)
+                        std::uint32_t n_tes)
 {
-    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, mppp::real128, mppp::real128>> &d_ntes, mppp::real128 h,
+bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
+                        const std::vector<nt_event<mppp::real128>> &ntes, mppp::real128 h,
                         const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                        std::uint32_t n_tes, std::uint32_t n_ntes)
+                        std::uint32_t n_tes)
 {
-    return taylor_detect_ntes_impl(d_ntes, h, ev_jet, order, dim, n_tes, n_ntes);
+    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
 }
 
 #endif

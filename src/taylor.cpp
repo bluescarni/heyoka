@@ -3089,8 +3089,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         }
 
         // Detect the non-terminal events.
-        if (!taylor_detect_ntes<T>(m_d_ntes, h, m_ev_jet, m_order, m_dim, static_cast<std::uint32_t>(m_tes.size()),
-                                   static_cast<std::uint32_t>(m_ntes.size()))) {
+        if (!taylor_detect_ntes<T>(m_d_ntes, m_ntes, h, m_ev_jet, m_order, m_dim,
+                                   static_cast<std::uint32_t>(m_tes.size()))) {
             // Non-finite values were generated during
             // the detection of non-terminal events. This could be
             // because of non-finite coefficients

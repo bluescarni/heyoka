@@ -253,6 +253,59 @@ TEST_CASE("taylor nte multizero")
         }
 
         REQUIRE(counter == 12u);
+
+        counter = 0;
+
+        // We re-run the test, but this time we want to detect
+        // only when the velocity goes from positive to negative.
+        // Thus the sequence of events will be:
+        // - 0 1 0
+        // - 0 0
+        // - 0 1 0
+        // - 0 0
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(0), fp_t(.25)},
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::nt_events
+                                   = {ev_t(v * v - 1e-10,
+                                           [&counter](taylor_adaptive<fp_t> &ta, fp_t t, std::uint32_t idx) {
+                                               using std::abs;
+
+                                               REQUIRE(idx == 0u);
+                                               REQUIRE((counter == 0u || (counter >= 2u && counter <= 6u)
+                                                        || (counter >= 7u && counter <= 9u)));
+
+                                               ta.update_d_output(t);
+
+                                               const auto v = ta.get_d_output()[1];
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                               ++counter;
+                                           }),
+                                      ev_t(
+                                          v,
+                                          [&counter](taylor_adaptive<fp_t> &ta, fp_t t, std::uint32_t idx) {
+                                              using std::abs;
+
+                                              REQUIRE(idx == 1u);
+                                              REQUIRE((counter == 1u || counter == 6u));
+
+                                              ta.update_d_output(t);
+
+                                              const auto v = ta.get_d_output()[1];
+                                              REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon());
+
+                                              ++counter;
+                                          },
+                                          event_direction::negative)}};
+
+        for (auto i = 0; i < 20; ++i) {
+            ta.step();
+        }
+
+        REQUIRE(counter == 10u);
     };
 
     for (auto cm : {false, true}) {

@@ -498,7 +498,7 @@ private:
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
     // Vector of detected non-terminal events.
-    std::vector<std::tuple<std::uint32_t, T, T>> m_d_ntes;
+    std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
