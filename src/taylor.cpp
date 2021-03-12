@@ -2910,11 +2910,11 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
-        for (const auto x : m_tes) {
-            ee.push_back(x.eq);
+        for (const auto &ev : m_tes) {
+            ee.push_back(ev.eq);
         }
-        for (const auto x : m_ntes) {
-            ee.push_back(x.eq);
+        for (const auto &ev : m_ntes) {
+            ee.push_back(ev.eq);
         }
 
         std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", std::move(sys), tol, 1,
