@@ -57,8 +57,8 @@ namespace
 template <typename T>
 auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
 {
-    auto n = boost::numeric_cast<unsigned>(n_);
-    auto k = boost::numeric_cast<unsigned>(k_);
+    const auto n = boost::numeric_cast<unsigned>(n_);
+    const auto k = boost::numeric_cast<unsigned>(k_);
 
 #if defined(HEYOKA_HAVE_REAL128)
     if constexpr (std::is_same_v<T, mppp::real128>) {
@@ -289,6 +289,7 @@ void poly_translate_1(OutputIt ret, InputIt a, std::uint32_t n, const BCs &bcs)
 
     for (std::uint32_t i = 0; i <= n; ++i) {
         const auto ai = a[i];
+
         for (std::uint32_t k = 0; k <= i; ++k) {
             assert(bc_idx(i, k) < bcs.size());
 
@@ -530,7 +531,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
             // Extract the pointer to the Taylor polynomial for the
             // current event.
-            auto ptr = ev_jet.data() + (base_jet_idx + i) * (order + 1u);
+            const auto ptr = ev_jet.data() + (base_jet_idx + i) * (order + 1u);
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be in the [0, h) range.
@@ -677,7 +678,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
             // Run the root finding in the isolating intervals.
             for (const auto &ival : isol) {
-                auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
+                const auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
 
                 if (cflag == 0) {
                     // Root finding finished successfully, record the event.

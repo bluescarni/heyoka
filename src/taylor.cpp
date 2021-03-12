@@ -3101,7 +3101,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // of *all* the non-terminal events. Otherwise, we need to figure
         // out which non-terminal events do not happen because their time
         // coordinate is past the the first terminal event.
-        auto ntes_end_it
+        const auto ntes_end_it
             = m_d_tes.empty()
                   ? m_d_ntes.end()
                   : std::lower_bound(m_d_ntes.begin(), m_d_ntes.end(), h,
