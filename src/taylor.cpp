@@ -3068,6 +3068,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
     } else {
         assert(!m_tes.empty() || !m_ntes.empty());
 
+        using std::abs;
+
         // Invoke the stepper for event handling.
         std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time, &h);
 
@@ -3083,11 +3085,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // for backward integration, thus we compare using
         // abs() so that the first events are those which
         // happen closer to the beginning of the timestep.
-        auto cmp = [](const auto &ev0, const auto &ev1) {
-            using std::abs;
-
-            return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1));
-        };
+        // NOTE: the checks inside taylor_detect_events() ensure
+        // that we can safely sort the events' times.
+        auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
 
@@ -3101,13 +3101,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // of *all* the non-terminal events. Otherwise, we need to figure
         // out which non-terminal events do not happen because their time
         // coordinate is past the the first terminal event.
-        auto ntes_end_it = m_d_tes.empty() ? m_d_ntes.end()
-                                           : std::lower_bound(m_d_ntes.begin(), m_d_ntes.end(), h,
-                                                              [](const auto &ev, const auto &t) {
-                                                                  using std::abs;
-
-                                                                  return abs(std::get<1>(ev)) < abs(t);
-                                                              });
+        auto ntes_end_it
+            = m_d_tes.empty()
+                  ? m_d_ntes.end()
+                  : std::lower_bound(m_d_ntes.begin(), m_d_ntes.end(), h,
+                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
         // Update the state.
         m_d_out_f(m_state.data(), m_ev_jet.data(), &h);
