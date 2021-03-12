@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstddef>
 #include <initializer_list>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <tuple>
@@ -25,6 +26,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/taylor.hpp>
@@ -69,6 +71,8 @@ TEST_CASE("taylor nte stream")
 
 TEST_CASE("taylor glancing blow test")
 {
+    std::cout << "Starting glancing blow test...\n";
+
     // NOTE: in this test two spherical particles are
     // "colliding" in a glancing fashion, meaning that
     // the polynomial representing the evolution in time
@@ -123,6 +127,8 @@ TEST_CASE("taylor glancing blow test")
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
+
+    std::cout << "Glancing blow test finished\n";
 }
 
 TEST_CASE("taylor nte negative timestep")

@@ -13,6 +13,7 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <limits>
 #include <stdexcept>
@@ -37,6 +38,7 @@
 #endif
 
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
@@ -460,10 +462,10 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     }
 #endif
 
-    if (errno != 0) {
+    if (errno > 0) {
         // Some error condition arose during root finding,
-        // return zero and flag 1.
-        return std::tuple{T(0), 1};
+        // return zero and errno.
+        return std::tuple{T(0), errno};
     }
 
     if (max_iter < iter_limit) {
@@ -473,8 +475,8 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     } else {
         // Root finding needed too many iterations,
         // return the (possibly wrong) result
-        // and flag 2.
-        return std::tuple{ret, 2};
+        // and flag -1.
+        return std::tuple{ret, -1};
     }
 }
 
@@ -622,9 +624,16 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, 
                 // The found root needs to be rescaled by h.
                 add_d_event(root * h);
             } else {
-                // Root finding encountered some issue.
-                // NOTE: in the future we probably want to log this somewhere,
-                // rather than just ignoring the event.
+                // Root finding encountered some issue. Ignore the
+                // event and log the issue.
+                if (cflag == -1) {
+                    get_logger().warn(
+                        "polynomial root finding during event detection failed due to too many iterations");
+                } else {
+                    get_logger().warn(
+                        "polynomial root finding during event detection returned a nonzero errno with message '{}'",
+                        std::strerror(cflag));
+                }
             }
         }
     }
