@@ -457,16 +457,48 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<mppp::
 #endif
 
 template <typename T>
+class HEYOKA_DLL_PUBLIC t_event
+{
+public:
+    explicit t_event(expression);
+    explicit t_event(expression, event_direction);
+
+    t_event(const t_event &);
+    t_event(t_event &&) noexcept;
+
+    ~t_event();
+
+    expression eq;
+    event_direction dir = event_direction::any;
+};
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const t_event<T> &)
+{
+    static_assert(always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<mppp::real128> &);
+
+#endif
+
+template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
 public:
     using nt_event_t = nt_event<T>;
-
-    struct HEYOKA_DLL_PUBLIC t_event {
-        explicit t_event(expression);
-
-        expression eq;
-    };
+    using t_event_t = t_event<T>;
 
 private:
     // State vector.
@@ -497,13 +529,15 @@ private:
     // The vector for the dense output.
     std::vector<T> m_d_out;
     // The vector of terminal events.
-    std::vector<t_event> m_tes;
+    std::vector<t_event_t> m_tes;
     // The vector of non-terminal events.
-    std::vector<nt_event<T>> m_ntes;
+    std::vector<nt_event_t> m_ntes;
     // The jet of derivatives for the state variables
     // and the events. This is used only if there
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
+    // Vector of detected terminal events.
+    std::vector<std::tuple<std::uint32_t, T>> m_d_tes;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
 
@@ -513,8 +547,8 @@ private:
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>, std::vector<t_event>,
-                                              std::vector<nt_event<T>>);
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>,
+                                              std::vector<t_event_t>, std::vector<nt_event_t>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
     {
@@ -542,7 +576,7 @@ private:
             // once we implement event detection in the batch integrator too.
 
             // Extract the terminal events, if any.
-            auto tes = [&p]() -> std::vector<t_event> {
+            auto tes = [&p]() -> std::vector<t_event_t> {
                 if constexpr (p.has(kw::t_events)) {
                     return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
                 } else {
@@ -551,7 +585,7 @@ private:
             }();
 
             // Extract the non-terminal events, if any.
-            auto ntes = [&p]() -> std::vector<nt_event<T>> {
+            auto ntes = [&p]() -> std::vector<nt_event_t> {
                 if constexpr (p.has(kw::nt_events)) {
                     return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
                 } else {

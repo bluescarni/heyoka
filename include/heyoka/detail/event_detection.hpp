@@ -29,30 +29,35 @@ namespace heyoka::detail
 {
 
 template <typename T>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, T>> &, const std::vector<nt_event<T>> &, T,
-                        const std::vector<T> &, std::uint32_t, std::uint32_t, std::uint32_t)
+bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, T>> &, std::vector<std::tuple<std::uint32_t, T>> &,
+                          const std::vector<t_event<T>> &, const std::vector<nt_event<T>> &, T, const std::vector<T> &,
+                          std::uint32_t, std::uint32_t)
 {
     static_assert(always_false_v<T>, "Unhandled type");
     return true;
 }
 
 template <>
-HEYOKA_DLL_PUBLIC bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, double>> &,
-                                          const std::vector<nt_event<double>> &, double, const std::vector<double> &,
-                                          std::uint32_t, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &,
+                                            std::vector<std::tuple<std::uint32_t, double>> &,
+                                            const std::vector<t_event<double>> &, const std::vector<nt_event<double>> &,
+                                            double, const std::vector<double> &, std::uint32_t, std::uint32_t);
 
 template <>
-HEYOKA_DLL_PUBLIC bool
-taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, long double>> &, const std::vector<nt_event<long double>> &,
-                   long double, const std::vector<long double> &, std::uint32_t, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &,
+                                            std::vector<std::tuple<std::uint32_t, long double>> &,
+                                            const std::vector<t_event<long double>> &,
+                                            const std::vector<nt_event<long double>> &, long double,
+                                            const std::vector<long double> &, std::uint32_t, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, mppp::real128>> &,
-                                          const std::vector<nt_event<mppp::real128>> &, mppp::real128,
-                                          const std::vector<mppp::real128> &, std::uint32_t, std::uint32_t,
-                                          std::uint32_t);
+HEYOKA_DLL_PUBLIC bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &,
+                                            std::vector<std::tuple<std::uint32_t, mppp::real128>> &,
+                                            const std::vector<t_event<mppp::real128>> &,
+                                            const std::vector<nt_event<mppp::real128>> &, mppp::real128,
+                                            const std::vector<mppp::real128> &, std::uint32_t, std::uint32_t);
 
 #endif
 

@@ -2838,8 +2838,8 @@ std::uint32_t n_pars_in_sys(const T &sys)
 template <typename T>
 template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
-                                                 bool compact_mode, std::vector<T> pars, std::vector<t_event> tes,
-                                                 std::vector<nt_event<T>> ntes)
+                                                 bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
+                                                 std::vector<nt_event_t> ntes)
 {
     using std::isfinite;
     using namespace fmt::literals;
@@ -2989,7 +2989,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
-    // NOTE: no need to copy m_d_ntes, which is used only as scratch
+    // NOTE: no need to copy m_d_tes/m_d_ntes, which is used only as scratch
     // temporary space during event detection.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
@@ -3000,6 +3000,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     } else {
         m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
     }
+
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
 
@@ -3044,8 +3045,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
     auto h = max_delta_t;
 
-    // Invoke the stepper.
     if (m_step_f.index() == 0u) {
+        assert(m_tes.empty() && m_ntes.empty());
+
+        // Invoke the vanilla stepper.
         std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
 
         // Update the time.
@@ -3063,23 +3066,77 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
     } else {
+        assert(!m_tes.empty() || !m_ntes.empty());
+
+        // Invoke the stepper for event handling.
         std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time, &h);
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
-        // TODO need to check h for non-finite value? Or check non-finiteness later?
+        // Helper to update state and time via propagation of the dense
+        // output for a timestep of ts.
+        auto update_state_time = [this](T ts) {
+            // Update the state.
+            m_d_out_f(m_state.data(), m_ev_jet.data(), &ts);
 
-        // TODO terminal events detection.
+            // Update the time.
+            m_time += ts;
 
-        // Update the state.
-        m_d_out_f(m_state.data(), m_ev_jet.data(), &h);
+            // Store the last timestep.
+            m_last_h = ts;
+        };
 
-        // Update the time.
-        m_time += h;
+        // Do the event detection.
+        if (!taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, h, m_ev_jet, m_order, m_dim)) {
+            // Non-finite values were generated during
+            // event detection. This could be
+            // because of non-finite coefficients
+            // in the Taylor polynomials for the event equations,
+            // a non-finite h or numerical issues when doing the
+            // poly transformations inside event detection.
 
-        // Store the last timestep.
-        m_last_h = h;
+            // For consistency with the other stepper function,
+            // we want to update state and time before returning.
+            update_state_time(h);
+
+            return std::tuple{taylor_outcome::err_nf_state, h};
+        }
+
+        // Sort the events by time.
+        // NOTE: the time coordinates in m_d_(n)tes is relative
+        // to the beginning of the timestep. It will be negative
+        // for backward integration, thus we compare using
+        // abs() so that the first events are those which
+        // happen closer to the beginning of the timestep.
+        auto cmp = [](const auto &ev0, const auto &ev1) {
+            using std::abs;
+
+            return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1));
+        };
+        std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
+        std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
+
+        // If we have terminal events we need
+        // to update the value of h.
+        if (!m_d_tes.empty()) {
+            h = std::get<1>(m_d_tes[0]);
+        }
+
+        // If we don't have terminal events, we will invoke the callbacks
+        // of *all* the non-terminal events. Otherwise, we need to figure
+        // out which non-terminal events do not happen because their time
+        // coordinate is past the the first terminal event.
+        auto ntes_end_it = m_d_tes.empty() ? m_d_ntes.end()
+                                           : std::lower_bound(m_d_ntes.begin(), m_d_ntes.end(), h,
+                                                              [](const auto &ev, const auto &t) {
+                                                                  using std::abs;
+
+                                                                  return abs(std::get<1>(ev)) < abs(t);
+                                                              });
+
+        // Update state and time.
+        update_state_time(h);
 
         // Check if the time or the state vector are non-finite at the
         // end of the timestep.
@@ -3088,28 +3145,20 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             return std::tuple{taylor_outcome::err_nf_state, h};
         }
 
-        // Detect the non-terminal events.
-        if (!taylor_detect_ntes<T>(m_d_ntes, m_ntes, h, m_ev_jet, m_order, m_dim,
-                                   static_cast<std::uint32_t>(m_tes.size()))) {
-            // Non-finite values were generated during
-            // the detection of non-terminal events. This could be
-            // because of non-finite coefficients
-            // in the Taylor polynomials for the event equations,
-            // or numerical issues when doing the poly transformations
-            // inside event detection.
-            return std::tuple{taylor_outcome::err_nf_state, h};
-        }
-
-        // Sort the events by time.
-        std::sort(m_d_ntes.begin(), m_d_ntes.end(),
-                  [](const auto &ev0, const auto &ev1) { return std::get<1>(ev0) < std::get<1>(ev1); });
-
         // Invoke the callbacks.
-        for (const auto &t : m_d_ntes) {
+        for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
+            const auto &t = *it;
+
             m_ntes[std::get<0>(t)].callback(*this, m_time - m_last_h + std::get<1>(t), std::get<0>(t));
         }
 
-        return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        if (m_d_tes.empty()) {
+            // No terminal events detected, return success or time limit.
+            return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
+        } else {
+            // Terminal event detected, return its index wrapped in the outcome.
+            return std::tuple{taylor_outcome{static_cast<std::int64_t>(std::get<0>(m_d_tes[0]))}, h};
+        }
     }
 }
 
@@ -3185,7 +3234,8 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         const auto [res, h] = step_impl(t - m_time, false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
-            // Something went wrong in the propagation of the timestep, exit.
+            // Something went wrong in the propagation of the timestep, or we reached
+            // a terminal event. Exit.
             return std::tuple{res, min_h, max_h, step_counter};
         }
 
@@ -3438,47 +3488,107 @@ std::ostream &operator<<(std::ostream &os, const nt_event<mppp::real128> &e)
 
 #endif
 
+template <typename T>
+t_event<T>::t_event(expression e) : eq(std::move(e))
+{
+}
+
+template <typename T>
+t_event<T>::t_event(expression e, event_direction d) : t_event(std::move(e))
+{
+    dir = d;
+}
+
+template <typename T>
+t_event<T>::t_event(const t_event &) = default;
+
+template <typename T>
+t_event<T>::t_event(t_event &&) noexcept = default;
+
+template <typename T>
+t_event<T>::~t_event() = default;
+
+namespace
+{
+
+// Implementation of stream insertion for the terminal event class.
+std::ostream &t_event_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
+{
+    os << "Event type     : terminal\n";
+    os << "Event equation : " << eq << '\n';
+    os << "Event direction: " << dir << '\n';
+
+    return os;
+}
+
+} // namespace
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event<double> &e)
+{
+    return t_event_stream_impl(os, e.eq, e.dir);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event<long double> &e)
+{
+    return t_event_stream_impl(os, e.eq, e.dir);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event<mppp::real128> &e)
+{
+    return t_event_stream_impl(os, e.eq, e.dir);
+}
+
+#endif
+
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
 template class nt_event<double>;
+template class t_event<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,
                                                                                  bool, bool, std::vector<double>,
-                                                                                 std::vector<t_event>,
-                                                                                 std::vector<nt_event<double>>);
+                                                                                 std::vector<t_event_t>,
+                                                                                 std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
-                                                 double, double, bool, bool, std::vector<double>, std::vector<t_event>,
-                                                 std::vector<nt_event<double>>);
+                                                 double, double, bool, bool, std::vector<double>,
+                                                 std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template class taylor_adaptive_impl<long double>;
 template class nt_event<long double>;
+template class t_event<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
                                                       long double, bool, bool, std::vector<long double>,
-                                                      std::vector<t_event>, std::vector<nt_event<long double>>);
+                                                      std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
     std::vector<std::pair<expression, expression>>, std::vector<long double>, long double, long double, bool, bool,
-    std::vector<long double>, std::vector<t_event>, std::vector<nt_event<long double>>);
+    std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
 template class nt_event<mppp::real128>;
+template class t_event<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
-    std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event<mppp::real128>>);
+    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
-    bool, std::vector<mppp::real128>, std::vector<t_event>, std::vector<nt_event<mppp::real128>>);
+    bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 #endif
 

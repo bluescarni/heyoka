@@ -501,15 +501,17 @@ auto &get_isol()
     return isol;
 }
 
-// Implementation of the detection of non-terminal events.
+// Implementation of event detection.
 template <typename T>
-bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<nt_event<T>> &ntes,
-                             T h, const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                             std::uint32_t n_tes)
+bool taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
+                               std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
+                               const std::vector<nt_event<T>> &ntes, T h, const std::vector<T> &ev_jet,
+                               std::uint32_t order, std::uint32_t dim)
 {
     assert(order >= 2u);
 
-    // Clear the vector of detected non-terminal events.
+    // Clear the vectors of detected events.
+    d_tes.clear();
     d_ntes.clear();
 
     // Fetch a reference to the list of isolating intervals.
@@ -521,196 +523,210 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, 
     // Prepare the cache of binomial coefficients.
     const auto &bc = get_bc_up_to<T>(order);
 
-    for (std::uint32_t i = 0; i < ntes.size(); ++i) {
-        // Clear out the list of isolating intervals.
-        isol.clear();
+    // Helper to run event detection on a vector of events
+    // (terminal or not). 'out' is the vector of detected
+    // events, 'ev_vec' the input vector of events to detect,
+    // 'base_jet_idx' an index for reading the event polynomials
+    // from ev_jet.
+    auto run_detection = [&](auto &out, const auto &ev_vec, auto base_jet_idx) {
+        for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
+            // Clear out the list of isolating intervals.
+            isol.clear();
 
-        // Reset the working list.
-        wl.clear();
+            // Reset the working list.
+            wl.clear();
 
-        // Extract the pointer to the Taylor polynomial for the
-        // current event.
-        auto ptr = ev_jet.data() + (dim + n_tes + i) * (order + 1u);
+            // Extract the pointer to the Taylor polynomial for the
+            // current event.
+            auto ptr = ev_jet.data() + (base_jet_idx + i) * (order + 1u);
 
-        // Helper to add a detected event to d_ntes.
-        // NOTE: the root here is expected to be in the [0, h) range.
-        auto add_d_event = [&d_ntes, i, ptr, order, dir = ntes[i].dir](T root) {
-            if (dir == event_direction::any) {
-                // If the event direction does not
-                // matter, just add it.
-                d_ntes.emplace_back(i, root);
-            } else {
-                // Otherwise, we need to compute the derivative
-                // and record the event only if its direction
-                // matches the sign of the derivative.
-                const auto der = poly_eval_1(ptr, root, order);
+            // Helper to add a detected event to out.
+            // NOTE: the root here is expected to be in the [0, h) range.
+            auto add_d_event = [&out, i, ptr, order, dir = ev_vec[i].dir](T root) {
+                if (dir == event_direction::any) {
+                    // If the event direction does not
+                    // matter, just add it.
+                    out.emplace_back(i, root);
+                } else {
+                    // Otherwise, we need to compute the derivative
+                    // and record the event only if its direction
+                    // matches the sign of the derivative.
+                    const auto der = poly_eval_1(ptr, root, order);
 
-                if ((der >= 0 && dir == event_direction::positive) || (der <= 0 && dir == event_direction::negative)) {
-                    d_ntes.emplace_back(i, root);
+                    if ((der >= 0 && dir == event_direction::positive)
+                        || (der <= 0 && dir == event_direction::negative)) {
+                        out.emplace_back(i, root);
+                    }
                 }
-            }
-        };
+            };
 
-        // Rescale it so that the range [0, h)
-        // becomes [0, 1).
-        pwrap<T> tmp(order);
-        poly_rescale(tmp.v.data(), ptr, h, order);
+            // Rescale it so that the range [0, h)
+            // becomes [0, 1).
+            pwrap<T> tmp(order);
+            poly_rescale(tmp.v.data(), ptr, h, order);
 
-        // Place the first element in the working list.
-        wl.emplace_back(0, 1, std::move(tmp));
+            // Place the first element in the working list.
+            wl.emplace_back(0, 1, std::move(tmp));
 
 #if !defined(NDEBUG)
-        auto max_wl_size = wl.size();
-        auto max_isol_size = isol.size();
+            auto max_wl_size = wl.size();
+            auto max_isol_size = isol.size();
 #endif
 
-        // Flag to signal that the do-while loop below failed.
-        bool loop_failed = false;
+            // Flag to signal that the do-while loop below failed.
+            bool loop_failed = false;
 
-        do {
-            // Fetch the current interval and polynomial from the working list.
-            // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
-            // be looking for. lb and ub represent what 0 and 1 correspond to in the original
-            // range.
-            auto [lb, ub, q] = std::move(wl.back());
-            wl.pop_back();
+            do {
+                // Fetch the current interval and polynomial from the working list.
+                // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
+                // be looking for. lb and ub represent what 0 and 1 correspond to in the original
+                // range.
+                auto [lb, ub, q] = std::move(wl.back());
+                wl.pop_back();
 
-            // Check for an event at the lower bound.
-            if (q.v[0] == T(0)) {
-                // NOTE: the original range had been rescaled wrt to h.
-                // Thus, we need to rescale back when adding the detected
-                // event.
-                add_d_event(lb * h);
-            }
+                // Check for an event at the lower bound.
+                if (q.v[0] == T(0)) {
+                    // NOTE: the original range had been rescaled wrt to h.
+                    // Thus, we need to rescale back when adding the detected
+                    // event.
+                    add_d_event(lb * h);
+                }
 
-            // Reverse it.
-            pwrap<T> tmp1(order);
-            std::copy(q.v.rbegin(), q.v.rend(), tmp1.v.data());
+                // Reverse it.
+                pwrap<T> tmp1(order);
+                std::copy(q.v.rbegin(), q.v.rend(), tmp1.v.data());
 
-            // Translate it.
-            pwrap<T> tmp2(order);
-            poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
-
-            // Check non-finiteness.
-            if (poly_nf(tmp2.v.data(), order)) {
-                return false;
-            }
-
-            // Count the sign changes.
-            const auto n_sc = count_sign_changes(tmp2.v.data(), order);
-
-            if (n_sc == 1u) {
-                // Found isolating interval, add it to isol.
-                isol.emplace_back(lb, ub);
-            } else if (n_sc > 1u) {
-                // No isolating interval found, bisect.
-
-                // First we transform q into 2**n * q(x/2) and store the result
-                // into tmp1.
-                poly_rescale_p2(tmp1.v.data(), q.v.data(), order);
-                // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
+                // Translate it.
+                pwrap<T> tmp2(order);
                 poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
 
-                // Finally we add tmp1 and tmp2 to the working list.
-                const auto mid = (lb + ub) / 2;
-                wl.emplace_back(lb, mid, std::move(tmp1));
-                wl.emplace_back(mid, ub, std::move(tmp2));
-            }
+                // Check non-finiteness.
+                if (poly_nf(tmp2.v.data(), order)) {
+                    return false;
+                }
+
+                // Count the sign changes.
+                const auto n_sc = count_sign_changes(tmp2.v.data(), order);
+
+                if (n_sc == 1u) {
+                    // Found isolating interval, add it to isol.
+                    isol.emplace_back(lb, ub);
+                } else if (n_sc > 1u) {
+                    // No isolating interval found, bisect.
+
+                    // First we transform q into 2**n * q(x/2) and store the result
+                    // into tmp1.
+                    poly_rescale_p2(tmp1.v.data(), q.v.data(), order);
+                    // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
+                    poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
+
+                    // Finally we add tmp1 and tmp2 to the working list.
+                    const auto mid = (lb + ub) / 2;
+                    wl.emplace_back(lb, mid, std::move(tmp1));
+                    wl.emplace_back(mid, ub, std::move(tmp2));
+                }
 
 #if !defined(NDEBUG)
-            max_wl_size = std::max(max_wl_size, wl.size());
-            max_isol_size = std::max(max_isol_size, isol.size());
+                max_wl_size = std::max(max_wl_size, wl.size());
+                max_isol_size = std::max(max_isol_size, isol.size());
 #endif
 
-            // We want to put limits in order to avoid an endless loop when the algorithm fails.
-            // The first check is on the working list size and it is based
-            // on heuristic observation of the algorithm's behaviour in pathological
-            // cases. The second check is that we cannot possibly find more isolating
-            // intervals than the degree of the polynomial.
-            if (wl.size() > 250u || isol.size() > order) {
-                get_logger()->warn("the polynomial root isolation algorithm failed during event detection: the working "
-                                   "list size is {} and the number of isolating intervals is {}",
-                                   wl.size(), isol.size());
-
-                loop_failed = true;
-
-                break;
-            }
-
-        } while (!wl.empty());
-
-#if !defined(NDEBUG)
-        SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
-        SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
-#endif
-
-        if (loop_failed) {
-            // Don't do root finding for this event if the loop failed,
-            // move to the next event.
-            continue;
-        }
-
-        // Reconstruct a version of the original event polynomial
-        // in which the range [0, h) is rescaled to [0, 1). We need
-        // to do root finding on the rescaled polynomial because the
-        // isolating intervals are also rescaled to [0, 1).
-        pwrap<T> tmp1(order);
-        poly_rescale(tmp1.v.data(), ptr, h, order);
-
-        // Run the root finding in the isolating intervals.
-        for (const auto &ival : isol) {
-            auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
-
-            if (cflag == 0) {
-                // Root finding finished successfully, record the event.
-                // The found root needs to be rescaled by h.
-                add_d_event(root * h);
-            } else {
-                // Root finding encountered some issue. Ignore the
-                // event and log the issue.
-                if (cflag == -1) {
+                // We want to put limits in order to avoid an endless loop when the algorithm fails.
+                // The first check is on the working list size and it is based
+                // on heuristic observation of the algorithm's behaviour in pathological
+                // cases. The second check is that we cannot possibly find more isolating
+                // intervals than the degree of the polynomial.
+                if (wl.size() > 250u || isol.size() > order) {
                     get_logger()->warn(
-                        "polynomial root finding during event detection failed due to too many iterations");
+                        "the polynomial root isolation algorithm failed during event detection: the working "
+                        "list size is {} and the number of isolating intervals is {}",
+                        wl.size(), isol.size());
+
+                    loop_failed = true;
+
+                    break;
+                }
+
+            } while (!wl.empty());
+
+#if !defined(NDEBUG)
+            SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
+            SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
+#endif
+
+            if (isol.empty() || loop_failed) {
+                // Don't do root finding for this event if the loop failed,
+                // or if the list of isolating intervals is empty. Just
+                // move to the next event.
+                continue;
+            }
+
+            // Reconstruct a version of the original event polynomial
+            // in which the range [0, h) is rescaled to [0, 1). We need
+            // to do root finding on the rescaled polynomial because the
+            // isolating intervals are also rescaled to [0, 1).
+            pwrap<T> tmp1(order);
+            poly_rescale(tmp1.v.data(), ptr, h, order);
+
+            // Run the root finding in the isolating intervals.
+            for (const auto &ival : isol) {
+                auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
+
+                if (cflag == 0) {
+                    // Root finding finished successfully, record the event.
+                    // The found root needs to be rescaled by h.
+                    add_d_event(root * h);
                 } else {
-                    get_logger()->warn(
-                        "polynomial root finding during event detection returned a nonzero errno with message '{}'",
-                        std::strerror(cflag));
+                    // Root finding encountered some issue. Ignore the
+                    // event and log the issue.
+                    if (cflag == -1) {
+                        get_logger()->warn(
+                            "polynomial root finding during event detection failed due to too many iterations");
+                    } else {
+                        get_logger()->warn(
+                            "polynomial root finding during event detection returned a nonzero errno with message '{}'",
+                            std::strerror(cflag));
+                    }
                 }
             }
         }
-    }
 
-    return true;
+        return true;
+    };
+
+    return run_detection(d_tes, tes, dim) && run_detection(d_ntes, ntes, dim + tes.size());
 }
 
 } // namespace
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
-                        const std::vector<nt_event<double>> &ntes, double h, const std::vector<double> &ev_jet,
-                        std::uint32_t order, std::uint32_t dim, std::uint32_t n_tes)
+bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
+                          const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes, double h,
+                          const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
+    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
-                        const std::vector<nt_event<long double>> &ntes, long double h,
-                        const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                        std::uint32_t n_tes)
+bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
+                          const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
+                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
+    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-bool taylor_detect_ntes(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
-                        const std::vector<nt_event<mppp::real128>> &ntes, mppp::real128 h,
-                        const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                        std::uint32_t n_tes)
+bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
+                          const std::vector<t_event<mppp::real128>> &tes,
+                          const std::vector<nt_event<mppp::real128>> &ntes, mppp::real128 h,
+                          const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_ntes_impl(d_ntes, ntes, h, ev_jet, order, dim, n_tes);
+    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 #endif
