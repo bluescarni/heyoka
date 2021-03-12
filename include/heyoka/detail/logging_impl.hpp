@@ -23,7 +23,7 @@
 namespace heyoka::detail
 {
 
-spdlog::logger &get_logger();
+spdlog::logger *get_logger();
 
 } // namespace heyoka::detail
 

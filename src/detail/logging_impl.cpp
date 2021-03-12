@@ -28,11 +28,11 @@ auto make_logger()
 
 } // namespace
 
-spdlog::logger &get_logger()
+spdlog::logger *get_logger()
 {
     static auto ret = make_logger();
 
-    return *ret;
+    return ret.get();
 }
 
 } // namespace heyoka::detail

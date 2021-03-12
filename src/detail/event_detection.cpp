@@ -462,6 +462,8 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     }
 #endif
 
+    SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
+
     if (errno > 0) {
         // Some error condition arose during root finding,
         // return zero and errno.
@@ -557,6 +559,14 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, 
         // Place the first element in the working list.
         wl.emplace_back(0, 1, std::move(tmp));
 
+#if !defined(NDEBUG)
+        auto max_wl_size = wl.size();
+        auto max_isol_size = isol.size();
+#endif
+
+        // Flag to signal that the do-while loop below failed.
+        bool loop_failed = false;
+
         do {
             // Fetch the current interval and polynomial from the working list.
             // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
@@ -606,7 +616,39 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, 
                 wl.emplace_back(lb, mid, std::move(tmp1));
                 wl.emplace_back(mid, ub, std::move(tmp2));
             }
+
+#if !defined(NDEBUG)
+            max_wl_size = std::max(max_wl_size, wl.size());
+            max_isol_size = std::max(max_isol_size, isol.size());
+#endif
+
+            // We want to put limits in order to avoid an endless loop when the algorithm fails.
+            // The first check is on the working list size and it is based
+            // on heuristic observation of the algorithm's behaviour in pathological
+            // cases. The second check is that we cannot possibly find more isolating
+            // intervals than the degree of the polynomial.
+            if (wl.size() > 250u || isol.size() > order) {
+                get_logger()->warn("the polynomial root isolation algorithm failed during event detection: the working "
+                                   "list size is {} and the number of isolating intervals is {}",
+                                   wl.size(), isol.size());
+
+                loop_failed = true;
+
+                break;
+            }
+
         } while (!wl.empty());
+
+#if !defined(NDEBUG)
+        SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
+        SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
+#endif
+
+        if (loop_failed) {
+            // Don't do root finding for this event if the loop failed,
+            // move to the next event.
+            continue;
+        }
 
         // Reconstruct a version of the original event polynomial
         // in which the range [0, h) is rescaled to [0, 1). We need
@@ -627,10 +669,10 @@ bool taylor_detect_ntes_impl(std::vector<std::tuple<std::uint32_t, T>> &d_ntes, 
                 // Root finding encountered some issue. Ignore the
                 // event and log the issue.
                 if (cflag == -1) {
-                    get_logger().warn(
+                    get_logger()->warn(
                         "polynomial root finding during event detection failed due to too many iterations");
                 } else {
-                    get_logger().warn(
+                    get_logger()->warn(
                         "polynomial root finding during event detection returned a nonzero errno with message '{}'",
                         std::strerror(cflag));
                 }
