@@ -498,6 +498,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                                const std::vector<nt_event<T>> &ntes, T h, const std::vector<T> &ev_jet,
                                std::uint32_t order, std::uint32_t dim)
 {
+    using std::isfinite;
+
     assert(order >= 2u);
 
     // Clear the vectors of detected events.
@@ -536,9 +538,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                 // NOTE: we do one last check on the root in order to
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
-
-                using std::isfinite;
-
                 if (!isfinite(root)) {
                     get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
                                        root);
@@ -588,10 +587,21 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
                 // Check for an event at the lower bound.
                 if (q.v[0] == T(0)) {
-                    // NOTE: the original range had been rescaled wrt to h.
-                    // Thus, we need to rescale back when adding the detected
-                    // event.
-                    add_d_event(lb * h);
+                    // NOTE: before adding the event, make sure
+                    // all the other coefficients are finite, otherwise
+                    // we cannot really claim to have detected an event.
+                    // When we do proper root finding below, the
+                    // algorithm should be able to detect non-finite
+                    // polynomials.
+                    if (std::all_of(q.v.data() + 1, q.v.data() + 1 + order,
+                                    [](const auto &x) { return isfinite(x); })) {
+                        // NOTE: the original range had been rescaled wrt to h.
+                        // Thus, we need to rescale back when adding the detected
+                        // event.
+                        add_d_event(lb * h);
+                    } else {
+                        get_logger()->warn("a non-finite Taylor polynomial was identified during event detection");
+                    }
                 }
 
                 // Reverse it.
