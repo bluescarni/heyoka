@@ -102,7 +102,7 @@ TEST_CASE("taylor glancing blow test")
               })}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step(fp_t(1.3));
+            REQUIRE(std::get<0>(ta.step(fp_t(1.3))) == taylor_outcome::time_limit);
         }
 
         // Any number of events up to 2 is acceptable here.
@@ -120,7 +120,7 @@ TEST_CASE("taylor glancing blow test")
                                            [&counter](taylor_adaptive<fp_t> &, fp_t, std::uint32_t) { ++counter; })}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step(fp_t(1.3));
+            REQUIRE(std::get<0>(ta.step(fp_t(1.3))) == taylor_outcome::time_limit);
         }
 
         REQUIRE(counter <= 2u);
@@ -185,7 +185,7 @@ TEST_CASE("taylor nte negative timestep")
                                            })}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step_backward();
+            REQUIRE(std::get<0>(ta.step_backward()) == taylor_outcome::success);
         }
 
         REQUIRE(counter == 12u);
@@ -255,7 +255,7 @@ TEST_CASE("taylor nte multizero")
                                            })}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step();
+            REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
         }
 
         REQUIRE(counter == 12u);
@@ -308,7 +308,7 @@ TEST_CASE("taylor nte multizero")
                                           event_direction::negative)}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step();
+            REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
         }
 
         REQUIRE(counter == 10u);
@@ -369,7 +369,7 @@ TEST_CASE("taylor nte basic")
             })}};
 
         for (auto i = 0; i < 20; ++i) {
-            ta.step();
+            REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
         }
 
         REQUIRE(counter == 3u);

@@ -37,6 +37,8 @@
 
 #endif
 
+#include <fmt/ostream.h>
+
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/taylor.hpp>
@@ -368,18 +370,6 @@ auto poly_eval(InputIt a, T x, std::uint32_t n)
     return ret;
 }
 
-// Check if a polynomial has non-finite coefficients.
-// Requires random-access iterator.
-template <typename InputIt>
-auto poly_nf(InputIt a, std::uint32_t n)
-{
-    return std::any_of(a, a + n, [](const auto &x) {
-        using std::isfinite;
-
-        return !isfinite(x);
-    });
-}
-
 // A RAII helper to extract polys from the cache and
 // return them to the cache upon destruction.
 template <typename T>
@@ -503,7 +493,7 @@ auto &get_isol()
 
 // Implementation of event detection.
 template <typename T>
-bool taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
+void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                                std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
                                const std::vector<nt_event<T>> &ntes, T h, const std::vector<T> &ev_jet,
                                std::uint32_t order, std::uint32_t dim)
@@ -543,6 +533,18 @@ bool taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be in the [0, h) range.
             auto add_d_event = [&out, i, ptr, order, dir = ev_vec[i].dir](T root) {
+                // NOTE: we do one last check on the root in order to
+                // avoid non-finite event times. This guarantees that
+                // sorting the events by time is safe.
+
+                using std::isfinite;
+
+                if (!isfinite(root)) {
+                    get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
+                                       root);
+                    return;
+                }
+
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
@@ -599,11 +601,6 @@ bool taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                 // Translate it.
                 pwrap<T> tmp2(order);
                 poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
-
-                // Check non-finiteness.
-                if (poly_nf(tmp2.v.data(), order)) {
-                    return false;
-                }
 
                 // Count the sign changes.
                 const auto n_sc = count_sign_changes(tmp2.v.data(), order);
@@ -690,43 +687,42 @@ bool taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                 }
             }
         }
-
-        return true;
     };
 
-    return run_detection(d_tes, tes, dim) && run_detection(d_ntes, ntes, dim + tes.size());
+    run_detection(d_tes, tes, dim);
+    run_detection(d_ntes, ntes, dim + tes.size());
 }
 
 } // namespace
 
 template <>
-bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
                           const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes, double h,
                           const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 template <>
-bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
                           long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-bool taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
                           const std::vector<nt_event<mppp::real128>> &ntes, mppp::real128 h,
                           const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    return taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
 }
 
 #endif

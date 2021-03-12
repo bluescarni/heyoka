@@ -3074,34 +3074,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
-        // Helper to update state and time via propagation of the dense
-        // output for a timestep of ts.
-        auto update_state_time = [this](T ts) {
-            // Update the state.
-            m_d_out_f(m_state.data(), m_ev_jet.data(), &ts);
-
-            // Update the time.
-            m_time += ts;
-
-            // Store the last timestep.
-            m_last_h = ts;
-        };
-
         // Do the event detection.
-        if (!taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, h, m_ev_jet, m_order, m_dim)) {
-            // Non-finite values were generated during
-            // event detection. This could be
-            // because of non-finite coefficients
-            // in the Taylor polynomials for the event equations,
-            // a non-finite h or numerical issues when doing the
-            // poly transformations inside event detection.
-
-            // For consistency with the other stepper function,
-            // we want to update state and time before returning.
-            update_state_time(h);
-
-            return std::tuple{taylor_outcome::err_nf_state, h};
-        }
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, h, m_ev_jet, m_order, m_dim);
 
         // Sort the events by time.
         // NOTE: the time coordinates in m_d_(n)tes is relative
@@ -3135,8 +3109,14 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                                                                   return abs(std::get<1>(ev)) < abs(t);
                                                               });
 
-        // Update state and time.
-        update_state_time(h);
+        // Update the state.
+        m_d_out_f(m_state.data(), m_ev_jet.data(), &h);
+
+        // Update the time.
+        m_time += h;
+
+        // Store the last timestep.
+        m_last_h = h;
 
         // Check if the time or the state vector are non-finite at the
         // end of the timestep.
