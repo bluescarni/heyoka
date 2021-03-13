@@ -5314,11 +5314,19 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
 {
+    using namespace fmt::literals;
+
     switch (oc) {
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::success);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::step_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
+        default:
+            if (oc > taylor_outcome::success) {
+                os << "taylor_outcome::terminal_event_{}"_format(static_cast<std::int64_t>(oc));
+            } else {
+                os << "taylor_outcome::??";
+            }
     }
 
     return os;
@@ -5330,6 +5338,8 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::any);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::positive);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::negative);
+        default:
+            os << "event_direction::??";
     }
 
     return os;
