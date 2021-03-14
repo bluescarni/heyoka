@@ -2993,7 +2993,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // temporary space during event detection.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_last_te(other.m_last_te)
+      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldown(other.m_te_cooldown)
 {
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3077,7 +3077,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_last_te, h, m_ev_jet, m_order, m_dim);
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldown, h, m_ev_jet, m_order, m_dim);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -3099,9 +3099,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         // If we have terminal events we need
         // to update the value of h. If we don't,
-        // we need to reset m_last_te.
+        // we need to reset m_te_cooldown.
         if (m_d_tes.empty()) {
-            m_last_te.reset();
+            m_te_cooldown.reset();
         } else {
             h = std::get<1>(m_d_tes[0]);
         }
@@ -3129,6 +3129,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
+            // Let's also reset the cooldown value, as at this point
+            // it has become useless.
+            m_te_cooldown.reset();
+
             return std::tuple{taylor_outcome::err_nf_state, h};
         }
 
@@ -3140,20 +3144,20 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
             // Update the cooldown.
             if (te.cooldown >= 0) {
-                m_last_te = std::tuple{te_idx, te.cooldown};
+                // Cooldown explicitly provided by the user, use it.
+                m_te_cooldown.emplace(te_idx, te.cooldown);
             } else {
-                const auto abs_h = abs(h);
-
-                if (abs_h >= 1) {
-                    m_last_te = std::tuple{te_idx, abs_h * (12 * std::numeric_limits<T>::epsilon())};
-                } else {
-                    m_last_te = std::tuple{te_idx, 12 * std::numeric_limits<T>::epsilon()};
-                }
+                // Deduce the cooldown automatically.
+                // NOTE: the idea here is that event detection
+                // yielded an event time accurate to about 4*eps
+                // relative to the timestep size. Thus, we use as
+                // cooldown time a small multiple of that accuracy.
+                m_te_cooldown.emplace(te_idx, abs(h) * (12 * std::numeric_limits<T>::epsilon()));
             }
 
-            // Invoke the callback of the first terminal event, if necessary.
+            // Invoke the callback of the first terminal event, if it has one.
             if (te.callback) {
-                te.callback(*this, m_time - m_last_h + h);
+                te.callback(*this, m_time - (m_last_h - h));
             }
         }
 
@@ -3161,7 +3165,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
 
-            m_ntes[std::get<0>(t)].callback(*this, m_time - m_last_h + std::get<1>(t));
+            m_ntes[std::get<0>(t)].callback(*this, m_time - (m_last_h - std::get<1>(t)));
         }
 
         if (m_d_tes.empty()) {

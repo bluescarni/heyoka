@@ -511,6 +511,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                                const std::optional<std::tuple<std::uint32_t, T>> &cooldown, T h,
                                const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
+    // TODO?
+    // - cache has_cooldown = static_cast<bool>(cooldown).
+    // - replace base jet idx with automatic deduction based
+    //   on ev_is_terminal.
+
     using std::isfinite;
 
     assert(order >= 2u);
@@ -596,9 +601,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
             do {
                 // Fetch the current interval and polynomial from the working list.
-                // NOTE: q(x) is the polynomial whose roots in the x range [0, 1) we will
-                // be looking for. lb and ub represent what 0 and 1 correspond to in the original
-                // range.
+                // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
+                // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
+                // [0, 1) range.
                 auto [lb, ub, q] = std::move(wl.back());
                 wl.pop_back();
 
@@ -611,7 +616,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                 // polynomials.
                 if (q.v[0] == T(0)
                     && std::all_of(q.v.data() + 1, q.v.data() + 1 + order, [](const auto &x) { return isfinite(x); })) {
-
                     // NOTE: we will have to skip the event if we are dealing
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.

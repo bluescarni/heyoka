@@ -357,8 +357,8 @@ IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
 IGOR_MAKE_NAMED_ARGUMENT(pars);
-IGOR_MAKE_NAMED_ARGUMENT(nt_events);
 IGOR_MAKE_NAMED_ARGUMENT(t_events);
+IGOR_MAKE_NAMED_ARGUMENT(nt_events);
 
 } // namespace kw
 
@@ -545,7 +545,7 @@ private:
     std::vector<std::tuple<std::uint32_t, T>> m_d_tes;
     // An optional to store the index of the last detected
     // event and its associated cooldown value.
-    std::optional<std::tuple<std::uint32_t, T>> m_last_te;
+    std::optional<std::tuple<std::uint32_t, T>> m_te_cooldown;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
 
