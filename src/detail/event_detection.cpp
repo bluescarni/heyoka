@@ -511,11 +511,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                                const std::optional<std::tuple<std::uint32_t, T>> &cooldown, T h,
                                const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    // TODO?
-    // - cache has_cooldown = static_cast<bool>(cooldown).
-    // - replace base jet idx with automatic deduction based
-    //   on ev_is_terminal.
-
     using std::isfinite;
 
     assert(order >= 2u);
@@ -533,12 +528,15 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
     // Prepare the cache of binomial coefficients.
     const auto &bc = get_bc_up_to<T>(order);
 
+    // Cache the presence of cooldown for terminal events.
+    const auto te_has_cooldown = static_cast<bool>(cooldown);
+
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect,
     // 'base_jet_idx' an index for reading the event polynomials
     // from ev_jet.
-    auto run_detection = [&](auto &out, const auto &ev_vec, auto base_jet_idx) {
+    auto run_detection = [&](auto &out, const auto &ev_vec) {
         // Check if we are doing detection of terminal events.
         using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
         constexpr bool ev_is_terminal = is_terminal_event<ev_type>::value;
@@ -552,7 +550,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
             // Extract the pointer to the Taylor polynomial for the
             // current event.
-            const auto ptr = ev_jet.data() + (base_jet_idx + i) * (order + 1u);
+            const auto ptr = ev_jet.data() + (i + dim + (ev_is_terminal ? 0u : tes.size())) * (order + 1u);
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be in the [0, h) range.
@@ -621,7 +619,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                     // falls within the cooldown time.
                     bool skip_event = false;
                     if constexpr (ev_is_terminal) {
-                        if (cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                        if (te_has_cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
                             skip_event = true;
                         }
                     }
@@ -711,7 +709,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                     // NOTE: if we are dealing with a terminal event
                     // subject to cooldown, we need to ensure that
                     // we don't look for roots before the cooldown has expired.
-                    if (cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                    if (te_has_cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
                         // Make sure we move lb past the cooldown.
                         lb = std::get<1>(*cooldown) / h;
 
@@ -759,8 +757,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
         }
     };
 
-    run_detection(d_tes, tes, dim);
-    run_detection(d_ntes, ntes, dim + tes.size());
+    run_detection(d_tes, tes);
+    run_detection(d_ntes, ntes);
 }
 
 } // namespace

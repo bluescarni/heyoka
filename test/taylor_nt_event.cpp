@@ -154,8 +154,6 @@ TEST_CASE("taylor glancing blow test")
 
 TEST_CASE("taylor te multizero")
 {
-    set_logger_level_debug();
-
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
 
@@ -219,8 +217,6 @@ TEST_CASE("taylor te multizero")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
-
-    set_logger_level_info();
 }
 
 TEST_CASE("taylor nte multizero")
@@ -280,7 +276,7 @@ TEST_CASE("taylor nte multizero")
                                                ta.update_d_output(t);
 
                                                const auto v = ta.get_d_output()[1];
-                                               REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon());
+                                               REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                ++counter;
 
@@ -341,7 +337,7 @@ TEST_CASE("taylor nte multizero")
                                               ta.update_d_output(t);
 
                                               const auto v = ta.get_d_output()[1];
-                                              REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon());
+                                              REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                               ++counter;
 
@@ -422,7 +418,7 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                ta.update_d_output(t);
 
                                                const auto v = ta.get_d_output()[1];
-                                               REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon());
+                                               REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                ++counter;
 
