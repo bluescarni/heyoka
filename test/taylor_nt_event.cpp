@@ -44,8 +44,10 @@ const auto fp_types = std::tuple<double, long double
 #endif
                                  >{};
 
-TEST_CASE("taylor nte stream")
+TEST_CASE("taylor nte")
 {
+    using Catch::Matchers::Message;
+
     auto [v] = make_vars("v");
 
     using ev_t = taylor_adaptive<double>::nt_event_t;
@@ -67,6 +69,14 @@ TEST_CASE("taylor nte stream")
     REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
     oss.str("");
+
+    // Failure modes.
+    REQUIRE_THROWS_MATCHES(ev_t(v * v - 1e-10, ev_t::callback_t{}), std::invalid_argument,
+                           Message("Cannot construct a non-terminal event with an empty callback"));
+    REQUIRE_THROWS_MATCHES(ev_t(
+                               v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction{50}),
+                           std::invalid_argument,
+                           Message("Invalid value selected for the direction of a non-terminal event"));
 }
 
 TEST_CASE("taylor glancing blow test")

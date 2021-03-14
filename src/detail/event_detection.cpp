@@ -554,7 +554,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be in the [0, h) range.
-            auto add_d_event = [&out, i, ptr, order, dir = ev_vec[i].dir](T root) {
+            auto add_d_event = [&out, i, ptr, order, dir = ev_vec[i].get_direction()](T root) {
                 // NOTE: we do one last check on the root in order to
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
