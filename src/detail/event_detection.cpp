@@ -16,6 +16,7 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -41,6 +42,7 @@
 
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/logging_impl.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
@@ -492,12 +494,22 @@ auto &get_isol()
     return isol;
 }
 
+// Helper to detect events of terminal type.
+template <typename>
+struct is_terminal_event : std::false_type {
+};
+
+template <typename T>
+struct is_terminal_event<t_event<T>> : std::true_type {
+};
+
 // Implementation of event detection.
 template <typename T>
 void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                                std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
-                               const std::vector<nt_event<T>> &ntes, T h, const std::vector<T> &ev_jet,
-                               std::uint32_t order, std::uint32_t dim)
+                               const std::vector<nt_event<T>> &ntes,
+                               const std::optional<std::tuple<std::uint32_t, T>> &cooldown, T h,
+                               const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
     using std::isfinite;
 
@@ -522,6 +534,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
     // 'base_jet_idx' an index for reading the event polynomials
     // from ev_jet.
     auto run_detection = [&](auto &out, const auto &ev_vec, auto base_jet_idx) {
+        // Check if we are doing detection of terminal events.
+        using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
+        constexpr bool ev_is_terminal = is_terminal_event<ev_type>::value;
+
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
             // Clear out the list of isolating intervals.
             isol.clear();
@@ -586,22 +602,31 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                 auto [lb, ub, q] = std::move(wl.back());
                 wl.pop_back();
 
-                // Check for an event at the lower bound.
-                if (q.v[0] == T(0)) {
-                    // NOTE: before adding the event, make sure
-                    // all the other coefficients are finite, otherwise
-                    // we cannot really claim to have detected an event.
-                    // When we do proper root finding below, the
-                    // algorithm should be able to detect non-finite
-                    // polynomials.
-                    if (std::all_of(q.v.data() + 1, q.v.data() + 1 + order,
-                                    [](const auto &x) { return isfinite(x); })) {
+                // Check for an event at the lower bound, which occurs
+                // if the constant term of the polynomial is zero. We also
+                // check for finiteness of all the other coefficients, otherwise
+                // we cannot really claim to have detected an event.
+                // When we do proper root finding below, the
+                // algorithm should be able to detect non-finite
+                // polynomials.
+                if (q.v[0] == T(0)
+                    && std::all_of(q.v.data() + 1, q.v.data() + 1 + order, [](const auto &x) { return isfinite(x); })) {
+
+                    // NOTE: we will have to skip the event if we are dealing
+                    // with a terminal event on cooldown and the lower bound
+                    // falls within the cooldown time.
+                    bool skip_event = false;
+                    if constexpr (ev_is_terminal) {
+                        if (cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                            skip_event = true;
+                        }
+                    }
+
+                    if (!skip_event) {
                         // NOTE: the original range had been rescaled wrt to h.
                         // Thus, we need to rescale back when adding the detected
                         // event.
                         add_d_event(lb * h);
-                    } else {
-                        get_logger()->warn("a non-finite Taylor polynomial was identified during event detection");
                     }
                 }
 
@@ -677,8 +702,38 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
             poly_rescale(tmp1.v.data(), ptr, h, order);
 
             // Run the root finding in the isolating intervals.
-            for (const auto &ival : isol) {
-                const auto [root, cflag] = bracketed_root_find(tmp1, order, std::get<0>(ival), std::get<1>(ival));
+            for (auto &[lb, ub] : isol) {
+                if constexpr (ev_is_terminal) {
+                    // NOTE: if we are dealing with a terminal event
+                    // subject to cooldown, we need to ensure that
+                    // we don't look for roots before the cooldown has expired.
+                    if (cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                        // Make sure we move lb past the cooldown.
+                        lb = std::get<1>(*cooldown) / h;
+
+                        // Check if the interval is now invalid.
+                        if (lb >= ub) {
+                            SPDLOG_LOGGER_DEBUG(get_logger(),
+                                                "terminal event {} is subject to cooldown, ignoring (lb >= ub)", i);
+                            continue;
+                        }
+
+                        // Check if the interval still contains a zero.
+                        const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
+                        const auto f_ub = poly_eval(tmp1.v.data(), ub, order);
+
+                        if (!(f_lb * f_ub < 0)) {
+                            SPDLOG_LOGGER_DEBUG(
+                                get_logger(),
+                                "terminal event {} is subject to cooldown, ignoring (zero not in interval any more)",
+                                i);
+                            continue;
+                        }
+                    }
+                }
+
+                // Run the root finding.
+                const auto [root, cflag] = bracketed_root_find(tmp1, order, lb, ub);
 
                 if (cflag == 0) {
                     // Root finding finished successfully, record the event.
@@ -709,19 +764,21 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 template <>
 void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
-                          const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes, double h,
+                          const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
+                          const std::optional<std::tuple<std::uint32_t, double>> &cooldown, double h,
                           const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
 }
 
 template <>
 void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
-                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                          const std::optional<std::tuple<std::uint32_t, long double>> &cooldown, long double h,
+                          const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -730,10 +787,11 @@ template <>
 void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
-                          const std::vector<nt_event<mppp::real128>> &ntes, mppp::real128 h,
+                          const std::vector<nt_event<mppp::real128>> &ntes,
+                          const std::optional<std::tuple<std::uint32_t, mppp::real128>> &cooldown, mppp::real128 h,
                           const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
 }
 
 #endif

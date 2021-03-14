@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -420,7 +421,7 @@ template <typename T>
 class HEYOKA_DLL_PUBLIC nt_event
 {
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, std::uint32_t)>;
+    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
 
     explicit nt_event(expression, callback_t);
     explicit nt_event(expression, callback_t, event_direction);
@@ -460,6 +461,8 @@ template <typename T>
 class HEYOKA_DLL_PUBLIC t_event
 {
 public:
+    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
+
     explicit t_event(expression);
     explicit t_event(expression, event_direction);
 
@@ -469,6 +472,8 @@ public:
     ~t_event();
 
     expression eq;
+    callback_t callback;
+    T cooldown = T(-1);
     event_direction dir = event_direction::any;
 };
 
@@ -538,6 +543,9 @@ private:
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
     std::vector<std::tuple<std::uint32_t, T>> m_d_tes;
+    // An optional to store the index of the last detected
+    // event and its associated cooldown value.
+    std::optional<std::tuple<std::uint32_t, T>> m_last_te;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
 

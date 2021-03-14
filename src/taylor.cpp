@@ -2993,7 +2993,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // temporary space during event detection.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet)
+      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_last_te(other.m_last_te)
 {
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3077,7 +3077,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, h, m_ev_jet, m_order, m_dim);
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_last_te, h, m_ev_jet, m_order, m_dim);
+
+        // NOTE: before this point, we did not alter
+        // any user-visible data in the integrator (just
+        // temporary memory). From here until we start invoking
+        // the callbacks, everything is noexcept, so we don't
+        // risk leaving the integrator in a half-baked state.
 
         // Sort the events by time.
         // NOTE: the time coordinates in m_d_(n)tes is relative
@@ -3092,8 +3098,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
-        // to update the value of h.
-        if (!m_d_tes.empty()) {
+        // to update the value of h. If we don't,
+        // we need to reset m_last_te.
+        if (m_d_tes.empty()) {
+            m_last_te.reset();
+        } else {
             h = std::get<1>(m_d_tes[0]);
         }
 
@@ -3123,11 +3132,36 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             return std::tuple{taylor_outcome::err_nf_state, h};
         }
 
-        // Invoke the callbacks.
+        if (!m_d_tes.empty()) {
+            // Fetch the first terminal event.
+            const auto te_idx = std::get<0>(m_d_tes[0]);
+            assert(te_idx < m_tes.size());
+            const auto &te = m_tes[te_idx];
+
+            // Update the cooldown.
+            if (te.cooldown >= 0) {
+                m_last_te = std::tuple{te_idx, te.cooldown};
+            } else {
+                const auto abs_h = abs(h);
+
+                if (abs_h >= 1) {
+                    m_last_te = std::tuple{te_idx, abs_h * (12 * std::numeric_limits<T>::epsilon())};
+                } else {
+                    m_last_te = std::tuple{te_idx, 12 * std::numeric_limits<T>::epsilon()};
+                }
+            }
+
+            // Invoke the callback of the first terminal event, if necessary.
+            if (te.callback) {
+                te.callback(*this, m_time - m_last_h + h);
+            }
+        }
+
+        // Invoke the callbacks of the non-terminal events.
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
 
-            m_ntes[std::get<0>(t)].callback(*this, m_time - m_last_h + std::get<1>(t), std::get<0>(t));
+            m_ntes[std::get<0>(t)].callback(*this, m_time - m_last_h + std::get<1>(t));
         }
 
         if (m_d_tes.empty()) {

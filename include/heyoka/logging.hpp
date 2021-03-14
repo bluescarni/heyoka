@@ -15,6 +15,7 @@ namespace heyoka
 {
 
 HEYOKA_DLL_PUBLIC void set_logger_level_debug();
+HEYOKA_DLL_PUBLIC void set_logger_level_info();
 
 } // namespace heyoka
 

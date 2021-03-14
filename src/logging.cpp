@@ -17,4 +17,9 @@ void set_logger_level_debug()
     detail::get_logger()->set_level(spdlog::level::debug);
 }
 
+void set_logger_level_info()
+{
+    detail::get_logger()->set_level(spdlog::level::info);
+}
+
 } // namespace heyoka
