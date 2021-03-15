@@ -2989,8 +2989,6 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
-    // NOTE: no need to copy m_d_tes/m_d_ntes, which is used only as scratch
-    // temporary space during event detection.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
       m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldown(other.m_te_cooldown)
@@ -3002,6 +3000,10 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     }
 
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // NOTE: instead of copying these, reserve the capacity.
+    m_d_tes.reserve(other.m_d_tes.capacity());
+    m_d_ntes.reserve(other.m_d_ntes.capacity());
 }
 
 template <typename T>
