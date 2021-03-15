@@ -597,8 +597,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // matches the sign of the derivative.
                     const auto der = poly_eval_1(ptr, root, order);
 
-                    if ((der >= 0 && dir == event_direction::positive)
-                        || (der <= 0 && dir == event_direction::negative)) {
+                    if ((der > 0 && dir == event_direction::positive)
+                        || (der < 0 && dir == event_direction::negative)) {
                         if constexpr (is_terminal_event_v<ev_type>) {
                             out.emplace_back(i, root, has_multi_roots);
                         } else {
