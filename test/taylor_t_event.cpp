@@ -24,12 +24,10 @@
 #endif
 
 #include <heyoka/expression.hpp>
-#include <heyoka/logging.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
-#include "spdlog_oss.hpp"
 #include "test_utils.hpp"
 
 using namespace heyoka;
@@ -361,8 +359,151 @@ TEST_CASE("taylor te close")
         oc = std::get<0>(ta.step_backward());
         REQUIRE(static_cast<std::uint32_t>(oc) == 1u);
 
+        // Taking the step forward will skip event zero as it is still
+        // on cooldown.
+        oc = std::get<0>(ta.step());
+        REQUIRE(oc == taylor_outcome::success);
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+TEST_CASE("taylor te retrigger")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        t_ev_t ev(
+            x - (1 - std::numeric_limits<fp_t>::epsilon() * 6),
+            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                        {fp_t(1), fp_t(0)},
+                                        kw::opt_level = opt_level,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode,
+                                        kw::t_events = {ev}};
+
+        // First timestep triggers the event immediately.
+        taylor_outcome oc;
         oc = std::get<0>(ta.step());
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() != 0);
+
+        // Step until re-trigger.
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+
+        oc = std::get<0>(ta.step());
+
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+TEST_CASE("taylor te dir")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        t_ev_t ev(
+            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {}, kw::direction = event_direction::positive);
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                        {fp_t(1), fp_t(0)},
+                                        kw::opt_level = opt_level,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode,
+                                        kw::t_events = {ev}};
+
+        // First timestep must not trigger the event (derivative is negative).
+        taylor_outcome oc = std::get<0>(ta.step());
+        REQUIRE(oc == taylor_outcome::success);
+
+        // Step until trigger.
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_state()[0] == approximately(fp_t(-1)));
+
+        // Step until trigger.
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_state()[0] == approximately(fp_t(-1)));
+
+        // Other direction.
+        auto ev1 = t_ev_t(
+            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {}, kw::direction = event_direction::negative);
+
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(1), fp_t(0)},
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::t_events = {ev1}};
+
+        // Now it must trigger immediately.
+        oc = std::get<0>(ta.step());
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+
+        // The next timestep must not trigger due to cooldown.
+        oc = std::get<0>(ta.step());
+        REQUIRE(oc == taylor_outcome::success);
+
+        // Step until trigger.
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_state()[0] == approximately(fp_t(1)));
     };
 
     for (auto cm : {false, true}) {
