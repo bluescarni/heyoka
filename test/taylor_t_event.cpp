@@ -131,7 +131,7 @@ TEST_CASE("taylor te basic")
         using nt_ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
         auto counter_nt = 0u, counter_t = 0u;
-        fp_t cur_time_nt(0), cur_time_t(0);
+        fp_t cur_time(0);
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -140,9 +140,9 @@ TEST_CASE("taylor te basic")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time_nt](taylor_adaptive<fp_t> &ta, fp_t t) {
+                                     [&counter_nt, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t) {
                                          // Make sure the callbacks are called in order.
-                                         REQUIRE(t > cur_time_nt);
+                                         REQUIRE(t > cur_time);
 
                                          ta.update_d_output(t);
 
@@ -151,11 +151,11 @@ TEST_CASE("taylor te basic")
 
                                          ++counter_nt;
 
-                                         cur_time_nt = t;
+                                         cur_time = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time_t](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
-                    REQUIRE(t > cur_time_t);
+                v, kw::callback = [&counter_t, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
+                    REQUIRE(t > cur_time);
 
                     ta.update_d_output(t);
 
@@ -164,7 +164,7 @@ TEST_CASE("taylor te basic")
 
                     ++counter_t;
 
-                    cur_time_t = t;
+                    cur_time = t;
                 })}};
 
         taylor_outcome oc;

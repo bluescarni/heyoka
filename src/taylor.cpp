@@ -3157,6 +3157,14 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             }
         }
 
+        // Invoke the callbacks of the non-terminal events, which are guaranteed
+        // to happen before the first terminal event.
+        for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
+            const auto &t = *it;
+
+            m_ntes[std::get<0>(t)].get_callback()(*this, m_time - (m_last_h - std::get<1>(t)));
+        }
+
         if (!m_d_tes.empty()) {
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(m_d_tes[0]);
@@ -3180,13 +3188,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             if (te.get_callback()) {
                 te.get_callback()(*this, m_time - (m_last_h - h), std::get<2>(m_d_tes[0]));
             }
-        }
-
-        // Invoke the callbacks of the non-terminal events.
-        for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
-            const auto &t = *it;
-
-            m_ntes[std::get<0>(t)].get_callback()(*this, m_time - (m_last_h - std::get<1>(t)));
         }
 
         if (m_d_tes.empty()) {
