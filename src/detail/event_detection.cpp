@@ -505,13 +505,19 @@ struct is_terminal_event<t_event<T>> : std::true_type {
 
 // Implementation of event detection.
 template <typename T>
-void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
+void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &d_tes,
                                std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
                                const std::vector<nt_event<T>> &ntes,
-                               const std::optional<std::tuple<std::uint32_t, T>> &cooldown, T h,
+                               const std::vector<std::optional<std::pair<T, T>>> &cooldowns, T h,
                                const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
     using std::isfinite;
+
+    if (!isfinite(h) || h == 0) {
+        get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
+
+        return;
+    }
 
     assert(order >= 2u);
 
@@ -527,9 +533,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
     // Prepare the cache of binomial coefficients.
     const auto &bc = get_bc_up_to<T>(order);
-
-    // Cache the presence of cooldown for terminal events.
-    const auto te_has_cooldown = static_cast<bool>(cooldown);
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
@@ -553,8 +556,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
             const auto ptr = ev_jet.data() + (i + dim + (ev_is_terminal ? 0u : tes.size())) * (order + 1u);
 
             // Helper to add a detected event to out.
-            // NOTE: the root here is expected to be in the [0, h) range.
-            auto add_d_event = [&out, i, ptr, order, dir = ev_vec[i].get_direction()](T root) {
+            // NOTE: the root here is expected to be already rescaled
+            // to the [0, h) range.
+            auto add_d_event = [&](T root) {
                 // NOTE: we do one last check on the root in order to
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
@@ -564,10 +568,26 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                     return;
                 }
 
+                // TODO multiroot in cooldown detection.
+                [[maybe_unused]] const bool has_multi_roots = [&]() {
+                    if constexpr (ev_is_terminal) {
+                        return false;
+                    } else {
+                        return false;
+                    }
+                }();
+
+                // Fetch and cache the event direction.
+                const auto dir = ev_vec[i].get_direction();
+
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
-                    out.emplace_back(i, root);
+                    if constexpr (ev_is_terminal) {
+                        out.emplace_back(i, root, has_multi_roots);
+                    } else {
+                        out.emplace_back(i, root);
+                    }
                 } else {
                     // Otherwise, we need to compute the derivative
                     // and record the event only if its direction
@@ -576,10 +596,47 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
                     if ((der >= 0 && dir == event_direction::positive)
                         || (der <= 0 && dir == event_direction::negative)) {
-                        out.emplace_back(i, root);
+                        if constexpr (ev_is_terminal) {
+                            out.emplace_back(i, root, has_multi_roots);
+                        } else {
+                            out.emplace_back(i, root);
+                        }
                     }
                 }
             };
+
+            // NOTE: if we are dealing with a terminal event on cooldown,
+            // we will need to ignore roots within the cooldown period.
+            // lb_offset is the value in the original [0, 1) range corresponding
+            // to the end of the cooldown.
+            const auto lb_offset = [&]() {
+                if constexpr (ev_is_terminal) {
+                    if (cooldowns[i]) {
+                        using std::abs;
+
+                        // NOTE: need to distinguish between forward
+                        // and backward integration.
+                        if (h >= 0) {
+                            return (cooldowns[i]->second - cooldowns[i]->first) / abs(h);
+                        } else {
+                            return (cooldowns[i]->second + cooldowns[i]->first) / abs(h);
+                        }
+                    }
+                }
+
+                // NOTE: we end up here if the event is not terminal
+                // or not on cooldown.
+                return T(0);
+            }();
+
+            if (lb_offset >= 1) {
+                // NOTE: the whole integration range is in the cooldown range,
+                // move to the next event.
+                SPDLOG_LOGGER_DEBUG(
+                    get_logger(),
+                    "the integration timestep falls within the cooldown range for the terminal event {}, skipping", i);
+                continue;
+            }
 
             // Rescale it so that the range [0, h)
             // becomes [0, 1).
@@ -619,7 +676,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                     // falls within the cooldown time.
                     bool skip_event = false;
                     if constexpr (ev_is_terminal) {
-                        if (te_has_cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                        if (lb < lb_offset) {
+                            SPDLOG_LOGGER_DEBUG(get_logger(),
+                                                "terminal event {} detected at the beginning of an isolating interval "
+                                                "is subject to cooldown, ignoring",
+                                                i);
                             skip_event = true;
                         }
                     }
@@ -657,7 +718,15 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 
                     // Finally we add tmp1 and tmp2 to the working list.
                     const auto mid = (lb + ub) / 2;
-                    wl.emplace_back(lb, mid, std::move(tmp1));
+                    // NOTE: don't add the lower range if it falls
+                    // entirely within the cooldown range.
+                    if (lb_offset < mid) {
+                        wl.emplace_back(lb, mid, std::move(tmp1));
+                    } else {
+                        SPDLOG_LOGGER_DEBUG(
+                            get_logger(),
+                            "ignoring lower interval in a bisection that would fall entirely in the cooldown period");
+                    }
                     wl.emplace_back(mid, ub, std::move(tmp2));
                 }
 
@@ -709,16 +778,14 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
                     // NOTE: if we are dealing with a terminal event
                     // subject to cooldown, we need to ensure that
                     // we don't look for roots before the cooldown has expired.
-                    if (te_has_cooldown && std::get<0>(*cooldown) == i && lb * h < std::get<1>(*cooldown)) {
+                    if (lb < lb_offset) {
                         // Make sure we move lb past the cooldown.
-                        lb = std::get<1>(*cooldown) / h;
+                        lb = lb_offset;
 
-                        // Check if the interval is now invalid.
-                        if (lb >= ub) {
-                            SPDLOG_LOGGER_DEBUG(get_logger(),
-                                                "terminal event {} is subject to cooldown, ignoring (lb >= ub)", i);
-                            continue;
-                        }
+                        // NOTE: this should be ensured by the fact that
+                        // we ensure above (lb_offset < mid) that we don't
+                        // end up with an invalid interval.
+                        assert(lb < ub);
 
                         // Check if the interval still contains a zero.
                         const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
@@ -764,36 +831,37 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T>> &d_tes,
 } // namespace
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
                           const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
-                          const std::optional<std::tuple<std::uint32_t, double>> &cooldown, double h,
+                          const std::vector<std::optional<std::pair<double, double>>> &cooldowns, double h,
                           const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
 }
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
-                          const std::optional<std::tuple<std::uint32_t, long double>> &cooldown, long double h,
-                          const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                          const std::vector<std::optional<std::pair<long double, long double>>> &cooldowns,
+                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
                           const std::vector<nt_event<mppp::real128>> &ntes,
-                          const std::optional<std::tuple<std::uint32_t, mppp::real128>> &cooldown, mppp::real128 h,
-                          const std::vector<mppp::real128> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                          const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &cooldowns,
+                          mppp::real128 h, const std::vector<mppp::real128> &ev_jet, std::uint32_t order,
+                          std::uint32_t dim)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldown, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
 }
 
 #endif

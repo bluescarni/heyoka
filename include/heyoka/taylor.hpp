@@ -472,7 +472,7 @@ template <typename T>
 class HEYOKA_DLL_PUBLIC t_event
 {
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
+    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, bool)>;
 
 private:
     void finalise_ctor(callback_t, T, event_direction);
@@ -602,10 +602,13 @@ private:
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
-    std::vector<std::tuple<std::uint32_t, T>> m_d_tes;
-    // An optional to store the index of the last detected
-    // event and its associated cooldown value.
-    std::optional<std::tuple<std::uint32_t, T>> m_te_cooldown;
+    std::vector<std::tuple<std::uint32_t, T, bool>> m_d_tes;
+    // The vector of cooldowns for the terminal events.
+    // If an event is on cooldown, the corresponding optional
+    // in this vector will contain the total time elapsed
+    // since the cooldown started and the absolute value
+    // of the cooldown duration.
+    std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
 
@@ -746,6 +749,8 @@ public:
         return m_d_out;
     }
     const std::vector<T> &update_d_output(T);
+
+    void reset_cooldowns();
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);

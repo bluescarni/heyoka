@@ -79,7 +79,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, double) {});
+        kw::callback = [](taylor_adaptive<double> &, double, bool) {});
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -88,7 +88,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, double) {}, kw::cooldown = -5);
+        kw::callback = [](taylor_adaptive<double> &, double, bool) {}, kw::cooldown = -5);
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -97,7 +97,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, double) {}, kw::cooldown = 1);
+        kw::callback = [](taylor_adaptive<double> &, double, bool) {}, kw::cooldown = 1);
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
@@ -107,20 +107,22 @@ TEST_CASE("taylor te")
     // Failure modes.
     REQUIRE_THROWS_MATCHES(ev_t(
                                v * v - 1e-10, kw::direction = event_direction::negative,
-                               kw::callback = [](taylor_adaptive<double> &, double) {},
+                               kw::callback = [](taylor_adaptive<double> &, double, bool) {},
                                kw::cooldown = std::numeric_limits<double>::quiet_NaN()),
                            std::invalid_argument,
                            Message("Cannot set a non-finite cooldown value for a terminal event"));
     REQUIRE_THROWS_MATCHES(ev_t(
                                v * v - 1e-10, kw::direction = event_direction{50},
-                               kw::callback = [](taylor_adaptive<double> &, double) {}),
+                               kw::callback = [](taylor_adaptive<double> &, double, bool) {}),
                            std::invalid_argument,
                            Message("Invalid value selected for the direction of a terminal event"));
 }
 
-TEST_CASE("taylor te multizero")
+TEST_CASE("taylor te basic")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
         using fp_t = decltype(fp_x);
 
         auto [x, v] = make_vars("x", "v");
@@ -128,8 +130,8 @@ TEST_CASE("taylor te multizero")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
         using nt_ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
-        auto counter = 0u;
-        fp_t cur_time(0);
+        auto counter_nt = 0u, counter_t = 0u;
+        fp_t cur_time_nt(0), cur_time_t(0);
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -138,22 +140,32 @@ TEST_CASE("taylor te multizero")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t) {
-                                         using std::abs;
-
+                                     [&counter_nt, &cur_time_nt](taylor_adaptive<fp_t> &ta, fp_t t) {
                                          // Make sure the callbacks are called in order.
-                                         REQUIRE(t > cur_time);
+                                         REQUIRE(t > cur_time_nt);
 
                                          ta.update_d_output(t);
 
                                          const auto v = ta.get_d_output()[1];
                                          REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
-                                         ++counter;
+                                         ++counter_nt;
 
-                                         cur_time = t;
+                                         cur_time_nt = t;
                                      })},
-            kw::t_events = {t_ev_t(v)}};
+            kw::t_events = {t_ev_t(
+                v, kw::callback = [&counter_t, &cur_time_t](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
+                    REQUIRE(t > cur_time_t);
+
+                    ta.update_d_output(t);
+
+                    const auto v = ta.get_d_output()[1];
+                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+
+                    ++counter_t;
+
+                    cur_time_t = t;
+                })}};
 
         taylor_outcome oc;
         while (true) {
@@ -165,6 +177,9 @@ TEST_CASE("taylor te multizero")
         }
 
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() < 1);
+        REQUIRE(counter_nt == 1u);
+        REQUIRE(counter_t == 1u);
 
         while (true) {
             oc = std::get<0>(ta.step());
@@ -173,6 +188,11 @@ TEST_CASE("taylor te multizero")
             }
             REQUIRE(oc == taylor_outcome::success);
         }
+
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() > 1);
+        REQUIRE(counter_nt == 3u);
+        REQUIRE(counter_t == 2u);
     };
 
     for (auto cm : {false, true}) {

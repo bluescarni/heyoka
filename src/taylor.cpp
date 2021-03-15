@@ -2984,6 +2984,9 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
         m_ev_jet.resize((m_dim + (n_tes + n_ntes)) * (m_order + 1u));
     }
+
+    // Setup the vector of cooldowns.
+    m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
 }
 
 template <typename T>
@@ -2991,7 +2994,7 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldown(other.m_te_cooldown)
+      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
 {
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3079,7 +3082,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldown, h, m_ev_jet, m_order, m_dim);
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -3100,11 +3103,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
-        // to update the value of h. If we don't,
-        // we need to reset m_te_cooldown.
-        if (m_d_tes.empty()) {
-            m_te_cooldown.reset();
-        } else {
+        // to update the value of h.
+        if (!m_d_tes.empty()) {
             h = std::get<1>(m_d_tes[0]);
         }
 
@@ -3131,11 +3131,30 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // end of the timestep.
         if (!isfinite(m_time)
             || std::any_of(m_state.cbegin(), m_state.cend(), [](const auto &x) { return !isfinite(x); })) {
-            // Let's also reset the cooldown value, as at this point
-            // it has become useless.
-            m_te_cooldown.reset();
+            // Let's also reset the cooldown values, as at this point
+            // they have become useless.
+            reset_cooldowns();
 
             return std::tuple{taylor_outcome::err_nf_state, h};
+        }
+
+        // Update the cooldowns.
+        for (auto &cd : m_te_cooldowns) {
+            if (cd) {
+                // Check if the timestep we just took
+                // brought this event outside the cooldown.
+                auto tmp = cd->first + h;
+
+                if (abs(tmp) >= cd->second) {
+                    // We are now outside the cooldown period
+                    // for this event, reset cd.
+                    cd.reset();
+                } else {
+                    // Still in cooldown, update the
+                    // time spent in cooldown.
+                    cd->first = tmp;
+                }
+            }
         }
 
         if (!m_d_tes.empty()) {
@@ -3144,22 +3163,22 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             assert(te_idx < m_tes.size());
             const auto &te = m_tes[te_idx];
 
-            // Update the cooldown.
+            // Set the corresponding cooldown.
             if (te.get_cooldown() >= 0) {
                 // Cooldown explicitly provided by the user, use it.
-                m_te_cooldown.emplace(te_idx, te.get_cooldown());
+                m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
                 // NOTE: the idea here is that event detection
                 // yielded an event time accurate to about 4*eps
                 // relative to the timestep size. Thus, we use as
                 // cooldown time a small multiple of that accuracy.
-                m_te_cooldown.emplace(te_idx, abs(h) * (12 * std::numeric_limits<T>::epsilon()));
+                m_te_cooldowns[te_idx].emplace(0, abs(h) * (12 * std::numeric_limits<T>::epsilon()));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te.get_callback()(*this, m_time - (m_last_h - h));
+                te.get_callback()(*this, m_time - (m_last_h - h), std::get<2>(m_d_tes[0]));
             }
         }
 
@@ -3205,6 +3224,15 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool 
     }
 
     return step_impl(max_delta_t, wtc);
+}
+
+// Reset all cooldowns for the terminal events.
+template <typename T>
+void taylor_adaptive_impl<T>::reset_cooldowns()
+{
+    for (auto &cd : m_te_cooldowns) {
+        cd.reset();
+    }
 }
 
 template <typename T>
