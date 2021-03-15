@@ -503,6 +503,9 @@ template <typename T>
 struct is_terminal_event<t_event<T>> : std::true_type {
 };
 
+template <typename T>
+constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
+
 // Implementation of event detection.
 template <typename T>
 void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &d_tes,
@@ -540,7 +543,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     // 'base_jet_idx' an index for reading the event polynomials
     // from ev_jet.
     auto run_detection = [&](auto &out, const auto &ev_vec) {
-        // Check if we are doing detection of terminal events.
+        // Fetch the event type.
         using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
@@ -553,7 +556,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
             // Extract the pointer to the Taylor polynomial for the
             // current event.
             const auto ptr
-                = ev_jet.data() + (i + dim + (is_terminal_event<ev_type>::value ? 0u : tes.size())) * (order + 1u);
+                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be already rescaled
@@ -570,7 +573,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
                 // TODO multiroot in cooldown detection.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
-                    if constexpr (is_terminal_event<ev_type>::value) {
+                    if constexpr (is_terminal_event_v<ev_type>) {
                         return false;
                     } else {
                         return false;
@@ -583,7 +586,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
-                    if constexpr (is_terminal_event<ev_type>::value) {
+                    if constexpr (is_terminal_event_v<ev_type>) {
                         out.emplace_back(i, root, has_multi_roots);
                     } else {
                         out.emplace_back(i, root);
@@ -596,7 +599,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
                     if ((der >= 0 && dir == event_direction::positive)
                         || (der <= 0 && dir == event_direction::negative)) {
-                        if constexpr (is_terminal_event<ev_type>::value) {
+                        if constexpr (is_terminal_event_v<ev_type>) {
                             out.emplace_back(i, root, has_multi_roots);
                         } else {
                             out.emplace_back(i, root);
@@ -610,7 +613,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
             // lb_offset is the value in the original [0, 1) range corresponding
             // to the end of the cooldown.
             const auto lb_offset = [&]() {
-                if constexpr (is_terminal_event<ev_type>::value) {
+                if constexpr (is_terminal_event_v<ev_type>) {
                     if (cooldowns[i]) {
                         using std::abs;
 
@@ -675,7 +678,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.
                     bool skip_event = false;
-                    if constexpr (is_terminal_event<ev_type>::value) {
+                    if constexpr (is_terminal_event_v<ev_type>) {
                         if (lb < lb_offset) {
                             SPDLOG_LOGGER_DEBUG(get_logger(),
                                                 "terminal event {} detected at the beginning of an isolating interval "
@@ -774,7 +777,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
             // Run the root finding in the isolating intervals.
             for (auto &[lb, ub] : isol) {
-                if constexpr (is_terminal_event<ev_type>::value) {
+                if constexpr (is_terminal_event_v<ev_type>) {
                     // NOTE: if we are dealing with a terminal event
                     // subject to cooldown, we need to ensure that
                     // we don't look for roots before the cooldown has expired.
