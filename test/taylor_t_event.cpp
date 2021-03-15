@@ -24,10 +24,12 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "spdlog_oss.hpp"
 #include "test_utils.hpp"
 
 using namespace heyoka;
@@ -283,11 +285,84 @@ TEST_CASE("taylor te identical")
             REQUIRE(time == approximately(ta.get_time()));
             REQUIRE((second_ev == 0u || second_ev == 1u));
             REQUIRE(second_ev != first_ev);
+
+            // Both events should be in cooldown: taking a step
+            // backwards should not run into another event.
+            oc = std::get<0>(ta.step_backward());
+            REQUIRE(oc == taylor_outcome::success);
         } else {
             REQUIRE(oc == taylor_outcome::success);
         }
+    };
 
-        //
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+TEST_CASE("taylor te close")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        t_ev_t ev1(
+            x, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+        t_ev_t ev2(
+            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+
+        auto ta = taylor_adaptive<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.1), fp_t(0.25)},         kw::opt_level = opt_level,
+            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev1, ev2}};
+
+        taylor_outcome oc;
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        // The second event must have triggered first.
+        REQUIRE(static_cast<std::uint32_t>(oc) == 1u);
+
+        // Next step the first event must trigger.
+        oc = std::get<0>(ta.step());
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+
+        // Next step no event must trigger: event 0 is now on cooldown
+        // as it just happened, and event 1 is still close enough to be
+        // on cooldown too.
+        oc = std::get<0>(ta.step());
+        REQUIRE(oc == taylor_outcome::success);
+
+        // Go back.
+        while (true) {
+            oc = std::get<0>(ta.step_backward());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+
+        oc = std::get<0>(ta.step_backward());
+        REQUIRE(static_cast<std::uint32_t>(oc) == 1u);
+
+        oc = std::get<0>(ta.step());
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
     };
 
     for (auto cm : {false, true}) {

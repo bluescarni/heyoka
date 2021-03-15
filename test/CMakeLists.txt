@@ -2,7 +2,7 @@
 find_package(xtensor REQUIRED CONFIG)
 find_package(xtensor-blas REQUIRED CONFIG)
 
-add_library(heyoka_test STATIC catch_main.cpp)
+add_library(heyoka_test STATIC catch_main.cpp spdlog_oss.cpp)
 target_compile_options(heyoka_test PRIVATE
   "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
   "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
@@ -13,6 +13,7 @@ target_compile_options(heyoka_test PRIVATE
 # Setup the C++ standard.
 target_compile_features(heyoka_test PRIVATE cxx_std_17)
 set_property(TARGET heyoka_test PROPERTY CXX_EXTENSIONS NO)
+target_link_libraries(heyoka_test PRIVATE spdlog::spdlog)
 
 function(ADD_HEYOKA_TESTCASE arg1)
   add_executable(${arg1} ${arg1}.cpp)
