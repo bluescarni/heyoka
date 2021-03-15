@@ -242,3 +242,60 @@ TEST_CASE("taylor te basic")
         }
     }
 }
+
+TEST_CASE("taylor te identical")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        t_ev_t ev(
+            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+
+        auto ta = taylor_adaptive<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.), fp_t(0.25)},          kw::opt_level = opt_level,
+            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev, ev}};
+
+        taylor_outcome oc;
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        // One of the two events must always be detected.
+        auto first_ev = static_cast<std::uint32_t>(oc);
+        auto time = ta.get_time();
+        REQUIRE((first_ev == 0u || first_ev == 1u));
+
+        // Taking a further step, we might either detect the second event,
+        // or it may end up being ignored due to numerics.
+        oc = std::get<0>(ta.step());
+        if (oc > taylor_outcome::success) {
+            auto second_ev = static_cast<std::uint32_t>(oc);
+            REQUIRE(time == approximately(ta.get_time()));
+            REQUIRE((second_ev == 0u || second_ev == 1u));
+            REQUIRE(second_ev != first_ev);
+        } else {
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        //
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
