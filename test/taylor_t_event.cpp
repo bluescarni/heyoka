@@ -132,6 +132,7 @@ TEST_CASE("taylor te basic")
 
         auto counter_nt = 0u, counter_t = 0u;
         fp_t cur_time(0);
+        bool direction = true;
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -140,9 +141,13 @@ TEST_CASE("taylor te basic")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t) {
+                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t) {
                                          // Make sure the callbacks are called in order.
-                                         REQUIRE(t > cur_time);
+                                         if (direction) {
+                                             REQUIRE(t > cur_time);
+                                         } else {
+                                             REQUIRE(t < cur_time);
+                                         }
 
                                          ta.update_d_output(t);
 
@@ -154,8 +159,12 @@ TEST_CASE("taylor te basic")
                                          cur_time = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
-                    REQUIRE(t > cur_time);
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
+                    if (direction) {
+                        REQUIRE(t > cur_time);
+                    } else {
+                        REQUIRE(t < cur_time);
+                    }
 
                     ta.update_d_output(t);
 
@@ -193,6 +202,35 @@ TEST_CASE("taylor te basic")
         REQUIRE(ta.get_time() > 1);
         REQUIRE(counter_nt == 3u);
         REQUIRE(counter_t == 2u);
+
+        // Move backwards.
+        direction = false;
+
+        while (true) {
+            oc = std::get<0>(ta.step_backward());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() < 1);
+        REQUIRE(counter_nt == 5u);
+        REQUIRE(counter_t == 3u);
+
+        while (true) {
+            oc = std::get<0>(ta.step_backward());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() < 0);
+        REQUIRE(counter_nt == 7u);
+        REQUIRE(counter_t == 4u);
     };
 
     for (auto cm : {false, true}) {
