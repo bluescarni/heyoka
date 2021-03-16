@@ -564,7 +564,7 @@ TEST_CASE("taylor te custom cooldown")
     }
 }
 
-TEST_CASE("taylor te propagate")
+TEST_CASE("taylor te propagate_for")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using std::abs;
@@ -600,6 +600,62 @@ TEST_CASE("taylor te propagate")
             kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev1}};
 
         oc = std::get<0>(ta.propagate_for(fp_t(100)));
+        REQUIRE(oc > taylor_outcome::success);
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() < 0.502);
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+TEST_CASE("taylor te propagate_grid")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        auto counter = 0u;
+
+        t_ev_t ev(
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, fp_t, bool mr) {
+                ++counter;
+                REQUIRE(!mr);
+            });
+
+        auto ta = taylor_adaptive<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
+            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev}};
+
+        std::vector<fp_t> grid;
+        for (auto i = 0; i < 101; ++i) {
+            grid.emplace_back(i);
+        }
+
+        auto oc = std::get<0>(ta.propagate_grid(grid));
+        REQUIRE(oc == taylor_outcome::success);
+        REQUIRE(ta.get_time() >= 100);
+
+        REQUIRE(counter == 100u);
+
+        t_ev_t ev1(v);
+
+        ta = taylor_adaptive<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
+            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev1}};
+
+        oc = std::get<0>(ta.propagate_grid(grid));
         REQUIRE(oc > taylor_outcome::success);
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
         REQUIRE(ta.get_time() < 0.502);
