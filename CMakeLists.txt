@@ -161,6 +161,8 @@ endif()
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
@@ -171,6 +173,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
@@ -194,7 +197,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
     # NOTE: sleef.cpp needs to be compiled even if we are not
     # building with sleef support on.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
@@ -310,6 +313,10 @@ endif()
 find_package(fmt REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE fmt::fmt)
 
+# Mandatory dependency on spdlog.
+find_package(spdlog REQUIRED CONFIG)
+target_link_libraries(heyoka PRIVATE spdlog::spdlog)
+
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED)
 
@@ -327,6 +334,16 @@ if(HEYOKA_WITH_MPPP)
         message(FATAL_ERROR "mp++ >= ${_HEYOKA_MIN_MPPP_VERSION} is required.")
     endif()
     target_link_libraries(heyoka PUBLIC mp++::mp++)
+endif()
+
+if(YACMA_COMPILER_IS_GNUCXX AND HEYOKA_WITH_MPPP AND mp++_WITH_QUADMATH)
+    # NOTE: this hack is needed because we need to use Boost's float128 wrapper
+    # for event detection, and that requires the extended literals provided
+    # by GCC. Supposedly the "-fext-numeric-literals" should also be enough,
+    # but alas it does not seem to work.
+    # Down the line perhaps we should try to adapt mp++ so that we can use
+    # real128 directly.
+    set_property(SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp" PROPERTY COMPILE_FLAGS -std=gnu++17)
 endif()
 
 # Optional dependency on SLEEF.

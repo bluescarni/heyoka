@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Initial version of the event detection system
+  (`#107 <https://github.com/bluescarni/heyoka/pull/107>`__).
 - Add a tutorial chapter for batch mode
   (`#106 <https://github.com/bluescarni/heyoka/pull/106>`__).
 - Add a couple of utilities to detect the presence of the time

@@ -202,15 +202,14 @@ struct llvm_state::jit {
 
         // Setup the machinery to cache the module's binary code
         // when it is lazily generated.
-        m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer)
-                                                         -> llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> {
+        m_lljit->getObjTransformLayer().setTransform([this](std::unique_ptr<llvm::MemoryBuffer> obj_buffer) {
             assert(obj_buffer);
             assert(!m_object_file);
 
             // Copy obj_buffer to the local m_object_file member.
             m_object_file.emplace(obj_buffer->getBufferStart(), obj_buffer->getBufferEnd());
 
-            return obj_buffer;
+            return llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>(std::move(obj_buffer));
         });
 
         // Setup the jit so that it can look up symbols from the current process.
