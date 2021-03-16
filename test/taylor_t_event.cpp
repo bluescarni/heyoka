@@ -488,6 +488,10 @@ TEST_CASE("taylor te dir")
                                    kw::compact_mode = compact_mode,
                                    kw::t_events = {ev1}};
 
+        // Check that zero timestep does not detect anything.
+        oc = std::get<0>(ta.step(fp_t(0)));
+        REQUIRE(oc == taylor_outcome::time_limit);
+
         // Now it must trigger immediately.
         oc = std::get<0>(ta.step());
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);

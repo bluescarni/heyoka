@@ -516,9 +516,14 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 {
     using std::isfinite;
 
-    if (!isfinite(h) || h == 0) {
+    if (!isfinite(h)) {
         get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
 
+        return;
+    }
+
+    if (h == 0) {
+        // If the timestep is zero, skip event detection.
         return;
     }
 
@@ -539,9 +544,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
-    // events, 'ev_vec' the input vector of events to detect,
-    // 'base_jet_idx' an index for reading the event polynomials
-    // from ev_jet.
+    // events, 'ev_vec' the input vector of events to detect.
     auto run_detection = [&](auto &out, const auto &ev_vec) {
         // Fetch the event type.
         using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
