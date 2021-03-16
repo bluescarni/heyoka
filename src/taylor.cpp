@@ -3280,8 +3280,15 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
             // Something went wrong in the propagation of the timestep, or we reached
-            // a terminal event. Exit.
-            return std::tuple{res, min_h, max_h, step_counter};
+            // a terminal event. If we reached a terminal event with a callback,
+            // we will continue.
+            assert(res < taylor_outcome::success || static_cast<std::uint32_t>(res) < m_tes.size());
+            const bool resume
+                = (res > taylor_outcome::success) && m_tes[static_cast<std::uint32_t>(res)].get_callback();
+
+            if (!resume) {
+                return std::tuple{res, min_h, max_h, step_counter};
+            }
         }
 
         // Update the number of iterations.
