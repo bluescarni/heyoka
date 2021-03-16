@@ -159,7 +159,9 @@ TEST_CASE("taylor te basic")
                                          cur_time = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, bool) {
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
+                    REQUIRE(!mr);
+
                     if (direction) {
                         REQUIRE(t > cur_time);
                     } else {
@@ -315,7 +317,8 @@ TEST_CASE("taylor te close")
 
         t_ev_t ev1(x);
         t_ev_t ev2(
-            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+            x - std::numeric_limits<fp_t>::epsilon() * 2,
+            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); });
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.1), fp_t(0.25)},         kw::opt_level = opt_level,
@@ -438,7 +441,8 @@ TEST_CASE("taylor te dir")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
         t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {}, kw::direction = event_direction::positive);
+            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); },
+            kw::direction = event_direction::positive);
 
         auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                         {fp_t(1), fp_t(0)},
@@ -475,7 +479,8 @@ TEST_CASE("taylor te dir")
 
         // Other direction.
         auto ev1 = t_ev_t(
-            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {}, kw::direction = event_direction::negative);
+            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); },
+            kw::direction = event_direction::negative);
 
         ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                    {fp_t(1), fp_t(0)},
@@ -506,6 +511,47 @@ TEST_CASE("taylor te dir")
         }
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
         REQUIRE(ta.get_state()[0] == approximately(fp_t(1)));
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
+TEST_CASE("taylor te custom cooldown")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using std::abs;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        t_ev_t ev(
+            v * v - std::numeric_limits<fp_t>::epsilon() * 4,
+            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(mr); }, kw::cooldown = fp_t(1e-1));
+
+        auto ta = taylor_adaptive<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
+            kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev}};
+
+        // Step until trigger.
+        taylor_outcome oc;
+        while (true) {
+            oc = std::get<0>(ta.step());
+            if (oc > taylor_outcome::success) {
+                break;
+            }
+            REQUIRE(oc == taylor_outcome::success);
+        }
+        REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
     };
 
     for (auto cm : {false, true}) {

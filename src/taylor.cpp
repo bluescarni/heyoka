@@ -3177,18 +3177,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                // NOTE: the idea here is that event detection
-                // yielded an event time accurate to about 4*eps
-                // relative to the timestep size. Thus, we use as
-                // cooldown time a small multiple of that accuracy.
-
-                const auto abs_h = abs(h);
-                constexpr auto delta = 12 * std::numeric_limits<T>::epsilon();
-
-                // NOTE: in order to avoid issues with small timesteps
-                // or zero timestep, we use delta as a relative value
-                // if abs_h >= 1, absolute otherwise.
-                m_te_cooldowns[te_idx].emplace(0, abs_h >= 1 ? (abs_h * delta) : delta);
+                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(h));
             }
 
             // Invoke the callback of the first terminal event, if it has one.

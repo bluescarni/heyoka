@@ -574,10 +574,22 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     return;
                 }
 
-                // TODO multiroot in cooldown detection.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
                     if constexpr (is_terminal_event_v<ev_type>) {
-                        return false;
+                        // Establish the cooldown time.
+                        // NOTE: this is the same logic that is
+                        // employed in taylor.cpp to assign a cooldown
+                        // to a detected terminal event.
+                        const auto cd
+                            = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown() : taylor_deduce_cooldown(h);
+
+                        // Evaluate the polynomial at the cooldown boundaries.
+                        const auto e1 = poly_eval(ptr, root + cd, order);
+                        const auto e2 = poly_eval(ptr, root - cd, order);
+
+                        // We detect multiple roots within the cooldown
+                        // if the signs of e1 and e2 are equal.
+                        return (e1 > 0) == (e2 > 0);
                     } else {
                         return false;
                     }
@@ -865,6 +877,54 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, b
                           std::uint32_t dim)
 {
     taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
+}
+
+#endif
+
+namespace
+{
+
+// Helper to automatically deduce the cooldown
+// for a terminal event which was detected within
+// a timestep of size h.
+// NOTE: the idea here is that event detection
+// yielded an event time accurate to about 4*eps
+// relative to the timestep size. Thus, we use as
+// cooldown time a small multiple of that accuracy.
+template <typename T>
+T taylor_deduce_cooldown_impl(T h)
+{
+    using std::abs;
+
+    const auto abs_h = abs(h);
+    constexpr auto delta = 12 * std::numeric_limits<T>::epsilon();
+
+    // NOTE: in order to avoid issues with small timesteps
+    // or zero timestep, we use delta as a relative value
+    // if abs_h >= 1, absolute otherwise.
+    return abs_h >= 1 ? (abs_h * delta) : delta;
+}
+
+} // namespace
+
+template <>
+double taylor_deduce_cooldown(double h)
+{
+    return taylor_deduce_cooldown_impl(h);
+}
+
+template <>
+long double taylor_deduce_cooldown(long double h)
+{
+    return taylor_deduce_cooldown_impl(h);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+mppp::real128 taylor_deduce_cooldown(mppp::real128 h)
+{
+    return taylor_deduce_cooldown_impl(h);
 }
 
 #endif

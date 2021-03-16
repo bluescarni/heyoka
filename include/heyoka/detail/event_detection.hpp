@@ -30,6 +30,25 @@ namespace heyoka::detail
 {
 
 template <typename T>
+inline T taylor_deduce_cooldown(T)
+{
+    static_assert(always_false_v<T>, "Unhandled type");
+}
+
+template <>
+double taylor_deduce_cooldown(double);
+
+template <>
+long double taylor_deduce_cooldown(long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+mppp::real128 taylor_deduce_cooldown(mppp::real128);
+
+#endif
+
+template <typename T>
 void taylor_detect_events(std::vector<std::tuple<std::uint32_t, T, bool>> &,
                           std::vector<std::tuple<std::uint32_t, T>> &, const std::vector<t_event<T>> &,
                           const std::vector<nt_event<T>> &, const std::vector<std::optional<std::pair<T, T>>> &, T,
