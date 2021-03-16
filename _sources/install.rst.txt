@@ -18,7 +18,8 @@ heyoka has the following **mandatory** dependencies:
 
 * the `LLVM <https://llvm.org/>`__ compiler infrastructure library, version 10 or 11,
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >= 1.60),
-* the `{fmt} <https://fmt.dev/latest/index.html>`__ library.
+* the `{fmt} <https://fmt.dev/latest/index.html>`__ library,
+* the `spdlog <https://github.com/gabime/spdlog>`__ library.
 
 Additionally, heyoka has the following **optional** dependencies:
 
@@ -142,7 +143,8 @@ Including heyoka in your project via CMake
 
 As a part of the heyoka installation, a group of CMake files is installed into
 ``CMAKE_INSTALL_PREFIX/lib/cmake/heyoka``.
-This bundle, which is known in the CMake lingo as a `config-file package <https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html>`__,
+This bundle, which is known in the CMake lingo as a
+`config-file package <https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html>`__,
 facilitates the detection and use of heyoka from other CMake-based projects.
 heyoka's config-file package, once loaded, provides
 an imported target called ``heyoka::heyoka`` which encapsulates all the information

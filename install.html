@@ -26,7 +26,7 @@
 
     
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="_static/sphinx-book-theme.37f24b989f4638ff9c27c22dc7559d4f.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.e7340bb3dbd8dde6db86f25597f54a1b.css" type="text/css" />
     
   <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
 
@@ -229,7 +229,8 @@
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
         <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i> Contents
+            <i class="fas fa-list"></i>
+            Contents
         </div>
         <nav id="bd-toc-nav">
             <ul class="nav section-nav flex-column">
@@ -307,7 +308,8 @@ a comprehensive continuous integration pipeline, which includes:</p>
 <ul class="simple">
 <li><p>the <a class="reference external" href="https://llvm.org/">LLVM</a> compiler infrastructure library, version 10 or 11,</p></li>
 <li><p>the <a class="reference external" href="https://www.boost.org/">Boost</a> C++ libraries (version &gt;= 1.60),</p></li>
-<li><p>the <a class="reference external" href="https://fmt.dev/latest/index.html">{fmt}</a> library.</p></li>
+<li><p>the <a class="reference external" href="https://fmt.dev/latest/index.html">{fmt}</a> library,</p></li>
+<li><p>the <a class="reference external" href="https://github.com/gabime/spdlog">spdlog</a> library.</p></li>
 </ul>
 <p>Additionally, heyoka has the following <strong>optional</strong> dependencies:</p>
 <ul class="simple">
@@ -412,7 +414,8 @@ DLL (otherwise the tests will fail to run).</p>
 <h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this headline">¶</a></h2>
 <p>As a part of the heyoka installation, a group of CMake files is installed into
 <code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX/lib/cmake/heyoka</span></code>.
-This bundle, which is known in the CMake lingo as a <a class="reference external" href="https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html">config-file package</a>,
+This bundle, which is known in the CMake lingo as a
+<a class="reference external" href="https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html">config-file package</a>,
 facilitates the detection and use of heyoka from other CMake-based projects.
 heyoka’s config-file package, once loaded, provides
 an imported target called <code class="docutils literal notranslate"><span class="pre">heyoka::heyoka</span></code> which encapsulates all the information
