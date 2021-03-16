@@ -254,8 +254,7 @@ TEST_CASE("taylor te identical")
 
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
-        t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+        t_ev_t ev(v);
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.), fp_t(0.25)},          kw::opt_level = opt_level,
@@ -314,8 +313,7 @@ TEST_CASE("taylor te close")
 
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
-        t_ev_t ev1(
-            x, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+        t_ev_t ev1(x);
         t_ev_t ev2(
             x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
 
@@ -386,9 +384,7 @@ TEST_CASE("taylor te retrigger")
 
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
-        t_ev_t ev(
-            x - (1 - std::numeric_limits<fp_t>::epsilon() * 6),
-            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool) {});
+        t_ev_t ev(x - (1 - std::numeric_limits<fp_t>::epsilon() * 6));
 
         auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                         {fp_t(1), fp_t(0)},
