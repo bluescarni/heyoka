@@ -31,10 +31,10 @@ template <typename>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC nt_event;
+class HEYOKA_DLL_PUBLIC nt_event_impl;
 
 template <typename>
-class HEYOKA_DLL_PUBLIC t_event;
+class HEYOKA_DLL_PUBLIC t_event_impl;
 
 } // namespace detail
 
