@@ -413,9 +413,11 @@ TEST_CASE("taylor te retrigger")
         }
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
 
+        auto tm = ta.get_time();
         oc = std::get<0>(ta.step());
 
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
+        REQUIRE(ta.get_time() > tm);
     };
 
     for (auto cm : {false, true}) {
