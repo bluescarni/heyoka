@@ -561,6 +561,8 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<mppp::r
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
 public:
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
@@ -773,46 +775,8 @@ public:
 
 } // namespace detail
 
-using taylor_adaptive_dbl = detail::taylor_adaptive_impl<double>;
-using taylor_adaptive_ldbl = detail::taylor_adaptive_impl<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-using taylor_adaptive_f128 = detail::taylor_adaptive_impl<mppp::real128>;
-
-#endif
-
-namespace detail
-{
-
 template <typename T>
-struct taylor_adaptive_t_impl {
-    static_assert(always_false_v<T>, "Unhandled type.");
-};
-
-template <>
-struct taylor_adaptive_t_impl<double> {
-    using type = taylor_adaptive_dbl;
-};
-
-template <>
-struct taylor_adaptive_t_impl<long double> {
-    using type = taylor_adaptive_ldbl;
-};
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-struct taylor_adaptive_t_impl<mppp::real128> {
-    using type = taylor_adaptive_f128;
-};
-
-#endif
-
-} // namespace detail
-
-template <typename T>
-using taylor_adaptive = typename detail::taylor_adaptive_t_impl<T>::type;
+using taylor_adaptive = detail::taylor_adaptive_impl<T>;
 
 namespace detail
 {
@@ -820,6 +784,8 @@ namespace detail
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
     // The batch size.
     std::uint32_t m_batch_size;
     // State vectors.
@@ -1005,46 +971,8 @@ public:
 
 } // namespace detail
 
-using taylor_adaptive_batch_dbl = detail::taylor_adaptive_batch_impl<double>;
-using taylor_adaptive_batch_ldbl = detail::taylor_adaptive_batch_impl<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-using taylor_adaptive_batch_f128 = detail::taylor_adaptive_batch_impl<mppp::real128>;
-
-#endif
-
-namespace detail
-{
-
 template <typename T>
-struct taylor_adaptive_batch_t_impl {
-    static_assert(always_false_v<T>, "Unhandled type.");
-};
-
-template <>
-struct taylor_adaptive_batch_t_impl<double> {
-    using type = taylor_adaptive_batch_dbl;
-};
-
-template <>
-struct taylor_adaptive_batch_t_impl<long double> {
-    using type = taylor_adaptive_batch_ldbl;
-};
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-struct taylor_adaptive_batch_t_impl<mppp::real128> {
-    using type = taylor_adaptive_batch_f128;
-};
-
-#endif
-
-} // namespace detail
-
-template <typename T>
-using taylor_adaptive_batch = typename detail::taylor_adaptive_batch_t_impl<T>::type;
+using taylor_adaptive_batch = detail::taylor_adaptive_batch_impl<T>;
 
 namespace detail
 {

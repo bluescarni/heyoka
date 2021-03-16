@@ -9,7 +9,15 @@
 #ifndef HEYOKA_DETAIL_TYPE_TRAITS_HPP
 #define HEYOKA_DETAIL_TYPE_TRAITS_HPP
 
+#include <heyoka/config.hpp>
+
 #include <type_traits>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 namespace heyoka::detail
 {
@@ -49,6 +57,30 @@ using detected_t = typename detector<nonesuch, void, Op, Args...>::type;
 
 template <template <class...> class Op, class... Args>
 inline constexpr bool is_detected_v = is_detected<Op, Args...>::value;
+
+// Helper to detect if T is a supported floating-point type.
+template <typename>
+struct is_supported_fp : std::false_type {
+};
+
+template <>
+struct is_supported_fp<double> : std::true_type {
+};
+
+template <>
+struct is_supported_fp<long double> : std::true_type {
+};
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+struct is_supported_fp<mppp::real128> : std::true_type {
+};
+
+#endif
+
+template <typename T>
+inline constexpr bool is_supported_fp_v = is_supported_fp<T>::value;
 
 } // namespace heyoka::detail
 
