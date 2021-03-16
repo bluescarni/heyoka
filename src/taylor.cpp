@@ -791,6 +791,8 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 {
     using namespace fmt::literals;
 
+    assert(sv_funcs.size() == sv_funcs_dc.size());
+
     std::unordered_map<std::string, expression> subs_map;
 
     // For each u variable, expand its definition
@@ -3733,8 +3735,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     if (m_state.size() / m_batch_size != sys.size()) {
         throw std::invalid_argument(
             "Inconsistent sizes detected in the initialization of an adaptive Taylor "
-            "integrator: the state vector has a dimension of {}, while the number of equations is {}"_format(
-                m_state.size() / m_batch_size, sys.size()));
+            "integrator: the state vector has a dimension of {} and a batch size of {}, "
+            "while the number of equations is {}"_format(m_state.size() / m_batch_size, m_batch_size, sys.size()));
     }
 
     if (m_time.size() != m_batch_size) {
