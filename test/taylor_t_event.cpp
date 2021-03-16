@@ -643,7 +643,12 @@ TEST_CASE("taylor te propagate_grid")
             grid.emplace_back(i);
         }
 
-        auto oc = std::get<0>(ta.propagate_grid(grid));
+        taylor_outcome oc;
+        {
+            auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+            oc = oc_;
+            REQUIRE(out.size() == 202u);
+        }
         REQUIRE(oc == taylor_outcome::success);
         REQUIRE(ta.get_time() >= 100);
 
@@ -655,7 +660,11 @@ TEST_CASE("taylor te propagate_grid")
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
             kw::high_accuracy = high_accuracy,        kw::compact_mode = compact_mode, kw::t_events = {ev1}};
 
-        oc = std::get<0>(ta.propagate_grid(grid));
+        {
+            auto [oc_, _1, _2, _3, out] = ta.propagate_grid(grid);
+            oc = oc_;
+            REQUIRE(out.size() == 2u);
+        }
         REQUIRE(oc > taylor_outcome::success);
         REQUIRE(static_cast<std::uint32_t>(oc) == 0u);
         REQUIRE(ta.get_time() < 0.502);
