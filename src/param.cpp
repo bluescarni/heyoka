@@ -63,7 +63,7 @@ std::ostream &operator<<(std::ostream &os, const param &p)
 {
     using namespace fmt::literals;
 
-    return os << "par[{}]"_format(p.idx());
+    return os << "p{}"_format(p.idx());
 }
 
 std::vector<std::string> get_variables(const param &)

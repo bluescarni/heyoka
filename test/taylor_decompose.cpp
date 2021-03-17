@@ -102,7 +102,7 @@ TEST_CASE("decompose sys")
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{{par[0], x}}, {}), std::invalid_argument,
                            Message("Error in the Taylor decomposition of a system of equations: the "
-                                   "left-hand side contains the expression 'par[0]', which is not a variable"));
+                                   "left-hand side contains the expression 'p0', which is not a variable"));
 
     REQUIRE_THROWS_MATCHES(taylor_decompose(sys_t{prime(x) = y}, {}), std::invalid_argument,
                            Message("Error in the Taylor decomposition of a system of equations: the variable 'y' "
