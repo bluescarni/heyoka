@@ -258,6 +258,30 @@ HEYOKA_DLL_PUBLIC expression pairwise_sum(std::vector<expression>);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const expression &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> & = {});
+HEYOKA_DLL_PUBLIC long double eval_ldbl(const expression &, const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> & = {});
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const expression &, const std::unordered_map<std::string, mppp::real128> &,
+                                          const std::vector<mppp::real128> & = {});
+
+#endif
+
+template <typename T>
+inline T eval(const expression &e, const std::unordered_map<std::string, T> &map, const std::vector<T> &pars = {})
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return eval_dbl(e, map, pars);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return eval_ldbl(e, map, pars);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return eval_f128(e, map, pars);
+#endif
+    } else {
+        static_assert(detail::always_false_v<T>, "Unhandled type.");
+    }
+}
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const expression &,
                                       const std::unordered_map<std::string, std::vector<double>> &,

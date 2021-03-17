@@ -85,6 +85,13 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual expression diff(const std::string &) const = 0;
 
     virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
+    virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
+                                  const std::vector<long double> &) const = 0;
+#if defined(HEYOKA_HAVE_REAL128)
+    virtual mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                                    const std::vector<mppp::real128> &) const = 0;
+#endif
+
     virtual void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                                 const std::vector<double> &) const = 0;
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
@@ -360,6 +367,24 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("double eval is not implemented for the function '" + get_name() + "'");
         }
     }
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &m, const std::vector<long double> &pars) const final
+    {
+        if constexpr (func_has_eval_dbl_v<T>) {
+            return m_value.eval_ldbl(m, pars);
+        } else {
+            throw not_implemented_error("long double eval is not implemented for the function '" + get_name() + "'");
+        }
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m, const std::vector< mppp::real128> &pars) const final
+    {
+        if constexpr (func_has_eval_dbl_v<T>) {
+            return m_value.eval_f128(m, pars);
+        } else {
+            throw not_implemented_error("mppp::real128 eval is not implemented for the function '" + get_name() + "'");
+        }
+    }
+#endif
     void eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
                         const std::vector<double> &pars) const final
     {
@@ -547,6 +572,11 @@ public:
     expression diff(const std::string &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &, const std::vector<mppp::real128> &) const;
+#endif
+
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                         const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;
@@ -586,6 +616,13 @@ HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
+HEYOKA_DLL_PUBLIC long double eval_ldbl(const func &, const std::unordered_map<std::string, long double> &,
+                                  const std::vector<long double> &);
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const func &, const std::unordered_map<std::string, mppp::real128> &,
+                                  const std::vector<mppp::real128> &);
+#endif
+
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const func &,
                                       const std::unordered_map<std::string, std::vector<double>> &,
                                       const std::vector<double> &);

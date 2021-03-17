@@ -42,6 +42,13 @@ public:
     expression diff(const std::string &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                            const std::vector<mppp::real128> &) const;
+#endif
+
+
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                         const std::vector<double> &) const;
     double eval_num_dbl(const std::vector<double> &) const;

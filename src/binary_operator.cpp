@@ -225,6 +225,38 @@ double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string,
     }
 }
 
+long double eval_ldbl(const binary_operator &bo, const std::unordered_map<std::string, long double> &map,
+                      const std::vector<long double> &pars)
+{
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return eval_ldbl(bo.lhs(), map, pars) + eval_ldbl(bo.rhs(), map, pars);
+        case binary_operator::type::sub:
+            return eval_ldbl(bo.lhs(), map, pars) - eval_ldbl(bo.rhs(), map, pars);
+        case binary_operator::type::mul:
+            return eval_ldbl(bo.lhs(), map, pars) * eval_ldbl(bo.rhs(), map, pars);
+        default:
+            return eval_ldbl(bo.lhs(), map, pars) / eval_ldbl(bo.rhs(), map, pars);
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const binary_operator &bo, const std::unordered_map<std::string, mppp::real128> &map,
+                        const std::vector<mppp::real128> &pars)
+{
+    switch (bo.op()) {
+        case binary_operator::type::add:
+            return eval_f128(bo.lhs(), map, pars) + eval_f128(bo.rhs(), map, pars);
+        case binary_operator::type::sub:
+            return eval_f128(bo.lhs(), map, pars) - eval_f128(bo.rhs(), map, pars);
+        case binary_operator::type::mul:
+            return eval_f128(bo.lhs(), map, pars) * eval_f128(bo.rhs(), map, pars);
+        default:
+            return eval_f128(bo.lhs(), map, pars) / eval_f128(bo.rhs(), map, pars);
+    }
+}
+#endif
+
 void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {

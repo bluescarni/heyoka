@@ -128,6 +128,30 @@ double eval_dbl(const variable &var, const std::unordered_map<std::string, doubl
     }
 }
 
+long double eval_ldbl(const variable &var, const std::unordered_map<std::string, long double> &map,
+                      const std::vector<long double> &)
+{
+    if (auto it = map.find(var.name()); it != map.end()) {
+        return it->second;
+    } else {
+        throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
+                                    + "' because it is missing from the evaluation map");
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::string, mppp::real128> &map,
+                        const std::vector<mppp::real128> &)
+{
+    if (auto it = map.find(var.name()); it != map.end()) {
+        return it->second;
+    } else {
+        throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
+                                    + "' because it is missing from the evaluation map");
+    }
+}
+#endif
+
 void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &)
 {
