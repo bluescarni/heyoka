@@ -5331,10 +5331,10 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
-    oss << "Taylor order: " << ta.get_order() << '\n';
-    oss << "Dimension   : " << ta.get_dim() << '\n';
-    oss << "Time        : " << ta.get_time() << '\n';
-    oss << "State       : [";
+    oss << "Taylor order            : " << ta.get_order() << '\n';
+    oss << "Dimension               : " << ta.get_dim() << '\n';
+    oss << "Time                    : " << ta.get_time() << '\n';
+    oss << "State                   : [";
     for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
         oss << ta.get_state()[i];
         if (i != ta.get_state().size() - 1u) {
@@ -5352,6 +5352,14 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
             }
         }
         oss << "]\n";
+    }
+
+    if (!ta.get_t_events().empty()) {
+        oss << "N of terminal events    : " << ta.get_t_events().size() << '\n';
+    }
+
+    if (!ta.get_nt_events().empty()) {
+        oss << "N of non-terminal events: " << ta.get_nt_events().size() << '\n';
     }
 
     return os << oss.str();
