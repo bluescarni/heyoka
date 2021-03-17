@@ -83,7 +83,7 @@ bool operator!=(const param &p0, const param &p1)
     return !(p0 == p1);
 }
 
-expression subs(const param &p, const std::unordered_map<std::string, expression> &smap)
+expression subs(const param &p, const std::unordered_map<std::string, expression> &)
 {
     return expression{p};
 }
