@@ -83,9 +83,13 @@ bool operator!=(const param &p0, const param &p1)
     return !(p0 == p1);
 }
 
-expression subs(const param &p, const std::unordered_map<std::string, expression> &)
+expression subs(const param &p, const std::unordered_map<std::string, expression> &smap)
 {
-    return expression{p};
+    if (auto it = smap.find("p"+std::to_string(p.idx())); it == smap.end()) {
+        return expression{p};
+    } else {
+        return it->second;
+    }
 }
 
 expression diff(const param &, const std::string &)
