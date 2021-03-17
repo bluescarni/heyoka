@@ -193,7 +193,7 @@ TEST_CASE("two uniform spheres")
 
     std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
-    taylor_adaptive_dbl tad{
+    taylor_adaptive<double> tad{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
         std::move(init_state)};
 
@@ -230,12 +230,12 @@ TEST_CASE("mixed tb/spheres")
     std::vector<double> init_state{0.593, -0.593, 0, 0, 0, 0, -1.000001, 1.000001, -1, 1, 0, 0};
 
     // 2BP integrator.
-    taylor_adaptive_dbl t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3, -z01 * r01_m3,
-                               vx0, vx1, vy0, vy1, vz0, vz1},
-                              init_state};
+    taylor_adaptive<double> t_2bp{{x01 * r01_m3, -x01 * r01_m3, y01 * r01_m3, -y01 * r01_m3, z01 * r01_m3,
+                                   -z01 * r01_m3, vx0, vx1, vy0, vy1, vz0, vz1},
+                                  init_state};
 
     // 2US integrator.
-    taylor_adaptive_dbl t_2us{
+    taylor_adaptive<double> t_2us{
         {x01 * fac, -x01 * fac, y01 * fac, -y01 * fac, z01 * fac, -z01 * fac, vx0, vx1, vy0, vy1, vz0, vz1},
         std::move(init_state)};
 
@@ -258,7 +258,7 @@ TEST_CASE("mixed tb/spheres")
     REQUIRE(cur_regime);
 
     // Pointers to the current and other integrators.
-    taylor_adaptive_dbl *cur_t = &t_2bp, *other_t = &t_2us;
+    taylor_adaptive<double> *cur_t = &t_2bp, *other_t = &t_2us;
 
     const auto en = tbp_energy(cur_t->get_state());
     const auto am = compute_am(cur_t->get_state());

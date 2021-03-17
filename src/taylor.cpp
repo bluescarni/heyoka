@@ -3425,15 +3425,24 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
             throw std::invalid_argument(err_msg);
         }
         // Do the step towards the time target.
-        oc = (grid[cur_grid_idx] >= m_time) ? step(true) : step_backward(true);
-        if (std::get<0>(oc) != taylor_outcome::success) {
-            // Something went wrong in the propagation of the timestep, exit.
-            return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+        const auto [res, h] = (grid[cur_grid_idx] >= m_time) ? step(true) : step_backward(true);
+
+        if (res != taylor_outcome::success) {
+            // Something went wrong in the propagation of the timestep, or we reached
+            // a terminal event. If we reached a terminal event with a callback,
+            // we will continue.
+            assert(res < taylor_outcome::success || static_cast<std::uint32_t>(res) < m_tes.size());
+            const bool resume
+                = (res > taylor_outcome::success) && m_tes[static_cast<std::uint32_t>(res)].get_callback();
+
+            if (!resume) {
+                return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
+            }
         }
 
         // Update step counter and min/max values.
         ++step_counter;
-        abs_h = abs(std::get<1>(oc));
+        abs_h = abs(h);
         min_h = std::min(min_h, abs_h);
         max_h = std::max(max_h, abs_h);
     }
@@ -3481,7 +3490,7 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
 }
 
 template <typename T>
-nt_event<T>::nt_event(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
+nt_event_impl<T>::nt_event_impl(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
 {
     if (!callback) {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
@@ -3489,7 +3498,8 @@ nt_event<T>::nt_event(expression e, callback_t f) : eq(std::move(e)), callback(s
 }
 
 template <typename T>
-nt_event<T>::nt_event(expression e, callback_t f, event_direction d) : nt_event(std::move(e), std::move(f))
+nt_event_impl<T>::nt_event_impl(expression e, callback_t f, event_direction d)
+    : nt_event_impl(std::move(e), std::move(f))
 {
     if (d < event_direction::any || d > event_direction::negative) {
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
@@ -3498,28 +3508,28 @@ nt_event<T>::nt_event(expression e, callback_t f, event_direction d) : nt_event(
 }
 
 template <typename T>
-nt_event<T>::nt_event(const nt_event &) = default;
+nt_event_impl<T>::nt_event_impl(const nt_event_impl &) = default;
 
 template <typename T>
-nt_event<T>::nt_event(nt_event &&) noexcept = default;
+nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
 
 template <typename T>
-nt_event<T>::~nt_event() = default;
+nt_event_impl<T>::~nt_event_impl() = default;
 
 template <typename T>
-const expression &nt_event<T>::get_expression() const
+const expression &nt_event_impl<T>::get_expression() const
 {
     return eq;
 }
 
 template <typename T>
-const typename nt_event<T>::callback_t &nt_event<T>::get_callback() const
+const typename nt_event_impl<T>::callback_t &nt_event_impl<T>::get_callback() const
 {
     return callback;
 }
 
 template <typename T>
-event_direction nt_event<T>::get_direction() const
+event_direction nt_event_impl<T>::get_direction() const
 {
     return dir;
 }
@@ -3528,7 +3538,7 @@ namespace
 {
 
 // Implementation of stream insertion for the non-terminal event class.
-std::ostream &nt_event_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
+std::ostream &nt_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
 {
     os << "Event type     : non-terminal\n";
     os << "Event equation : " << eq << '\n';
@@ -3540,29 +3550,29 @@ std::ostream &nt_event_stream_impl(std::ostream &os, const expression &eq, event
 } // namespace
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event<double> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<double> &e)
 {
-    return nt_event_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event<long double> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double> &e)
 {
-    return nt_event_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event<mppp::real128> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e)
 {
-    return nt_event_stream_impl(os, e.get_expression(), e.get_direction());
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
 
 #endif
 
 template <typename T>
-void t_event<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
+void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
 {
     using std::isfinite;
 
@@ -3580,34 +3590,34 @@ void t_event<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
 }
 
 template <typename T>
-t_event<T>::t_event(const t_event &) = default;
+t_event_impl<T>::t_event_impl(const t_event_impl &) = default;
 
 template <typename T>
-t_event<T>::t_event(t_event &&) noexcept = default;
+t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
 
 template <typename T>
-t_event<T>::~t_event() = default;
+t_event_impl<T>::~t_event_impl() = default;
 
 template <typename T>
-const expression &t_event<T>::get_expression() const
+const expression &t_event_impl<T>::get_expression() const
 {
     return eq;
 }
 
 template <typename T>
-const typename t_event<T>::callback_t &t_event<T>::get_callback() const
+const typename t_event_impl<T>::callback_t &t_event_impl<T>::get_callback() const
 {
     return callback;
 }
 
 template <typename T>
-event_direction t_event<T>::get_direction() const
+event_direction t_event_impl<T>::get_direction() const
 {
     return dir;
 }
 
 template <typename T>
-T t_event<T>::get_cooldown() const
+T t_event_impl<T>::get_cooldown() const
 {
     return cooldown;
 }
@@ -3617,8 +3627,8 @@ namespace
 
 // Implementation of stream insertion for the terminal event class.
 template <typename C, typename T>
-std::ostream &t_event_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
-                                  const T &cooldown)
+std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
+                                       const T &cooldown)
 {
     using namespace fmt::literals;
 
@@ -3634,23 +3644,23 @@ std::ostream &t_event_stream_impl(std::ostream &os, const expression &eq, event_
 } // namespace
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event<double> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<double> &e)
 {
-    return t_event_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event<long double> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<long double> &e)
 {
-    return t_event_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event<mppp::real128> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128> &e)
 {
-    return t_event_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
 
 #endif
@@ -3659,8 +3669,8 @@ std::ostream &operator<<(std::ostream &os, const t_event<mppp::real128> &e)
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
-template class nt_event<double>;
-template class t_event<double>;
+template class nt_event_impl<double>;
+template class t_event_impl<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
                                                                                  std::vector<double>, double, double,
@@ -3674,8 +3684,8 @@ taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expressio
                                                  std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template class taylor_adaptive_impl<long double>;
-template class nt_event<long double>;
-template class t_event<long double>;
+template class nt_event_impl<long double>;
+template class t_event_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
@@ -3689,8 +3699,8 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
-template class nt_event<mppp::real128>;
-template class t_event<mppp::real128>;
+template class nt_event_impl<mppp::real128>;
+template class t_event_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
@@ -5321,10 +5331,10 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
-    oss << "Taylor order: " << ta.get_order() << '\n';
-    oss << "Dimension   : " << ta.get_dim() << '\n';
-    oss << "Time        : " << ta.get_time() << '\n';
-    oss << "State       : [";
+    oss << "Taylor order            : " << ta.get_order() << '\n';
+    oss << "Dimension               : " << ta.get_dim() << '\n';
+    oss << "Time                    : " << ta.get_time() << '\n';
+    oss << "State                   : [";
     for (decltype(ta.get_state().size()) i = 0; i < ta.get_state().size(); ++i) {
         oss << ta.get_state()[i];
         if (i != ta.get_state().size() - 1u) {
@@ -5342,6 +5352,14 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
             }
         }
         oss << "]\n";
+    }
+
+    if (!ta.get_t_events().empty()) {
+        oss << "N of terminal events    : " << ta.get_t_events().size() << '\n';
+    }
+
+    if (!ta.get_nt_events().empty()) {
+        oss << "N of non-terminal events: " << ta.get_nt_events().size() << '\n';
     }
 
     return os << oss.str();

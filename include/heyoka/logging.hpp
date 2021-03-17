@@ -14,8 +14,14 @@
 namespace heyoka
 {
 
+HEYOKA_DLL_PUBLIC void *create_logger();
+
+HEYOKA_DLL_PUBLIC void set_logger_level_trace();
 HEYOKA_DLL_PUBLIC void set_logger_level_debug();
 HEYOKA_DLL_PUBLIC void set_logger_level_info();
+HEYOKA_DLL_PUBLIC void set_logger_level_warn();
+HEYOKA_DLL_PUBLIC void set_logger_level_err();
+HEYOKA_DLL_PUBLIC void set_logger_level_critical();
 
 } // namespace heyoka
 

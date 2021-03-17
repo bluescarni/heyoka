@@ -424,18 +424,20 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
 }
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC nt_event
+class HEYOKA_DLL_PUBLIC nt_event_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
 public:
     using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
 
-    explicit nt_event(expression, callback_t);
-    explicit nt_event(expression, callback_t, event_direction);
+    explicit nt_event_impl(expression, callback_t);
+    explicit nt_event_impl(expression, callback_t, event_direction);
 
-    nt_event(const nt_event &);
-    nt_event(nt_event &&) noexcept;
+    nt_event_impl(const nt_event_impl &);
+    nt_event_impl(nt_event_impl &&) noexcept;
 
-    ~nt_event();
+    ~nt_event_impl();
 
     const expression &get_expression() const;
     const callback_t &get_callback() const;
@@ -448,7 +450,7 @@ private:
 };
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const nt_event<T> &)
+inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -456,21 +458,23 @@ inline std::ostream &operator<<(std::ostream &os, const nt_event<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128> &);
 
 #endif
 
 template <typename T>
-class HEYOKA_DLL_PUBLIC t_event
+class HEYOKA_DLL_PUBLIC t_event_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
 public:
     using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, bool)>;
 
@@ -479,7 +483,7 @@ private:
 
 public:
     template <typename... KwArgs>
-    explicit t_event(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
         igor::parser p{kw_args...};
 
@@ -520,10 +524,10 @@ public:
         }
     }
 
-    t_event(const t_event &);
-    t_event(t_event &&) noexcept;
+    t_event_impl(const t_event_impl &);
+    t_event_impl(t_event_impl &&) noexcept;
 
-    ~t_event();
+    ~t_event_impl();
 
     const expression &get_expression() const;
     const callback_t &get_callback() const;
@@ -538,7 +542,7 @@ private:
 };
 
 template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const t_event<T> &)
+inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -546,21 +550,34 @@ inline std::ostream &operator<<(std::ostream &os, const t_event<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128> &);
 
 #endif
+
+} // namespace detail
+
+template <typename T>
+using nt_event = detail::nt_event_impl<T>;
+
+template <typename T>
+using t_event = detail::t_event_impl<T>;
+
+namespace detail
+{
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
 public:
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
@@ -751,6 +768,14 @@ public:
     const std::vector<T> &update_d_output(T);
 
     void reset_cooldowns();
+    const std::vector<t_event_t> &get_t_events() const
+    {
+        return m_tes;
+    }
+    const std::vector<nt_event_t> &get_nt_events() const
+    {
+        return m_ntes;
+    }
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
@@ -773,46 +798,8 @@ public:
 
 } // namespace detail
 
-using taylor_adaptive_dbl = detail::taylor_adaptive_impl<double>;
-using taylor_adaptive_ldbl = detail::taylor_adaptive_impl<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-using taylor_adaptive_f128 = detail::taylor_adaptive_impl<mppp::real128>;
-
-#endif
-
-namespace detail
-{
-
 template <typename T>
-struct taylor_adaptive_t_impl {
-    static_assert(always_false_v<T>, "Unhandled type.");
-};
-
-template <>
-struct taylor_adaptive_t_impl<double> {
-    using type = taylor_adaptive_dbl;
-};
-
-template <>
-struct taylor_adaptive_t_impl<long double> {
-    using type = taylor_adaptive_ldbl;
-};
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-struct taylor_adaptive_t_impl<mppp::real128> {
-    using type = taylor_adaptive_f128;
-};
-
-#endif
-
-} // namespace detail
-
-template <typename T>
-using taylor_adaptive = typename detail::taylor_adaptive_t_impl<T>::type;
+using taylor_adaptive = detail::taylor_adaptive_impl<T>;
 
 namespace detail
 {
@@ -820,6 +807,8 @@ namespace detail
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 {
+    static_assert(is_supported_fp_v<T>, "Unhandled type.");
+
     // The batch size.
     std::uint32_t m_batch_size;
     // State vectors.
@@ -1005,46 +994,8 @@ public:
 
 } // namespace detail
 
-using taylor_adaptive_batch_dbl = detail::taylor_adaptive_batch_impl<double>;
-using taylor_adaptive_batch_ldbl = detail::taylor_adaptive_batch_impl<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-using taylor_adaptive_batch_f128 = detail::taylor_adaptive_batch_impl<mppp::real128>;
-
-#endif
-
-namespace detail
-{
-
 template <typename T>
-struct taylor_adaptive_batch_t_impl {
-    static_assert(always_false_v<T>, "Unhandled type.");
-};
-
-template <>
-struct taylor_adaptive_batch_t_impl<double> {
-    using type = taylor_adaptive_batch_dbl;
-};
-
-template <>
-struct taylor_adaptive_batch_t_impl<long double> {
-    using type = taylor_adaptive_batch_ldbl;
-};
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-struct taylor_adaptive_batch_t_impl<mppp::real128> {
-    using type = taylor_adaptive_batch_f128;
-};
-
-#endif
-
-} // namespace detail
-
-template <typename T>
-using taylor_adaptive_batch = typename detail::taylor_adaptive_batch_t_impl<T>::type;
+using taylor_adaptive_batch = detail::taylor_adaptive_batch_impl<T>;
 
 namespace detail
 {

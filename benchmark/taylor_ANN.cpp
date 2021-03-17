@@ -106,7 +106,7 @@ int main()
     // Defining the integrator
     std::cout << "\nCompiling the Taylor Integrator (" << std::to_string(w.size()) << " parameters)." << std::endl;
     auto start = high_resolution_clock::now();
-    taylor_adaptive_dbl neural_network_ode{dynamics, ic};
+    taylor_adaptive<double> neural_network_ode{dynamics, ic};
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << "Microseconds: " << duration.count() << std::endl;
