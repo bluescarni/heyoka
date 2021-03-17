@@ -750,3 +750,31 @@ TEST_CASE("taylor tc basic")
         }
     }
 }
+
+// A test to check that vector data passed to the constructor
+// is moved into the integrator (and not just copied)
+TEST_CASE("taylor scalar move")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto init_state = std::vector{-1., 0.};
+    auto pars = std::vector{9.8};
+    auto tes = std::vector{t_event<double>(v)};
+    auto ntes = std::vector{nt_event<double>(v, [](taylor_adaptive<double> &, double) {})};
+
+    auto s_data = init_state.data();
+    auto p_data = pars.data();
+    auto tes_data = tes.data();
+    auto ntes_data = ntes.data();
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -par[0] * sin(x)},
+                                      std::move(init_state),
+                                      kw::pars = std::move(pars),
+                                      kw::t_events = std::move(tes),
+                                      kw::nt_events = std::move(ntes)};
+
+    REQUIRE(s_data == ta.get_state().data());
+    REQUIRE(p_data == ta.get_pars().data());
+    REQUIRE(tes_data == ta.get_t_events().data());
+    REQUIRE(ntes_data == ta.get_nt_events().data());
+}

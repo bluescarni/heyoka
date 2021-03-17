@@ -768,6 +768,14 @@ public:
     const std::vector<T> &update_d_output(T);
 
     void reset_cooldowns();
+    const std::vector<t_event_t> &get_t_events() const
+    {
+        return m_tes;
+    }
+    const std::vector<nt_event_t> &get_nt_events() const
+    {
+        return m_ntes;
+    }
 
     std::tuple<taylor_outcome, T> step(bool = false);
     std::tuple<taylor_outcome, T> step_backward(bool = false);
