@@ -3360,8 +3360,16 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     }
     auto oc = (grid[0] >= m_time) ? step(true) : step_backward(true);
     if (std::get<0>(oc) != taylor_outcome::success) {
-        // Something went wrong in the propagation of the timestep, exit.
-        return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+        // Something went wrong in the propagation of the first step, or we reached
+        // a terminal event. If we reached a terminal event with a callback,
+        // we will continue.
+        assert(std::get<0>(oc) < taylor_outcome::success || static_cast<std::uint32_t>(std::get<0>(oc)) < m_tes.size());
+        const bool resume = (std::get<0>(oc) > taylor_outcome::success)
+                            && m_tes[static_cast<std::uint32_t>(std::get<0>(oc))].get_callback();
+
+        if (!resume) {
+            return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
+        }
     }
 
     // Update step counter and min/max values.

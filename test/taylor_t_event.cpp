@@ -679,3 +679,44 @@ TEST_CASE("taylor te propagate_grid")
         }
     }
 }
+
+// Test for a bug in propagate_grid() in which the
+// integration would stop at the first step, in case
+// a terminal event triggers immediately.
+TEST_CASE("taylor te propagate_grid first step bug")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = taylor_adaptive<double>::t_event_t;
+
+    {
+        t_ev_t ev(
+            v, kw::callback = [](taylor_adaptive<double> &, double, bool) {});
+
+        auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {ev}};
+
+        std::vector<double> grid;
+        for (auto i = 0; i < 100; ++i) {
+            grid.emplace_back(5 / 100. * i);
+        }
+
+        auto out = ta.propagate_grid(grid);
+
+        REQUIRE(std::get<4>(out).size() == 200u);
+    }
+
+    {
+        t_ev_t ev(v);
+
+        auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {ev}};
+
+        std::vector<double> grid;
+        for (auto i = 0; i < 100; ++i) {
+            grid.emplace_back(5 / 100. * i);
+        }
+
+        auto out = ta.propagate_grid(grid);
+
+        REQUIRE(std::get<4>(out).size() == 0u);
+    }
+}
