@@ -17,6 +17,11 @@ void *create_logger()
     return detail::get_logger();
 }
 
+void set_logger_level_trace()
+{
+    detail::get_logger()->set_level(spdlog::level::trace);
+}
+
 void set_logger_level_debug()
 {
     detail::get_logger()->set_level(spdlog::level::debug);
@@ -25,6 +30,21 @@ void set_logger_level_debug()
 void set_logger_level_info()
 {
     detail::get_logger()->set_level(spdlog::level::info);
+}
+
+void set_logger_level_warn()
+{
+    detail::get_logger()->set_level(spdlog::level::warn);
+}
+
+void set_logger_level_err()
+{
+    detail::get_logger()->set_level(spdlog::level::err);
+}
+
+void set_logger_level_critical()
+{
+    detail::get_logger()->set_level(spdlog::level::critical);
 }
 
 } // namespace heyoka
