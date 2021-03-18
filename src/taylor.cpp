@@ -1441,39 +1441,37 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
         auto diff_arr = std::get<llvm::Value *>(diff_variant);
 
-        // Compute the norm infinity of the state vector and the norm infinity of the derivatives
-        // at orders order and order - 1.
-        max_abs_state = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
-        max_abs_diff_o = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
-        max_abs_diff_om1 = builder.CreateAlloca(to_llvm_vector_type<T>(context, batch_size));
+        // These will end up containing the norm infinity of the state vector and the
+        // norm infinity of the derivatives at orders order and order - 1.
+        auto vec_t = to_llvm_vector_type<T>(context, batch_size);
+        max_abs_state = builder.CreateAlloca(vec_t);
+        max_abs_diff_o = builder.CreateAlloca(vec_t);
+        max_abs_diff_om1 = builder.CreateAlloca(vec_t);
 
         // Initialise with the abs(derivatives) of the first state variable at orders 0, 'order' and 'order - 1'.
         builder.CreateStore(
-            taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {builder.getInt32(0)}))),
+            taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), builder.getInt32(0))),
             max_abs_state);
-        // NOTE: in compact mode diff_arr contains the derivatives for *all* uvars,
-        // hence the indexing is order * n_uvars.
-        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
-                                                   diff_arr, {builder.getInt32(order * n_uvars)}))),
-                            max_abs_diff_o);
-        builder.CreateStore(taylor_step_abs(s, builder.CreateLoad(builder.CreateInBoundsGEP(
-                                                   diff_arr, {builder.getInt32((order - 1u) * n_uvars)}))),
+        builder.CreateStore(
+            taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), builder.getInt32(0))),
+            max_abs_diff_o);
+        builder.CreateStore(taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u),
+                                                                  builder.getInt32(0))),
                             max_abs_diff_om1);
 
+        // Iterate over the variables to compute the norm infinities.
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
-            builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(max_abs_state),
-                                                   builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {cur_idx}))),
-                                max_abs_state);
+            builder.CreateStore(
+                taylor_step_maxabs(s, builder.CreateLoad(max_abs_state),
+                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx)),
+                max_abs_state);
             builder.CreateStore(
                 taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_o),
-                                   builder.CreateLoad(builder.CreateInBoundsGEP(
-                                       diff_arr, {builder.CreateAdd(builder.getInt32(order * n_uvars), cur_idx)}))),
+                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_idx)),
                 max_abs_diff_o);
             builder.CreateStore(
-                taylor_step_maxabs(
-                    s, builder.CreateLoad(max_abs_diff_om1),
-                    builder.CreateLoad(builder.CreateInBoundsGEP(
-                        diff_arr, {builder.CreateAdd(builder.getInt32((order - 1u) * n_uvars), cur_idx)}))),
+                taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_om1),
+                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u), cur_idx)),
                 max_abs_diff_om1);
         });
 
