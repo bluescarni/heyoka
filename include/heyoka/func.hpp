@@ -164,6 +164,22 @@ template <typename T>
 inline constexpr bool func_has_eval_dbl_v = std::is_same_v<detected_t<func_eval_dbl_t, T>, double>;
 
 template <typename T>
+using func_eval_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_ldbl(
+    std::declval<const std::unordered_map<std::string, long double> &>(), std::declval<const std::vector<long double> &>()));
+
+template <typename T>
+inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval_ldbl_t, T>, long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+template <typename T>
+using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_ldbl(
+    std::declval<const std::unordered_map<std::string, mppp::real128> &>(), std::declval<const std::vector<mppp::real128> &>()));
+
+template <typename T>
+inline constexpr bool func_has_eval_f128_v = std::is_same_v<detected_t<func_eval_f128_t, T>, mppp::real128>;
+#endif
+
+template <typename T>
 using func_eval_batch_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_batch_dbl(
     std::declval<std::vector<double> &>(), std::declval<const std::unordered_map<std::string, std::vector<double>> &>(),
     std::declval<const std::vector<double> &>()));
@@ -369,7 +385,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
     long double eval_ldbl(const std::unordered_map<std::string, long double> &m, const std::vector<long double> &pars) const final
     {
-        if constexpr (func_has_eval_dbl_v<T>) {
+        if constexpr (func_has_eval_ldbl_v<T>) {
             return m_value.eval_ldbl(m, pars);
         } else {
             throw not_implemented_error("long double eval is not implemented for the function '" + get_name() + "'");
@@ -378,7 +394,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #if defined(HEYOKA_HAVE_REAL128)
     mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m, const std::vector< mppp::real128> &pars) const final
     {
-        if constexpr (func_has_eval_dbl_v<T>) {
+        if constexpr (func_has_eval_f128_v<T>) {
             return m_value.eval_f128(m, pars);
         } else {
             throw not_implemented_error("mppp::real128 eval is not implemented for the function '" + get_name() + "'");
