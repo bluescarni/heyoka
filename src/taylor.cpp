@@ -2833,6 +2833,553 @@ std::uint32_t n_pars_in_sys(const T &sys)
     return retval;
 }
 
+// Run the Horner scheme to propagate an ODE state via the evaluation of the Taylor polynomials.
+// diff_var contains either the derivatives for all u variables (in compact mode) or only
+// for the state variables (non-compact mode). The evaluation point (i.e., the timestep)
+// is h. The evaluation is run in parallel over the polynomials of all the state
+// variables.
+std::variant<llvm::Value *, std::vector<llvm::Value *>>
+taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var,
+                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                       bool compact_mode)
+{
+    auto &builder = s.builder();
+
+    if (compact_mode) {
+        // Compact mode.
+        auto diff_arr = std::get<llvm::Value *>(diff_var);
+
+        // Create the array storing the results of the evaluation.
+        auto array_type = llvm::ArrayType::get(pointee_type(diff_arr), n_eq);
+        auto res_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Init the return value, filling it with the values of the
+        // coefficients of the highest-degree monomial in each polynomial.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the value from diff_arr and store it in res_arr.
+            builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
+                                builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+        });
+
+        // Run the evaluation.
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Load the current poly coeff from diff_arr.
+                              // NOTE: we are loading the coefficients backwards wrt the order, hence
+                              // we specify order - cur_order.
+                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                           builder.CreateSub(builder.getInt32(order), cur_order),
+                                                           cur_var_idx);
+
+                              // Accumulate in res_arr.
+                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                              builder.CreateStore(
+                                  builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)), res_ptr);
+                          });
+                      });
+
+        return res_arr;
+    } else {
+        // Non-compact mode.
+        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
+
+        // Init the return value, filling it with the values of the
+        // coefficients of the highest-degree monomial in each polynomial.
+        std::vector<llvm::Value *> res_arr;
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            res_arr.push_back(diff_arr[(n_eq * order) + i]);
+        }
+
+        // Run the Horner scheme simultaneously for all polynomials.
+        for (std::uint32_t i = 1; i <= order; ++i) {
+            for (std::uint32_t j = 0; j < n_eq; ++j) {
+                res_arr[j] = builder.CreateFAdd(diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
+            }
+        }
+
+        return res_arr;
+    }
+}
+
+// Same as the previous function, but here the data is always coming in as a
+// pointer to scalar FP values representing the derivatives of the state variables.
+// The same pointer is also used for output. Hence, the internal logic and indexing are
+// different.
+void taylor_run_multihorner_state_updater(llvm_state &s, llvm::Value *jet_ptr, llvm::Value *h, std::uint32_t n_eq,
+                                          std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
+{
+    auto &builder = s.builder();
+
+    if (compact_mode) {
+        // Compact mode.
+
+        // Create the array storing the result of the evaluation.
+        auto array_type = llvm::ArrayType::get(make_vector_type(pointee_type(jet_ptr), batch_size), n_eq);
+        auto res_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Init res_arr, filling it with the values of the
+        // coefficients of the highest-degree monomial in each polynomial.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the value from jet_ptr.
+            // NOTE: the index is order * n_eq * batch_size + cur_var_idx * batch_size.
+            // NOTE: overflow checking was done in taylor_add_jet_impl().
+            auto ptr = builder.CreateInBoundsGEP(
+                jet_ptr, {builder.CreateAdd(builder.getInt32(order * n_eq * batch_size),
+                                            builder.CreateMul(builder.getInt32(batch_size), cur_var_idx))});
+            auto val = load_vector_from_memory(builder, ptr, batch_size);
+
+            // Store it in res_arr.
+            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+        });
+
+        // Run the evaluation.
+        llvm_loop_u32(
+            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+            [&](llvm::Value *cur_order) {
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                    // Load the current poly coeff from jet_ptr.
+                    // NOTE: the index is (order - cur_order) * n_eq * batch_size + cur_var_idx * batch_size.
+                    auto cf_ptr = builder.CreateInBoundsGEP(
+                        jet_ptr,
+                        {builder.CreateAdd(builder.CreateMul(builder.CreateSub(builder.getInt32(order), cur_order),
+                                                             builder.getInt32(n_eq * batch_size)),
+                                           builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)))});
+                    auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
+
+                    // Accumulate in res_arr.
+                    auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                    builder.CreateStore(builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)),
+                                        res_ptr);
+                });
+            });
+
+        // Copy the result to jet_ptr.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+            store_vector_to_memory(
+                builder,
+                builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))}),
+                val);
+        });
+    } else {
+        // Non-compact mode.
+
+        // Create the array of results, initially containing the values of the
+        // coefficients of the highest-degree monomial in each polynomial.
+        std::vector<llvm::Value *> res_arr;
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            auto ptr
+                = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(order * n_eq * batch_size + i * batch_size)});
+            res_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+        }
+
+        // Run the evaluation.
+        for (std::uint32_t i = 1; i <= order; ++i) {
+            for (std::uint32_t j = 0; j < n_eq; ++j) {
+                auto ptr = builder.CreateInBoundsGEP(
+                    jet_ptr, {builder.getInt32((order - i) * n_eq * batch_size + j * batch_size)});
+                res_arr[j] = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size),
+                                                builder.CreateFMul(res_arr[j], h));
+            }
+        }
+
+        // Write the result to jet_ptr.
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(batch_size * i)}),
+                                   res_arr[i]);
+        }
+    }
+}
+
+// Same as taylor_run_multihorner(), but instead of the Horner scheme this implementation uses
+// a compensated summation over the naive evaluation of monomials.
+template <typename T>
+std::variant<llvm::Value *, std::vector<llvm::Value *>>
+taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
+                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool,
+                 bool compact_mode)
+{
+    auto &builder = s.builder();
+
+    if (compact_mode) {
+        // Compact mode.
+        auto diff_arr = std::get<llvm::Value *>(diff_var);
+
+        // Create the arrays storing the results of the evaluation and the running compensations.
+        auto array_type = llvm::ArrayType::get(pointee_type(diff_arr), n_eq);
+        auto res_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+        auto comp_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Init res_arr with the order-0 monomials, and the running
+        // compensations with zero.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the value from diff_arr.
+            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {cur_var_idx}));
+
+            // Store it in res_arr.
+            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+
+            // Zero-init the element in comp_arr.
+            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
+        });
+
+        // Init the running updater for the powers of h.
+        auto cur_h = builder.CreateAlloca(h->getType());
+        builder.CreateStore(h, cur_h);
+
+        // Run the evaluation.
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          // Load the current power of h.
+                          auto cur_h_val = builder.CreateLoad(cur_h);
+
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Evaluate the current monomial.
+                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
+                              auto tmp = builder.CreateFMul(cf, cur_h_val);
+
+                              // Compute the quantities for the compensation.
+                              auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                              auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                              auto cur_res = builder.CreateLoad(res_ptr);
+                              auto t = builder.CreateFAdd(cur_res, y);
+
+                              // Update the compensation and the return value.
+                              builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                              builder.CreateStore(t, res_ptr);
+                          });
+
+                          // Update the value of h.
+                          builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+                      });
+
+        return res_arr;
+    } else {
+        // Non-compact mode.
+        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
+
+        // Init the return values with the order-0 monomials, and the running
+        // compensations with zero.
+        std::vector<llvm::Value *> res_arr, comp_arr;
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            res_arr.push_back(diff_arr[i]);
+            comp_arr.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+        }
+
+        // Evaluate and sum.
+        auto cur_h = h;
+        for (std::uint32_t i = 1; i <= order; ++i) {
+            for (std::uint32_t j = 0; j < n_eq; ++j) {
+                // Evaluate the current monomial.
+                auto tmp = builder.CreateFMul(diff_arr[i * n_eq + j], cur_h);
+
+                // Compute the quantities for the compensation.
+                auto y = builder.CreateFSub(tmp, comp_arr[j]);
+                auto t = builder.CreateFAdd(res_arr[j], y);
+
+                // Update the compensation and the return value.
+                comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);
+                res_arr[j] = t;
+            }
+
+            // Update the power of h.
+            cur_h = builder.CreateFMul(cur_h, h);
+        }
+
+        return res_arr;
+    }
+}
+
+// Same as the previous function, but here the data is always coming in as a
+// pointer to scalar FP values representing the derivatives of the state variables.
+// The same pointer is also used for output. Hence, the internal logic and indexing are
+// different.
+template <typename T>
+void taylor_run_ceval_state_updater(llvm_state &s, llvm::Value *jet_ptr, llvm::Value *h, std::uint32_t n_eq,
+                                    std::uint32_t order, std::uint32_t batch_size, bool, bool compact_mode)
+{
+    auto &builder = s.builder();
+
+    if (compact_mode) {
+        // Compact mode.
+
+        // Create the array storing the results of the evaluation and the running compensations.
+        auto array_type = llvm::ArrayType::get(make_vector_type(pointee_type(jet_ptr), batch_size), n_eq);
+        auto res_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+        auto comp_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Init res_arr with the order-0 monomials, and the running
+        // compensations with zero.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the value from jet_ptr.
+            // NOTE: the index is cur_var_idx * batch_size.
+            // NOTE: overflow checking was done in taylor_add_jet_impl().
+            auto ptr
+                = builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(builder.getInt32(batch_size), cur_var_idx)});
+            auto val = load_vector_from_memory(builder, ptr, batch_size);
+
+            // Store it in res_arr.
+            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+
+            // Zero-init the element in comp_arr.
+            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
+        });
+
+        // Init the running updater for the powers of h.
+        auto cur_h = builder.CreateAlloca(h->getType());
+        builder.CreateStore(h, cur_h);
+
+        // Run the evaluation.
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          // Load the current power of h.
+                          auto cur_h_val = builder.CreateLoad(cur_h);
+
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Evaluate the current monomial.
+                              // NOTE: the index is cur_order * n_eq * batch_size + cur_var_idx * batch_size.
+                              auto cf_ptr = builder.CreateInBoundsGEP(
+                                  jet_ptr,
+                                  {builder.CreateAdd(builder.CreateMul(cur_order, builder.getInt32(n_eq * batch_size)),
+                                                     builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)))});
+                              auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
+                              auto tmp = builder.CreateFMul(cf, cur_h_val);
+
+                              // Compute the quantities for the compensation.
+                              auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                              auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                              auto cur_res = builder.CreateLoad(res_ptr);
+                              auto t = builder.CreateFAdd(cur_res, y);
+
+                              // Update the compensation and the result.
+                              builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                              builder.CreateStore(t, res_ptr);
+                          });
+
+                          // Update the value of h.
+                          builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+                      });
+
+        // Copy the result to jet_ptr.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
+            store_vector_to_memory(
+                builder,
+                builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))}),
+                val);
+        });
+    } else {
+        // Non-compact mode.
+
+        // Init the results with the order-0 monomials, and the running
+        // compensations with zero.
+        std::vector<llvm::Value *> res_arr, comp_arr;
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            auto ptr = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(i * batch_size)});
+            res_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
+
+            comp_arr.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+        }
+
+        // Evaluate and sum.
+        auto cur_h = h;
+        for (std::uint32_t i = 1; i <= order; ++i) {
+            for (std::uint32_t j = 0; j < n_eq; ++j) {
+                auto cf_ptr
+                    = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(i * n_eq * batch_size + j * batch_size)});
+                auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
+                auto tmp = builder.CreateFMul(cf, cur_h);
+
+                // Compute the quantities for the compensation.
+                auto y = builder.CreateFSub(tmp, comp_arr[j]);
+                auto t = builder.CreateFAdd(res_arr[j], y);
+
+                // Update the compensation and the result.
+                comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);
+                res_arr[j] = t;
+            }
+
+            // Update the power of h.
+            cur_h = builder.CreateFMul(cur_h, h);
+        }
+
+        // Write the result to jet_ptr.
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(batch_size * i)}),
+                                   res_arr[i]);
+        }
+    }
+}
+
+// NOTE: in compact mode, care must be taken when adding multiple stepper functions to the same llvm state
+// with the same floating-point type, batch size and number of u variables. The potential issue there
+// is that when the first stepper is added, the compact mode AD functions are created and then optimised.
+// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
+// uses in the second stepper (e.g., an argument might be removed from the signature because it is a
+// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
+// in the state, add the 2 steppers and then run a single optimisation pass. This is what we do
+// in the integrators' ctors.
+// NOTE: document this eventually.
+template <typename T, typename U>
+auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
+                              bool high_accuracy, bool compact_mode)
+{
+    using namespace fmt::literals;
+    using std::isfinite;
+
+    assert(!s.is_compiled());
+    assert(batch_size > 0u);
+    assert(isfinite(tol) && tol > 0);
+
+    // Determine the order from the tolerance.
+    const auto order = taylor_order_from_tol(tol);
+
+    // Record the number of equations/variables.
+    const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Decompose the system of equations.
+    // NOTE: no sv_funcs needed for this stepper.
+    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
+
+    assert(sv_funcs_dc.empty());
+
+    // Compute the number of u variables.
+    assert(dc.size() > n_eq);
+    const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Prepare the function prototype. The arguments are:
+    // - pointer to the current state vector (read & write),
+    // - pointer to the parameters (read only),
+    // - pointer to the time value(s) (read only),
+    // - pointer to the array of max timesteps (read & write),
+    // - pointer to the Taylor coefficients output (write only).
+    // These pointers cannot overlap.
+    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    if (f == nullptr) {
+        throw std::invalid_argument(
+            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
+    }
+
+    // Set the names/attributes of the function arguments.
+    auto state_ptr = f->args().begin();
+    state_ptr->setName("state_ptr");
+    state_ptr->addAttr(llvm::Attribute::NoCapture);
+    state_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto par_ptr = state_ptr + 1;
+    par_ptr->setName("par_ptr");
+    par_ptr->addAttr(llvm::Attribute::NoCapture);
+    par_ptr->addAttr(llvm::Attribute::NoAlias);
+    par_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto time_ptr = par_ptr + 1;
+    time_ptr->setName("time_ptr");
+    time_ptr->addAttr(llvm::Attribute::NoCapture);
+    time_ptr->addAttr(llvm::Attribute::NoAlias);
+    time_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = time_ptr + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto tc_ptr = h_ptr + 1;
+    tc_ptr->setName("tc_ptr");
+    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    tc_ptr->addAttr(llvm::Attribute::NoAlias);
+    tc_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Compute the jet of derivatives at the given order.
+    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
+                                              compact_mode);
+
+    // Determine the integration timestep.
+    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, h_ptr, n_eq, n_uvars, order, batch_size);
+
+    // Evaluate the Taylor polynomials, producing the updated state of the system.
+    auto new_state_var
+        = high_accuracy
+              ? taylor_run_ceval<T>(s, diff_variant, h, n_eq, n_uvars, order, batch_size, high_accuracy, compact_mode)
+              : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
+
+    // Store the new state.
+    // NOTE: no need to perform overflow check on n_eq * batch_size,
+    // as in taylor_compute_jet() we already checked.
+    if (compact_mode) {
+        auto new_state = std::get<llvm::Value *>(new_state_var);
+
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(new_state, {cur_var_idx}));
+            store_vector_to_memory(
+                builder,
+                builder.CreateInBoundsGEP(state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
+                val);
+        });
+    } else {
+        const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
+
+        assert(new_state.size() == n_eq);
+
+        for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
+            store_vector_to_memory(builder,
+                                   builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
+                                   new_state[var_idx]);
+        }
+    }
+
+    // Store the timesteps that were used.
+    store_vector_to_memory(builder, h_ptr, h);
+
+    // Write the Taylor coefficients, if requested.
+    auto nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
+    llvm_if_then_else(
+        s, builder.CreateICmpNE(tc_ptr, nptr),
+        [&]() {
+            // tc_ptr is not null: copy the Taylor coefficients
+            // for the state variables.
+            taylor_write_tc(s, diff_variant, {}, tc_ptr, n_eq, n_uvars, order, batch_size);
+        },
+        [&]() {
+            // Taylor coefficients were not requested,
+            // don't do anything in this branch.
+        });
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+
+    return std::tuple{std::move(dc), order};
+}
+
 } // namespace
 
 template <typename T>
@@ -4521,631 +5068,6 @@ taylor_add_jet_f128(llvm_state &s, const std::string &name, std::vector<std::pai
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
                                                       compact_mode, std::move(sv_funcs));
-}
-
-#endif
-
-namespace detail
-{
-
-namespace
-{
-
-// Run the Horner scheme to propagate an ODE state via the evaluation of the Taylor polynomials.
-// diff_var contains either the derivatives for all u variables (in compact mode) or only
-// for the state variables (non-compact mode). The evaluation point (i.e., the timestep)
-// is h. The evaluation is run in parallel over the polynomials of all the state
-// variables.
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var,
-                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                       bool compact_mode)
-{
-    auto &builder = s.builder();
-
-    if (compact_mode) {
-        // Compact mode.
-        auto diff_arr = std::get<llvm::Value *>(diff_var);
-
-        // Create the array storing the results of the evaluation.
-        auto array_type = llvm::ArrayType::get(pointee_type(diff_arr), n_eq);
-        auto res_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-
-        // Init the return value, filling it with the values of the
-        // coefficients of the highest-degree monomial in each polynomial.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            // Load the value from diff_arr and store it in res_arr.
-            builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
-                                builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-        });
-
-        // Run the evaluation.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                      [&](llvm::Value *cur_order) {
-                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                              // Load the current poly coeff from diff_arr.
-                              // NOTE: we are loading the coefficients backwards wrt the order, hence
-                              // we specify order - cur_order.
-                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars,
-                                                           builder.CreateSub(builder.getInt32(order), cur_order),
-                                                           cur_var_idx);
-
-                              // Accumulate in res_arr.
-                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                              builder.CreateStore(
-                                  builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)), res_ptr);
-                          });
-                      });
-
-        return res_arr;
-    } else {
-        // Non-compact mode.
-        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
-
-        // Init the return value, filling it with the values of the
-        // coefficients of the highest-degree monomial in each polynomial.
-        std::vector<llvm::Value *> res_arr;
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            res_arr.push_back(diff_arr[(n_eq * order) + i]);
-        }
-
-        // Run the Horner scheme simultaneously for all polynomials.
-        for (std::uint32_t i = 1; i <= order; ++i) {
-            for (std::uint32_t j = 0; j < n_eq; ++j) {
-                res_arr[j] = builder.CreateFAdd(diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
-            }
-        }
-
-        return res_arr;
-    }
-}
-
-// Same as the previous function, but here the data is always coming in as a
-// pointer to scalar FP values representing the derivatives of the state variables.
-// The same pointer is also used for output. Hence, the internal logic and indexing are
-// different.
-void taylor_run_multihorner_state_updater(llvm_state &s, llvm::Value *jet_ptr, llvm::Value *h, std::uint32_t n_eq,
-                                          std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
-{
-    auto &builder = s.builder();
-
-    if (compact_mode) {
-        // Compact mode.
-
-        // Create the array storing the result of the evaluation.
-        auto array_type = llvm::ArrayType::get(make_vector_type(pointee_type(jet_ptr), batch_size), n_eq);
-        auto res_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-
-        // Init res_arr, filling it with the values of the
-        // coefficients of the highest-degree monomial in each polynomial.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            // Load the value from jet_ptr.
-            // NOTE: the index is order * n_eq * batch_size + cur_var_idx * batch_size.
-            // NOTE: overflow checking was done in taylor_add_jet_impl().
-            auto ptr = builder.CreateInBoundsGEP(
-                jet_ptr, {builder.CreateAdd(builder.getInt32(order * n_eq * batch_size),
-                                            builder.CreateMul(builder.getInt32(batch_size), cur_var_idx))});
-            auto val = load_vector_from_memory(builder, ptr, batch_size);
-
-            // Store it in res_arr.
-            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-        });
-
-        // Run the evaluation.
-        llvm_loop_u32(
-            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-            [&](llvm::Value *cur_order) {
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                    // Load the current poly coeff from jet_ptr.
-                    // NOTE: the index is (order - cur_order) * n_eq * batch_size + cur_var_idx * batch_size.
-                    auto cf_ptr = builder.CreateInBoundsGEP(
-                        jet_ptr,
-                        {builder.CreateAdd(builder.CreateMul(builder.CreateSub(builder.getInt32(order), cur_order),
-                                                             builder.getInt32(n_eq * batch_size)),
-                                           builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)))});
-                    auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
-
-                    // Accumulate in res_arr.
-                    auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                    builder.CreateStore(builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)),
-                                        res_ptr);
-                });
-            });
-
-        // Copy the result to jet_ptr.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-            store_vector_to_memory(
-                builder,
-                builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))}),
-                val);
-        });
-    } else {
-        // Non-compact mode.
-
-        // Create the array of results, initially containing the values of the
-        // coefficients of the highest-degree monomial in each polynomial.
-        std::vector<llvm::Value *> res_arr;
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            auto ptr
-                = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(order * n_eq * batch_size + i * batch_size)});
-            res_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
-        }
-
-        // Run the evaluation.
-        for (std::uint32_t i = 1; i <= order; ++i) {
-            for (std::uint32_t j = 0; j < n_eq; ++j) {
-                auto ptr = builder.CreateInBoundsGEP(
-                    jet_ptr, {builder.getInt32((order - i) * n_eq * batch_size + j * batch_size)});
-                res_arr[j] = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size),
-                                                builder.CreateFMul(res_arr[j], h));
-            }
-        }
-
-        // Write the result to jet_ptr.
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(batch_size * i)}),
-                                   res_arr[i]);
-        }
-    }
-}
-
-// Same as taylor_run_multihorner(), but instead of the Horner scheme this implementation uses
-// a compensated summation over the naive evaluation of monomials.
-template <typename T>
-std::variant<llvm::Value *, std::vector<llvm::Value *>>
-taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
-                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool,
-                 bool compact_mode)
-{
-    auto &builder = s.builder();
-
-    if (compact_mode) {
-        // Compact mode.
-        auto diff_arr = std::get<llvm::Value *>(diff_var);
-
-        // Create the arrays storing the results of the evaluation and the running compensations.
-        auto array_type = llvm::ArrayType::get(pointee_type(diff_arr), n_eq);
-        auto res_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-        auto comp_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-
-        // Init res_arr with the order-0 monomials, and the running
-        // compensations with zero.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            // Load the value from diff_arr.
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(diff_arr, {cur_var_idx}));
-
-            // Store it in res_arr.
-            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-
-            // Zero-init the element in comp_arr.
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
-                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
-        });
-
-        // Init the running updater for the powers of h.
-        auto cur_h = builder.CreateAlloca(h->getType());
-        builder.CreateStore(h, cur_h);
-
-        // Run the evaluation.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                      [&](llvm::Value *cur_order) {
-                          // Load the current power of h.
-                          auto cur_h_val = builder.CreateLoad(cur_h);
-
-                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                              // Evaluate the current monomial.
-                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
-                              auto tmp = builder.CreateFMul(cf, cur_h_val);
-
-                              // Compute the quantities for the compensation.
-                              auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
-                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                              auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
-                              auto cur_res = builder.CreateLoad(res_ptr);
-                              auto t = builder.CreateFAdd(cur_res, y);
-
-                              // Update the compensation and the return value.
-                              builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
-                              builder.CreateStore(t, res_ptr);
-                          });
-
-                          // Update the value of h.
-                          builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
-                      });
-
-        return res_arr;
-    } else {
-        // Non-compact mode.
-        const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
-
-        // Init the return values with the order-0 monomials, and the running
-        // compensations with zero.
-        std::vector<llvm::Value *> res_arr, comp_arr;
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            res_arr.push_back(diff_arr[i]);
-            comp_arr.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-        }
-
-        // Evaluate and sum.
-        auto cur_h = h;
-        for (std::uint32_t i = 1; i <= order; ++i) {
-            for (std::uint32_t j = 0; j < n_eq; ++j) {
-                // Evaluate the current monomial.
-                auto tmp = builder.CreateFMul(diff_arr[i * n_eq + j], cur_h);
-
-                // Compute the quantities for the compensation.
-                auto y = builder.CreateFSub(tmp, comp_arr[j]);
-                auto t = builder.CreateFAdd(res_arr[j], y);
-
-                // Update the compensation and the return value.
-                comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);
-                res_arr[j] = t;
-            }
-
-            // Update the power of h.
-            cur_h = builder.CreateFMul(cur_h, h);
-        }
-
-        return res_arr;
-    }
-}
-
-// Same as the previous function, but here the data is always coming in as a
-// pointer to scalar FP values representing the derivatives of the state variables.
-// The same pointer is also used for output. Hence, the internal logic and indexing are
-// different.
-template <typename T>
-void taylor_run_ceval_state_updater(llvm_state &s, llvm::Value *jet_ptr, llvm::Value *h, std::uint32_t n_eq,
-                                    std::uint32_t order, std::uint32_t batch_size, bool, bool compact_mode)
-{
-    auto &builder = s.builder();
-
-    if (compact_mode) {
-        // Compact mode.
-
-        // Create the array storing the results of the evaluation and the running compensations.
-        auto array_type = llvm::ArrayType::get(make_vector_type(pointee_type(jet_ptr), batch_size), n_eq);
-        auto res_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-        auto comp_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
-
-        // Init res_arr with the order-0 monomials, and the running
-        // compensations with zero.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            // Load the value from jet_ptr.
-            // NOTE: the index is cur_var_idx * batch_size.
-            // NOTE: overflow checking was done in taylor_add_jet_impl().
-            auto ptr
-                = builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(builder.getInt32(batch_size), cur_var_idx)});
-            auto val = load_vector_from_memory(builder, ptr, batch_size);
-
-            // Store it in res_arr.
-            builder.CreateStore(val, builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-
-            // Zero-init the element in comp_arr.
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
-                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
-        });
-
-        // Init the running updater for the powers of h.
-        auto cur_h = builder.CreateAlloca(h->getType());
-        builder.CreateStore(h, cur_h);
-
-        // Run the evaluation.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                      [&](llvm::Value *cur_order) {
-                          // Load the current power of h.
-                          auto cur_h_val = builder.CreateLoad(cur_h);
-
-                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                              // Evaluate the current monomial.
-                              // NOTE: the index is cur_order * n_eq * batch_size + cur_var_idx * batch_size.
-                              auto cf_ptr = builder.CreateInBoundsGEP(
-                                  jet_ptr,
-                                  {builder.CreateAdd(builder.CreateMul(cur_order, builder.getInt32(n_eq * batch_size)),
-                                                     builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)))});
-                              auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
-                              auto tmp = builder.CreateFMul(cf, cur_h_val);
-
-                              // Compute the quantities for the compensation.
-                              auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
-                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                              auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
-                              auto cur_res = builder.CreateLoad(res_ptr);
-                              auto t = builder.CreateFAdd(cur_res, y);
-
-                              // Update the compensation and the result.
-                              builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
-                              builder.CreateStore(t, res_ptr);
-                          });
-
-                          // Update the value of h.
-                          builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
-                      });
-
-        // Copy the result to jet_ptr.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(res_arr, {cur_var_idx}));
-            store_vector_to_memory(
-                builder,
-                builder.CreateInBoundsGEP(jet_ptr, {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))}),
-                val);
-        });
-    } else {
-        // Non-compact mode.
-
-        // Init the results with the order-0 monomials, and the running
-        // compensations with zero.
-        std::vector<llvm::Value *> res_arr, comp_arr;
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            auto ptr = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(i * batch_size)});
-            res_arr.push_back(load_vector_from_memory(builder, ptr, batch_size));
-
-            comp_arr.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-        }
-
-        // Evaluate and sum.
-        auto cur_h = h;
-        for (std::uint32_t i = 1; i <= order; ++i) {
-            for (std::uint32_t j = 0; j < n_eq; ++j) {
-                auto cf_ptr
-                    = builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(i * n_eq * batch_size + j * batch_size)});
-                auto cf = load_vector_from_memory(builder, cf_ptr, batch_size);
-                auto tmp = builder.CreateFMul(cf, cur_h);
-
-                // Compute the quantities for the compensation.
-                auto y = builder.CreateFSub(tmp, comp_arr[j]);
-                auto t = builder.CreateFAdd(res_arr[j], y);
-
-                // Update the compensation and the result.
-                comp_arr[j] = builder.CreateFSub(builder.CreateFSub(t, res_arr[j]), y);
-                res_arr[j] = t;
-            }
-
-            // Update the power of h.
-            cur_h = builder.CreateFMul(cur_h, h);
-        }
-
-        // Write the result to jet_ptr.
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(jet_ptr, {builder.getInt32(batch_size * i)}),
-                                   res_arr[i]);
-        }
-    }
-}
-
-// NOTE: in compact mode, care must be taken when adding multiple stepper functions to the same llvm state
-// with the same floating-point type, batch size and number of u variables. The potential issue there
-// is that when the first stepper is added, the compact mode AD functions are created and then optimised.
-// The optimisation pass might alter the functions in a way that makes them incompatible with subsequent
-// uses in the second stepper (e.g., an argument might be removed from the signature because it is a
-// compile-time constant). A workaround to avoid issues is to set the optimisation level to zero
-// in the state, add the 2 steppers and then run a single optimisation pass. This is what we do
-// in the integrators' ctors.
-// NOTE: document this eventually.
-template <typename T, typename U>
-auto taylor_add_adaptive_step_impl(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
-                                   bool high_accuracy, bool compact_mode)
-{
-    using namespace fmt::literals;
-    using std::isfinite;
-
-    if (s.is_compiled()) {
-        throw std::invalid_argument("An adaptive Taylor stepper cannot be added to an llvm_state after compilation");
-    }
-
-    if (batch_size == 0u) {
-        throw std::invalid_argument("The batch size of a Taylor stepper cannot be zero");
-    }
-
-    if (!isfinite(tol) || tol <= 0) {
-        throw std::invalid_argument(
-            "The tolerance in an adaptive Taylor stepper must be finite and positive, but it is {} instead"_format(
-                tol));
-    }
-
-    // Determine the order from the tolerance.
-    const auto order = taylor_order_from_tol(tol);
-
-    // Record the number of equations/variables.
-    const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
-
-    // Decompose the system of equations.
-    // NOTE: no sv_funcs needed for this stepper.
-    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
-
-    assert(sv_funcs_dc.empty());
-
-    // Compute the number of u variables.
-    assert(dc.size() > n_eq);
-    const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
-
-    auto &builder = s.builder();
-    auto &context = s.context();
-
-    // Prepare the function prototype. The arguments are:
-    // - pointer to the current state vector (read & write),
-    // - pointer to the parameters (read only),
-    // - pointer to the time value(s) (read only),
-    // - pointer to the array of max timesteps (read & write),
-    // - pointer to the Taylor coefficients output (write only).
-    // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
-    // The function does not return anything.
-    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
-    // Now create the function.
-    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
-    if (f == nullptr) {
-        throw std::invalid_argument(
-            "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
-    }
-
-    // Set the names/attributes of the function arguments.
-    auto state_ptr = f->args().begin();
-    state_ptr->setName("state_ptr");
-    state_ptr->addAttr(llvm::Attribute::NoCapture);
-    state_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    auto par_ptr = state_ptr + 1;
-    par_ptr->setName("par_ptr");
-    par_ptr->addAttr(llvm::Attribute::NoCapture);
-    par_ptr->addAttr(llvm::Attribute::NoAlias);
-    par_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto time_ptr = par_ptr + 1;
-    time_ptr->setName("time_ptr");
-    time_ptr->addAttr(llvm::Attribute::NoCapture);
-    time_ptr->addAttr(llvm::Attribute::NoAlias);
-    time_ptr->addAttr(llvm::Attribute::ReadOnly);
-
-    auto h_ptr = time_ptr + 1;
-    h_ptr->setName("h_ptr");
-    h_ptr->addAttr(llvm::Attribute::NoCapture);
-    h_ptr->addAttr(llvm::Attribute::NoAlias);
-
-    auto tc_ptr = h_ptr + 1;
-    tc_ptr->setName("tc_ptr");
-    tc_ptr->addAttr(llvm::Attribute::NoCapture);
-    tc_ptr->addAttr(llvm::Attribute::NoAlias);
-    tc_ptr->addAttr(llvm::Attribute::WriteOnly);
-
-    // Create a new basic block to start insertion into.
-    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
-    builder.SetInsertPoint(bb);
-
-    // Compute the jet of derivatives at the given order.
-    auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
-                                              compact_mode);
-
-    // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, h_ptr, n_eq, n_uvars, order, batch_size);
-
-    // Evaluate the Taylor polynomials, producing the updated state of the system.
-    auto new_state_var
-        = high_accuracy
-              ? taylor_run_ceval<T>(s, diff_variant, h, n_eq, n_uvars, order, batch_size, high_accuracy, compact_mode)
-              : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
-
-    // Store the new state.
-    // NOTE: no need to perform overflow check on n_eq * batch_size,
-    // as in taylor_compute_jet() we already checked.
-    if (compact_mode) {
-        auto new_state = std::get<llvm::Value *>(new_state_var);
-
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(new_state, {cur_var_idx}));
-            store_vector_to_memory(
-                builder,
-                builder.CreateInBoundsGEP(state_ptr, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))),
-                val);
-        });
-    } else {
-        const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
-
-        assert(new_state.size() == n_eq);
-
-        for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(state_ptr, builder.getInt32(var_idx * batch_size)),
-                                   new_state[var_idx]);
-        }
-    }
-
-    // Store the timesteps that were used.
-    store_vector_to_memory(builder, h_ptr, h);
-
-    // Write the Taylor coefficients, if requested.
-    auto nptr = llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
-    llvm_if_then_else(
-        s, builder.CreateICmpNE(tc_ptr, nptr),
-        [&]() {
-            // tc_ptr is not null: copy the Taylor coefficients
-            // for the state variables.
-            taylor_write_tc(s, diff_variant, {}, tc_ptr, n_eq, n_uvars, order, batch_size);
-        },
-        [&]() {
-            // Taylor coefficients were not requested,
-            // don't do anything in this branch.
-        });
-
-    // Create the return value.
-    builder.CreateRetVoid();
-
-    // Verify the function.
-    s.verify_function(f);
-
-    // Run the optimisation pass.
-    s.optimise();
-
-    return std::tuple{std::move(dc), order};
-}
-
-} // namespace
-
-} // namespace detail
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys, double tol,
-                             std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                         compact_mode);
-}
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_ldbl(llvm_state &s, const std::string &name, std::vector<expression> sys, long double tol,
-                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                              compact_mode);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_f128(llvm_state &s, const std::string &name, std::vector<expression> sys, mppp::real128 tol,
-                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                                compact_mode);
-}
-
-#endif
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_dbl(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                             double tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                         compact_mode);
-}
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_ldbl(llvm_state &s, const std::string &name,
-                              std::vector<std::pair<expression, expression>> sys, long double tol,
-                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<long double>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                              compact_mode);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_f128(llvm_state &s, const std::string &name,
-                              std::vector<std::pair<expression, expression>> sys, mppp::real128 tol,
-                              std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    return detail::taylor_add_adaptive_step_impl<mppp::real128>(s, name, std::move(sys), tol, batch_size, high_accuracy,
-                                                                compact_mode);
 }
 
 #endif
