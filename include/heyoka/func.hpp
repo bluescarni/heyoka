@@ -172,7 +172,7 @@ inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval
 
 #if defined(HEYOKA_HAVE_REAL128)
 template <typename T>
-using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_ldbl(
+using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_f128(
     std::declval<const std::unordered_map<std::string, mppp::real128> &>(), std::declval<const std::vector<mppp::real128> &>()));
 
 template <typename T>
