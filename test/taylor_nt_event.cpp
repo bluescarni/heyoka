@@ -43,6 +43,53 @@ const auto fp_types = std::tuple<double, long double
 #endif
                                  >{};
 
+// A test case to check that the propagation codepath
+// with events produces results identical results
+// to the no-events codepath.
+TEST_CASE("taylor nte match")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
+
+        auto ta_ev = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                           {fp_t(-0.25), fp_t(0.)},
+                                           kw::opt_level = opt_level,
+                                           kw::high_accuracy = high_accuracy,
+                                           kw::compact_mode = compact_mode,
+                                           kw::nt_events = {ev_t(v, [](taylor_adaptive<fp_t> &, fp_t) {})}};
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                        {fp_t(-0.25), fp_t(0.)},
+                                        kw::opt_level = opt_level,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode};
+
+        for (auto i = 0; i < 200; ++i) {
+            auto [oc_ev, h_ev] = ta_ev.step();
+            auto [oc, h] = ta.step();
+
+            REQUIRE(oc_ev == oc);
+            REQUIRE(h_ev == h);
+
+            REQUIRE(ta_ev.get_state() == ta.get_state());
+            REQUIRE(ta_ev.get_time() == ta.get_time());
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
 TEST_CASE("taylor nte")
 {
     using Catch::Matchers::Message;
