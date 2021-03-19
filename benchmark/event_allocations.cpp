@@ -20,6 +20,11 @@
 
 using namespace heyoka;
 
+// NOTE: this benchmark is meant to be run under valgrind
+// (or other similar tool) with several values of final_time in order to check
+// that the number of memory allocations tends to a fixed value
+// as final_time increases. This is meant to check the caching
+// techniques in the event detection machinery.
 int main(int argc, char *argv[])
 {
     namespace po = boost::program_options;
@@ -53,7 +58,9 @@ int main(int argc, char *argv[])
                                          {-0.25, 0.},
                                          kw::nt_events = {ev_t(v, [](taylor_adaptive<double> &, double) {})}};
 
-    ta_ev.propagate_until(final_time);
+    for (auto i = 0; i < 10; ++i) {
+        ta_ev.propagate_for(final_time);
+    }
 
     std::cout << "Final time: " << ta_ev.get_time() << '\n';
 }
