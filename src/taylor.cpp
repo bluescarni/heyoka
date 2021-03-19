@@ -5272,7 +5272,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << "]\n";
 
     if (!ta.get_pars().empty()) {
-        oss << "Parameters  : [";
+        oss << "Parameters              : [";
         for (decltype(ta.get_pars().size()) i = 0; i < ta.get_pars().size(); ++i) {
             oss << ta.get_pars()[i];
             if (i != ta.get_pars().size() - 1u) {
