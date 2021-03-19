@@ -3015,7 +3015,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         auto comp_arr
             = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
 
-        // Init res_arr with the order-0 monomials, and the running
+        // Init res_arr with the order-0 coefficients, and the running
         // compensations with zero.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the value from diff_arr.
@@ -3034,31 +3034,30 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         builder.CreateStore(h, cur_h);
 
         // Run the evaluation.
-        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                      [&](llvm::Value *cur_order) {
-                          // Load the current power of h.
-                          auto cur_h_val = builder.CreateLoad(cur_h);
+        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order + 1u), [&](llvm::Value *cur_order) {
+            // Load the current power of h.
+            auto cur_h_val = builder.CreateLoad(cur_h);
 
-                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                              // Evaluate the current monomial.
-                              auto cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
-                              auto tmp = builder.CreateFMul(cf, cur_h_val);
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                // Evaluate the current monomial.
+                auto cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
+                auto tmp = builder.CreateFMul(cf, cur_h_val);
 
-                              // Compute the quantities for the compensation.
-                              auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
-                              auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
-                              auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
-                              auto cur_res = builder.CreateLoad(res_ptr);
-                              auto t = builder.CreateFAdd(cur_res, y);
+                // Compute the quantities for the compensation.
+                auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                auto res_ptr = builder.CreateInBoundsGEP(res_arr, {cur_var_idx});
+                auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                auto cur_res = builder.CreateLoad(res_ptr);
+                auto t = builder.CreateFAdd(cur_res, y);
 
-                              // Update the compensation and the return value.
-                              builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
-                              builder.CreateStore(t, res_ptr);
-                          });
+                // Update the compensation and the return value.
+                builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                builder.CreateStore(t, res_ptr);
+            });
 
-                          // Update the value of h.
-                          builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
-                      });
+            // Update the value of h.
+            builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+        });
 
         return res_arr;
     } else {
