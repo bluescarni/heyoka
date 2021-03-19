@@ -289,6 +289,19 @@ double func::eval_dbl(const std::unordered_map<std::string, double> &m, const st
     return ptr()->eval_dbl(m, pars);
 }
 
+long double func::eval_ldbl(const std::unordered_map<std::string, long double> &m,
+                            const std::vector<long double> &pars) const
+{
+    return ptr()->eval_ldbl(m, pars);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 func::eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
+                              const std::vector<mppp::real128> &pars) const
+{
+    return ptr()->eval_f128(m, pars);
+}
+#endif
 void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &m,
                           const std::vector<double> &pars) const
 {
@@ -623,6 +636,18 @@ double eval_dbl(const func &f, const std::unordered_map<std::string, double> &ma
 {
     return f.eval_dbl(map, pars);
 }
+
+long double eval_ldbl(const func &f, const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars)
+{
+    return f.eval_ldbl(map, pars);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars)
+{
+    return f.eval_f128(map, pars);
+}
+#endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const func &f,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
