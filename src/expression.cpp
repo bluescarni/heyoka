@@ -745,6 +745,20 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
     return std::visit([&](const auto &arg) { return eval_dbl(arg, map, pars); }, e.value());
 }
 
+long double eval_ldbl(const expression &e, const std::unordered_map<std::string, long double> &map,
+                const std::vector<long double> &pars)
+{
+    return std::visit([&](const auto &arg) { return eval_ldbl(arg, map, pars); }, e.value());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const expression &e, const std::unordered_map<std::string, mppp::real128> &map,
+                const std::vector<mppp::real128> &pars)
+{
+    return std::visit([&](const auto &arg) { return eval_f128(arg, map, pars); }, e.value());
+}
+#endif
+
 void eval_batch_dbl(std::vector<double> &retval, const expression &e,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
 {

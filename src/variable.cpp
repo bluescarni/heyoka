@@ -21,6 +21,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/format.h>
+
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -120,13 +122,40 @@ expression diff(const variable &var, const std::string &s)
 
 double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)
 {
+    using namespace fmt::literals;
     if (auto it = map.find(var.name()); it != map.end()) {
         return it->second;
     } else {
-        throw std::invalid_argument("Cannot evaluate the variable '" + var.name()
-                                    + "' because it is missing from the evaluation map");
+        throw std::invalid_argument(
+            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
     }
 }
+
+long double eval_ldbl(const variable &var, const std::unordered_map<std::string, long double> &map,
+                      const std::vector<long double> &)
+{
+    using namespace fmt::literals;
+    if (auto it = map.find(var.name()); it != map.end()) {
+        return it->second;
+    } else {
+        throw std::invalid_argument(
+            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
+    }
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::string, mppp::real128> &map,
+                        const std::vector<mppp::real128> &)
+{
+    using namespace fmt::literals;
+    if (auto it = map.find(var.name()); it != map.end()) {
+        return it->second;
+    } else {
+        throw std::invalid_argument(
+            "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
+    }
+}
+#endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &)

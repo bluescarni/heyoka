@@ -210,20 +210,43 @@ expression diff(const binary_operator &bo, const std::string &s)
     }
 }
 
-double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
-                const std::vector<double> &pars)
+namespace detail
+{
+template <class T>
+T eval_bo_impl(const binary_operator &bo, const std::unordered_map<std::string, T> &map, const std::vector<T> &pars)
 {
     switch (bo.op()) {
         case binary_operator::type::add:
-            return eval_dbl(bo.lhs(), map, pars) + eval_dbl(bo.rhs(), map, pars);
+            return eval<T>(bo.lhs(), map, pars) + eval<T>(bo.rhs(), map, pars);
         case binary_operator::type::sub:
-            return eval_dbl(bo.lhs(), map, pars) - eval_dbl(bo.rhs(), map, pars);
+            return eval<T>(bo.lhs(), map, pars) - eval<T>(bo.rhs(), map, pars);
         case binary_operator::type::mul:
-            return eval_dbl(bo.lhs(), map, pars) * eval_dbl(bo.rhs(), map, pars);
+            return eval<T>(bo.lhs(), map, pars) * eval<T>(bo.rhs(), map, pars);
         default:
-            return eval_dbl(bo.lhs(), map, pars) / eval_dbl(bo.rhs(), map, pars);
+            return eval<T>(bo.lhs(), map, pars) / eval<T>(bo.rhs(), map, pars);
     }
 }
+} // namespace detail
+
+double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
+                const std::vector<double> &pars)
+{
+    return detail::eval_bo_impl<double>(bo, map, pars);
+}
+
+long double eval_ldbl(const binary_operator &bo, const std::unordered_map<std::string, long double> &map,
+                      const std::vector<long double> &pars)
+{
+    return detail::eval_bo_impl<long double>(bo, map, pars);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const binary_operator &bo, const std::unordered_map<std::string, mppp::real128> &map,
+                        const std::vector<mppp::real128> &pars)
+{
+    return detail::eval_bo_impl<mppp::real128>(bo, map, pars);
+}
+#endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
                     const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)

@@ -111,6 +111,36 @@ double eval_dbl(const param &p, const std::unordered_map<std::string, double> &,
     return pars[static_cast<decltype(pars.size())>(p.idx())];
 }
 
+long double eval_ldbl(const param &p, const std::unordered_map<std::string, long double> &,
+                      const std::vector<long double> &pars)
+{
+    if (p.idx() >= pars.size()) {
+        using namespace fmt::literals;
+
+        throw std::out_of_range(
+            "Index error in the long double numerical evaluation of a parameter: the parameter index is {}, "
+            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+    }
+
+    return pars[static_cast<decltype(pars.size())>(p.idx())];
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 eval_f128(const param &p, const std::unordered_map<std::string, mppp::real128> &,
+                       const std::vector<mppp::real128> &pars)
+{
+    if (p.idx() >= pars.size()) {
+        using namespace fmt::literals;
+
+        throw std::out_of_range(
+            "Index error in the real 128 numerical evaluation of a parameter: the parameter index is {}, "
+            "but the vector of parametric values has a size of only {}"_format(p.idx(), pars.size()));
+    }
+
+    return pars[static_cast<decltype(pars.size())>(p.idx())];
+}
+#endif
+
 void eval_batch_dbl(std::vector<double> &out, const param &p,
                     const std::unordered_map<std::string, std::vector<double>> &, const std::vector<double> &pars)
 {

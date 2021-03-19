@@ -300,6 +300,16 @@ struct func_06 : func_base {
     {
         return 42;
     }
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const
+    {
+        return 42;
+    }
+#if defined(HEYOKA_HAVE_REAL128)
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &, const std::vector<mppp::real128> &) const
+    {
+        return mppp::real128(42);
+    }
+#endif
 };
 
 TEST_CASE("func eval_dbl")

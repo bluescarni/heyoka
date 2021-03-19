@@ -18,6 +18,12 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include "catch.hpp"
 
 using namespace heyoka;
@@ -25,44 +31,72 @@ using namespace Catch::literals;
 
 #include <iostream>
 
-TEST_CASE("eval_dbl")
-{
+template <class T>
+void test_eval() {
+    using std::sin;
+    using std::cos;
+    using std::tan;
+    using std::log;
+    using std::exp;
+    using std::pow;
+    using std::sqrt;
+
+    auto [x, y] = make_vars("x", "y");
+
     // We test on a number
     {
-        expression ex = 2.345_dbl;
-        std::unordered_map<std::string, double> in;
-        REQUIRE(eval_dbl(ex, in) == 2.345);
+        expression ex(T(0.125));
+        std::unordered_map<std::string, T> in;
+        REQUIRE(eval(ex, in) == T(0.125));
     }
     // We test on a variable
     {
-        expression ex = "x"_var;
-        std::unordered_map<std::string, double> in{{"x", 2.345}};
-        REQUIRE(eval_dbl(ex, in) == 2.345);
+        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
+        REQUIRE(eval(x, in) == T(0.125));
     }
     // We test on a function call
-    {
-        expression ex = cos("x"_var);
-        std::unordered_map<std::string, double> in{{"x", 2.345}};
-        REQUIRE(eval_dbl(ex, in) == std::cos(2.345));
-    }
+
     // We test on a binary operator
     {
-        expression ex = "x"_var / 2.345_dbl;
-        std::unordered_map<std::string, double> in{{"x", 2.345}};
-        REQUIRE(eval_dbl(ex, in) == 1.);
+        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
+        REQUIRE(eval(x/T(0.125), in) == 1.);
     }
     // We test on a deeper tree
     {
-        expression ex = "x"_var * "y"_var + cos("x"_var * "y"_var);
-        std::unordered_map<std::string, double> in{{"x", 2.345}, {"y", -1.}};
-        REQUIRE(eval_dbl(ex, in) == -2.345 + std::cos(-2.345));
+        expression ex = (x*y + x*y*y*y)/(x*y + x*y*y*y) - x/y;
+        std::unordered_map<std::string, T> in{{"x", T(0.125)}, {"y", T(0.125)}};
+        REQUIRE(eval(ex, in) == 0.);
     }
     // We test the corner case of a dictionary not containing the variable.
     {
-        expression ex = "x"_var * "y"_var;
-        std::unordered_map<std::string, double> in{{"x", 2.345}};
-        REQUIRE_THROWS(eval_dbl(ex, in));
+        expression ex = x*y;
+        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
+        REQUIRE_THROWS(eval(ex, in));
     }
+    // We test the implementation of all function.
+    {
+        std::unordered_map<std::string, T> in{{"x", T(0.125)}};
+        REQUIRE(eval(cos(x), in) == cos(T(0.125)));
+        REQUIRE(eval(sin(x), in) == sin(T(0.125)));
+        REQUIRE(eval(log(x), in) == log(T(0.125)));
+        REQUIRE(eval(exp(x), in) == exp(T(0.125)));
+        REQUIRE(eval(pow(x,x), in) == pow(T(0.125), T(0.125)));
+        REQUIRE(eval(tan(x), in) == tan(T(0.125)));
+        REQUIRE(eval(sqrt(x), in) == sqrt(T(0.125)));
+        REQUIRE(eval(sigmoid(x), in) == T(1.) / (T(1.)+exp(-T(0.125))) );
+    }
+}
+
+
+TEST_CASE("eval")
+{
+    test_eval<double>();
+    test_eval<long double>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    test_eval<mppp::real128>();
+#endif
+
 }
 
 TEST_CASE("eval_batch_dbl")

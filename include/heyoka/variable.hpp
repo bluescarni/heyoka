@@ -57,6 +57,13 @@ HEYOKA_DLL_PUBLIC expression diff(const variable &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const variable &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
+HEYOKA_DLL_PUBLIC long double eval_ldbl(const variable &, const std::unordered_map<std::string, long double> &,
+                                        const std::vector<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const variable &, const std::unordered_map<std::string, mppp::real128> &,
+                                  const std::vector<mppp::real128> &);
+#endif
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const variable &,
                                       const std::unordered_map<std::string, std::vector<double>> &,

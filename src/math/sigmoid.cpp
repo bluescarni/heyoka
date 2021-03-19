@@ -146,6 +146,23 @@ double sigmoid_impl::eval_dbl(const std::unordered_map<std::string, double> &map
     return heyoka_sigmoid(heyoka::eval_dbl(args()[0], map, pars));
 }
 
+long double sigmoid_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return heyoka_sigmoidl(heyoka::eval_ldbl(args()[0], map, pars));
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 sigmoid_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return mppp::real128(heyoka_sigmoid128(heyoka::eval_f128(args()[0], map, pars).m_value));
+}
+#endif
+
+
 void sigmoid_impl::eval_batch_dbl(std::vector<double> &out,
                                   const std::unordered_map<std::string, std::vector<double>> &map,
                                   const std::vector<double> &pars) const

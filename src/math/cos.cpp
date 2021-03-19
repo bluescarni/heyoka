@@ -132,6 +132,22 @@ double cos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::cos(heyoka::eval_dbl(args()[0], map, pars));
 }
 
+long double cos_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return std::cos(heyoka::eval_ldbl(args()[0], map, pars));
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 cos_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return mppp::cos(heyoka::eval_f128(args()[0], map, pars));
+}
+#endif
+
 void cos_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std::string, std::vector<double>> &map,
                               const std::vector<double> &pars) const
 {
