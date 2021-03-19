@@ -172,7 +172,7 @@ double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
 
 long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
 {
-    assert(args().size() == 1u);
+    assert(args().size() == 2u);
 
     return std::pow(heyoka::eval_ldbl(args()[0], map, pars), heyoka::eval_ldbl(args()[1], map, pars));
 }
@@ -180,7 +180,7 @@ long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 #if defined(HEYOKA_HAVE_REAL128)
 mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
 {
-    assert(args().size() == 1u);
+    assert(args().size() == 2u);
 
     return mppp::pow(heyoka::eval_f128(args()[0], map, pars), heyoka::eval_f128(args()[1], map, pars));
 }
