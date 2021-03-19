@@ -271,7 +271,8 @@ namespace
 // Add a function for computing the dense output
 // via polynomial evaluation.
 template <typename T>
-void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size)
+void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size,
+                               bool high_accuracy)
 {
     assert(n_eq > 0u);
     assert(order > 0u);
@@ -321,48 +322,108 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
-    // Start by writing into out_ptr the coefficients of the highest-degree
-    // monomial in each polynomial.
-    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-        // Load the coefficient from tc_ptr. The index is:
-        // batch_size * (order + 1u) * cur_var_idx + batch_size * order.
-        auto tc_idx = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
-                                        builder.getInt32(batch_size * order));
-        auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
-
-        // Store it in out_ptr. The index is:
-        // batch_size * cur_var_idx.
-        auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
-    });
-
     // Load the value of h.
     auto h = load_vector_from_memory(builder, h_ptr, batch_size);
 
-    // Now let's run the Horner scheme.
-    llvm_loop_u32(
-        s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-        [&](llvm::Value *cur_order) {
+    if (high_accuracy) {
+        // Create the array for storing the running compensations.
+        auto array_type = llvm::ArrayType::get(make_vector_type(to_llvm_type<T>(context), batch_size), n_eq);
+        auto comp_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Start by writing into out_ptr the zero-order coefficients
+        // and by filling with zeroes the running compensations.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the coefficient from tc_ptr. The index is:
+            // batch_size * (order + 1u) * cur_var_idx.
+            auto tc_idx = builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx);
+            auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+            // Store it in out_ptr. The index is:
+            // batch_size * cur_var_idx.
+            auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+
+            // Zero-init the element in comp_arr.
+            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
+        });
+
+        // Init the running updater for the powers of h.
+        auto cur_h = builder.CreateAlloca(h->getType());
+        builder.CreateStore(h, cur_h);
+
+        // Run the evaluation.
+        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order + 1u), [&](llvm::Value *cur_order) {
+            // Load the current power of h.
+            auto cur_h_val = builder.CreateLoad(cur_h);
+
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                // Load the current Taylor coefficient from tc_ptr.
-                // NOTE: we are loading the coefficients backwards wrt the order, hence
-                // we specify order - cur_order.
-                // NOTE: the index is:
-                // batch_size * (order + 1u) * cur_var_idx + batch_size * (order - cur_order).
+                // Load the coefficient from tc_ptr. The index is:
+                // batch_size * (order + 1u) * cur_var_idx + batch_size * cur_order.
                 auto tc_idx
                     = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
-                                        builder.CreateMul(builder.getInt32(batch_size),
-                                                          builder.CreateSub(builder.getInt32(order), cur_order)));
-                auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                                        builder.CreateMul(builder.getInt32(batch_size), cur_order));
+                auto cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                auto tmp = builder.CreateFMul(cf, cur_h_val);
 
-                // Accumulate in out_ptr. The index is:
-                // batch_size * cur_var_idx.
+                // Compute the quantities for the compensation.
+                auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
                 auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                auto out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
-                auto cur_out = load_vector_from_memory(builder, out_p, batch_size);
-                store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
+                auto res_ptr = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                auto cur_res = load_vector_from_memory(builder, res_ptr, batch_size);
+                auto t = builder.CreateFAdd(cur_res, y);
+
+                // Update the compensation and the return value.
+                builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                store_vector_to_memory(builder, res_ptr, t);
             });
+
+            // Update the value of h.
+            builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
         });
+    } else {
+        // Start by writing into out_ptr the coefficients of the highest-degree
+        // monomial in each polynomial.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+            // Load the coefficient from tc_ptr. The index is:
+            // batch_size * (order + 1u) * cur_var_idx + batch_size * order.
+            auto tc_idx = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                            builder.getInt32(batch_size * order));
+            auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+            // Store it in out_ptr. The index is:
+            // batch_size * cur_var_idx.
+            auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+        });
+
+        // Now let's run the Horner scheme.
+        llvm_loop_u32(
+            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+            [&](llvm::Value *cur_order) {
+                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                    // Load the current Taylor coefficient from tc_ptr.
+                    // NOTE: we are loading the coefficients backwards wrt the order, hence
+                    // we specify order - cur_order.
+                    // NOTE: the index is:
+                    // batch_size * (order + 1u) * cur_var_idx + batch_size * (order - cur_order).
+                    auto tc_idx
+                        = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                            builder.CreateMul(builder.getInt32(batch_size),
+                                                              builder.CreateSub(builder.getInt32(order), cur_order)));
+                    auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+
+                    // Accumulate in out_ptr. The index is:
+                    // batch_size * cur_var_idx.
+                    auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+                    auto out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                    auto cur_out = load_vector_from_memory(builder, out_p, batch_size);
+                    store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
+                });
+            });
+    }
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -3472,7 +3533,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Add the function for the computation of
     // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1);
+    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1, high_accuracy);
 
     // Restore the original optimisation level in s.
     od.reset();
@@ -4357,7 +4418,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Add the function for the computation of
     // the dense output.
-    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size);
+    taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size, high_accuracy);
 
     // Restore the original optimisation level in s.
     od.reset();
