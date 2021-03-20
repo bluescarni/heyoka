@@ -436,7 +436,7 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     auto &context = s.context();
 
     // The function arguments:
-    // - the output pointer (read/write),
+    // - the output pointer (write-only),
     // - the pointer to the poly coefficients (read-only).
     // No overlap is allowed.
     std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
@@ -456,6 +456,7 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
