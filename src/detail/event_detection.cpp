@@ -427,6 +427,8 @@ auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
 #endif
 }
 
+// Helper to add a polynomial translation function
+// to the state 's'.
 template <typename T>
 void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -504,6 +506,8 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     s.optimise();
 }
 
+// Fetch a polynomial translation function
+// from the thread-local cache.
 template <typename T>
 auto get_poly_translator_1(std::uint32_t order)
 {
@@ -514,19 +518,25 @@ auto get_poly_translator_1(std::uint32_t order)
     auto it = tf_map.find(order);
 
     if (it == tf_map.end()) {
+        // Cache miss, we need to create
+        // a new LLVM state and function.
         llvm_state s;
 
+        // Add the polynomial translation function.
         add_poly_translator_1<T>(s, order, 1);
 
         s.compile();
 
+        // Fetch the function.
         auto f = reinterpret_cast<func_t>(s.jit_lookup("poly_translate_1"));
 
+        // Insert state and function into the cache.
         [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), f});
         assert(ret.second);
 
         return f;
     } else {
+        // Cache hit, return the function.
         return it->second.second;
     }
 }
