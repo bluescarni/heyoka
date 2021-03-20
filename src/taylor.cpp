@@ -48,6 +48,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -3871,7 +3872,7 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
     // timesteps.
     // NOTE: iter_counter is for keeping track of the max_steps
     // limits, step_counter counts the number of timesteps performed
-    // with a non-zero h. Most of the time these two quantities
+    // with a nonzero h. Most of the time these two quantities
     // will be identical, apart from corner cases.
     std::size_t iter_counter = 0, step_counter = 0;
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
@@ -4690,7 +4691,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
         // Update the local step counters.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             // NOTE: the local step counters increase only if we integrated
-            // for a non-zero time.
+            // for a nonzero time.
             m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
         }
 

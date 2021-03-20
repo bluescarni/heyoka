@@ -14,17 +14,18 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <boost/cstdint.hpp>
-#include <boost/iterator/filter_iterator.hpp>
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/special_functions/binomial.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
@@ -40,9 +41,22 @@
 
 #include <fmt/ostream.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
@@ -50,32 +64,6 @@ namespace heyoka::detail
 
 namespace
 {
-
-#if !defined(NDEBUG)
-
-// Debug functions to check the computation of
-// the binomial coefficients.
-
-template <typename T>
-auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
-{
-    const auto n = boost::numeric_cast<unsigned>(n_);
-    const auto k = boost::numeric_cast<unsigned>(k_);
-
-#if defined(HEYOKA_HAVE_REAL128)
-    if constexpr (std::is_same_v<T, mppp::real128>) {
-        using bf128 = boost::multiprecision::float128;
-
-        return mppp::real128{boost::math::binomial_coefficient<bf128>(n, k).backend().value()};
-    } else {
-#endif
-        return boost::math::binomial_coefficient<T>(n, k);
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-#endif
 
 // Helper to fetch the per-thread poly cache.
 template <typename T>
@@ -144,102 +132,6 @@ void put_poly_in_cache(std::vector<T> &&v)
     cache[n].push_back(std::move(v));
 }
 
-// Compute and return all binomial coefficients (n choose k)
-// up to n = max_n.
-template <typename T>
-auto make_binomial_coefficients(std::uint32_t max_n)
-{
-    assert(max_n >= 2u);
-
-    if (max_n > std::numeric_limits<std::uint32_t>::max() - 2u
-        || (max_n + 1u) > std::numeric_limits<std::uint32_t>::max() / (max_n + 2u)) {
-        throw std::overflow_error("An overflow was detected while generating a list of binomial coefficients");
-    }
-
-    std::vector<T> retval;
-    retval.resize(boost::numeric_cast<decltype(retval.size())>(((max_n + 1u) * (max_n + 2u)) / 2u));
-
-    // Fill up to n = 2.
-
-    // 0 choose 0.
-    retval[0] = 1;
-
-    // 1 choose 0.
-    retval[1] = 1;
-    // 1 choose 1.
-    retval[2] = 1;
-
-    // 2 choose 0.
-    retval[3] = 1;
-    // 2 choose 1.
-    retval[4] = 2;
-    // 2 choose 2.
-    retval[5] = 1;
-
-    // Iterate using the recursion formula.
-    std::uint32_t base_idx = 6;
-    for (std::uint32_t n = 3; n <= max_n; base_idx += ++n) {
-        // n choose 0 = 1.
-        retval[base_idx] = 1;
-
-        // NOTE: the recursion formula is valid up to k = n - 1.
-        const auto prev_base_idx = base_idx - n;
-        for (std::uint32_t k = 1; k < n; ++k) {
-            retval[base_idx + k] = retval[prev_base_idx + k] + retval[prev_base_idx + k - 1u];
-        }
-
-        // n choose n = 1.
-        retval[base_idx + n] = 1;
-    }
-
-    return retval;
-}
-
-// Fetch the index of (n choose k) in a vector produced by
-// make_binomial_coefficients().
-std::uint32_t bc_idx(std::uint32_t n, std::uint32_t k)
-{
-    assert(k <= n);
-
-    return (n * (n + 1u)) / 2u + k;
-}
-
-// Helper to fetch the per-thread cache of binomial coefficients.
-template <typename T>
-auto &get_bc_cache()
-{
-    thread_local std::vector<std::vector<T>> ret;
-
-    return ret;
-}
-
-// Fetch from the cache the list of all binomial
-// coefficients (n choose k) up to n = max_n.
-template <typename T>
-const auto &get_bc_up_to(std::uint32_t max_n)
-{
-    auto &cache = get_bc_cache<T>();
-
-    if (max_n >= cache.size()) {
-        cache.resize(boost::numeric_cast<decltype(cache.size())>(max_n + 1u));
-    }
-
-    auto &bcache = cache[max_n];
-
-    if (bcache.empty()) {
-        // NOTE: here, in principle, rather than computing all
-        // binomial coefficients for each different value of max_n,
-        // we could re-use the coefficients computed for lower values
-        // of max_n. I don't think this makes much of a difference in practice,
-        // as the computation is done once per thread and most likely with
-        // not many different values of max_n. Keep this in mind
-        // in any case.
-        bcache = make_binomial_coefficients<T>(max_n);
-    }
-
-    return bcache;
-}
-
 // Given an input polynomial a(x), substitute
 // x with x_1 * h and write to ret the resulting
 // polynomial in the new variable x_1. Requires
@@ -272,72 +164,80 @@ void poly_rescale_p2(OutputIt ret, InputIt a, std::uint32_t n)
     }
 }
 
-// Substitute the polynomial variable x with x_1 + 1,
-// and write the resulting polynomial in ret. bcs
-// is a vector containing the binomial coefficients
-// up to to (n choose n) in the format returned
-// by make_binomial_coefficients().
-// Requires random-access iterators.
-// NOTE: aliasing NOT allowed.
-template <typename OutputIt, typename InputIt, typename BCs>
-void poly_translate_1(OutputIt ret, InputIt a, std::uint32_t n, const BCs &bcs)
+// Generic branchless sign function.
+template <typename T>
+int sgn(T val)
 {
-    using value_type [[maybe_unused]] = typename std::iterator_traits<InputIt>::value_type;
-
-    // Zero out the return value.
-    for (std::uint32_t i = 0; i <= n; ++i) {
-        ret[i] = 0;
-    }
-
-    for (std::uint32_t i = 0; i <= n; ++i) {
-        const auto ai = a[i];
-
-        for (std::uint32_t k = 0; k <= i; ++k) {
-            assert(bc_idx(i, k) < bcs.size());
-
-#if !defined(NDEBUG)
-            // In debug mode check that the binomial coefficient
-            // was computed correctly.
-            using std::abs;
-
-            auto cmp = boost_math_bc<value_type>(i, k);
-            auto bc = bcs[bc_idx(i, k)];
-            assert(abs((bc - cmp) / cmp) < std::numeric_limits<value_type>::epsilon() * 1e4);
-#endif
-
-            ret[k] += ai * bcs[bc_idx(i, k)];
-        }
-    }
+    return (T(0) < val) - (val < T(0));
 }
 
 // Count the number of sign changes in the coefficients of polynomial a.
 // Zero coefficients are skipped. Requires random-access iterator.
+// NOTE: in case of NaN values in a, the return value of this
+// function will be meaningless, and we rely on checks elsewhere
+// (e.g., in the root finding function) to bail out.
 template <typename InputIt>
 std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
 {
-    using value_type = typename std::iterator_traits<InputIt>::value_type;
-
-    struct zero_filter {
-        bool operator()(const value_type &x) const
-        {
-            return x != 0;
-        }
-    };
-
-    // Create iterators for skipping zero coefficients in the polynomial.
-    auto begin = boost::make_filter_iterator<zero_filter>(a, a + n + 1u);
-    const auto end = boost::make_filter_iterator<zero_filter>(a + n + 1u, a + n + 1u);
-
-    if (begin == end) {
-        return 0;
-    }
+    assert(n > 0u);
 
     std::uint32_t retval = 0;
 
-    auto prev = begin;
-    for (++begin; begin != end; ++begin, ++prev) {
-        retval += (*begin > 0) != (*prev > 0);
+    // Start from index 0 and move forward
+    // until we find a nonzero coefficient.
+    std::uint32_t last_nz_idx = 0;
+    while (a[last_nz_idx] == 0) {
+        if (last_nz_idx == n - 1u) {
+            // The second-to-last coefficient is
+            // zero, no sign changes are possible
+            // regardless of the sign of the
+            // last coefficient.
+            return 0;
+        }
+        ++last_nz_idx;
     }
+
+    // Start iterating 1 past the first nonzero coefficient.
+    for (auto idx = last_nz_idx + 1u; idx <= n; ++idx) {
+        // Determine if a sign change occurred wrt
+        // the last nonzero coefficient found.
+        const auto cur_sign = sgn(a[idx]);
+        assert(sgn(a[last_nz_idx]));
+        retval += (cur_sign + sgn(a[last_nz_idx])) == 0;
+
+        // Update last_nz_idx if necessary.
+        last_nz_idx = cur_sign ? idx : last_nz_idx;
+    }
+
+#if !defined(NDEBUG)
+    // In debug mode, run a sanity check with a simpler algorithm.
+    thread_local std::vector<typename std::iterator_traits<InputIt>::value_type> nz_cfs;
+    nz_cfs.clear();
+
+    // NOTE: check if we have nans in the polynomials,
+    // we don't want to run the check in that case.
+    bool has_nan = false;
+
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        using std::isnan;
+        if (isnan(a[i])) {
+            has_nan = true;
+        }
+
+        if (a[i] != 0) {
+            nz_cfs.push_back(a[i]);
+        }
+    }
+
+    std::uint32_t r_check = 0;
+    for (std::uint32_t i = 1; i < nz_cfs.size(); ++i) {
+        if ((nz_cfs[i] > 0) != (nz_cfs[i - 1u] > 0)) {
+            ++r_check;
+        }
+    }
+
+    assert(has_nan || r_check == retval);
+#endif
 
     return retval;
 }
@@ -506,6 +406,141 @@ struct is_terminal_event<t_event<T>> : std::true_type {
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
+// Helper to compute binomial coefficients
+// using Boost.Math.
+template <typename T>
+auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
+{
+    const auto n = boost::numeric_cast<unsigned>(n_);
+    const auto k = boost::numeric_cast<unsigned>(k_);
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if constexpr (std::is_same_v<T, mppp::real128>) {
+        using bf128 = boost::multiprecision::float128;
+
+        return mppp::real128{boost::math::binomial_coefficient<bf128>(n, k).backend().value()};
+    } else {
+#endif
+        return boost::math::binomial_coefficient<T>(n, k);
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to add a polynomial translation function
+// to the state 's'.
+template <typename T>
+void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
+{
+    assert(order > 0u);
+
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // The function arguments:
+    // - the output pointer (write-only),
+    // - the pointer to the poly coefficients (read-only).
+    // No overlap is allowed.
+    std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create a function for polynomial translation");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto cf_ptr = f->args().begin() + 1;
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Init the return values as zeroes.
+    std::vector<llvm::Value *> ret_cfs;
+    for (std::uint32_t i = 0; i <= order; ++i) {
+        ret_cfs.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+    }
+
+    // Do the translation.
+    for (std::uint32_t i = 0; i <= order; ++i) {
+        auto ai = load_vector_from_memory(
+            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32(i * batch_size)}), batch_size);
+
+        for (std::uint32_t k = 0; k <= i; ++k) {
+            auto tmp = builder.CreateFMul(
+                ai, vector_splat(builder, codegen<T>(s, number{boost_math_bc<T>(i, k)}), batch_size));
+
+            ret_cfs[k] = builder.CreateFAdd(ret_cfs[k], tmp);
+        }
+    }
+
+    // Write out the return value.
+    for (std::uint32_t i = 0; i <= order; ++i) {
+        auto ret_ptr = builder.CreateInBoundsGEP(out_ptr, {builder.getInt32(i * batch_size)});
+        store_vector_to_memory(builder, ret_ptr, ret_cfs[i]);
+    }
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+}
+
+// Fetch a polynomial translation function
+// from the thread-local cache.
+template <typename T>
+auto get_poly_translator_1(std::uint32_t order)
+{
+    using func_t = void (*)(T *, const T *);
+
+    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, func_t>> tf_map;
+
+    auto it = tf_map.find(order);
+
+    if (it == tf_map.end()) {
+        // Cache miss, we need to create
+        // a new LLVM state and function.
+        llvm_state s;
+
+        // Add the polynomial translation function.
+        add_poly_translator_1<T>(s, order, 1);
+
+        s.compile();
+
+        // Fetch the function.
+        auto f = reinterpret_cast<func_t>(s.jit_lookup("poly_translate_1"));
+
+        // Insert state and function into the cache.
+        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), f});
+        assert(ret.second);
+
+        return f;
+    } else {
+        // Cache hit, return the function.
+        return it->second.second;
+    }
+}
+
 // Implementation of event detection.
 template <typename T>
 void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &d_tes,
@@ -539,8 +574,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     // Fetch a reference to the wlist.
     auto &wl = get_wlist<T>();
 
-    // Prepare the cache of binomial coefficients.
-    const auto &bc = get_bc_up_to<T>(order);
+    // Fetch the polynomial translation function.
+    auto pt1 = get_poly_translator_1<T>(order);
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
@@ -717,7 +752,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
                 // Translate it.
                 pwrap<T> tmp2(order);
-                poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
+                pt1(tmp2.v.data(), tmp1.v.data());
 
                 // Count the sign changes.
                 const auto n_sc = count_sign_changes(tmp2.v.data(), order);
@@ -732,7 +767,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // into tmp1.
                     poly_rescale_p2(tmp1.v.data(), q.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                    poly_translate_1(tmp2.v.data(), tmp1.v.data(), order, bc);
+                    pt1(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
                     const auto mid = (lb + ub) / 2;

@@ -15,7 +15,10 @@
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
+#include "benchmark_utils.hpp"
+
 using namespace heyoka;
+using namespace heyoka_benchmark;
 
 int main()
 {
@@ -34,15 +37,19 @@ int main()
     ta_ev.set_time(0.);
     std::copy(ic.begin(), ic.end(), ta_ev.get_state_data());
 
+    warmup();
+
     auto start = std::chrono::high_resolution_clock::now();
-    ta.propagate_until(1000.);
+    ta.propagate_until(100000.);
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
     std::cout << "Without events: " << elapsed << "μs\n";
 
+    warmup();
+
     start = std::chrono::high_resolution_clock::now();
-    ta_ev.propagate_until(1000.);
+    ta_ev.propagate_until(100000.);
     elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());

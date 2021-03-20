@@ -720,3 +720,35 @@ TEST_CASE("taylor te propagate_grid first step bug")
         REQUIRE(std::get<4>(out).size() == 0u);
     }
 }
+
+TEST_CASE("taylor te damped pendulum")
+{
+    using t_ev_t = taylor_adaptive<double>::t_event_t;
+
+    auto [x, v] = make_vars("x", "v");
+
+    std::vector<double> zero_vel_times;
+
+    auto callback = [&zero_vel_times](taylor_adaptive<double> &ta, double tm, bool) {
+        if (ta.get_pars()[0] == 0) {
+            ta.get_pars_data()[0] = 1;
+        } else {
+            ta.get_pars_data()[0] = 0;
+        }
+
+        zero_vel_times.push_back(tm);
+    };
+
+    t_ev_t ev(v, kw::callback = callback);
+
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x) - par[0] * v}, {0.05, 0.025}, kw::t_events = {ev}};
+
+    ta.propagate_until(100);
+
+    REQUIRE(zero_vel_times.size() == 99u);
+
+    ta.step();
+
+    REQUIRE(zero_vel_times.size() == 100u);
+}
