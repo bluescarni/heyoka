@@ -59,4 +59,23 @@ int main()
     for (auto t : zero_vel_times) {
         std::cout << "Event detection time: " << t << '\n';
     }
+
+    // Redefine ev to detect only events
+    // in the positive direction.
+    ev = nt_event<double>(
+        v, [&zero_vel_times](taylor_adaptive<double> &, double time) { zero_vel_times.push_back(time); },
+        // Specify the direction.
+        event_direction::positive);
+
+    // Reset zero_vel_times and the integrator.
+    zero_vel_times.clear();
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {-0.05, 0.}, kw::nt_events = {ev}};
+
+    // Propagate for a few time units.
+    ta.propagate_until(5);
+
+    // Print the event times.
+    for (auto t : zero_vel_times) {
+        std::cout << "Event detection time: " << t << '\n';
+    }
 }

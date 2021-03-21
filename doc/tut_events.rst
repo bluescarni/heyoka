@@ -141,10 +141,9 @@ Let us now integrate for a few time units and observe the screen output:
    Value of x when v is zero: 0.05
    Value of x when v is zero: -0.05
 
-The event detection system is correctly detecting that
-the velocity of the bob goes to zero when the absolute value
-of the :math:`x` angle corresponds to the initial amplitude
-of :math:`0.05`.
+As expected, when the velocity of the bob goes to zero
+the absolute value the :math:`x` angle corresponds to the
+initial amplitude of :math:`0.05`.
 
 Let us now print the event times:
 
@@ -167,6 +166,43 @@ which can be computed exactly via elliptic functions. With the specific
 initial conditions of this example, :math:`T = 2.0074035758801299\ldots`, and
 we can see from the event times printed to screen
 how the event detection system was accurate to machine precision.
+
+Event direction
+^^^^^^^^^^^^^^^
+
+By default, heyoka will detect all zeroes of the event equations regardless
+of the *direction* of the zero crossing (i.e., the value of the time derivative
+of the event equation at the zero). However, it is sometimes useful to tigger the detection
+of an event only if its direction is positive or negative. Event direction is represented
+in heyoka by the ``event_direction`` enum, whose values can be
+
+- ``event_direction::any`` (the default),
+- ``event_direction::positive`` (derivative > 0),
+- ``event_direction::negative`` (derivative < 0).
+
+An event's direction can be specified upon construction:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 63-72
+
+In this specific case, constraining the event direction to be positive is equivalent
+to detect :math:`v = 0` only when the pendulum reaches the maximum amplitude on the left.
+Let us take a look at the event times:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 74-80
+
+.. code-block:: console
+
+   Event detection time: 0
+   Event detection time: 2.00740357588013
+   Event detection time: 4.014807151760261
+
+Indeed, the event now triggers only 3 times (instead of 5), and the event times confirm
+that the event is detected only when :math:`v` switches from negative to positive, i.e.,
+at :math:`t=0`, :math:`t=T` and :math:`t=2T`.
 
 Terminal events
 ---------------
