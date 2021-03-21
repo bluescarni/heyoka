@@ -200,9 +200,15 @@ Let us take a look at the event times:
    Event detection time: 2.00740357588013
    Event detection time: 4.014807151760261
 
-Indeed, the event now triggers only 3 times (instead of 5), and the event times confirm
+Indeed, the event now triggers only 3 times (instead of 5), and the times confirm
 that the event is detected only when :math:`v` switches from negative to positive, i.e.,
 at :math:`t=0`, :math:`t=T` and :math:`t=2T`.
+
+Multiple events
+^^^^^^^^^^^^^^^
+
+When multiple events trigger within the same timestep, heyoka will process them
+in chronological order (or reverse chronological order if integrating backwards in time).
 
 Terminal events
 ---------------

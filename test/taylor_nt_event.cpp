@@ -239,6 +239,11 @@ TEST_CASE("taylor nte multizero")
                                                     // Make sure the callbacks are called in order.
                                                     REQUIRE(t > cur_time);
 
+                                                    // Ensure the state of ta has
+                                                    // been propagated until after the
+                                                    // event.
+                                                    REQUIRE(ta.get_time() > t);
+
                                                     REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
 
                                                     ta.update_d_output(t);
@@ -255,6 +260,11 @@ TEST_CASE("taylor nte multizero")
 
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
 
                                                REQUIRE((counter % 3u == 1u));
 
@@ -297,6 +307,11 @@ TEST_CASE("taylor nte multizero")
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t > cur_time);
 
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
                                                REQUIRE((counter == 0u || (counter >= 2u && counter <= 6u)
                                                         || (counter >= 7u && counter <= 9u)));
 
@@ -316,6 +331,11 @@ TEST_CASE("taylor nte multizero")
 
                                               // Make sure the callbacks are called in order.
                                               REQUIRE(t > cur_time);
+
+                                              // Ensure the state of ta has
+                                              // been propagated until after the
+                                              // event.
+                                              REQUIRE(ta.get_time() > t);
 
                                               REQUIRE((counter == 1u || counter == 6u));
 
@@ -381,6 +401,11 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                     // Make sure the callbacks are called in order.
                                                     REQUIRE(t < cur_time);
 
+                                                    // Ensure the state of ta has
+                                                    // been propagated until after the
+                                                    // event.
+                                                    REQUIRE(ta.get_time() < t);
+
                                                     REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
 
                                                     ta.update_d_output(t);
@@ -397,6 +422,11 @@ TEST_CASE("taylor nte multizero negative timestep")
 
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t < cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() < t);
 
                                                REQUIRE((counter % 3u == 1u));
 
