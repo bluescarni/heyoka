@@ -15,6 +15,7 @@
 #include <limits>
 #include <sstream>
 #include <tuple>
+#include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
@@ -113,6 +114,24 @@ TEST_CASE("taylor nte")
     oss << ev_t(
         v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::negative);
     REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    // Check the assignment operators.
+    ev_t ev0(v * v - 1e-10, [](taylor_adaptive<double> &, double) {}),
+        ev1(
+            v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::negative),
+        ev2(
+            v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::positive);
+    ev0 = ev1;
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    ev0 = std::move(ev2);
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
     REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
     oss.str("");
 

@@ -14,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -102,6 +103,27 @@ TEST_CASE("taylor te")
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
     REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
+    oss.str("");
+
+    // Check the assignment operators.
+    ev_t ev0(
+        v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, double, bool) {}),
+        ev1(
+            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, double, bool) {},
+            kw::direction = event_direction::negative),
+        ev2(
+            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, double, bool) {},
+            kw::direction = event_direction::positive);
+    ev0 = ev1;
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+    oss.str("");
+
+    ev0 = std::move(ev2);
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
+    REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     oss.str("");
 
     // Failure modes.

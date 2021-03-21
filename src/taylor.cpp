@@ -4128,6 +4128,12 @@ template <typename T>
 nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
 
 template <typename T>
+nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &) = default;
+
+template <typename T>
+nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &) noexcept = default;
+
+template <typename T>
 nt_event_impl<T>::~nt_event_impl() = default;
 
 template <typename T>
@@ -4208,6 +4214,12 @@ t_event_impl<T>::t_event_impl(const t_event_impl &) = default;
 
 template <typename T>
 t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
+
+template <typename T>
+t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &) = default;
+
+template <typename T>
+t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &) noexcept = default;
 
 template <typename T>
 t_event_impl<T>::~t_event_impl() = default;
