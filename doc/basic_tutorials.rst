@@ -29,3 +29,4 @@ of the source tree. The tutorials can be compiled by enabling the
   tut_param
   tut_nonauto
   tut_d_output
+  tut_events
