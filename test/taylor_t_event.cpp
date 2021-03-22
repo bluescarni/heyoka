@@ -190,6 +190,8 @@ TEST_CASE("taylor te basic")
                         REQUIRE(t < cur_time);
                     }
 
+                    REQUIRE(t == ta.get_time());
+
                     ta.update_d_output(t);
 
                     const auto v = ta.get_d_output()[1];
@@ -340,7 +342,10 @@ TEST_CASE("taylor te close")
         t_ev_t ev1(x);
         t_ev_t ev2(
             x - std::numeric_limits<fp_t>::epsilon() * 2,
-            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); });
+            kw::callback = [](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
+                REQUIRE(t == ta.get_time());
+                REQUIRE(!mr);
+            });
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0.1), fp_t(0.25)},         kw::opt_level = opt_level,
@@ -463,7 +468,12 @@ TEST_CASE("taylor te dir")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
         t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); },
+            v,
+            kw::callback =
+                [](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
+                    REQUIRE(t == ta.get_time());
+                    REQUIRE(!mr);
+                },
             kw::direction = event_direction::positive);
 
         auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -501,7 +511,12 @@ TEST_CASE("taylor te dir")
 
         // Other direction.
         auto ev1 = t_ev_t(
-            v, kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(!mr); },
+            v,
+            kw::callback =
+                [](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
+                    REQUIRE(t == ta.get_time());
+                    REQUIRE(!mr);
+                },
             kw::direction = event_direction::negative);
 
         ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
@@ -558,7 +573,12 @@ TEST_CASE("taylor te custom cooldown")
 
         t_ev_t ev(
             v * v - std::numeric_limits<fp_t>::epsilon() * 4,
-            kw::callback = [](taylor_adaptive<fp_t> &, fp_t, bool mr) { REQUIRE(mr); }, kw::cooldown = fp_t(1e-1));
+            kw::callback =
+                [](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
+                    REQUIRE(t == ta.get_time());
+                    REQUIRE(mr);
+                },
+            kw::cooldown = fp_t(1e-1));
 
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -9.8 * sin(x)}, {fp_t(0), fp_t(0.25)},           kw::opt_level = opt_level,
@@ -600,8 +620,9 @@ TEST_CASE("taylor te propagate_for")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, fp_t, bool mr) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
                 ++counter;
+                REQUIRE(t == ta.get_time());
                 REQUIRE(!mr);
             });
 
@@ -651,8 +672,9 @@ TEST_CASE("taylor te propagate_grid")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, fp_t, bool mr) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &ta, fp_t t, bool mr) {
                 ++counter;
+                REQUIRE(t == ta.get_time());
                 REQUIRE(!mr);
             });
 
@@ -713,7 +735,10 @@ TEST_CASE("taylor te propagate_grid first step bug")
 
     {
         t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<double> &, double, bool) {});
+            v, kw::callback = [](taylor_adaptive<double> &ta, double t, bool mr) {
+                REQUIRE(t == ta.get_time());
+                REQUIRE(!mr);
+            });
 
         auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {ev}};
 
@@ -757,6 +782,8 @@ TEST_CASE("taylor te damped pendulum")
         } else {
             ta.get_pars_data()[0] = 0;
         }
+
+        REQUIRE(tm == ta.get_time());
 
         zero_vel_times.push_back(tm);
     };
