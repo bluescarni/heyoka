@@ -78,4 +78,17 @@ int main()
     for (auto t : zero_vel_times) {
         std::cout << "Event detection time: " << t << '\n';
     }
+
+    // Define two close non-terminal events.
+    nt_event<double> ev0(
+        v, [](taylor_adaptive<double> &, double time) { std::cout << "Event 0 triggering at t=" << time << '\n'; });
+    nt_event<double> ev1(v * v - 1e-12, [](taylor_adaptive<double> &, double time) {
+        std::cout << "Event 1 triggering at t=" << time << '\n';
+    });
+
+    // Reset the integrator.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {-0.05, 0.}, kw::nt_events = {ev0, ev1}};
+
+    // Propagate for a few time units.
+    ta.propagate_until(5);
 }

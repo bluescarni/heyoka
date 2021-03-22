@@ -207,8 +207,59 @@ at :math:`t=0`, :math:`t=T` and :math:`t=2T`.
 Multiple events
 ^^^^^^^^^^^^^^^
 
-When multiple events trigger within the same timestep, heyoka will process them
-in chronological order (or reverse chronological order if integrating backwards in time).
+When multiple events trigger within the same timestep (or if the same event triggers
+multiple times), heyoka will process the events in chronological order
+(or reverse chronological order when integrating backwards in time).
+
+Let us demonstrate this with another simple example with the simple pendulum.
+We will be now detecting two events defined by the equations:
+
+.. math::
+
+    \begin{cases}
+    v = 0 \\
+    v^2 - 10^{-12} = 0
+    \end{cases}
+
+In other words, we are looking to determine the time of maximum amplitude (:math:`v = 0`) and
+two nearby times in which the absolute value of the angular velocity is small but not zero. Because
+of the closeness of these events, we can expect both events to be detected during the same timestep,
+with the second event triggering twice.
+
+Let's begin by defining the two events:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 82-87
+
+This time the events' callbacks just print the event time to screen, without
+modifying the ``zero_vel_times`` list.
+
+We can then reset the integrator, propagate for a few time units and check the screen output:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 89-93
+
+.. code-block:: console
+
+    Event 0 triggering at t=0
+    Event 1 triggering at t=2.041666914753826e-06
+    Event 1 triggering at t=1.003699746272244
+    Event 0 triggering at t=1.003701787940065
+    Event 1 triggering at t=1.003703829606799
+    Event 1 triggering at t=2.007401534213656
+    Event 0 triggering at t=2.00740357588013
+    Event 1 triggering at t=2.00740561754654
+    Event 1 triggering at t=3.011103322152711
+    Event 0 triggering at t=3.011105363820196
+    Event 1 triggering at t=3.011107405487484
+    Event 1 triggering at t=4.014805110093445
+    Event 0 triggering at t=4.014807151760261
+    Event 1 triggering at t=4.014809193427102
+
+Note how the events are indeed processed in chronological order, and how the event detection system is able to
+successfully recognize the same event triggering twice in close succession.
 
 Terminal events
 ---------------
