@@ -211,8 +211,8 @@ When multiple events trigger within the same timestep (or if the same event trig
 multiple times), heyoka will process the events in chronological order
 (or reverse chronological order when integrating backwards in time).
 
-Let us demonstrate this with another simple example with the simple pendulum.
-We will be now detecting two events defined by the equations:
+Let us demonstrate this with another example with the simple pendulum.
+We will now aim to detect two events defined by the equations:
 
 .. math::
 
@@ -222,7 +222,7 @@ We will be now detecting two events defined by the equations:
     \end{cases}
 
 In other words, we are looking to determine the time of maximum amplitude (:math:`v = 0`) and
-two nearby times in which the absolute value of the angular velocity is small but not zero. Because
+the time at which the absolute value of the angular velocity is small but not zero. Because
 of the closeness of these events, we can expect both events to be detected during the same timestep,
 with the second event triggering twice.
 
@@ -259,10 +259,56 @@ We can then reset the integrator, propagate for a few time units and check the s
     Event 1 triggering at t=4.014809193427102
 
 Note how the events are indeed processed in chronological order, and how the event detection system is able to
-successfully recognize the same event triggering twice in close succession.
+successfully recognize the second event triggering twice in close succession.
 
 Terminal events
 ---------------
+
+The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
+they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
+`elastic collision <https://en.wikipedia.org/wiki/Elastic_collision>`__ of
+two rigid bodies, which instantaneously and discontinuously changes the bodies' velocity vectors.
+Another example is the switching on of a spacecraft engine, which alters the differential
+equations governing the dynamics of the spacecraft.
+
+Terminal events are represented in heyoka by the ``t_event`` class. Similarly to
+the ``nt_event`` class, the construction of a ``t_event`` requires
+at the very least the expression corresponding to the left-hand side of the event equation.
+A number of additional optional keyword arguments can be passed to customise the behaviour
+of a terminal event:
+
+- ``kw::callback``: a callback function that will be called when the event triggers. Note that,
+  for terminal events, the presence of a callback is optional (whereas it is mandatory for
+  non-terminal events);
+- ``kw::cooldown``: a floating-point value representing the cooldown time for the terminal event
+  (see below for an explanation);
+- ``kw::direction``: a value of the ``event_direction`` enum which, like for non-terminal
+  events, can be used to specify that the event should be detected only for a specific direction
+  of the zero crossing.
+
+It is important to understand how heyoka reacts to terminal events. At every integration timestep, heyoka
+performs event detection for both terminal and non-terminal events. If one or more terminal events
+are detected, heyoka will sort the detected terminal events by time and will select the first
+terminal event triggering in chronological order (or reverse chronological order when integrating
+backwards in time). All the other terminal events and all the non-terminal events triggering *after*
+the first terminal event are discarded. heyoka then propagates the state of the system up to the
+trigger time of the first terminal event, executes the callbacks of the surviving non-terminal events
+in chronological order and finally executes the callback of the first terminal event (if provided).
+If a callback was provided for the first non-terminal event, then the integration resumes, otherwise
+the integration stops.
+
+In order to illustrate the use of terminal events, we will consider a damped pendulum with a small twist:
+the friction coefficient :math:`\alpha` switches discontinuously between 1 and 0 every time the angular
+velocity :math:`v` is zero. The ODE system reads:
+
+.. math::
+
+    \begin{cases}
+    x^\prime = v \\
+    v^\prime = - \sin(x) - \alpha v
+    \end{cases},
+
+and the terminal event equation is, again, simply :math:`v = 0`.
 
 Full code listing
 -----------------
