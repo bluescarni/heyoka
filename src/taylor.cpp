@@ -3923,11 +3923,14 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
             return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
 
-        // Update min_h/max_h.
-        using std::abs;
-        const auto abs_h = abs(h);
-        min_h = std::min(min_h, abs_h);
-        max_h = std::max(max_h, abs_h);
+        // Update min_h/max_h, but only if we did not trigger a terminal event
+        // (in which case the timestep is artificially clamped).
+        if (res == taylor_outcome::success) {
+            using std::abs;
+            const auto abs_h = abs(h);
+            min_h = std::min(min_h, abs_h);
+            max_h = std::max(max_h, abs_h);
+        }
 
         // Check the iteration limit.
         if (has_step_limit && iter_counter == max_steps) {
