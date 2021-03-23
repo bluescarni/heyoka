@@ -3773,6 +3773,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             m_ntes[std::get<0>(t)].get_callback()(*this, m_time - (m_last_h - std::get<1>(t)));
         }
 
+        // The return value of the first
+        // terminal event's callback. It will be
+        // unused if there are no terminal events.
+        bool te_cb_ret = false;
+
         if (!m_d_tes.empty()) {
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(m_d_tes[0]);
@@ -3790,7 +3795,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te.get_callback()(*this, m_time - (m_last_h - h), std::get<2>(m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]));
             }
         }
 
@@ -3798,8 +3803,15 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             // No terminal events detected, return success or time limit.
             return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
         } else {
-            // Terminal event detected, return its index wrapped in the outcome.
-            return std::tuple{taylor_outcome{static_cast<std::int64_t>(std::get<0>(m_d_tes[0]))}, h};
+            // Terminal event detected. Fetch its index.
+            const auto ev_idx = static_cast<std::int64_t>(std::get<0>(m_d_tes[0]));
+
+            // NOTE: if te_cb_ret is true, it means that the terminal event has
+            // a callback and its invocation returned true (meaning that the
+            // integration should continue). Otherwise, either the terminal event
+            // has no callback or its callback returned false, meaning that the
+            // integration must stop.
+            return std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
         }
     }
 }
@@ -3886,13 +3898,12 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit) {
             // Something went wrong in the propagation of the timestep, or we reached
-            // a terminal event. If we reached a terminal event with a callback,
-            // we will continue.
-            assert(res < taylor_outcome::success || static_cast<std::uint32_t>(res) < m_tes.size());
-            const bool resume
-                = (res > taylor_outcome::success) && m_tes[static_cast<std::uint32_t>(res)].get_callback();
-
-            if (!resume) {
+            // a terminal event. If we reached a stopping terminal event, we will
+            // exit, otherwise we will continue.
+            // NOTE: at this point, the only possibility for a negative
+            // res is a terminal event without callback or whose callback
+            // returned false.
+            if (res < taylor_outcome{0}) {
                 return std::tuple{res, min_h, max_h, step_counter};
             }
         }
@@ -3967,13 +3978,12 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     auto oc = (grid[0] >= m_time) ? step(true) : step_backward(true);
     if (std::get<0>(oc) != taylor_outcome::success) {
         // Something went wrong in the propagation of the first step, or we reached
-        // a terminal event. If we reached a terminal event with a callback,
-        // we will continue.
-        assert(std::get<0>(oc) < taylor_outcome::success || static_cast<std::uint32_t>(std::get<0>(oc)) < m_tes.size());
-        const bool resume = (std::get<0>(oc) > taylor_outcome::success)
-                            && m_tes[static_cast<std::uint32_t>(std::get<0>(oc))].get_callback();
-
-        if (!resume) {
+        // a terminal event. If we reached a stopping terminal event, we will
+        // exit, otherwise we will continue.
+        // NOTE: at this point, the only possibility for a negative
+        // res is a terminal event without callback or whose callback
+        // returned false.
+        if (std::get<0>(oc) < taylor_outcome{0}) {
             return std::tuple{std::get<0>(oc), min_h, max_h, step_counter, std::move(retval)};
         }
     }
@@ -4043,13 +4053,12 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
 
         if (res != taylor_outcome::success) {
             // Something went wrong in the propagation of the timestep, or we reached
-            // a terminal event. If we reached a terminal event with a callback,
-            // we will continue.
-            assert(res < taylor_outcome::success || static_cast<std::uint32_t>(res) < m_tes.size());
-            const bool resume
-                = (res > taylor_outcome::success) && m_tes[static_cast<std::uint32_t>(res)].get_callback();
-
-            if (!resume) {
+            // a terminal event. If we reached a stopping terminal event, we will
+            // exit, otherwise we will continue.
+            // NOTE: at this point, the only possibility for a negative
+            // res is a terminal event without callback or whose callback
+            // returned false.
+            if (res < taylor_outcome{0}) {
                 return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
             }
         }

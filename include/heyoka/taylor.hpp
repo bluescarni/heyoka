@@ -270,10 +270,13 @@ taylor_add_custom_step(llvm_state &s, const std::string &name, std::vector<std::
 // Enum to represent the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome : std::int64_t {
-    success = -1,     // Integration step was successful, no time/step limits were reached.
-    step_limit = -2,  // Maximum number of steps reached.
-    time_limit = -3,  // Time limit reached.
-    err_nf_state = -4 // Non-finite state detected at the end of the timestep.
+    // NOTE: we make these enums start at -2**32 - 1,
+    // so that we have 2**32 values in the [-2**32, -1]
+    // range to use for signalling stopping terminal events.
+    success = -4294967296ll - 1,     // Integration step was successful, no time/step limits were reached.
+    step_limit = -4294967296ll - 2,  // Maximum number of steps reached.
+    time_limit = -4294967296ll - 3,  // Time limit reached.
+    err_nf_state = -4294967296ll - 4 // Non-finite state detected at the end of the timestep.
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
@@ -413,7 +416,7 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, bool)>;
+    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool)>;
 
 private:
     void finalise_ctor(callback_t, T, event_direction);
