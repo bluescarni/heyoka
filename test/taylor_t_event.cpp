@@ -692,7 +692,7 @@ TEST_CASE("taylor te propagate_grid")
             oc = oc_;
             REQUIRE(out.size() == 202u);
         }
-        REQUIRE(oc == taylor_outcome::success);
+        REQUIRE(oc == taylor_outcome::time_limit);
         REQUIRE(ta.get_time() >= 100);
 
         REQUIRE(counter == 100u);
@@ -708,7 +708,7 @@ TEST_CASE("taylor te propagate_grid")
             oc = oc_;
             REQUIRE(out.size() == 2u);
         }
-        REQUIRE(oc > taylor_outcome::success);
+        REQUIRE(oc > taylor_outcome::time_limit);
         REQUIRE(static_cast<std::int64_t>(oc) == -1);
         REQUIRE(ta.get_time() < 0.502);
     };
@@ -763,7 +763,7 @@ TEST_CASE("taylor te propagate_grid first step bug")
 
         auto out = ta.propagate_grid(grid);
 
-        REQUIRE(std::get<4>(out).size() == 0u);
+        REQUIRE(std::get<4>(out).size() == 2u);
     }
 }
 
@@ -892,10 +892,11 @@ TEST_CASE("taylor te boolean callback")
         ta.get_state_data()[1] = 0;
         cur_time = -1;
         direction = true;
-        counter_t = 4;
+        counter_t = 0;
 
         auto out = ta.propagate_grid({fp_t{0}});
-        REQUIRE(static_cast<std::int64_t>(std::get<0>(out)) == -1);
+        REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+        REQUIRE(counter_t == 0u);
 
         ta.reset_cooldowns();
         ta.set_time(fp_t{0});

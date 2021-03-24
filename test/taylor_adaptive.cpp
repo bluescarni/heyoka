@@ -104,11 +104,12 @@ TEST_CASE("propagate grid scalar")
 
     // Propagate to the initial time.
     out = ta.propagate_grid({0.});
-    REQUIRE(std::get<0>(out) == taylor_outcome::success);
-    REQUIRE(std::get<1>(out) == std::get<2>(out));
-    REQUIRE(std::get<3>(out) == 1u);
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(std::get<1>(out) == std::numeric_limits<double>::infinity());
+    REQUIRE(std::get<2>(out) == 0);
+    REQUIRE(std::get<3>(out) == 0u);
     REQUIRE(std::get<4>(out) == std::vector{0.05, 0.025});
-    REQUIRE(ta.get_time() > 0.);
+    REQUIRE(ta.get_time() == 0.);
 
     REQUIRE_THROWS_MATCHES(
         ta.propagate_grid({2., std::numeric_limits<double>::infinity()}), std::invalid_argument,
@@ -124,7 +125,7 @@ TEST_CASE("propagate grid scalar")
     }
     out = ta.propagate_grid(grid);
 
-    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
@@ -139,7 +140,7 @@ TEST_CASE("propagate grid scalar")
 
     out = ta.propagate_grid(grid);
 
-    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
@@ -151,14 +152,71 @@ TEST_CASE("propagate grid scalar")
     ta.get_state_data()[0] = 0.;
     ta.get_state_data()[1] = 1.;
 
-    std::uniform_real_distribution<double> rdist(-5., 5.);
-    for (auto i = 0u; i < 1000u; ++i) {
-        grid[i] = rdist(rng);
+    std::uniform_real_distribution<double> rdist(0., .1);
+    grid[0] = 0;
+    for (auto i = 1u; i < 1000u; ++i) {
+        grid[i] = grid[i - 1u] + rdist(rng);
     }
 
     out = ta.propagate_grid(grid);
 
-    REQUIRE(std::get<0>(out) == taylor_outcome::success);
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
+    }
+
+    // Do it also backwards.
+    ta.set_time(0.);
+    ta.get_state_data()[0] = 0.;
+    ta.get_state_data()[1] = 1.;
+
+    rdist = std::uniform_real_distribution<double>(0., -.1);
+    grid[0] = 0;
+    for (auto i = 1u; i < 1000u; ++i) {
+        grid[i] = grid[i - 1u] + rdist(rng);
+    }
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
+    }
+
+    // A grid of identical time points.
+    ta.set_time(0.);
+    ta.get_state_data()[0] = 0.;
+    ta.get_state_data()[1] = 1.;
+
+    for (auto i = 1u; i < 1000u; ++i) {
+        grid[i] = 1;
+    }
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 1000u; ++i) {
+        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
+        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
+    }
+
+    // A grid of identical time points all at zero.
+    ta.set_time(0.);
+    ta.get_state_data()[0] = 0.;
+    ta.get_state_data()[1] = 1.;
+
+    for (auto i = 1u; i < 1000u; ++i) {
+        grid[i] = 0;
+    }
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
