@@ -784,8 +784,6 @@ TEST_CASE("taylor te damped pendulum")
             ta.get_pars_data()[0] = 0;
         }
 
-        REQUIRE(tm == ta.get_time());
-
         zero_vel_times.push_back(tm);
 
         return true;
