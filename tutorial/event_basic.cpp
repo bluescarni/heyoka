@@ -91,4 +91,55 @@ int main()
 
     // Propagate for a few time units.
     ta.propagate_until(5);
+
+    // Define a terminal event that turns air drag on/off
+    // whenever the velocity goes to zero.
+    t_event<double> t_ev(
+        // The event equation.
+        v,
+        // The callback.
+        kw::callback = [](taylor_adaptive<double> &ta, [[maybe_unused]] bool mr) {
+            // NOTE: the value of the drag coefficient
+            // is stored as the first (and only) runtime parameter
+            // of the integrator.
+            if (ta.get_pars()[0] == 0) {
+                ta.get_pars_data()[0] = 1;
+            } else {
+                ta.get_pars_data()[0] = 0;
+            }
+
+            // Do not stop the integration.
+            return true;
+        });
+
+    // Construct the damped pendulum integrator.
+    ta = taylor_adaptive<double>{{prime(x) = v,
+                                  // NOTE: alpha is represented as
+                                  // the first (and only) runtime
+                                  // parameter: par[0].
+                                  prime(v) = -9.8 * sin(x) - par[0] * v},
+                                 {0.05, 0.025},
+                                 // The list of termina events.
+                                 kw::t_events = {t_ev}};
+
+    // Propagate step-by-step until the event triggers.
+    taylor_outcome oc;
+    do {
+        oc = std::get<0>(ta.step());
+    } while (oc == taylor_outcome::success);
+
+    // Print the outcome to screen.
+    std::cout << "Integration outcome: " << oc << '\n';
+    std::cout << "Event index        : " << static_cast<std::int64_t>(oc) << '\n';
+
+    // Integrate over a time grid.
+    auto out = ta.propagate_grid({1., 2., 3., 4., 5., 6., 7., 8., 9., 10.});
+
+    // Let's print the values of the state vectors
+    // over the time grid.
+    for (auto i = 0; i < 10; ++i) {
+        std::cout << "[" << std::get<4>(out)[i * 2] << ", " << std::get<4>(out)[i * 2 + 1] << "]\n";
+    }
+
+    std::cout << "Final time: " << ta.get_time() << '\n';
 }

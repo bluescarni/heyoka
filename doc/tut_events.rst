@@ -180,7 +180,7 @@ in heyoka by the ``event_direction`` enum, whose values can be
 - ``event_direction::positive`` (derivative > 0),
 - ``event_direction::negative`` (derivative < 0).
 
-An event's direction can be specified upon construction:
+Event direction can be specified upon construction:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
@@ -281,7 +281,7 @@ of a terminal event:
   for terminal events, the presence of a callback is optional (whereas it is mandatory for
   non-terminal events);
 - ``kw::cooldown``: a floating-point value representing the cooldown time for the terminal event
-  (see below for an explanation);
+  (see :ref:`below <tut_t_event_cooldown>` for an explanation);
 - ``kw::direction``: a value of the ``event_direction`` enum which, like for non-terminal
   events, can be used to specify that the event should be detected only for a specific direction
   of the zero crossing.
@@ -294,8 +294,6 @@ backwards in time). All the other terminal events and all the non-terminal event
 the first terminal event are discarded. heyoka then propagates the state of the system up to the
 trigger time of the first terminal event, executes the callbacks of the surviving non-terminal events
 in chronological order and finally executes the callback of the first terminal event (if provided).
-If a callback was provided for the first non-terminal event, then the integration resumes, otherwise
-the integration stops.
 
 In order to illustrate the use of terminal events, we will consider a damped pendulum with a small twist:
 the friction coefficient :math:`\alpha` switches discontinuously between 1 and 0 every time the angular
@@ -305,10 +303,118 @@ velocity :math:`v` is zero. The ODE system reads:
 
     \begin{cases}
     x^\prime = v \\
-    v^\prime = - \sin(x) - \alpha v
+    v^\prime = - 9.8\sin x - \alpha v
     \end{cases},
 
 and the terminal event equation is, again, simply :math:`v = 0`.
+
+Let us begin with the definition of the terminal event:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 95-113
+
+Like in the case of non-terminal events, we specified as first construction argument
+the event equation. As second argument we passed a callback function that will be invoked
+when the event triggers.
+
+As you can see from the code snippet, the callback signature for terminal events
+differs from the signature non-terminal callbacks. Specifically:
+
+- the event trigger time is not passed to the callback. This is not necessary
+  because, when a terminal event triggers, the state of the integrator is propagated
+  up to the event, and thus the trigger time is the current integrator time
+  (which can be fetched via ``ta.get_time()``);
+- there is an additional boolean function argument, here called ``mr``. We will be ignoring
+  this extra argument for the moment, its meaning will be clarified in the
+  :ref:`cooldown section <tut_t_event_cooldown>`;
+- whereas non-terminal event callbacks do not return anything, terminal event callbacks
+  are required to return ``true`` or ``false``. If the callback returns ``false`` the integration
+  will always be stopped after the execution of the callback. Otherwise, when using the
+  ``propagate_*()`` family of functions, the integration will resume after the execution
+  of the callback.
+
+Note that, for the purpose of stopping the integration, an event *without* a callback is considered
+equivalent to an event whose callback returns ``false``.
+We thus refer to terminal events without a callback or whose callback returns ``false``
+as *stopping* terminal events, because their occurrence will prevent the integrator from continuing
+without user intervention.
+
+In this example, within the callback code we alter the value of the drag coefficient :math:`\alpha`
+(which is stored within the :ref:`runtime parameters <tut_param>` of the integrator): if :math:`\alpha`
+is currently 0, we set it to 1, otherwise we set it to 0.
+
+Let us proceed to the construction of the integrator:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 115-123
+
+Similarly to the non-terminal events case, the list of terminal events
+is specified when constructing an integrator via the ``kw::t_events`` keyword argument.
+
+If a terminal event triggers within the single-step functions (``step()`` and ``step_backward()``),
+the outcome of the integration will contain the index of the event that triggered. Let us see a simple example:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 125-133
+
+.. code-block:: console
+
+   Integration outcome: taylor_outcome::terminal_event_0
+   Event index        : 0
+
+The screen output confirms that the first (and only) event triggered.
+
+Because here we used the single step
+function, even if the event's callback returned ``true`` the integration was stopped in correpondence of the
+event. Let us now use the ``propagate_grid()`` function instead, so that the integration resumes after the
+execution of the callback:
+
+.. literalinclude:: ../tutorial/event_basic.cpp
+    :language: c++
+    :lines: 135-144
+
+.. code-block:: console
+
+   [-0.02976504606251412, -0.02063006479837935]
+   [0.02970666582653454, 0.02099345736431702]
+   [-0.01761378049610636, -0.01622382722426959]
+   [0.01757771112979705, 0.01613903817360225]
+   [-0.01037481471383597, -0.01205316233867281]
+   [0.01035648925410416, 0.01177669636844242]
+   [-0.006080605964468329, -0.008627473720971276]
+   [0.006074559637531474, 0.008299135527482404]
+   [-0.003544733998720797, -0.006013682818278612]
+   [0.003546198899884463, 0.005703010459398463]
+
+   Final time: 10
+
+The screen output confirms that indeed the integration continued up to the final time :math:`t = 10`. The values
+of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
+for half of the total integration time) progressively slowed the bob down.
+
+.. _tut_t_event_cooldown:
+
+Cooldown
+^^^^^^^^
+
+One notable complication when restarting an integration that was stopped in correspondence of a terminal event
+is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
+being made in the integration.
+
+In order to avoid this issue, whenever a terminal event occurs the event enters
+a *cooldown* period. Within the cooldown period, occurrences of the same event are ignored by the event detection
+system. The length of the cooldown period is, by default, automatically deduced by heyoka, but in some cases
+it might be useful to manually set a custom value. A custom cooldown period can be selected when constructing
+a terminal event via the ``kw::cooldown`` keyword.
+
+When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
+the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
+then the ``mr`` boolean parameter in the terminal event callback will be set to ``true``, so that the user
+has the possibility to handle such occurrence. Note that an ``mr`` value of ``false`` in the callback does not imply
+that multiple roots do not exist, just that they were not detected.
 
 Full code listing
 -----------------
