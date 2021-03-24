@@ -254,6 +254,13 @@ TEST_CASE("propagate grid scalar")
     REQUIRE(std::get<4>(out)[3] == approximately(std::cos(10.), 100.));
     REQUIRE(std::get<4>(out)[4] == approximately(std::sin(100.), 1000.));
     REQUIRE(std::get<4>(out)[5] == approximately(std::cos(100.), 1000.));
+
+    // A case in which the initial propagate_until() to bring the system
+    // to grid[0] interrupts the integration.
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x}, {0., 1.}, kw::t_events = {t_event<double>(v - 0.999)}};
+    out = ta.propagate_grid({10., 100.});
+    REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+    REQUIRE(std::get<4>(out).empty());
 }
 
 TEST_CASE("streaming op")
