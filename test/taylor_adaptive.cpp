@@ -93,6 +93,18 @@ TEST_CASE("propagate grid scalar")
         ta.propagate_grid({std::numeric_limits<double>::infinity()}), std::invalid_argument,
         Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
 
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({1., std::numeric_limits<double>::infinity()}), std::invalid_argument,
+        Message("A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({1., 2., 1.}), std::invalid_argument,
+        Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({-1., -2., 1.}), std::invalid_argument,
+        Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
     // Set an infinity in the state.
     ta.get_state_data()[0] = std::numeric_limits<double>::infinity();
 
@@ -126,6 +138,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
@@ -141,6 +154,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 10000.));
@@ -161,6 +175,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
@@ -181,6 +196,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
@@ -199,6 +215,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
@@ -217,6 +234,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
         REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
@@ -229,6 +247,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid({.1, 10., 100.});
 
     REQUIRE(std::get<4>(out).size() == 6u);
+    REQUIRE(ta.get_time() == 100.);
     REQUIRE(std::get<4>(out)[0] == approximately(std::sin(.1), 100.));
     REQUIRE(std::get<4>(out)[1] == approximately(std::cos(.1), 100.));
     REQUIRE(std::get<4>(out)[2] == approximately(std::sin(10.), 100.));
