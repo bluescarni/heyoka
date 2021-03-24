@@ -261,6 +261,14 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid({10., 100.});
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out).empty());
+
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x},
+                                 {0., 1.},
+                                 kw::t_events = {t_event<double>(
+                                     v - 0.999, kw::callback = [](taylor_adaptive<double> &, bool) { return false; })}};
+    out = ta.propagate_grid({10., 100.});
+    REQUIRE(std::get<0>(out) == taylor_outcome{-1});
+    REQUIRE(std::get<4>(out).empty());
 }
 
 TEST_CASE("streaming op")
