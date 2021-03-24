@@ -252,9 +252,7 @@ contiguously in row-major order:
    v(0.4) = -0.14078
 
 There are no special requirements on the time values in the grid (apart from the
-fact that they must be finite), or on their spacing/ordering. Note however that
-in order to maximise both precision and performance, the time points should be ordered
-monotonically.
+fact that they must be finite and ordered monotonically).
 
 Full code listing
 -----------------

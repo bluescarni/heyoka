@@ -1,0 +1,898 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event detection &#8212; heyoka 0.6.0 documentation</title>
+    
+  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+  <link rel="stylesheet"
+    href="_static/vendor/open-sans_all/1.44.1/index.css">
+  <link rel="stylesheet"
+    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.e7340bb3dbd8dde6db86f25597f54a1b.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Advanced tutorials" href="advanced_tutorials.html" />
+    <link rel="prev" title="Dense output" href="tut_d_output.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="index.html">
+  
+  <img src="_static/white_logo.png" class="logo" alt="logo">
+  
+  
+  <h1 class="site-logo" id="site-title">heyoka 0.6.0 documentation</h1>
+  
+</a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form>
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 current active collapsible-parent">
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
+  </a>
+  <ul class="current collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_param.html">
+     Runtime parameters
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_nonauto.html">
+     Non-autonomous systems
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_d_output.html">
+     Dense output
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Event detection
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1 collapsible-parent">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <ul class="collapse-ul">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
+    </a>
+   </li>
+  </ul>
+  <i class="fas fa-chevron-down">
+  </i>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ad_notes.html">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
+  </a>
+ </li>
+</ul>
+
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_events.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_events.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+                    title="Fullscreen mode"><i
+                        class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i>
+            Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#non-terminal-events">
+   Non-terminal events
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#event-direction">
+     Event direction
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#multiple-events">
+     Multiple events
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#terminal-events">
+   Terminal events
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#cooldown">
+     Cooldown
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#full-code-listing">
+   Full code listing
+  </a>
+ </li>
+</ul>
+
+        </nav>
+        
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="event-detection">
+<span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.6.0.</span></p>
+</div>
+<p>When integrating systems of ODEs, the need often arises to detect the occurrence of specific
+conditions (or <em>events</em>) in the state of the system. Many real systems, for instance, are described by equations
+that change discontinuously in response to particular conditions
+(e.g., a spacecraft entering the cone of shadow of a planet,
+or a thermostat switching on once the temperature reaches a certain level). In other situations,
+detection of specific system states may suffice (e.g., in the computation of
+<a class="reference external" href="https://en.wikipedia.org/wiki/Poincar%C3%A9_map">Poincaré sections</a>).</p>
+<p>An event in a system of ODEs can be defined by an <em>event equation</em> of the form</p>
+<div class="math notranslate nohighlight">
+\[g\left( t, \boldsymbol{x} \left( t \right) \right) = 0,\]</div>
+<p>where, as usual, <span class="math notranslate nohighlight">\(t\)</span> is the independent variable (time) and <span class="math notranslate nohighlight">\(\boldsymbol{x} \left( t \right)\)</span> the state vector of the system.
+As a concrete example, the collision between two spheres of radius 1 moving in a three-dimensional space can be described
+by the event equation</p>
+<div class="math notranslate nohighlight">
+\[\left( x_1 - x_0 \right)^2 + \left( y_1 - y_0 \right)^2 + \left( z_1 - z_0 \right)^2 - 4 = 0,\]</div>
+<p>where <span class="math notranslate nohighlight">\(\left( x_0, y_0, z_0 \right)\)</span> and <span class="math notranslate nohighlight">\(\left( x_1, y_1, z_1 \right)\)</span> are the Cartesian coordinates
+of the spheres’ centres.</p>
+<p>heyoka features a flexible and accurate event detection framework in which the <a class="reference internal" href="tut_expression_system.html#tut-expression-system"><span class="std std-ref">expression system</span></a>
+can be used to formulate arbitrary event equations. The event equations are then added to the ODE system and
+integrated together with the other equations, so that, at every timestep, a Taylor series expansion of the event equations
+in powers of time is available. Polynomial root finding techniques <span id="id1">[<a class="reference internal" href="bibliography.html#id9">CA76</a>]</span> are then employed
+on the Taylor series of the event equations to accurately locate the time of occurrence of an event within the timestep.</p>
+<p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
+We will begin with non-terminal events, as they are conceptually simpler.</p>
+<div class="section" id="non-terminal-events">
+<h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this headline">¶</a></h2>
+<p>Non-terminal events are events that do not modify the state of an ODE system. That is, the occurrence of a non-terminal event does not
+change the system’s dynamics and it does not alter the state vector of the system. A typical use of non-terminal events is to detect and log
+when the system reaches a particular state of interest (e.g., flagging close encounters between celestial bodies, detecting when
+a velocity or coordinate is zero, etc.).</p>
+<p>As an initial example, we will turn to our good ole friend, the simple pendulum:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = -9.8 \sin x
+\end{cases}.\end{split}\]</div>
+<p>Our goal will be to detect when the bob reaches the point of maximum amplitude, which corresponds to the angular velocity
+<span class="math notranslate nohighlight">\(v\)</span> going to zero. In other words, out (very simple) event equation is</p>
+<div class="math notranslate nohighlight">
+\[v = 0.\]</div>
+<p>We begin, as usual, with the definition of the symbolic variables:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Next, we create a vector into which we will log the times at which <span class="math notranslate nohighlight">\(v = 0\)</span>:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create a vector to store the times</span>
+    <span class="c1">// at which v goes to zero.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">zero_vel_times</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>We can now proceed to create a non-terminal event:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the event object for the detection</span>
+    <span class="c1">// of &#39;v == 0&#39;.</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev</span><span class="p">(</span>
+        <span class="c1">// The left-hand side of the event equation</span>
+        <span class="n">v</span><span class="p">,</span>
+        <span class="c1">// The callback.</span>
+        <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// Compute the state of the system when the</span>
+            <span class="c1">// event triggered and print the value of x.</span>
+            <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
+            <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Value of x when v is zero: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+            <span class="c1">// Add the event time to zero_vel_times.</span>
+            <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
+        <span class="p">});</span>
+</pre></div>
+</div>
+<p>Non-terminal events are represented in heyoka by the <code class="docutils literal notranslate"><span class="pre">nt_event</span></code> class. Like the <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">adaptive integrator</span></a>
+class, <code class="docutils literal notranslate"><span class="pre">nt_event</span></code> is parametrised over the floating-point type we want to use for  event detection
+(in this case, <code class="docutils literal notranslate"><span class="pre">double</span></code>). The first mandatory argument for the construction of a non-terminal event is the left-hand
+side of the event equation, which in this case is simply <span class="math notranslate nohighlight">\(v\)</span>.</p>
+<p>The second mandatory construction argument is a callback function that will be invoked when the event is detected.
+The callback function can be a lambda, a regular function, or a function object - the only requirement is that the
+callback is a callable object with the following signature:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The first function argument is a mutable reference to the integrator object, while the second argument is the absolute time
+at which the event was detected.</p>
+<p>Because non-terminal event detection is performed at the end of an integration step,
+when the callback is invoked the state and time of the integrator object are those <em>at the end</em> of the integration
+step in which the event was detected. Note that when integrating an ODE system with events, the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>
+class ensures that the Taylor coefficients are always kept up to date (as explained in the tutorial about
+<a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>), and thus in the callback function it is always possible to use the <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code>
+function to compute the dense output at any time within the last timestep that was taken.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> object is passed as a non-const reference only so that it is possible to call
+non-const functions on it (such as <code class="docutils literal notranslate"><span class="pre">update_d_output()</span></code>). Do not try to assign a new integrator object
+from within the callback, as that will result in undefined behaviour.</p>
+</div>
+<p>In this specific case, we perform two actions in the callback:</p>
+<ul class="simple">
+<li><p>first, we compute the dense output at the event trigger time and print
+the value of the <code class="docutils literal notranslate"><span class="pre">x</span></code> coordinate,</p></li>
+<li><p>second, we append to <code class="docutils literal notranslate"><span class="pre">zero_vel_times</span></code> the trigger time.</p></li>
+</ul>
+<p>We are now ready to create our first event-detecting integrator:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
+                                      <span class="c1">// Non-terminal events.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>The list of non-terminal events is passed to the constructor of the
+integrator via the <code class="docutils literal notranslate"><span class="pre">kw::nt_events</span></code> keyword argument. Note how we
+set up the initial conditions so that the bob is at rest at an
+angle of amplitude <span class="math notranslate nohighlight">\(0.05\)</span>.</p>
+<p>Let us now integrate for a few time units and observe the screen output:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Value of x when v is zero: -0.05</span>
+<span class="go">Value of x when v is zero: 0.05</span>
+<span class="go">Value of x when v is zero: -0.05</span>
+<span class="go">Value of x when v is zero: 0.05</span>
+<span class="go">Value of x when v is zero: -0.05</span>
+</pre></div>
+</div>
+<p>As expected, when the velocity of the bob goes to zero
+the absolute value the <span class="math notranslate nohighlight">\(x\)</span> angle corresponds to the
+initial amplitude of <span class="math notranslate nohighlight">\(0.05\)</span>.</p>
+<p>Let us now print the event times:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Print the event times.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event detection time: 0</span>
+<span class="go">Event detection time: 1.003701787940065</span>
+<span class="go">Event detection time: 2.00740357588013</span>
+<span class="go">Event detection time: 3.011105363820196</span>
+<span class="go">Event detection time: 4.014807151760261</span>
+</pre></div>
+</div>
+<p>We can see how the the initial condition <span class="math notranslate nohighlight">\(v_0 = 0\)</span> immediately
+and correctly triggers an event at <span class="math notranslate nohighlight">\(t = 0\)</span>. Physically, we know that the time
+interval between the events must be half the period <span class="math notranslate nohighlight">\(T\)</span> of the pendulum,
+which can be computed exactly via elliptic functions. With the specific
+initial conditions of this example, <span class="math notranslate nohighlight">\(T = 2.0074035758801299\ldots\)</span>, and
+we can see from the event times printed to screen
+how the event detection system was accurate to machine precision.</p>
+<div class="section" id="event-direction">
+<h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this headline">¶</a></h3>
+<p>By default, heyoka will detect all zeroes of the event equations regardless
+of the <em>direction</em> of the zero crossing (i.e., the value of the time derivative
+of the event equation at the zero). However, it is sometimes useful to tigger the detection
+of an event only if its direction is positive or negative. Event direction is represented
+in heyoka by the <code class="docutils literal notranslate"><span class="pre">event_direction</span></code> enum, whose values can be</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">event_direction::any</span></code> (the default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">event_direction::positive</span></code> (derivative &gt; 0),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">event_direction::negative</span></code> (derivative &lt; 0).</p></li>
+</ul>
+<p>Event direction can be specified upon construction:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Redefine ev to detect only events</span>
+    <span class="c1">// in the positive direction.</span>
+    <span class="n">ev</span> <span class="o">=</span> <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span>
+        <span class="n">v</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span> <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span> <span class="p">},</span>
+        <span class="c1">// Specify the direction.</span>
+        <span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span>
+
+    <span class="c1">// Reset zero_vel_times and the integrator.</span>
+    <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>In this specific case, constraining the event direction to be positive is equivalent
+to detect <span class="math notranslate nohighlight">\(v = 0\)</span> only when the pendulum reaches the maximum amplitude on the left.
+Let us take a look at the event times:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+
+    <span class="c1">// Print the event times.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event detection time: 0</span>
+<span class="go">Event detection time: 2.00740357588013</span>
+<span class="go">Event detection time: 4.014807151760261</span>
+</pre></div>
+</div>
+<p>Indeed, the event now triggers only 3 times (instead of 5), and the times confirm
+that the event is detected only when <span class="math notranslate nohighlight">\(v\)</span> switches from negative to positive, i.e.,
+at <span class="math notranslate nohighlight">\(t=0\)</span>, <span class="math notranslate nohighlight">\(t=T\)</span> and <span class="math notranslate nohighlight">\(t=2T\)</span>.</p>
+</div>
+<div class="section" id="multiple-events">
+<h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this headline">¶</a></h3>
+<p>When multiple events trigger within the same timestep (or if the same event triggers
+multiple times), heyoka will process the events in chronological order
+(or reverse chronological order when integrating backwards in time).</p>
+<p>Let us demonstrate this with another example with the simple pendulum.
+We will now aim to detect two events defined by the equations:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+v = 0 \\
+v^2 - 10^{-12} = 0
+\end{cases}\end{split}\]</div>
+<p>In other words, we are looking to determine the time of maximum amplitude (<span class="math notranslate nohighlight">\(v = 0\)</span>) and
+the time at which the absolute value of the angular velocity is small but not zero. Because
+of the closeness of these events, we can expect both events to be detected during the same timestep,
+with the second event triggering twice.</p>
+<p>Let’s begin by defining the two events:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Define two close non-terminal events.</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev0</span><span class="p">(</span>
+        <span class="n">v</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span> <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 0 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span> <span class="p">});</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev1</span><span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 1 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">});</span>
+</pre></div>
+</div>
+<p>This time the events’ callbacks just print the event time to screen, without
+modifying the <code class="docutils literal notranslate"><span class="pre">zero_vel_times</span></code> list.</p>
+<p>We can then reset the integrator, propagate for a few time units and check the screen output:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the integrator.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev0</span><span class="p">,</span> <span class="n">ev1</span><span class="p">}};</span>
+
+    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event 0 triggering at t=0</span>
+<span class="go">Event 1 triggering at t=2.041666914753826e-06</span>
+<span class="go">Event 1 triggering at t=1.003699746272244</span>
+<span class="go">Event 0 triggering at t=1.003701787940065</span>
+<span class="go">Event 1 triggering at t=1.003703829606799</span>
+<span class="go">Event 1 triggering at t=2.007401534213656</span>
+<span class="go">Event 0 triggering at t=2.00740357588013</span>
+<span class="go">Event 1 triggering at t=2.00740561754654</span>
+<span class="go">Event 1 triggering at t=3.011103322152711</span>
+<span class="go">Event 0 triggering at t=3.011105363820196</span>
+<span class="go">Event 1 triggering at t=3.011107405487484</span>
+<span class="go">Event 1 triggering at t=4.014805110093445</span>
+<span class="go">Event 0 triggering at t=4.014807151760261</span>
+<span class="go">Event 1 triggering at t=4.014809193427102</span>
+</pre></div>
+</div>
+<p>Note how the events are indeed processed in chronological order, and how the event detection system is able to
+successfully recognize the second event triggering twice in close succession.</p>
+</div>
+</div>
+<div class="section" id="terminal-events">
+<h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this headline">¶</a></h2>
+<p>The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
+they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
+<a class="reference external" href="https://en.wikipedia.org/wiki/Elastic_collision">elastic collision</a> of
+two rigid bodies, which instantaneously and discontinuously changes the bodies’ velocity vectors.
+Another example is the switching on of a spacecraft engine, which alters the differential
+equations governing the dynamics of the spacecraft.</p>
+<p>Terminal events are represented in heyoka by the <code class="docutils literal notranslate"><span class="pre">t_event</span></code> class. Similarly to
+the <code class="docutils literal notranslate"><span class="pre">nt_event</span></code> class, the construction of a <code class="docutils literal notranslate"><span class="pre">t_event</span></code> requires
+at the very least the expression corresponding to the left-hand side of the event equation.
+A number of additional optional keyword arguments can be passed to customise the behaviour
+of a terminal event:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kw::callback</span></code>: a callback function that will be called when the event triggers. Note that,
+for terminal events, the presence of a callback is optional (whereas it is mandatory for
+non-terminal events);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kw::cooldown</span></code>: a floating-point value representing the cooldown time for the terminal event
+(see <a class="reference internal" href="#tut-t-event-cooldown"><span class="std std-ref">below</span></a> for an explanation);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kw::direction</span></code>: a value of the <code class="docutils literal notranslate"><span class="pre">event_direction</span></code> enum which, like for non-terminal
+events, can be used to specify that the event should be detected only for a specific direction
+of the zero crossing.</p></li>
+</ul>
+<p>It is important to understand how heyoka reacts to terminal events. At every integration timestep, heyoka
+performs event detection for both terminal and non-terminal events. If one or more terminal events
+are detected, heyoka will sort the detected terminal events by time and will select the first
+terminal event triggering in chronological order (or reverse chronological order when integrating
+backwards in time). All the other terminal events and all the non-terminal events triggering <em>after</em>
+the first terminal event are discarded. heyoka then propagates the state of the system up to the
+trigger time of the first terminal event, executes the callbacks of the surviving non-terminal events
+in chronological order and finally executes the callback of the first terminal event (if provided).</p>
+<p>In order to illustrate the use of terminal events, we will consider a damped pendulum with a small twist:
+the friction coefficient <span class="math notranslate nohighlight">\(\alpha\)</span> switches discontinuously between 1 and 0 every time the angular
+velocity <span class="math notranslate nohighlight">\(v\)</span> is zero. The ODE system reads:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = - 9.8\sin x - \alpha v
+\end{cases},\end{split}\]</div>
+<p>and the terminal event equation is, again, simply <span class="math notranslate nohighlight">\(v = 0\)</span>.</p>
+<p>Let us begin with the definition of the terminal event:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Define a terminal event that turns air drag on/off</span>
+    <span class="c1">// whenever the velocity goes to zero.</span>
+    <span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">t_ev</span><span class="p">(</span>
+        <span class="c1">// The event equation.</span>
+        <span class="n">v</span><span class="p">,</span>
+        <span class="c1">// The callback.</span>
+        <span class="n">kw</span><span class="o">::</span><span class="n">callback</span> <span class="o">=</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span> <span class="kt">bool</span> <span class="n">mr</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// NOTE: the value of the drag coefficient</span>
+            <span class="c1">// is stored as the first (and only) runtime parameter</span>
+            <span class="c1">// of the integrator.</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="p">}</span>
+
+            <span class="c1">// Do not stop the integration.</span>
+            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+        <span class="p">});</span>
+</pre></div>
+</div>
+<p>Like in the case of non-terminal events, we specified as first construction argument
+the event equation. As second argument we passed a callback function that will be invoked
+when the event triggers.</p>
+<p>As you can see from the code snippet, the callback signature for terminal events
+differs from the signature non-terminal callbacks. Specifically:</p>
+<ul class="simple">
+<li><p>the event trigger time is not passed to the callback. This is not necessary
+because, when a terminal event triggers, the state of the integrator is propagated
+up to the event, and thus the trigger time is the current integrator time
+(which can be fetched via <code class="docutils literal notranslate"><span class="pre">ta.get_time()</span></code>);</p></li>
+<li><p>there is an additional boolean function argument, here called <code class="docutils literal notranslate"><span class="pre">mr</span></code>. We will be ignoring
+this extra argument for the moment, its meaning will be clarified in the
+<a class="reference internal" href="#tut-t-event-cooldown"><span class="std std-ref">cooldown section</span></a>;</p></li>
+<li><p>whereas non-terminal event callbacks do not return anything, terminal event callbacks
+are required to return <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>. If the callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code> the integration
+will always be stopped after the execution of the callback. Otherwise, when using the
+<code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> family of functions, the integration will resume after the execution
+of the callback.</p></li>
+</ul>
+<p>Note that, for the purpose of stopping the integration, an event <em>without</em> a callback is considered
+equivalent to an event whose callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code>.
+We thus refer to terminal events without a callback or whose callback returns <code class="docutils literal notranslate"><span class="pre">false</span></code>
+as <em>stopping</em> terminal events, because their occurrence will prevent the integrator from continuing
+without user intervention.</p>
+<p>In this example, within the callback code we alter the value of the drag coefficient <span class="math notranslate nohighlight">\(\alpha\)</span>
+(which is stored within the <a class="reference internal" href="tut_param.html#tut-param"><span class="std std-ref">runtime parameters</span></a> of the integrator): if <span class="math notranslate nohighlight">\(\alpha\)</span>
+is currently 0, we set it to 1, otherwise we set it to 0.</p>
+<p>Let us proceed to the construction of the integrator:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Construct the damped pendulum integrator.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span>
+                                  <span class="c1">// NOTE: alpha is represented as</span>
+                                  <span class="c1">// the first (and only) runtime</span>
+                                  <span class="c1">// parameter: par[0].</span>
+                                  <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
+                                 <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
+                                 <span class="c1">// The list of termina events.</span>
+                                 <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>Similarly to the non-terminal events case, the list of terminal events
+is specified when constructing an integrator via the <code class="docutils literal notranslate"><span class="pre">kw::t_events</span></code> keyword argument.</p>
+<p>If a terminal event triggers within the single-step functions (<code class="docutils literal notranslate"><span class="pre">step()</span></code> and <code class="docutils literal notranslate"><span class="pre">step_backward()</span></code>),
+the outcome of the integration will contain the index of the event that triggered. Let us see a simple example:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate step-by-step until the event triggers.</span>
+    <span class="n">taylor_outcome</span> <span class="n">oc</span><span class="p">;</span>
+    <span class="k">do</span> <span class="p">{</span>
+        <span class="n">oc</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span>
+    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">oc</span> <span class="o">==</span> <span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome to screen.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Integration outcome: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event index        : &quot;</span> <span class="o">&lt;&lt;</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Integration outcome: taylor_outcome::terminal_event_0</span>
+<span class="go">Event index        : 0</span>
+</pre></div>
+</div>
+<p>The screen output confirms that the first (and only) event triggered.</p>
+<p>Because here we used the single step
+function, even if the event’s callback returned <code class="docutils literal notranslate"><span class="pre">true</span></code> the integration was stopped in correpondence of the
+event. Let us now use the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function instead, so that the integration resumes after the
+execution of the callback:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate over a time grid.</span>
+    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">4.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">,</span> <span class="mf">6.</span><span class="p">,</span> <span class="mf">7.</span><span class="p">,</span> <span class="mf">8.</span><span class="p">,</span> <span class="mf">9.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">});</span>
+
+    <span class="c1">// Let&#39;s print the values of the state vectors</span>
+    <span class="c1">// over the time grid.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;[&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Final time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[-0.02976504606251412, -0.02063006479837935]</span>
+<span class="go">[0.02970666582653454, 0.02099345736431702]</span>
+<span class="go">[-0.01761378049610636, -0.01622382722426959]</span>
+<span class="go">[0.01757771112979705, 0.01613903817360225]</span>
+<span class="go">[-0.01037481471383597, -0.01205316233867281]</span>
+<span class="go">[0.01035648925410416, 0.01177669636844242]</span>
+<span class="go">[-0.006080605964468329, -0.008627473720971276]</span>
+<span class="go">[0.006074559637531474, 0.008299135527482404]</span>
+<span class="go">[-0.003544733998720797, -0.006013682818278612]</span>
+<span class="go">[0.003546198899884463, 0.005703010459398463]</span>
+
+<span class="go">Final time: 10</span>
+</pre></div>
+</div>
+<p>The screen output confirms that indeed the integration continued up to the final time <span class="math notranslate nohighlight">\(t = 10\)</span>. The values
+of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
+for half of the total integration time) progressively slowed the bob down.</p>
+<div class="section" id="cooldown">
+<span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">¶</a></h3>
+<p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
+is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
+being made in the integration.</p>
+<p>In order to avoid this issue, whenever a terminal event occurs the event enters
+a <em>cooldown</em> period. Within the cooldown period, occurrences of the same event are ignored by the event detection
+system. The length of the cooldown period is, by default, automatically deduced by heyoka, but in some cases
+it might be useful to manually set a custom value. A custom cooldown period can be selected when constructing
+a terminal event via the <code class="docutils literal notranslate"><span class="pre">kw::cooldown</span></code> keyword.</p>
+<p>When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
+the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
+then the <code class="docutils literal notranslate"><span class="pre">mr</span></code> boolean parameter in the terminal event callback will be set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, so that the user
+has the possibility to handle such occurrence. Note that an <code class="docutils literal notranslate"><span class="pre">mr</span></code> value of <code class="docutils literal notranslate"><span class="pre">false</span></code> in the callback does not imply
+that multiple roots do not exist, just that they were not detected.</p>
+</div>
+</div>
+<div class="section" id="full-code-listing">
+<h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="n">heyoka</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create a vector to store the times</span>
+    <span class="c1">// at which v goes to zero.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">zero_vel_times</span><span class="p">;</span>
+
+    <span class="c1">// Create the event object for the detection</span>
+    <span class="c1">// of &#39;v == 0&#39;.</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev</span><span class="p">(</span>
+        <span class="c1">// The left-hand side of the event equation</span>
+        <span class="n">v</span><span class="p">,</span>
+        <span class="c1">// The callback.</span>
+        <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// Compute the state of the system when the</span>
+            <span class="c1">// event triggered and print the value of x.</span>
+            <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
+            <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Value of x when v is zero: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+            <span class="c1">// Add the event time to zero_vel_times.</span>
+            <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
+        <span class="p">});</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
+                                      <span class="c1">// Non-terminal events.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+
+    <span class="c1">// Enable full precision printing.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="p">.</span><span class="n">precision</span><span class="p">(</span><span class="mi">16</span><span class="p">);</span>
+
+    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+
+    <span class="c1">// Print the event times.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Redefine ev to detect only events</span>
+    <span class="c1">// in the positive direction.</span>
+    <span class="n">ev</span> <span class="o">=</span> <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span>
+        <span class="n">v</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span> <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span> <span class="p">},</span>
+        <span class="c1">// Specify the direction.</span>
+        <span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span>
+
+    <span class="c1">// Reset zero_vel_times and the integrator.</span>
+    <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+
+    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+
+    <span class="c1">// Print the event times.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Define two close non-terminal events.</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev0</span><span class="p">(</span>
+        <span class="n">v</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span> <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 0 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span> <span class="p">});</span>
+    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev1</span><span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 1 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="p">});</span>
+
+    <span class="c1">// Reset the integrator.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev0</span><span class="p">,</span> <span class="n">ev1</span><span class="p">}};</span>
+
+    <span class="c1">// Propagate for a few time units.</span>
+    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+
+    <span class="c1">// Define a terminal event that turns air drag on/off</span>
+    <span class="c1">// whenever the velocity goes to zero.</span>
+    <span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">t_ev</span><span class="p">(</span>
+        <span class="c1">// The event equation.</span>
+        <span class="n">v</span><span class="p">,</span>
+        <span class="c1">// The callback.</span>
+        <span class="n">kw</span><span class="o">::</span><span class="n">callback</span> <span class="o">=</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span> <span class="kt">bool</span> <span class="n">mr</span><span class="p">)</span> <span class="p">{</span>
+            <span class="c1">// NOTE: the value of the drag coefficient</span>
+            <span class="c1">// is stored as the first (and only) runtime parameter</span>
+            <span class="c1">// of the integrator.</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="p">}</span>
+
+            <span class="c1">// Do not stop the integration.</span>
+            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+        <span class="p">});</span>
+
+    <span class="c1">// Construct the damped pendulum integrator.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span>
+                                  <span class="c1">// NOTE: alpha is represented as</span>
+                                  <span class="c1">// the first (and only) runtime</span>
+                                  <span class="c1">// parameter: par[0].</span>
+                                  <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
+                                 <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
+                                 <span class="c1">// The list of termina events.</span>
+                                 <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
+
+    <span class="c1">// Propagate step-by-step until the event triggers.</span>
+    <span class="n">taylor_outcome</span> <span class="n">oc</span><span class="p">;</span>
+    <span class="k">do</span> <span class="p">{</span>
+        <span class="n">oc</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span>
+    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">oc</span> <span class="o">==</span> <span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span>
+
+    <span class="c1">// Print the outcome to screen.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Integration outcome: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event index        : &quot;</span> <span class="o">&lt;&lt;</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Integrate over a time grid.</span>
+    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">4.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">,</span> <span class="mf">6.</span><span class="p">,</span> <span class="mf">7.</span><span class="p">,</span> <span class="mf">8.</span><span class="p">,</span> <span class="mf">9.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">});</span>
+
+    <span class="c1">// Let&#39;s print the values of the state vectors</span>
+    <span class="c1">// over the time grid.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;[&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Final time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        
+        <div class='prev-next-bottom'>
+            
+    <a class='left-prev' id="prev-link" href="tut_d_output.html" title="previous page">Dense output</a>
+    <a class='right-next' id="next-link" href="advanced_tutorials.html" title="next page">Advanced tutorials</a>
+
+        </div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    
+  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
+
+
+    
+  </body>
+</html>
