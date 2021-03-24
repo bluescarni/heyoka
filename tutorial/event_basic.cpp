@@ -119,7 +119,7 @@ int main()
                                   // parameter: par[0].
                                   prime(v) = -9.8 * sin(x) - par[0] * v},
                                  {0.05, 0.025},
-                                 // The list of termina events.
+                                 // The list of terminal events.
                                  kw::t_events = {t_ev}};
 
     // Propagate step-by-step until the event triggers.
