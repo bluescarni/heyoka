@@ -141,5 +141,5 @@ int main()
         std::cout << "[" << std::get<4>(out)[i * 2] << ", " << std::get<4>(out)[i * 2 + 1] << "]\n";
     }
 
-    std::cout << "Final time: " << ta.get_time() << '\n';
+    std::cout << "\nFinal time: " << ta.get_time() << '\n';
 }
