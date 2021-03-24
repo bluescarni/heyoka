@@ -801,6 +801,25 @@ TEST_CASE("taylor te damped pendulum")
     ta.step();
 
     REQUIRE(zero_vel_times.size() == 100u);
+
+    // Mix use of step() and propagate like in the tutorial.
+    zero_vel_times.clear();
+    ta.set_time(0);
+    ta.get_state_data()[0] = 0.05;
+    ta.get_state_data()[1] = 0.025;
+
+    taylor_outcome oc;
+    do {
+        oc = std::get<0>(ta.step());
+    } while (oc == taylor_outcome::success);
+
+    ta.propagate_until(100);
+
+    REQUIRE(zero_vel_times.size() == 99u);
+
+    ta.step();
+
+    REQUIRE(zero_vel_times.size() == 100u);
 }
 
 TEST_CASE("taylor te boolean callback")

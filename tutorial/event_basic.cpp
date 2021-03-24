@@ -135,10 +135,10 @@ int main()
     // Integrate over a time grid.
     auto out = ta.propagate_grid({1., 2., 3., 4., 5., 6., 7., 8., 9., 10.});
 
-    // Let's print the values of the state vectors
+    // Let's print the values of the state vector
     // over the time grid.
-    for (auto i = 0; i < 10; ++i) {
-        std::cout << "[" << std::get<4>(out)[i * 2] << ", " << std::get<4>(out)[i * 2 + 1] << "]\n";
+    for (auto i = 0u; i < 10u; ++i) {
+        std::cout << "[" << std::get<4>(out)[i * 2u] << ", " << std::get<4>(out)[i * 2u + 1u] << "]\n";
     }
 
     std::cout << "\nFinal time: " << ta.get_time() << '\n';
