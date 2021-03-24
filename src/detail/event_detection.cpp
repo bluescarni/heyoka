@@ -551,6 +551,12 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 {
     using std::isfinite;
 
+    // Clear the vectors of detected events.
+    // NOTE: do it here as this is always necessary,
+    // regardless of issues with h.
+    d_tes.clear();
+    d_ntes.clear();
+
     if (!isfinite(h)) {
         get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
 
@@ -563,10 +569,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     }
 
     assert(order >= 2u);
-
-    // Clear the vectors of detected events.
-    d_tes.clear();
-    d_ntes.clear();
 
     // Fetch a reference to the list of isolating intervals.
     auto &isol = get_isol<T>();
