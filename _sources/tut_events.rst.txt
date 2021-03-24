@@ -219,7 +219,7 @@ We will now aim to detect two events defined by the equations:
     \begin{cases}
     v = 0 \\
     v^2 - 10^{-12} = 0
-    \end{cases}
+    \end{cases}.
 
 In other words, we are looking to determine the time of maximum amplitude (:math:`v = 0`) and
 the time at which the absolute value of the angular velocity is small but not zero. Because

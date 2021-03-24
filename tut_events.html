@@ -501,7 +501,7 @@ We will now aim to detect two events defined by the equations:</p>
 \[\begin{split}\begin{cases}
 v = 0 \\
 v^2 - 10^{-12} = 0
-\end{cases}\end{split}\]</div>
+\end{cases}.\end{split}\]</div>
 <p>In other words, we are looking to determine the time of maximum amplitude (<span class="math notranslate nohighlight">\(v = 0\)</span>) and
 the time at which the absolute value of the angular velocity is small but not zero. Because
 of the closeness of these events, we can expect both events to be detected during the same timestep,
@@ -642,7 +642,7 @@ is currently 0, we set it to 1, otherwise we set it to 0.</p>
                                   <span class="c1">// parameter: par[0].</span>
                                   <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
                                  <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
-                                 <span class="c1">// The list of termina events.</span>
+                                 <span class="c1">// The list of terminal events.</span>
                                  <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
 </pre></div>
 </div>
@@ -831,7 +831,7 @@ that multiple roots do not exist, just that they were not detected.</p>
                                   <span class="c1">// parameter: par[0].</span>
                                   <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
                                  <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
-                                 <span class="c1">// The list of termina events.</span>
+                                 <span class="c1">// The list of terminal events.</span>
                                  <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
 
     <span class="c1">// Propagate step-by-step until the event triggers.</span>
