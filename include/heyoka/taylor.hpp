@@ -199,72 +199,6 @@ taylor_add_jet(llvm_state &s, const std::string &name, std::vector<std::pair<exp
     }
 }
 
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<expression>, double, std::uint32_t, bool,
-                             bool);
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<expression>, long double, std::uint32_t,
-                              bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<expression>, mppp::real128, std::uint32_t,
-                              bool, bool);
-
-#endif
-
-template <typename T>
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<expression> sys, T tol,
-                         std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_dbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, double,
-                             std::uint32_t, bool, bool);
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_ldbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
-                              long double, std::uint32_t, bool, bool);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step_f128(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>,
-                              mppp::real128, std::uint32_t, bool, bool);
-
-#endif
-
-template <typename T>
-std::tuple<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::uint32_t>
-taylor_add_adaptive_step(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                         T tol, std::uint32_t batch_size, bool high_accuracy, bool compact_mode)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_adaptive_step_dbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_adaptive_step_ldbl(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_adaptive_step_f128(s, name, std::move(sys), tol, batch_size, high_accuracy, compact_mode);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
-
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
 taylor_add_custom_step_dbl(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t,
                            bool, bool);
@@ -336,10 +270,13 @@ taylor_add_custom_step(llvm_state &s, const std::string &name, std::vector<std::
 // Enum to represent the outcome of a Taylor integration
 // stepping function.
 enum class taylor_outcome : std::int64_t {
-    success = -1,     // Integration step was successful, no time/step limits were reached.
-    step_limit = -2,  // Maximum number of steps reached.
-    time_limit = -3,  // Time limit reached.
-    err_nf_state = -4 // Non-finite state detected at the end of the timestep.
+    // NOTE: we make these enums start at -2**32 - 1,
+    // so that we have 2**32 values in the [-2**32, -1]
+    // range to use for signalling stopping terminal events.
+    success = -4294967296ll - 1,     // Integration step was successful, no time/step limits were reached.
+    step_limit = -4294967296ll - 2,  // Maximum number of steps reached.
+    time_limit = -4294967296ll - 3,  // Time limit reached.
+    err_nf_state = -4294967296ll - 4 // Non-finite state detected at the end of the timestep.
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
@@ -437,6 +374,9 @@ public:
     nt_event_impl(const nt_event_impl &);
     nt_event_impl(nt_event_impl &&) noexcept;
 
+    nt_event_impl &operator=(const nt_event_impl &);
+    nt_event_impl &operator=(nt_event_impl &) noexcept;
+
     ~nt_event_impl();
 
     const expression &get_expression() const;
@@ -476,7 +416,7 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, bool)>;
+    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool)>;
 
 private:
     void finalise_ctor(callback_t, T, event_direction);
@@ -526,6 +466,9 @@ public:
 
     t_event_impl(const t_event_impl &);
     t_event_impl(t_event_impl &&) noexcept;
+
+    t_event_impl &operator=(const t_event_impl &);
+    t_event_impl &operator=(t_event_impl &) noexcept;
 
     ~t_event_impl();
 

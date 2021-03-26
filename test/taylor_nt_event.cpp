@@ -15,6 +15,7 @@
 #include <limits>
 #include <sstream>
 #include <tuple>
+#include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
@@ -43,6 +44,53 @@ const auto fp_types = std::tuple<double, long double
 #endif
                                  >{};
 
+// A test case to check that the propagation codepath
+// with events produces results identical results
+// to the no-events codepath.
+TEST_CASE("taylor nte match")
+{
+    auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
+
+        auto ta_ev = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                           {fp_t(-0.25), fp_t(0.)},
+                                           kw::opt_level = opt_level,
+                                           kw::high_accuracy = high_accuracy,
+                                           kw::compact_mode = compact_mode,
+                                           kw::nt_events = {ev_t(v, [](taylor_adaptive<fp_t> &, fp_t) {})}};
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                        {fp_t(-0.25), fp_t(0.)},
+                                        kw::opt_level = opt_level,
+                                        kw::high_accuracy = high_accuracy,
+                                        kw::compact_mode = compact_mode};
+
+        for (auto i = 0; i < 200; ++i) {
+            auto [oc_ev, h_ev] = ta_ev.step();
+            auto [oc, h] = ta.step();
+
+            REQUIRE(oc_ev == oc);
+            REQUIRE(h_ev == h);
+
+            REQUIRE(ta_ev.get_state() == ta.get_state());
+            REQUIRE(ta_ev.get_time() == ta.get_time());
+        }
+    };
+
+    for (auto cm : {false, true}) {
+        for (auto f : {false, true}) {
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 2, f, cm); });
+            tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
+        }
+    }
+}
+
 TEST_CASE("taylor nte")
 {
     using Catch::Matchers::Message;
@@ -66,6 +114,24 @@ TEST_CASE("taylor nte")
     oss << ev_t(
         v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::negative);
     REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    // Check the assignment operators.
+    ev_t ev0(v * v - 1e-10, [](taylor_adaptive<double> &, double) {}),
+        ev1(
+            v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::negative),
+        ev2(
+            v * v - 1e-10, [](taylor_adaptive<double> &, double) {}, event_direction::positive);
+    ev0 = ev1;
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+    oss.str("");
+
+    ev0 = std::move(ev2);
+    oss << ev0;
+    REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
     REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
     oss.str("");
 
@@ -173,6 +239,11 @@ TEST_CASE("taylor nte multizero")
                                                     // Make sure the callbacks are called in order.
                                                     REQUIRE(t > cur_time);
 
+                                                    // Ensure the state of ta has
+                                                    // been propagated until after the
+                                                    // event.
+                                                    REQUIRE(ta.get_time() > t);
+
                                                     REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
 
                                                     ta.update_d_output(t);
@@ -189,6 +260,11 @@ TEST_CASE("taylor nte multizero")
 
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
 
                                                REQUIRE((counter % 3u == 1u));
 
@@ -231,6 +307,11 @@ TEST_CASE("taylor nte multizero")
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t > cur_time);
 
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
                                                REQUIRE((counter == 0u || (counter >= 2u && counter <= 6u)
                                                         || (counter >= 7u && counter <= 9u)));
 
@@ -250,6 +331,11 @@ TEST_CASE("taylor nte multizero")
 
                                               // Make sure the callbacks are called in order.
                                               REQUIRE(t > cur_time);
+
+                                              // Ensure the state of ta has
+                                              // been propagated until after the
+                                              // event.
+                                              REQUIRE(ta.get_time() > t);
 
                                               REQUIRE((counter == 1u || counter == 6u));
 
@@ -315,6 +401,11 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                     // Make sure the callbacks are called in order.
                                                     REQUIRE(t < cur_time);
 
+                                                    // Ensure the state of ta has
+                                                    // been propagated until after the
+                                                    // event.
+                                                    REQUIRE(ta.get_time() < t);
+
                                                     REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
 
                                                     ta.update_d_output(t);
@@ -331,6 +422,11 @@ TEST_CASE("taylor nte multizero negative timestep")
 
                                                // Make sure the callbacks are called in order.
                                                REQUIRE(t < cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() < t);
 
                                                REQUIRE((counter % 3u == 1u));
 

@@ -24,6 +24,9 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the ``propagate_grid()`` function now requires
+  monotonically-ordered grid points
+  (`#114 <https://github.com/bluescarni/heyoka/pull/114>`__).
 - Change the screen output format for ``taylor_outcome``
   (`#106 <https://github.com/bluescarni/heyoka/pull/106>`__).
 
