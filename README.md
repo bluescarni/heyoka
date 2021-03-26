@@ -5,6 +5,7 @@ heyoka
 [![Build Status](https://img.shields.io/appveyor/ci/bluescarni/heyoka/master.svg?logo=appveyor&style=for-the-badge)](https://ci.appveyor.com/project/bluescarni/heyoka)
 [![Build Status](https://img.shields.io/github/workflow/status/bluescarni/heyoka/GitHub%20CI?style=for-the-badge)](https://github.com/bluescarni/heyoka/actions?query=workflow%3A%22GitHub+CI%22)
 ![language](https://img.shields.io/badge/language-C%2B%2B17-red.svg?style=for-the-badge)
+[![Code Coverage](https://img.shields.io/codecov/c/github/bluescarni/heyoka.svg?style=for-the-badge)](https://codecov.io/github/bluescarni/heyoka?branch=master)
 
 [![Anaconda-Server Badge](https://img.shields.io/conda/vn/conda-forge/heyoka.svg?style=for-the-badge)](https://anaconda.org/conda-forge/heyoka)
 
