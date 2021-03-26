@@ -119,13 +119,17 @@ void put_poly_in_cache(std::vector<T> &&v)
 
     // Look if we have inited the cache for order n.
     if (n >= cache.size()) {
+        // NOTE: this is currently never reached
+        // because we always look in the cache
+        // before the first invocation of this function.
+        // LCOV_EXCL_START
         // The cache was never used for polynomials of order
         // n, add the necessary entries.
-
         if (n == std::numeric_limits<decltype(cache.size())>::max()) {
             throw std::overflow_error("An overflow was detected in the polynomial cache");
         }
         cache.resize(n + 1u);
+        // LCOV_EXCL_STOP
     }
 
     // Move v in.
@@ -368,10 +372,12 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
         // iteration limit, return ret and success.
         return std::tuple{ret, 0};
     } else {
+        // LCOV_EXCL_START
         // Root finding needed too many iterations,
         // return the (possibly wrong) result
         // and flag -1.
         return std::tuple{ret, -1};
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -558,9 +564,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     d_ntes.clear();
 
     if (!isfinite(h)) {
+        // LCOV_EXCL_START
         get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
-
         return;
+        // LCOV_EXCL_STOP
     }
 
     if (h == 0) {
@@ -606,9 +613,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // avoid non-finite event times. This guarantees that
                 // sorting the events by time is safe.
                 if (!isfinite(root)) {
+                    // LCOV_EXCL_START
                     get_logger()->warn("polynomial root finding produced a non-finite root of {} - skipping the event",
                                        root);
                     return;
+                    // LCOV_EXCL_STOP
                 }
 
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
@@ -685,12 +694,14 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
             }();
 
             if (lb_offset >= 1) {
+                // LCOV_EXCL_START
                 // NOTE: the whole integration range is in the cooldown range,
                 // move to the next event.
                 SPDLOG_LOGGER_DEBUG(
                     get_logger(),
                     "the integration timestep falls within the cooldown range for the terminal event {}, skipping", i);
                 continue;
+                // LCOV_EXCL_STOP
             }
 
             // Rescale it so that the range [0, h)
@@ -724,7 +735,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // When we do proper root finding below, the
                 // algorithm should be able to detect non-finite
                 // polynomials.
-                if (q.v[0] == T(0)
+                if (q.v[0] == T(0) // LCOV_EXCL_LINE
                     && std::all_of(q.v.data() + 1, q.v.data() + 1 + order, [](const auto &x) { return isfinite(x); })) {
                     // NOTE: we will have to skip the event if we are dealing
                     // with a terminal event on cooldown and the lower bound
@@ -778,9 +789,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     if (lb_offset < mid) {
                         wl.emplace_back(lb, mid, std::move(tmp1));
                     } else {
+                        // LCOV_EXCL_START
                         SPDLOG_LOGGER_DEBUG(
                             get_logger(),
                             "ignoring lower interval in a bisection that would fall entirely in the cooldown period");
+                        // LCOV_EXCL_STOP
                     }
                     wl.emplace_back(mid, ub, std::move(tmp2));
                 }
@@ -796,6 +809,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // cases. The second check is that we cannot possibly find more isolating
                 // intervals than the degree of the polynomial.
                 if (wl.size() > 250u || isol.size() > order) {
+                    // LCOV_EXCL_START
                     get_logger()->warn(
                         "the polynomial root isolation algorithm failed during event detection: the working "
                         "list size is {} and the number of isolating intervals is {}",
@@ -804,6 +818,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     loop_failed = true;
 
                     break;
+                    // LCOV_EXCL_STOP
                 }
 
             } while (!wl.empty());
@@ -864,8 +879,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // Root finding encountered some issue. Ignore the
                     // event and log the issue.
                     if (cflag == -1) {
+                        // LCOV_EXCL_START
                         get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
+                        // LCOV_EXCL_STOP
                     } else {
                         get_logger()->warn(
                             "polynomial root finding during event detection returned a nonzero errno with message '{}'",
