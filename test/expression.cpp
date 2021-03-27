@@ -25,15 +25,21 @@
 #endif
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 using namespace Catch::literals;
-
-#include <iostream>
 
 template <class T>
 void test_eval()
 {
+    using std::acos;
+    using std::acosh;
+    using std::asin;
+    using std::asinh;
+    using std::atan;
+    using std::atanh;
     using std::cos;
     using std::exp;
     using std::log;
@@ -41,13 +47,6 @@ void test_eval()
     using std::sin;
     using std::sqrt;
     using std::tan;
-    using std::acos;
-    using std::asin;
-    using std::acosh;
-    using std::asinh;
-    using std::atan;
-    using std::atanh;
-
 
     auto [x, y] = make_vars("x", "y");
 
@@ -85,9 +84,9 @@ void test_eval()
     {
         std::unordered_map<std::string, T> in{{"x", T(0.125)}};
         REQUIRE(eval(acos(x), in) == acos(T(0.125)));
-        //REQUIRE(eval(acosh(x+heyoka::expression(T(1.))), in) == acosh(T(1.125)));
+        REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == acosh(T(1.125)));
         REQUIRE(eval(asin(x), in) == asin(T(0.125)));
-        //REQUIRE(eval(asinh(x), in) == asinh(T(0.125)));
+        REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
         REQUIRE(eval(atan(x), in) == atan(T(0.125)));
         REQUIRE(eval(atanh(x), in) == atanh(T(0.125)));
         REQUIRE(eval(cos(x), in) == cos(T(0.125)));
