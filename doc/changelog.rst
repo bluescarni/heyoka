@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Start tracking code coverage
+  (`#115 <https://github.com/bluescarni/heyoka/pull/115>`__).
 - Initial version of the event detection system
   (`#107 <https://github.com/bluescarni/heyoka/pull/107>`__).
 - Add a tutorial chapter for batch mode
