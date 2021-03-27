@@ -4514,7 +4514,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_cur_max_delta_ts.resize(m_batch_size);
     m_pfor_ts.resize(m_batch_size);
 
-    m_d_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
+    m_d_out_time.resize(boost::numeric_cast<decltype(m_d_out_time.size())>(m_batch_size));
 }
 
 template <typename T>
