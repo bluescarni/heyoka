@@ -41,6 +41,7 @@ void test_eval()
     using std::atan;
     using std::atanh;
     using std::cos;
+    using std::erf;
     using std::exp;
     using std::log;
     using std::pow;
@@ -84,9 +85,7 @@ void test_eval()
     {
         std::unordered_map<std::string, T> in{{"x", T(0.125)}};
         REQUIRE(eval(acos(x), in) == acos(T(0.125)));
-        REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == acosh(T(1.125)));
         REQUIRE(eval(asin(x), in) == asin(T(0.125)));
-        REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
         REQUIRE(eval(atan(x), in) == atan(T(0.125)));
         REQUIRE(eval(atanh(x), in) == atanh(T(0.125)));
         REQUIRE(eval(cos(x), in) == cos(T(0.125)));
@@ -97,6 +96,15 @@ void test_eval()
         REQUIRE(eval(tan(x), in) == tan(T(0.125)));
         REQUIRE(eval(sqrt(x), in) == sqrt(T(0.125)));
         REQUIRE(eval(sigmoid(x), in) == T(1.) / (T(1.) + exp(-T(0.125))));
+        REQUIRE(eval(erf(x), in) == erf(T(0.125)));
+        REQUIRE(eval(neg(x), in) == -T(0.125));
+        REQUIRE(eval(square(x), in) == T(0.125) * T(0.125));
+
+        // For these we require only an approximate match. The test may fail
+        // otherwise (not clear why, a possible substitution at compile time might
+        // be using an implementation for these functions that is not guaranteed to match the std one)
+        REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
+        REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
     }
 }
 

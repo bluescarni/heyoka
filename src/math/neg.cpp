@@ -93,6 +93,31 @@ llvm::Value *neg_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
+double neg_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return -heyoka::eval_dbl(args()[0], map, pars);
+}
+
+long double neg_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return -heyoka::eval_ldbl(args()[0], map, pars);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 neg_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return -heyoka::eval_f128(args()[0], map, pars);
+}
+#endif
+
 namespace
 {
 
