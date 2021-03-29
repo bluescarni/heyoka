@@ -228,7 +228,7 @@ TEST_CASE("propagate grid")
     std::fill(grid.begin(), grid.begin() + 4, 0.);
     std::uniform_real_distribution<double> rdist(0., .1);
     for (auto i = 1u; i < 1000u; ++i) {
-        for (auto j = 0; j < 4; ++j) {
+        for (auto j = 0u; j < 4u; ++j) {
             grid[i * 4u + j] = grid[(i - 1u) * 4u + j] + rdist(rng);
         }
     }
@@ -254,7 +254,7 @@ TEST_CASE("propagate grid")
     std::fill(grid.begin(), grid.begin() + 4, 0.);
     rdist = std::uniform_real_distribution<double>(-.1, 0.);
     for (auto i = 1u; i < 1000u; ++i) {
-        for (auto j = 0; j < 4; ++j) {
+        for (auto j = 0u; j < 4u; ++j) {
             grid[i * 4u + j] = grid[(i - 1u) * 4u + j] + rdist(rng);
         }
     }
