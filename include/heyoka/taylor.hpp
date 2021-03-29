@@ -929,6 +929,7 @@ public:
 
     void propagate_for(const std::vector<T> &, std::size_t = 0);
     void propagate_until(const std::vector<T> &, std::size_t = 0);
+    std::vector<T> propagate_grid(const std::vector<T> &, std::size_t = 0);
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
         return m_prop_res;
