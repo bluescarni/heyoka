@@ -108,6 +108,12 @@ TEST_CASE("propagate grid scalar")
     REQUIRE_THROWS_MATCHES(
         ta.propagate_grid({0., 0., 1.}), std::invalid_argument,
         Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0., 1., 1.}), std::invalid_argument,
+        Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0., 1., 2., 2.}), std::invalid_argument,
+        Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
 
     // Set an infinity in the state.
     ta.get_state_data()[0] = std::numeric_limits<double>::infinity();
