@@ -4066,7 +4066,10 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         // Take the next step, making sure to write the Taylor coefficients
         // and to cap the timestep size so that we don't go past the
         // last grid point.
-        const auto [res, h] = step(grid.back() - m_time, true);
+        // NOTE: grid.back() - m_time cannot be nan as the grid times
+        // are all finite and the current time must also be finite
+        // (otherwise we would have exited the integration earlier).
+        const auto [res, h] = step_impl(grid.back() - m_time, true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -5030,10 +5033,13 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
         // Take the next step, making sure to write the Taylor coefficients
         // and to cap the timestep size so that we don't go past the
         // last grid point.
+        // NOTE: we are sure that no elements in pgrid_tmp can be nan,
+        // as the grid values are all finite and the current times must also
+        // be finite (otherwise we would have exited the integration earlier).
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             pgrid_tmp[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - m_time[i];
         }
-        step(pgrid_tmp, true);
+        step_impl(pgrid_tmp, true);
 
         // Check the result of the integration.
         if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &t) {
