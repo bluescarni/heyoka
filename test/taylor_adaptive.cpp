@@ -105,6 +105,10 @@ TEST_CASE("propagate grid scalar")
         ta.propagate_grid({-1., -2., 1.}), std::invalid_argument,
         Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
 
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0., 0., 1.}), std::invalid_argument,
+        Message("A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator"));
+
     // Set an infinity in the state.
     ta.get_state_data()[0] = std::numeric_limits<double>::infinity();
 
@@ -139,6 +143,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(std::get<4>(out).size() == 2000u);
     REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
@@ -155,6 +160,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(std::get<4>(out).size() == 2000u);
     REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
@@ -176,6 +182,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(std::get<4>(out).size() == 2000u);
     REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {
@@ -197,44 +204,7 @@ TEST_CASE("propagate grid scalar")
     out = ta.propagate_grid(grid);
 
     REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-    REQUIRE(ta.get_time() == grid.back());
-
-    for (auto i = 0u; i < 1000u; ++i) {
-        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
-        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
-    }
-
-    // A grid of identical time points.
-    ta.set_time(0.);
-    ta.get_state_data()[0] = 0.;
-    ta.get_state_data()[1] = 1.;
-
-    for (auto i = 1u; i < 1000u; ++i) {
-        grid[i] = 1;
-    }
-
-    out = ta.propagate_grid(grid);
-
-    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
-    REQUIRE(ta.get_time() == grid.back());
-
-    for (auto i = 0u; i < 1000u; ++i) {
-        REQUIRE(std::get<4>(out)[2u * i] == approximately(std::sin(grid[i]), 100000.));
-        REQUIRE(std::get<4>(out)[2u * i + 1u] == approximately(std::cos(grid[i]), 100000.));
-    }
-
-    // A grid of identical time points all at zero.
-    ta.set_time(0.);
-    ta.get_state_data()[0] = 0.;
-    ta.get_state_data()[1] = 1.;
-
-    for (auto i = 1u; i < 1000u; ++i) {
-        grid[i] = 0;
-    }
-
-    out = ta.propagate_grid(grid);
-
-    REQUIRE(std::get<0>(out) == taylor_outcome::time_limit);
+    REQUIRE(std::get<4>(out).size() == 2000u);
     REQUIRE(ta.get_time() == grid.back());
 
     for (auto i = 0u; i < 1000u; ++i) {

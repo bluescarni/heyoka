@@ -3950,29 +3950,34 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     }
 
     // Check the input grid points.
-    constexpr auto err_msg = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    constexpr auto nf_err_msg
+        = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    constexpr auto ig_err_msg
+        = "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator";
     // Check the first point.
     if (!isfinite(grid[0])) {
-        throw std::invalid_argument(err_msg);
+        throw std::invalid_argument(nf_err_msg);
     }
     if (grid.size() > 1u) {
         // Establish the direction of the grid from
         // the first two points.
         if (!isfinite(grid[1])) {
-            throw std::invalid_argument(err_msg);
+            throw std::invalid_argument(nf_err_msg);
         }
-        const auto grid_direction = grid[1] >= grid[0];
+        if (grid[1] == grid[0]) {
+            throw std::invalid_argument(ig_err_msg);
+        }
+        const auto grid_direction = grid[1] > grid[0];
 
         // Check that the remaining points are finite and that
         // they are ordered monotonically.
         for (decltype(grid.size()) i = 2; i < grid.size(); ++i) {
             if (!isfinite(grid[i])) {
-                throw std::invalid_argument(err_msg);
+                throw std::invalid_argument(nf_err_msg);
             }
 
-            if ((grid[i] >= grid[i - 1u]) != grid_direction) {
-                throw std::invalid_argument(
-                    "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator");
+            if ((grid[i] > grid[i - 1u]) != grid_direction) {
+                throw std::invalid_argument(ig_err_msg);
             }
         }
     }
@@ -4001,6 +4006,10 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     // NOTE: this may not be needed strictly speaking if
     // the time is already grid[0], but it will ensure that
     // m_last_h is properly updated.
+    // NOTE: this will *not* write the TCs, but, because we
+    // know that the grid is strictly monotonic, we know that we
+    // will take at least 1 TC-writing timestep before starting
+    // to use the dense output.
     const auto oc = std::get<0>(propagate_until(grid[0]));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
