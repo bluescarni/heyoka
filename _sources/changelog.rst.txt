@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement ``propagate_grid()`` for the batch integrator
+  (`#119 <https://github.com/bluescarni/heyoka/pull/119>`__).
 - Start tracking code coverage
   (`#115 <https://github.com/bluescarni/heyoka/pull/115>`__).
 - Initial version of the event detection system

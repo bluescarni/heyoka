@@ -408,7 +408,7 @@ In order to avoid this issue, whenever a terminal event occurs the event enters
 a *cooldown* period. Within the cooldown period, occurrences of the same event are ignored by the event detection
 system. The length of the cooldown period is, by default, automatically deduced by heyoka, but in some cases
 it might be useful to manually set a custom value. A custom cooldown period can be selected when constructing
-a terminal event via the ``kw::cooldown`` keyword.
+a terminal event via the ``kw::cooldown`` keyword argument.
 
 When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
 the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
