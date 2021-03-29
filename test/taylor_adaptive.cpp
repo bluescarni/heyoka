@@ -110,6 +110,7 @@ TEST_CASE("propagate grid scalar")
 
     auto out = ta.propagate_grid({.2});
     REQUIRE(std::get<0>(out) == taylor_outcome::err_nf_state);
+    REQUIRE(std::get<4>(out).empty());
 
     // Reset the integrator.
     ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
