@@ -3950,29 +3950,34 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     }
 
     // Check the input grid points.
-    constexpr auto err_msg = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    constexpr auto nf_err_msg
+        = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
+    constexpr auto ig_err_msg
+        = "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator";
     // Check the first point.
     if (!isfinite(grid[0])) {
-        throw std::invalid_argument(err_msg);
+        throw std::invalid_argument(nf_err_msg);
     }
     if (grid.size() > 1u) {
         // Establish the direction of the grid from
         // the first two points.
         if (!isfinite(grid[1])) {
-            throw std::invalid_argument(err_msg);
+            throw std::invalid_argument(nf_err_msg);
         }
-        const auto grid_direction = grid[1] >= grid[0];
+        if (grid[1] == grid[0]) {
+            throw std::invalid_argument(ig_err_msg);
+        }
+        const auto grid_direction = grid[1] > grid[0];
 
         // Check that the remaining points are finite and that
         // they are ordered monotonically.
         for (decltype(grid.size()) i = 2; i < grid.size(); ++i) {
             if (!isfinite(grid[i])) {
-                throw std::invalid_argument(err_msg);
+                throw std::invalid_argument(nf_err_msg);
             }
 
-            if ((grid[i] >= grid[i - 1u]) != grid_direction) {
-                throw std::invalid_argument(
-                    "A non-monotonic time grid was passed to propagate_grid() in an adaptive Taylor integrator");
+            if ((grid[i] > grid[i - 1u]) != grid_direction) {
+                throw std::invalid_argument(ig_err_msg);
             }
         }
     }
@@ -4001,6 +4006,10 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     // NOTE: this may not be needed strictly speaking if
     // the time is already grid[0], but it will ensure that
     // m_last_h is properly updated.
+    // NOTE: this will *not* write the TCs, but, because we
+    // know that the grid is strictly monotonic, we know that we
+    // will take at least 1 TC-writing timestep before starting
+    // to use the dense output.
     const auto oc = std::get<0>(propagate_until(grid[0]));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
@@ -4057,7 +4066,10 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         // Take the next step, making sure to write the Taylor coefficients
         // and to cap the timestep size so that we don't go past the
         // last grid point.
-        const auto [res, h] = step(grid.back() - m_time, true);
+        // NOTE: grid.back() - m_time cannot be nan as the grid times
+        // are all finite and the current time must also be finite
+        // (otherwise we would have exited the integration earlier).
+        const auto [res, h] = step_impl(grid.back() - m_time, true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -4514,7 +4526,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_cur_max_delta_ts.resize(m_batch_size);
     m_pfor_ts.resize(m_batch_size);
 
-    m_d_out_time.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size));
+    m_d_out_time.resize(boost::numeric_cast<decltype(m_d_out_time.size())>(m_batch_size));
 }
 
 template <typename T>
@@ -4718,11 +4730,18 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
         // Run the integration timestep.
         step_impl(m_cur_max_delta_ts, false);
 
-        // Check if the integration timestep produced an error condition.
+        // Check if the integration timestep produced an error condition or we reached
+        // a stopping terminal event.
         if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {
-                return std::get<0>(tup) != taylor_outcome::success && std::get<0>(tup) != taylor_outcome::time_limit;
+                const auto oc = std::get<0>(tup);
+                return oc != taylor_outcome::success && oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
             })) {
-            break;
+            // Setup m_prop_res before exiting.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return;
         }
 
         // Update the iteration counter.
@@ -4739,13 +4758,20 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
         // batch elements.
         if (std::all_of(m_step_res.begin(), m_step_res.end(),
                         [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::time_limit; })) {
-            break;
+            // Setup m_prop_res before exiting. The outcomes will all be time_limit.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return;
         }
 
         // Update min_h/max_h.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // Don't update if we reached the time limit.
-            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit) {
+            // Don't update if we reached the time limit or triggered a continuing
+            // terminal event.
+            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit
+                || std::get<0>(m_step_res[i]) >= taylor_outcome{0}) {
                 continue;
             }
 
@@ -4756,29 +4782,326 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
         }
 
         // Check the iteration limit.
-        if (max_steps != 0u && iter_counter == max_steps) {
-            break;
+        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
+        // then this condition will never trigger as by this point we are
+        // sure iter_counter is at least 1.
+        if (iter_counter == max_steps) {
+            // We reached the max_steps limit: the outcome for each batch element must be
+            // either step_limit or time_limit.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i]
+                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
+                                                                                       : taylor_outcome::time_limit,
+                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return;
+        }
+    }
+}
+
+template <typename T>
+std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
+{
+    using std::abs;
+
+    // Helper to detect if an input value is nonfinite.
+    auto is_nf = [](const T &t) {
+        using std::isfinite;
+        return !isfinite(t);
+    };
+
+    if (grid.empty()) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if the time grid is empty");
+    }
+
+    // Check that the grid size is a multiple of m_batch_size.
+    if (grid.size() % m_batch_size != 0u) {
+        using namespace fmt::literals;
+
+        throw std::invalid_argument(
+            "Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
+            "the grid has a size of {}, which is not a multiple of the batch size ({})"_format(grid.size(),
+                                                                                               m_batch_size));
+    }
+
+    if (std::any_of(m_time.begin(), m_time.end(), is_nf)) {
+        throw std::invalid_argument("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
+                                    "the current time is not finite");
+    }
+
+    // The number of grid points.
+    const auto n_grid_points = grid.size() / m_batch_size;
+
+    // Pointer to the grid data.
+    const auto grid_ptr = grid.data();
+
+    // Check the input grid points.
+    constexpr auto nf_err_msg
+        = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator in batch mode";
+    constexpr auto ig_err_msg = "A non-monotonic time grid was passed to propagate_grid() in an adaptive "
+                                "Taylor integrator in batch mode";
+
+    // Check the first point.
+    if (std::any_of(grid_ptr, grid_ptr + m_batch_size, is_nf)) {
+        throw std::invalid_argument(nf_err_msg);
+    }
+    if (n_grid_points > 1u) {
+        // Establish the direction of the grid from
+        // the first two batches of points.
+        if (std::any_of(grid_ptr + m_batch_size, grid_ptr + m_batch_size + m_batch_size, is_nf)) {
+            throw std::invalid_argument(nf_err_msg);
+        }
+        if (grid_ptr[m_batch_size] == grid_ptr[0]) {
+            throw std::invalid_argument(ig_err_msg);
+        }
+
+        const auto grid_direction = grid_ptr[m_batch_size] > grid_ptr[0];
+        for (std::uint32_t i = 1; i < m_batch_size; ++i) {
+            if ((grid_ptr[m_batch_size + i] > grid_ptr[i]) != grid_direction) {
+                throw std::invalid_argument(ig_err_msg);
+            }
+        }
+
+        // Check that the remaining points are finite and that
+        // they are ordered monotonically.
+        for (decltype(grid.size()) i = 2; i < n_grid_points; ++i) {
+            if (std::any_of(grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size, is_nf)) {
+                throw std::invalid_argument(nf_err_msg);
+            }
+
+            if (std::any_of(
+                    grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
+                    [this, grid_direction](const T &t) { return (t > *(&t - m_batch_size)) != grid_direction; })) {
+                throw std::invalid_argument(ig_err_msg);
+            }
         }
     }
 
-    // Assemble the return value.
-    if (max_steps != 0u && iter_counter == max_steps) {
-        // We exited because we reached the max_steps limit: if the last integration step was successful
-        // return step_limit, otherwise time_limit.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_prop_res[i]
-                = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                   : taylor_outcome::time_limit,
-                             m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+    // Pre-allocate the return value.
+    std::vector<T> retval;
+    // LCOV_EXCL_START
+    if (get_dim() > std::numeric_limits<decltype(retval.size())>::max() / grid.size()) {
+        throw std::overflow_error("Overflow detected in the creation of the return value of propagate_grid() in an "
+                                  "adaptive Taylor integrator in batch mode");
+    }
+    // LCOV_EXCL_STOP
+    retval.resize(grid.size() * get_dim());
+
+    // Propagate the system up to the first batch of grid points.
+    // NOTE: this will *not* write the TCs, but because we know that
+    // the grid is strictly monotonic, we are sure we will take at least
+    // one TC-writing timestep below before trying to use the dense output.
+    std::vector<T> pgrid_tmp;
+    pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
+    std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
+    propagate_until(pgrid_tmp);
+
+    // Check the result of the integration.
+    if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
+            // Check if the outcome is not time_limit and it is not a continuing
+            // terminal event. This means that either a non-finite state was
+            // encountered, or a stopping terminal event triggered.
+            const auto oc = std::get<0>(t);
+            return oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
+        })) {
+        // NOTE: for consistency with the scalar implementation,
+        // keep the outcomes from propagate_until() but we reset
+        // min/max h and the step counter.
+        for (auto &[_, min_h, max_h, ts_count] : m_prop_res) {
+            min_h = std::numeric_limits<T>::infinity();
+            max_h = 0;
+            ts_count = 0;
         }
-    } else {
-        // We exited either because of an error, or because all the batch
-        // elements reached the time limits. In this case, we just use the
-        // outcome of the last timestep.
+
+        return retval;
+    }
+
+    // Add the first result to retval.
+    std::copy(m_state.begin(), m_state.end(), retval.begin());
+
+    // Reset the counters and the min/max abs(h) vectors.
+    std::size_t iter_counter = 0;
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_ts_count[i] = 0;
+        m_min_abs_h[i] = std::numeric_limits<T>::infinity();
+        m_max_abs_h[i] = 0;
+    }
+
+    // NOTE: in general, an integration timestep will cover a different number
+    // of grid points for each batch element. We thus need to track the grid
+    // index separately for each batch element. We will start with index
+    // 1 for all batch elements, since all batch elements have been propagated to
+    // index 0 already.
+    std::vector<decltype(grid.size())> cur_grid_idx(
+        boost::numeric_cast<typename std::vector<decltype(grid.size())>::size_type>(m_batch_size), 1);
+
+    // Vectors to keep track of the time range of the last taken timestep.
+    std::vector<T> t0(boost::numeric_cast<typename std::vector<T>::size_type>(m_batch_size)), t1(t0);
+
+    // Vector of flags to keep track of the batch elements
+    // we can compute dense output for.
+    std::vector<unsigned> dflags(boost::numeric_cast<std::vector<unsigned>::size_type>(m_batch_size));
+
+    // NOTE: loop until we have processed all grid points
+    // for all batch elements.
+    auto cont_cond = [n_grid_points, &cur_grid_idx]() {
+        return std::any_of(cur_grid_idx.begin(), cur_grid_idx.end(),
+                           [n_grid_points](auto idx) { return idx < n_grid_points; });
+    };
+
+    while (cont_cond()) {
+        // Establish the time ranges of the last
+        // taken timestep.
+        // NOTE: t0 < t1.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            t0[i] = std::min(m_time[i], m_time[i] - m_last_h[i]);
+            t1[i] = std::max(m_time[i], m_time[i] - m_last_h[i]);
+        }
+
+        // Reset dflags.
+        std::fill(dflags.begin(), dflags.end(), 1u);
+
+        // Compute the state of the system via dense output for as many grid
+        // points as possible, i.e., as long as the grid times
+        // fall within the validity range for the dense output of at least
+        // one batch element.
+        while (true) {
+            // Establish and count for which batch elements we
+            // can still compute dense output.
+            std::uint32_t counter = 0;
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                // Fetch the grid index for the current batch element.
+                const auto gidx = cur_grid_idx[i];
+
+                if (dflags[i] && gidx < n_grid_points) {
+                    // The current batch element has not been eliminated
+                    // yet from the candidate list and it still has grid
+                    // points available. Determine if the current grid point
+                    // falls within the validity domain for the dense output.
+                    const auto idx = gidx * m_batch_size + i;
+                    const auto d_avail = grid_ptr[idx] >= t0[i] && grid_ptr[idx] <= t1[i];
+                    dflags[i] = d_avail;
+                    counter += d_avail;
+
+                    // Copy over the grid point to pgrid_tmp regardless
+                    // of whether d_avail is true or false.
+                    pgrid_tmp[i] = grid_ptr[idx];
+                } else {
+                    // Either the batch element had already been eliminated
+                    // previously, or there are no more grid points available.
+                    // Make sure the batch element is marked as eliminated.
+                    dflags[i] = 0;
+                }
+            }
+
+            if (counter == 0u) {
+                // Cannot use dense output on any of the batch elements,
+                // need to take another step.
+                break;
+            }
+
+            // Compute the dense output.
+            update_d_output(pgrid_tmp);
+
+            // Add the results to retval and bump up the values in cur_grid_idx.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                if (dflags[i]) {
+                    const auto gidx = cur_grid_idx[i];
+
+                    for (std::uint32_t j = 0; j < m_dim; ++j) {
+                        retval[gidx * m_batch_size * m_dim + j * m_batch_size + i] = m_d_out[j * m_batch_size + i];
+                    }
+
+                    assert(cur_grid_idx[i] < n_grid_points);
+                    cur_grid_idx[i] += 1u;
+                }
+            }
+
+            // Check if we exhausted all grid points for all batch elements.
+            if (!cont_cond()) {
+                break;
+            }
+        }
+
+        // Check if we exhausted all grid points for all batch elements.
+        if (!cont_cond()) {
+            break;
+        }
+
+        // Take the next step, making sure to write the Taylor coefficients
+        // and to cap the timestep size so that we don't go past the
+        // last grid point.
+        // NOTE: we are sure that no elements in pgrid_tmp can be nan,
+        // as the grid values are all finite and the current times must also
+        // be finite (otherwise we would have exited the integration earlier).
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            pgrid_tmp[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - m_time[i];
+        }
+        step_impl(pgrid_tmp, true);
+
+        // Check the result of the integration.
+        if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &t) {
+                // Something went wrong in the propagation of the timestep, or we reached
+                // a stopping terminal event.
+                const auto oc = std::get<0>(t);
+                return oc != taylor_outcome::success && oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
+            })) {
+            // Setup m_prop_res before exiting.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return retval;
+        }
+
+        // Update the number of iterations.
+        ++iter_counter;
+
+        // Update the local step counters and min_h/max_h.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: the local step counters increase only if we integrated
+            // for a nonzero time.
+            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
+
+            // Don't update if we reached the time limit or if we
+            // triggered a continuing terminal event
+            // (in which case the timestep is artificially clamped).
+            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit
+                || std::get<0>(m_step_res[i]) >= taylor_outcome{0}) {
+                continue;
+            }
+
+            const auto abs_h = abs(std::get<1>(m_step_res[i]));
+            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+        }
+
+        // Check the iteration limit.
+        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
+        // then this condition will never trigger as by this point we are
+        // sure iter_counter is at least 1.
+        if (iter_counter == max_steps) {
+            // We reached the max_steps limit: the outcome for each batch element must be
+            // either step_limit or time_limit.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i]
+                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
+                                                                                       : taylor_outcome::time_limit,
+                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return retval;
         }
     }
+
+    // Everything went fine, set all outcomes to time_limit.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+    }
+
+    return retval;
 }
 
 template <typename T>
