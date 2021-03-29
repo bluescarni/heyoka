@@ -188,7 +188,7 @@ TEST_CASE("propagate grid scalar")
     ta.get_state_data()[0] = 0.;
     ta.get_state_data()[1] = 1.;
 
-    rdist = std::uniform_real_distribution<double>(0., -.1);
+    rdist = std::uniform_real_distribution<double>(-.1, 0.);
     grid[0] = 0;
     for (auto i = 1u; i < 1000u; ++i) {
         grid[i] = grid[i - 1u] + rdist(rng);
