@@ -31,6 +31,8 @@ public:
     erf_impl();
     explicit erf_impl(expression);
 
+    expression diff(const std::string &) const;
+
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
