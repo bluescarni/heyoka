@@ -33,6 +33,13 @@ public:
 
     expression diff(const std::string &) const;
 
+    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                            const std::vector<mppp::real128> &) const;
+#endif
+
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
 #if defined(HEYOKA_HAVE_REAL128)

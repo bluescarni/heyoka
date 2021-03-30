@@ -117,6 +117,29 @@ llvm::Value *erf_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
 
 #endif
 
+double erf_impl::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return std::erf(heyoka::eval_dbl(args()[0], map, pars));
+}
+
+long double erf_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return std::erf(heyoka::eval_ldbl(args()[0], map, pars));
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+mppp::real128 erf_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+{
+    assert(args().size() == 1u);
+
+    return mppp::erf(heyoka::eval_f128(args()[0], map, pars));
+}
+#endif
+
 std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
 erf_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
 {
@@ -454,6 +477,17 @@ llvm::Function *erf_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 }
 
 #endif
+
+expression erf_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 1u);
+#if defined(HEYOKA_HAVE_REAL128)
+    auto coeff = heyoka::expression(heyoka::number(1./sqrt_pi_2<mppp::real128>));
+#else
+    auto coeff = heyoka::expression(heyoka::number(1./sqrt_pi_2<long double>));
+#endif
+    return coeff * exp(-args()[0]*args()[0]) * heyoka::diff(args()[0], s);
+}
 
 } // namespace detail
 
