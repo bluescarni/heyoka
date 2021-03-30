@@ -52,7 +52,7 @@ TEST_CASE("erf diff")
 #if defined(HEYOKA_HAVE_REAL128)
     auto coeff = 1./sqrt_pi_2<mppp::real128>;
 #else
-    auto coeff = 1./sqrt_pi_2<long double>);
+    auto coeff = 1./sqrt_pi_2<long double>;
 #endif
     REQUIRE(diff(erf(x * x - y), x) == (coeff * exp((-(x*x - y) * (x*x - y)))) * (2. * x));
     REQUIRE(diff(erf(x * x + y), y) == (coeff * exp((-(x*x + y) * (x*x + y)))));
