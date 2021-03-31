@@ -75,6 +75,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -91,7 +103,6 @@ std::string taylor_mangle_suffix(llvm::Type *t)
     if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        using fmt::literals::operator""_format;
         return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
     } else {
         // Otherwise just return the type name.
@@ -455,8 +466,6 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
-    using fmt::literals::operator""_format;
-
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
     // n_eq variables at the end and possibly
@@ -584,8 +593,6 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // n_eq variables at the end and possibly
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
-
-    using fmt::literals::operator""_format;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -764,8 +771,6 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
-    using fmt::literals::operator""_format;
-
     const auto n_eq = orig.size();
 
     assert(dc.size() >= n_eq * 2u);
@@ -860,8 +865,6 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
                                 const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
                                 std::vector<expression>::size_type n_eq)
 {
-    using fmt::literals::operator""_format;
-
     assert(sv_funcs.size() == sv_funcs_dc.size());
 
     std::unordered_map<std::string, expression> subs_map;
@@ -903,8 +906,6 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
 taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
 {
-    using fmt::literals::operator""_format;
-
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -1053,8 +1054,6 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
 std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
 taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector<expression> sv_funcs)
 {
-    using fmt::literals::operator""_format;
-
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -1256,7 +1255,6 @@ namespace
 template <typename T>
 std::uint32_t taylor_order_from_tol(T tol)
 {
-    using fmt::literals::operator""_format;
     using std::ceil;
     using std::isfinite;
     using std::log;
@@ -2219,8 +2217,6 @@ auto taylor_build_function_maps(llvm_state &s,
             const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
-                using fmt::literals::operator""_format;
-
                 throw std::invalid_argument(
                     "Inconsistent arity detected in a Taylor derivative function in compact "
                     "mode: the same function is being called with both {} and {} arguments"_format(
@@ -2793,7 +2789,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                           std::uint32_t batch_size, bool, bool compact_mode,
                                           std::vector<expression> ntes)
 {
-    using fmt::literals::operator""_format;
     using std::isfinite;
 
     assert(!s.is_compiled());
@@ -3313,7 +3308,6 @@ template <typename T, typename U>
 auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
                               bool high_accuracy, bool compact_mode)
 {
-    using fmt::literals::operator""_format;
     using std::isfinite;
 
     assert(!s.is_compiled());
@@ -3467,7 +3461,6 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  std::vector<nt_event_t> ntes)
 {
     using std::isfinite;
-    using fmt::literals::operator""_format;
 
     // Assign the data members.
     m_state = std::move(state);
@@ -3516,8 +3509,6 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     if (m_pars.size() < npars) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
     } else if (m_pars.size() > npars) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Excessive number of parameter values passed to the constructor of an adaptive "
             "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
@@ -4314,8 +4305,6 @@ template <typename C, typename T>
 std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
                                        const T &cooldown)
 {
-    using fmt::literals::operator""_format;
-
     os << "Event type     : terminal\n";
     os << "Event equation : " << eq << '\n';
     os << "Event direction: " << dir << '\n';
@@ -4408,7 +4397,6 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
-    using fmt::literals::operator""_format;
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -4467,8 +4455,6 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Excessive number of parameter values passed to the constructor of an adaptive "
             "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
@@ -4661,8 +4647,6 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
             "but the number of specified timesteps is {}"_format(m_batch_size, max_delta_ts.size()));
@@ -4686,8 +4670,6 @@ void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
                                     "the batch size is {}, but the number of specified time intervals is {}"_format(
                                         m_batch_size, delta_ts.size()));
@@ -4707,8 +4689,6 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
 
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
             "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
@@ -4836,8 +4816,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
 
     // Check that the grid size is a multiple of m_batch_size.
     if (grid.size() % m_batch_size != 0u) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
             "the grid has a size of {}, which is not a multiple of the batch size ({})"_format(grid.size(),
@@ -5158,8 +5136,6 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
 {
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Invalid number of time coordinates specified for the dense output in a Taylor integrator in batch "
             "mode: the batch size is {}, but the number of time coordinates is {}"_format(m_batch_size, time.size()));
@@ -5281,8 +5257,6 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'"_format(
                 name));
@@ -5551,8 +5525,6 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        using fmt::literals::operator""_format;
-
         throw std::invalid_argument(
             "Unable to create a function for a Taylor state updater with name '{}'"_format(name));
     }
@@ -5834,8 +5806,6 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
 {
-    using fmt::literals::operator""_format;
-
     switch (oc) {
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::success);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::step_limit);
