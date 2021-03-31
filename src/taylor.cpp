@@ -749,7 +749,6 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // Reorder the decomposition.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> retval;
     for (auto idx : v_idx) {
-        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         retval.push_back(std::move(dc[idx]));
     }
 
@@ -969,7 +968,6 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
     // of the original variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : vars) {
-        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
@@ -1146,7 +1144,6 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // for checking later.
     std::vector<expression> orig_rhs;
     for (const auto &[_, rhs_ex] : sys) {
-        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         orig_rhs.push_back(rhs_ex);
     }
     const auto orig_sv_funcs = sv_funcs;
@@ -1166,7 +1163,6 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // of the original lhs variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : lhs_vars) {
-        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
@@ -1864,6 +1860,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s,
     auto nums_arr_type
         = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>(nums.size()));
     auto nums_arr = llvm::ConstantArray::get(nums_arr_type, nums);
+    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto *g_nums
         = new llvm::GlobalVariable(module, nums_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, nums_arr);
 
@@ -4187,7 +4184,7 @@ template <typename T>
 nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &) = default;
 
 template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &) noexcept = default;
+nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
 
 template <typename T>
 nt_event_impl<T>::~nt_event_impl() = default;
@@ -4275,7 +4272,7 @@ template <typename T>
 t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &) = default;
 
 template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &) noexcept = default;
+t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;
 
 template <typename T>
 t_event_impl<T>::~t_event_impl() = default;

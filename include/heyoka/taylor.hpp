@@ -375,7 +375,7 @@ public:
     nt_event_impl(nt_event_impl &&) noexcept;
 
     nt_event_impl &operator=(const nt_event_impl &);
-    nt_event_impl &operator=(nt_event_impl &) noexcept;
+    nt_event_impl &operator=(nt_event_impl &&) noexcept;
 
     ~nt_event_impl();
 
@@ -468,7 +468,7 @@ public:
     t_event_impl(t_event_impl &&) noexcept;
 
     t_event_impl &operator=(const t_event_impl &);
-    t_event_impl &operator=(t_event_impl &) noexcept;
+    t_event_impl &operator=(t_event_impl &&) noexcept;
 
     ~t_event_impl();
 
