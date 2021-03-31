@@ -748,6 +748,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
 
     // Reorder the decomposition.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> retval;
+    retval.reserve(v_idx.size());
     for (auto idx : v_idx) {
         retval.push_back(std::move(dc[idx]));
     }
@@ -967,6 +968,7 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
     // Init the decomposition. It begins with a list
     // of the original variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
+    u_vars_defs.reserve(vars.size());
     for (const auto &var : vars) {
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
@@ -1143,6 +1145,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // Store a copy of the original rhs and sv_funcs
     // for checking later.
     std::vector<expression> orig_rhs;
+    orig_rhs.reserve(sys.size());
     for (const auto &[_, rhs_ex] : sys) {
         orig_rhs.push_back(rhs_ex);
     }
@@ -1162,6 +1165,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
+    u_vars_defs.reserve(lhs_vars.size());
     for (const auto &var : lhs_vars) {
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
@@ -4165,6 +4169,7 @@ nt_event_impl<T>::nt_event_impl(expression e, callback_t f) : eq(std::move(e)), 
 }
 
 template <typename T>
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
 nt_event_impl<T>::nt_event_impl(expression e, callback_t f, event_direction d)
     : nt_event_impl(std::move(e), std::move(f))
 {
