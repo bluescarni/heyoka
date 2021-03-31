@@ -88,10 +88,10 @@ std::string taylor_mangle_suffix(llvm::Type *t)
 {
     assert(t != nullptr);
 
-    if (auto v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
+    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
         return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
     } else {
         // Otherwise just return the type name.
@@ -112,6 +112,12 @@ struct opt_disabler {
         // Disable optimisations.
         m_s.opt_level() = 0;
     }
+
+    opt_disabler(const opt_disabler &) = delete;
+    opt_disabler(opt_disabler &&) noexcept = delete;
+    opt_disabler &operator=(const opt_disabler &) = delete;
+    opt_disabler &operator=(opt_disabler &&) noexcept = delete;
+
     ~opt_disabler()
     {
         // Restore the original optimisation level.
@@ -162,7 +168,7 @@ llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Va
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
-    auto ptr = builder.CreateInBoundsGEP(par_ptr, {builder.getInt32(arr_idx)});
+    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.getInt32(arr_idx)});
 
     // Load.
     return load_vector_from_memory(builder, ptr, batch_size);
@@ -231,7 +237,7 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
 
     // Fetch the pointer into par_ptr.
     // NOTE: the overflow check is done in taylor_compute_jet().
-    auto ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
+    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
 
     return load_vector_from_memory(builder, ptr, batch_size);
 }
@@ -260,7 +266,7 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint3
 
     // NOTE: overflow check has already been done to ensure that the
     // total size of diff_arr fits in a 32-bit unsigned integer.
-    auto ptr = builder.CreateInBoundsGEP(
+    auto *ptr = builder.CreateInBoundsGEP(
         diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
 
     return builder.CreateLoad(ptr);
@@ -301,18 +307,18 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
-    auto out_ptr = f->args().begin();
+    auto *out_ptr = f->args().begin();
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
 
-    auto tc_ptr = f->args().begin() + 1;
+    auto *tc_ptr = f->args().begin() + 1;
     tc_ptr->setName("tc_ptr");
     tc_ptr->addAttr(llvm::Attribute::NoCapture);
     tc_ptr->addAttr(llvm::Attribute::NoAlias);
     tc_ptr->addAttr(llvm::Attribute::ReadOnly);
 
-    auto h_ptr = f->args().begin() + 2;
+    auto *h_ptr = f->args().begin() + 2;
     h_ptr->setName("h_ptr");
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
@@ -324,7 +330,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     builder.SetInsertPoint(bb);
 
     // Load the value of h.
-    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+    auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
 
     if (high_accuracy) {
         // Create the array for storing the running compensations.
@@ -337,12 +343,12 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the coefficient from tc_ptr. The index is:
             // batch_size * (order + 1u) * cur_var_idx.
-            auto tc_idx = builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx);
-            auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+            auto *tc_idx = builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx);
+            auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
-            auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+            auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
             store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
 
             // Zero-init the element in comp_arr.
@@ -351,30 +357,30 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
         });
 
         // Init the running updater for the powers of h.
-        auto cur_h = builder.CreateAlloca(h->getType());
+        auto *cur_h = builder.CreateAlloca(h->getType());
         builder.CreateStore(h, cur_h);
 
         // Run the evaluation.
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order + 1u), [&](llvm::Value *cur_order) {
             // Load the current power of h.
-            auto cur_h_val = builder.CreateLoad(cur_h);
+            auto *cur_h_val = builder.CreateLoad(cur_h);
 
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
                 // Load the coefficient from tc_ptr. The index is:
                 // batch_size * (order + 1u) * cur_var_idx + batch_size * cur_order.
-                auto tc_idx
+                auto *tc_idx
                     = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                         builder.CreateMul(builder.getInt32(batch_size), cur_order));
-                auto cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
-                auto tmp = builder.CreateFMul(cf, cur_h_val);
+                auto *cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                auto *tmp = builder.CreateFMul(cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
-                auto comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
-                auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                auto res_ptr = builder.CreateInBoundsGEP(out_ptr, {out_idx});
-                auto y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
-                auto cur_res = load_vector_from_memory(builder, res_ptr, batch_size);
-                auto t = builder.CreateFAdd(cur_res, y);
+                auto *comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+                auto *res_ptr = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                auto *y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                auto *cur_res = load_vector_from_memory(builder, res_ptr, batch_size);
+                auto *t = builder.CreateFAdd(cur_res, y);
 
                 // Update the compensation and the return value.
                 builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
@@ -390,13 +396,14 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the coefficient from tc_ptr. The index is:
             // batch_size * (order + 1u) * cur_var_idx + batch_size * order.
-            auto tc_idx = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
-                                            builder.getInt32(batch_size * order));
-            auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+            auto *tc_idx
+                = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
+                                    builder.getInt32(batch_size * order));
+            auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
-            auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+            auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
             store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
         });
 
@@ -410,17 +417,18 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
                     // we specify order - cur_order.
                     // NOTE: the index is:
                     // batch_size * (order + 1u) * cur_var_idx + batch_size * (order - cur_order).
-                    auto tc_idx
+                    auto *tc_idx
                         = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                             builder.CreateMul(builder.getInt32(batch_size),
                                                               builder.CreateSub(builder.getInt32(order), cur_order)));
-                    auto tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                    auto *tc
+                        = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
 
                     // Accumulate in out_ptr. The index is:
                     // batch_size * cur_var_idx.
-                    auto out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                    auto out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
-                    auto cur_out = load_vector_from_memory(builder, out_p, batch_size);
+                    auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
+                    auto *out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                    auto *cur_out = load_vector_from_memory(builder, out_p, batch_size);
                     store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
                 });
             });
@@ -447,7 +455,7 @@ taylor_decompose_cse(std::vector<std::pair<expression, std::vector<std::uint32_t
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
@@ -577,7 +585,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
 
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -719,7 +727,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
 
     // Do the remap for the definitions of the u variables, the
     // derivatives and the hidden deps.
-    for (auto it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
+    for (auto *it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
         rename_variables(it->first, remap);
 
@@ -741,6 +749,7 @@ auto taylor_sort_dc(std::vector<std::pair<expression, std::vector<std::uint32_t>
     // Reorder the decomposition.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> retval;
     for (auto idx : v_idx) {
+        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         retval.push_back(std::move(dc[idx]));
     }
 
@@ -755,7 +764,7 @@ void verify_taylor_dec(const std::vector<expression> &orig,
 {
     using idx_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type;
 
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     const auto n_eq = orig.size();
 
@@ -851,7 +860,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
                                 const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
                                 std::vector<expression>::size_type n_eq)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     assert(sv_funcs.size() == sv_funcs_dc.size());
 
@@ -894,7 +903,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
 taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
@@ -960,6 +969,7 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
     // of the original variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : vars) {
+        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
@@ -988,11 +998,11 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
     // Decompose sv_funcs, and write into sv_funcs_dc the index
     // of the u variable which each sv_func corresponds to.
     std::vector<std::uint32_t> sv_funcs_dc;
-    for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
-        if (const auto var_ptr = std::get_if<variable>(&sv_funcs[i].value())) {
+    for (auto &sv_ex : sv_funcs) {
+        if (const auto *var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_funcs[i]), u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_ex), u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
@@ -1043,7 +1053,7 @@ taylor_decompose(std::vector<expression> v_ex, std::vector<expression> sv_funcs)
 std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
 taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector<expression> sv_funcs)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
@@ -1136,6 +1146,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // for checking later.
     std::vector<expression> orig_rhs;
     for (const auto &[_, rhs_ex] : sys) {
+        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         orig_rhs.push_back(rhs_ex);
     }
     const auto orig_sv_funcs = sv_funcs;
@@ -1155,6 +1166,7 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // of the original lhs variables of the system.
     std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs;
     for (const auto &var : lhs_vars) {
+        // NOLINTNEXTLINE(performance-inefficient-vector-operation)
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
@@ -1183,11 +1195,11 @@ taylor_decompose(std::vector<std::pair<expression, expression>> sys, std::vector
     // Decompose sv_funcs, and write into sv_funcs_dc the index
     // of the u variable which each sv_func corresponds to.
     std::vector<std::uint32_t> sv_funcs_dc;
-    for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
-        if (const auto var_ptr = std::get_if<variable>(&sv_funcs[i].value())) {
+    for (auto &sv_ex : sv_funcs) {
+        if (const auto var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_funcs[i]), u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_ex), u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
@@ -1244,7 +1256,7 @@ namespace
 template <typename T>
 std::uint32_t taylor_order_from_tol(T tol)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
     using std::ceil;
     using std::isfinite;
     using std::log;
@@ -1272,7 +1284,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
+    auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -1300,7 +1312,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     } else {
 #endif
         // Compute abs(b).
-        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        auto *abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
         // Return max(a, abs(b)).
         return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, abs_y_v});
 #if defined(HEYOKA_HAVE_REAL128)
@@ -1313,7 +1325,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 {
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
-    auto x_t = x_v->getType()->getScalarType();
+    auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
         // NOTE: for __float128 we cannot use the intrinsic, we need
@@ -1341,7 +1353,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     } else {
 #endif
         // Compute abs(b).
-        auto abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
+        auto *abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
         // Return min(a, abs(b)).
         return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
 #if defined(HEYOKA_HAVE_REAL128)
@@ -2203,7 +2215,7 @@ auto taylor_build_function_maps(llvm_state &s,
             const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
-                using namespace fmt::literals;
+                using fmt::literals::operator""_format;
 
                 throw std::invalid_argument(
                     "Inconsistent arity detected in a Taylor derivative function in compact "
@@ -2776,7 +2788,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                           std::uint32_t batch_size, bool, bool compact_mode,
                                           std::vector<expression> ntes)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
     using std::isfinite;
 
     assert(!s.is_compiled());
@@ -3296,7 +3308,7 @@ template <typename T, typename U>
 auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
                               bool high_accuracy, bool compact_mode)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
     using std::isfinite;
 
     assert(!s.is_compiled());
@@ -3450,7 +3462,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  std::vector<nt_event_t> ntes)
 {
     using std::isfinite;
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     // Assign the data members.
     m_state = std::move(state);
@@ -3499,7 +3511,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     if (m_pars.size() < npars) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
     } else if (m_pars.size() > npars) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Excessive number of parameter values passed to the constructor of an adaptive "
@@ -4296,7 +4308,7 @@ template <typename C, typename T>
 std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
                                        const T &cooldown)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     os << "Event type     : terminal\n";
     os << "Event equation : " << eq << '\n';
@@ -4390,7 +4402,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        bool compact_mode, std::vector<T> pars)
 {
     using std::isfinite;
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     // Init the data members.
     m_batch_size = batch_size;
@@ -4449,7 +4461,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Excessive number of parameter values passed to the constructor of an adaptive "
@@ -4643,7 +4655,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 {
     // Check the dimensionality of max_delta_ts.
     if (max_delta_ts.size() != m_batch_size) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is {}, "
@@ -4668,7 +4680,7 @@ void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument("Invalid number of time intervals specified in a Taylor integrator in batch mode: "
                                     "the batch size is {}, but the number of specified time intervals is {}"_format(
@@ -4689,7 +4701,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
 
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
@@ -4818,7 +4830,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
 
     // Check that the grid size is a multiple of m_batch_size.
     if (grid.size() % m_batch_size != 0u) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
@@ -5140,7 +5152,7 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
 {
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Invalid number of time coordinates specified for the dense output in a Taylor integrator in batch "
@@ -5263,7 +5275,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Unable to create a function for the computation of the jet of Taylor derivatives with name '{}'"_format(
@@ -5533,7 +5545,7 @@ auto taylor_add_state_updater_impl(llvm_state &s, const std::string &name, std::
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
-        using namespace fmt::literals;
+        using fmt::literals::operator""_format;
 
         throw std::invalid_argument(
             "Unable to create a function for a Taylor state updater with name '{}'"_format(name));
@@ -5816,7 +5828,7 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
 {
-    using namespace fmt::literals;
+    using fmt::literals::operator""_format;
 
     switch (oc) {
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::success);
