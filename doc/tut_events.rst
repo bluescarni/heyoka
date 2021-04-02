@@ -416,6 +416,35 @@ then the ``mr`` boolean parameter in the terminal event callback will be set to 
 has the possibility to handle such occurrence. Note that an ``mr`` value of ``false`` in the callback does not imply
 that multiple roots do not exist, just that they were not detected.
 
+Note that manually modifying the integrator's time or state does **not** automatically reset the cooldown values
+for terminal events. This could in principle lead to missing terminal events when the integration restarts.
+For this reason, a member function called ``reset_cooldowns()`` is available to clear the cooldown timers of
+all terminal events.
+
+Limitations and caveats
+-----------------------
+
+Because heyoka's event detection system is based on polynomial root finding techniques, it will experience
+issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
+not a problem in practice, unless the event equations are written in such a way to always generate polynomials
+with multiple roots.
+
+For instance, an event equation such as
+
+.. math::
+
+    \left[ g\left( t, \boldsymbol{x} \left( t \right) \right) \right]^2 = 0
+
+will be troublesome, because both the event equation *and* its time derivative will be zero
+when the event triggers. This will translate to a Taylor series with a double root in correspondence
+of the event trigger time, which will lead to a breakdown of the root finding algorithm.
+This, at best, will result in reduced performance and, at worst, in missing events altogether.
+
+As a general rule, users should then avoid defining event equations in which the event trigger times
+are stationary points.
+
+Note that missed events due to ill-conditioned polynomials will be flagged by heyoka's logging system.
+
 Full code listing
 -----------------
 
