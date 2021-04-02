@@ -173,3 +173,9 @@ may look like this:
    # dependencies are transitively linked to 'main'.
    add_executable(main main.cpp)
    target_link_libraries(main heyoka::heyoka)
+
+heyoka's config-file package also exports the following boolean variables to signal with which optional
+dependencies heyoka was compiled:
+
+* ``heyoka_WITH_SLEEF`` if SLEEF support was enabled,
+* ``heyoka_WITH_MPPP`` if mp++ support was enabled.
