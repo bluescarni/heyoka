@@ -33,8 +33,6 @@
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-#include <boost/multiprecision/float128.hpp>
-
 #include <mp++/real128.hpp>
 
 #endif
@@ -329,35 +327,10 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     // Clear out errno before running the root finding.
     errno = 0;
 
-    // Prepare the return value.
-    T ret;
-
-#if defined(HEYOKA_HAVE_REAL128)
-    if constexpr (std::is_same_v<T, mppp::real128>) {
-        // NOTE: currently in order to use Boost's root finding
-        // we need to also use their own float128 wrapper. In the long run we should
-        // perhaps try to adapt mp++ so that this is not necessary
-        // and we can use directly real128.
-        using bf128 = boost::multiprecision::float128;
-
-        // Transform the poly coefficients to bf128.
-        pwrap<bf128> tmp(order);
-        std::transform(poly.v.begin(), poly.v.end(), tmp.v.begin(), [](auto x) { return bf128(x.m_value); });
-
-        auto p = boost::math::tools::toms748_solve(
-            [d = std::as_const(tmp.v).data(), order](bf128 x) { return poly_eval(d, x, order); }, bf128(lb.m_value),
-            bf128(ub.m_value), boost::math::tools::eps_tolerance<bf128>(), max_iter, pol{});
-
-        ret = mppp::real128(((p.first + p.second) / 2).backend().value());
-    } else {
-#endif
-        auto p = boost::math::tools::toms748_solve([d = poly.v.data(), order](T x) { return poly_eval(d, x, order); },
-                                                   lb, ub, boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
-
-        ret = (p.first + p.second) / 2;
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    // Run the root finder.
+    const auto p = boost::math::tools::toms748_solve([d = poly.v.data(), order](T x) { return poly_eval(d, x, order); },
+                                                     lb, ub, boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
+    const auto ret = (p.first + p.second) / 2;
 
     SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
 
@@ -420,17 +393,7 @@ auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
     const auto n = boost::numeric_cast<unsigned>(n_);
     const auto k = boost::numeric_cast<unsigned>(k_);
 
-#if defined(HEYOKA_HAVE_REAL128)
-    if constexpr (std::is_same_v<T, mppp::real128>) {
-        using bf128 = boost::multiprecision::float128;
-
-        return mppp::real128{boost::math::binomial_coefficient<bf128>(n, k).backend().value()};
-    } else {
-#endif
-        return boost::math::binomial_coefficient<T>(n, k);
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    return boost::math::binomial_coefficient<T>(n, k);
 }
 
 // Helper to add a polynomial translation function
