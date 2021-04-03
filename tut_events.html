@@ -270,6 +270,11 @@
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#limitations-and-caveats">
+   Limitations and caveats
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#full-code-listing">
    Full code listing
   </a>
@@ -714,7 +719,28 @@ the occurrence of multiple roots of the event equation within the cooldown perio
 then the <code class="docutils literal notranslate"><span class="pre">mr</span></code> boolean parameter in the terminal event callback will be set to <code class="docutils literal notranslate"><span class="pre">true</span></code>, so that the user
 has the possibility to handle such occurrence. Note that an <code class="docutils literal notranslate"><span class="pre">mr</span></code> value of <code class="docutils literal notranslate"><span class="pre">false</span></code> in the callback does not imply
 that multiple roots do not exist, just that they were not detected.</p>
+<p>Note that manually modifying the integrator’s time or state does <strong>not</strong> automatically reset the cooldown values
+for terminal events. This could in principle lead to missing terminal events when the integration restarts.
+For this reason, a member function called <code class="docutils literal notranslate"><span class="pre">reset_cooldowns()</span></code> is available to clear the cooldown timers of
+all terminal events.</p>
 </div>
+</div>
+<div class="section" id="limitations-and-caveats">
+<h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this headline">¶</a></h2>
+<p>Because heyoka’s event detection system is based on polynomial root finding techniques, it will experience
+issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
+not a problem in practice, unless the event equations are written in such a way to always generate polynomials
+with multiple roots.</p>
+<p>For instance, an event equation such as</p>
+<div class="math notranslate nohighlight">
+\[\left[ g\left( t, \boldsymbol{x} \left( t \right) \right) \right]^2 = 0\]</div>
+<p>will be troublesome, because both the event equation <em>and</em> its time derivative will be zero
+when the event triggers. This will translate to a Taylor series with a double root in correspondence
+of the event trigger time, which will lead to a breakdown of the root finding algorithm.
+This, at best, will result in reduced performance and, at worst, in missing events altogether.</p>
+<p>As a general rule, users should then avoid defining event equations in which the event trigger times
+are stationary points.</p>
+<p>Note that missed events due to ill-conditioned polynomials will be flagged by heyoka’s logging system.</p>
 </div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
