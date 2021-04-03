@@ -135,6 +135,9 @@ all initialised to zero, as we can verify by printing to screen the time array:
 
    Time array: { 0.,  0.,  0.,  0.}
 
+Step-by-step integration
+^^^^^^^^^^^^^^^^^^^^^^^^
+
 We are now ready to start integrating. Like ``taylor_adaptive``, ``taylor_adaptive_batch``
 provides ``step()`` functions for integrating forward or backward in time step-by-step.
 One important difference is that, in order to avoid costly memory allocations,
@@ -198,7 +201,10 @@ then the timesteps will be clamped.
    Time array:
    { 0.215801,  0.21687 ,  0.216791,  0.216963}
 
-The ``propagate_for()`` and ``propagate_until()`` functions are also available for the
+Time-limited propagation
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``propagate_*()`` functions are also available for the
 batch integrator. Similarly to the ``step()`` functions, the outcomes of the ``propagate_*()``
 functions are stored in internal vectors of tuples, with the tuple elements representing:
 
@@ -238,6 +244,9 @@ Let's see a couple of examples:
 
    Time array:
    { 20.,  21.,  22.,  23.}
+
+Dense output
+^^^^^^^^^^^^
 
 The batch integrator also supports :ref:`dense output <tut_d_output>`. Like for ``taylor_adaptive``,
 enabling dense output is a two-step process. First we invoke one of the ``step()`` functions
