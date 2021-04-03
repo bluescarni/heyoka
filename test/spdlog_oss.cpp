@@ -20,7 +20,7 @@ namespace heyoka_test
 {
 
 struct spdlog_oss::impl {
-    impl(spdlog::sink_ptr &&log) : orig_logger(std::move(log)) {}
+    explicit impl(spdlog::sink_ptr &&log) : orig_logger(std::move(log)) {}
 
     spdlog::sink_ptr orig_logger;
     std::ostringstream oss;
