@@ -4,7 +4,8 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17: http://docutils.sourceforge.net/" />
+
     <title>Installation &#8212; heyoka 0.6.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
@@ -297,9 +298,9 @@
         
               <div>
                 
-  <div class="section" id="installation">
+  <section id="installation">
 <span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="introduction">
+<section id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
 <p>heyoka is written in modern C++, and it requires a compiler able to understand
 at least C++17. The library is regularly tested on
@@ -327,19 +328,19 @@ libraries (used in the tests and benchmarks).</p></li>
 </ul>
 <p><a class="reference external" href="https://cmake.org/">CMake</a> is the build system used by heyoka and it must also be available when
 installing from source (the minimum required version is 3.8).</p>
-<div class="section" id="support-for-extended-precision">
+<section id="support-for-extended-precision">
 <span id="ep-support"></span><h3>Support for extended precision<a class="headerlink" href="#support-for-extended-precision" title="Permalink to this headline">¶</a></h3>
 <p>Whereas in heyoka double-precision computations are always supported, support for extended-precision
 computations varies depending on the software/hardware platform.</p>
-<div class="section" id="bit-precision">
+<section id="bit-precision">
 <h4>80-bit precision<a class="headerlink" href="#bit-precision" title="Permalink to this headline">¶</a></h4>
 <p>80-bit precision support requires an x86 processor. Additionally, the 80-bit floating-point
 type must be available in C++ as the <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type. This is case for most compilers,
 with the notable exception of Microsoft Visual C++, in which <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a synonym for <code class="docutils literal notranslate"><span class="pre">double</span></code>.
 Thus, on Windows heyoka (and all its dependencies) must be compiled with a non-MSVC compiler
 in order to enable 80-bit computations.</p>
-</div>
-<div class="section" id="id2">
+</section>
+<section id="id2">
 <h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
 <p>Currently quadruple-precision support in heyoka has the following prerequisites:</p>
 <ul class="simple">
@@ -348,12 +349,12 @@ in order to enable 80-bit computations.</p>
 <a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>,</p></li>
 <li><p>heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p></li>
 </ul>
-</div>
-</div>
-</div>
-<div class="section" id="packages">
+</section>
+</section>
+</section>
+<section id="packages">
 <h2>Packages<a class="headerlink" href="#packages" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="conda">
+<section id="conda">
 <h3>Conda<a class="headerlink" href="#conda" title="Permalink to this headline">¶</a></h3>
 <p>heyoka is available via the <a class="reference external" href="https://conda.io/docs/">conda</a> package manager for Linux, OSX and Windows
 thanks to the infrastructure provided by <a class="reference external" href="https://conda-forge.org/">conda-forge</a>.</p>
@@ -369,9 +370,9 @@ and it is regularly updated when new heyoka versions are released.</p>
 <p>Please refer to the <a class="reference external" href="https://conda.io/docs/">conda documentation</a> for instructions
 on how to setup and manage
 your conda installation.</p>
-</div>
-</div>
-<div class="section" id="installation-from-source">
+</section>
+</section>
+<section id="installation-from-source">
 <span id="id3"></span><h2>Installation from source<a class="headerlink" href="#installation-from-source" title="Permalink to this headline">¶</a></h2>
 <p>Source releases of heyoka can be downloaded from
 <a class="reference external" href="https://github.com/bluescarni/heyoka/releases">github</a>.
@@ -414,8 +415,8 @@ in order to execute the test or the benchmark suite you have to ensure that the
 <code class="docutils literal notranslate"><span class="pre">PATH</span></code> variable includes the directory that contains the heyoka
 DLL (otherwise the tests will fail to run).</p>
 </div>
-</div>
-<div class="section" id="including-heyoka-in-your-project-via-cmake">
+</section>
+<section id="including-heyoka-in-your-project-via-cmake">
 <h2>Including heyoka in your project via CMake<a class="headerlink" href="#including-heyoka-in-your-project-via-cmake" title="Permalink to this headline">¶</a></h2>
 <p>As a part of the heyoka installation, a group of CMake files is installed into
 <code class="docutils literal notranslate"><span class="pre">CMAKE_INSTALL_PREFIX/lib/cmake/heyoka</span></code>.
@@ -453,8 +454,8 @@ dependencies heyoka was compiled:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_SLEEF</span></code> if SLEEF support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_MPPP</span></code> if mp++ support was enabled.</p></li>
 </ul>
-</div>
-</div>
+</section>
+</section>
 
 
               </div>

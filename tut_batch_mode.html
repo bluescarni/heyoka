@@ -4,7 +4,8 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17: http://docutils.sourceforge.net/" />
+
     <title>Batch mode &#8212; heyoka 0.6.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
@@ -279,7 +280,7 @@
         
               <div>
                 
-  <div class="section" id="batch-mode">
+  <section id="batch-mode">
 <span id="tut-batch-mode"></span><h1>Batch mode<a class="headerlink" href="#batch-mode" title="Permalink to this headline">¶</a></h1>
 <p>heyoka’s API supports a mode of operation called <em>batch mode</em>.
 In batch mode, all the scalar quantities appearing in a system of ODEs
@@ -306,7 +307,7 @@ processor in use. Because at this time the most widespread SIMD instruction set 
 <a class="reference external" href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">AVX</a> (available on
 most x86 processors sold since 2011), in this tutorial we will be using a
 batch size <span class="math notranslate nohighlight">\(n=4\)</span>.</p>
-<div class="section" id="the-adaptive-batch-integrator">
+<section id="the-adaptive-batch-integrator">
 <h2>The adaptive batch integrator<a class="headerlink" href="#the-adaptive-batch-integrator" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code> class is the batch mode counterpart of the adaptive
 (scalar) integrator <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">described earlier</span></a>. Although at a high-level
@@ -416,7 +417,7 @@ all initialised to zero, as we can verify by printing to screen the time array:<
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Time array: { 0.,  0.,  0.,  0.}</span>
 </pre></div>
 </div>
-<div class="section" id="step-by-step-integration">
+<section id="step-by-step-integration">
 <h3>Step-by-step integration<a class="headerlink" href="#step-by-step-integration" title="Permalink to this headline">¶</a></h3>
 <p>We are now ready to start integrating. Like <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>, <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code>
 provides <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions for integrating forward or backward in time step-by-step.
@@ -492,8 +493,8 @@ then the timesteps will be clamped.</p>
 <span class="go">{ 0.215801,  0.21687 ,  0.216791,  0.216963}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="time-limited-propagation">
+</section>
+<section id="time-limited-propagation">
 <h3>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions are also available for the
 batch integrator. Similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions, the outcomes of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code>
@@ -551,8 +552,8 @@ that were used in the propagation,</p></li>
 <span class="go">{ 20.,  21.,  22.,  23.}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="dense-output">
+</section>
+<section id="dense-output">
 <h3>Dense output<a class="headerlink" href="#dense-output" title="Permalink to this headline">¶</a></h3>
 <p>The batch integrator also supports <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. Like for <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>,
 enabling dense output is a two-step process. First we invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
@@ -648,9 +649,9 @@ at different time coordinates:</p>
 <span class="go"> { 1.289941,  0.411166, -0.134188,  0.776195}}</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="full-code-listing">
+</section>
+</section>
+<section id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;cstddef&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
@@ -788,8 +789,8 @@ at different time coordinates:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
               </div>
