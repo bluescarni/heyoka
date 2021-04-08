@@ -420,6 +420,19 @@ then the timestep will be clamped to <code class="docutils literal notranslate">
 </pre></div>
 </div>
 <p>Note that the integration outcome is now <code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>, instead of <code class="docutils literal notranslate"><span class="pre">taylor_outcome::success</span></code>.</p>
+<p>Before moving on, we need to point out an important caveat when using the single
+step functions:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If the exact solution of the ODE system can be expressed as a polynomial function
+of time, the automatic timestep deduction algorithm may return a timestep of infinity.
+This is the case, for instance, when integrating the rectilinear motion of a free
+particle or the constant-gravity free-fall equation. In such cases, the step functions
+should be called with a finite <code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code> argument, in order to clamp the timestep
+to a finite value.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions (described <a class="reference internal" href="#tlimited-prop"><span class="std std-ref">below</span></a>)
+are not affected by this issue.</p>
+</div>
 </section>
 <section id="accessing-state-and-time">
 <h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Permalink to this headline">¶</a></h2>
@@ -444,7 +457,7 @@ holding the integrator state, while <code class="docutils literal notranslate"><
 to the state data. Only <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> can be used to mutate the state.</p>
 </section>
 <section id="time-limited-propagation">
-<h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h2>
+<span id="tlimited-prop"></span><h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h2>
 <p>In addition to the step-by-step integration functions,
 <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> also provides functions to propagate
 the state of the system for a specified amount of time.
