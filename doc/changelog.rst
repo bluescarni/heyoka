@@ -1,6 +1,15 @@
 Changelog
 =========
 
+0.6.1 (unreleased)
+------------------
+
+Fix
+~~~
+
+- Fix an assertion misfiring in the event detection function
+  (`#123 <https://github.com/bluescarni/heyoka/pull/123>`__).
+
 0.6.0 (2021-04-06)
 ------------------
 

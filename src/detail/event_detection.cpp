@@ -183,6 +183,8 @@ std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
 {
     assert(n > 0u);
 
+    using std::isnan;
+
     std::uint32_t retval = 0;
 
     // Start from index 0 and move forward
@@ -204,7 +206,9 @@ std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
         // Determine if a sign change occurred wrt
         // the last nonzero coefficient found.
         const auto cur_sign = sgn(a[idx]);
-        assert(sgn(a[last_nz_idx]));
+        // NOTE: don't run the assertion check if
+        // we are dealing with nans.
+        assert(isnan(a[last_nz_idx]) || sgn(a[last_nz_idx]));
         retval += (cur_sign + sgn(a[last_nz_idx])) == 0;
 
         // Update last_nz_idx if necessary.
@@ -221,7 +225,6 @@ std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
     bool has_nan = false;
 
     for (std::uint32_t i = 0; i <= n; ++i) {
-        using std::isnan;
         if (isnan(a[i])) {
             has_nan = true;
         }
