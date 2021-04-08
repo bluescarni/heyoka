@@ -7,6 +7,8 @@ Changelog
 Fix
 ~~~
 
+- Fix an initialisation order issue in the event detection code
+  (`#124 <https://github.com/bluescarni/heyoka/pull/124>`__).
 - Fix an assertion misfiring in the event detection function
   (`#123 <https://github.com/bluescarni/heyoka/pull/123>`__).
 
