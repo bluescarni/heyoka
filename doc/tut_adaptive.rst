@@ -128,6 +128,21 @@ then the timestep will be clamped to ``max_delta_t``:
 
 Note that the integration outcome is now ``taylor_outcome::time_limit``, instead of ``taylor_outcome::success``.
 
+Before moving on, we need to point out an important caveat when using the single
+step functions:
+
+.. warning::
+
+   If the exact solution of the ODE system can be expressed as a polynomial function
+   of time, the automatic timestep deduction algorithm may return a timestep of infinity.
+   This is the case, for instance, when integrating the rectilinear motion of a free
+   particle or the constant-gravity free-fall equation. In such cases, the step functions
+   should be called with a finite ``max_delta_t`` argument, in order to clamp the timestep
+   to a finite value.
+
+   Note that the ``propagate_*()`` functions (described :ref:`below <tlimited_prop>`)
+   are not affected by this issue.
+
 Accessing state and time
 ------------------------
 
@@ -143,6 +158,8 @@ can be used to access the state data:
 Note that ``get_state()`` returns a const reference to the ``std::vector``
 holding the integrator state, while ``get_state_data()`` returns a naked pointer
 to the state data. Only ``get_state_data()`` can be used to mutate the state.
+
+.. _tlimited_prop:
 
 Time-limited propagation
 ------------------------
