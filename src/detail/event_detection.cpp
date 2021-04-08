@@ -543,6 +543,16 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
     assert(order >= 2u);
 
+    // NOTE: trigger the creation of the poly cache
+    // *before* triggering the creation of the other
+    // thread-local variables. This is important because
+    // the working list contains pwrap objects, which in turn
+    // interact with the poly cache. If we don't do this,
+    // the poly cache will be destroyed before the working
+    // list, and the destructors in the working list will
+    // interact with invalid memory.
+    [[maybe_unused]] auto *pc = &get_poly_cache<T>();
+
     // Fetch a reference to the list of isolating intervals.
     auto &isol = get_isol<T>();
 
