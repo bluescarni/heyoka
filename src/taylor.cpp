@@ -1492,16 +1492,54 @@ llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
 #endif
 }
 
+// Create a global read-only array containing the values in sv_funcs_dc, if any
+// (otherwise, the return value will be null). This is for use in the adaptive steppers
+// when employing compact mode.
+llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::uint32_t> &sv_funcs_dc)
+{
+    auto &builder = s.builder();
+
+    if (sv_funcs_dc.empty()) {
+        return nullptr;
+    } else {
+        auto *arr_type = llvm::ArrayType::get(llvm::Type::getInt32Ty(s.context()),
+                                              boost::numeric_cast<std::uint64_t>(sv_funcs_dc.size()));
+        std::vector<llvm::Constant *> sv_funcs_dc_const;
+        sv_funcs_dc_const.reserve(sv_funcs_dc.size());
+        for (auto idx : sv_funcs_dc) {
+            sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
+        }
+        auto *sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
+        auto *g_sv_funcs_dc = new llvm::GlobalVariable(s.module(), sv_funcs_dc_arr->getType(), true,
+                                                       llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
+
+        // Get out a pointer to the beginning of the array.
+        return builder.CreateInBoundsGEP(g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
+    }
+}
+
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
 // following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
 // the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
-// the clamping values for the timesteps.
+// the clamping values for the timesteps. svf_ptr is a pointer to an LLVM array containing the
+// values in sv_funcs_dc.
 template <typename T>
-llvm::Value *taylor_determine_h(llvm_state &s,
-                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                                const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *h_ptr, std::uint32_t n_eq,
-                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *
+taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+                   const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                   std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
+    assert(batch_size != 0u);
+#if !defined(NDEBUG)
+    if (diff_variant.index() == 0u) {
+        // Compact mode.
+        assert(sv_funcs_dc.empty() == !svf_ptr);
+    } else {
+        // Non-compact mode.
+        assert(svf_ptr == nullptr);
+    }
+#endif
+
     using std::exp;
 
     auto &builder = s.builder();
@@ -1514,7 +1552,7 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
 
-        // These will end up containing the norm infinity of the state vector and the
+        // These will end up containing the norm infinity of the state vector + sv_funcs and the
         // norm infinity of the derivatives at orders order and order - 1.
         auto vec_t = to_llvm_vector_type<T>(context, batch_size);
         max_abs_state = builder.CreateAlloca(vec_t);
@@ -1548,6 +1586,30 @@ llvm::Value *taylor_determine_h(llvm_state &s,
                 max_abs_diff_om1);
         });
 
+        if (svf_ptr != nullptr) {
+            // Consider also the functions of state variables for
+            // the computation of the timestep.
+            llvm_loop_u32(
+                s, builder.getInt32(0), builder.getInt32(boost::numeric_cast<std::uint32_t>(sv_funcs_dc.size())),
+                [&](llvm::Value *arr_idx) {
+                    // Fetch the index value from the array.
+                    auto cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(svf_ptr, {arr_idx}));
+
+                    builder.CreateStore(
+                        taylor_step_maxabs(s, builder.CreateLoad(max_abs_state),
+                                           taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx)),
+                        max_abs_state);
+                    builder.CreateStore(
+                        taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_o),
+                                           taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_idx)),
+                        max_abs_diff_o);
+                    builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(max_abs_diff_om1),
+                                                           taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                                              builder.getInt32(order - 1u), cur_idx)),
+                                        max_abs_diff_om1);
+                });
+        }
+
         // Load the values for later use.
         max_abs_state = builder.CreateLoad(max_abs_state);
         max_abs_diff_o = builder.CreateLoad(max_abs_diff_o);
@@ -1567,7 +1629,10 @@ llvm::Value *taylor_determine_h(llvm_state &s,
         // order * (n_eq + n_sv_funcs).
         max_abs_diff_o = taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs)]);
         max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs)]);
-        for (std::uint32_t i = 1; i < n_eq; ++i) {
+        // NOTE: iterate up to n_eq + n_sv_funcs in order to
+        // consider also the functions of state variables for
+        // the computation of the timestep.
+        for (std::uint32_t i = 1; i < n_eq + n_sv_funcs; ++i) {
             max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
             max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * (n_eq + n_sv_funcs) + i]);
             max_abs_diff_om1
@@ -2637,42 +2702,25 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     }
 }
 
-// Create a global read-only array containing the values in sv_funcs_dc, if any
-// (otherwise, the return value will be null). This is for use in the adaptive steppers
-// when employing compact mode.
-llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::uint32_t> &sv_funcs_dc)
-{
-    auto &builder = s.builder();
-
-    if (sv_funcs_dc.empty()) {
-        return nullptr;
-    } else {
-        auto *arr_type = llvm::ArrayType::get(llvm::Type::getInt32Ty(s.context()),
-                                              boost::numeric_cast<std::uint64_t>(sv_funcs_dc.size()));
-        std::vector<llvm::Constant *> sv_funcs_dc_const;
-        sv_funcs_dc_const.reserve(sv_funcs_dc.size());
-        for (auto idx : sv_funcs_dc) {
-            sv_funcs_dc_const.emplace_back(builder.getInt32(idx));
-        }
-        auto *sv_funcs_dc_arr = llvm::ConstantArray::get(arr_type, sv_funcs_dc_const);
-        auto *g_sv_funcs_dc = new llvm::GlobalVariable(s.module(), sv_funcs_dc_arr->getType(), true,
-                                                       llvm::GlobalVariable::InternalLinkage, sv_funcs_dc_arr);
-
-        // Get out a pointer to the beginning of the array.
-        return builder.CreateInBoundsGEP(g_sv_funcs_dc, {builder.getInt32(0), builder.getInt32(0)});
-    }
-}
-
 // Helper to generate the LLVM code to store the Taylor coefficients of the state variables and
 // the sv funcs into an external array. The Taylor polynomials are stored in row-major order,
 // first the state variables and after the sv funcs. For use in the adaptive timestepper implementations.
 void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                     const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *tc_ptr, std::uint32_t n_eq,
-                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+                     const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
+                     std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
-    auto &builder = s.builder();
-
     assert(batch_size != 0u);
+#if !defined(NDEBUG)
+    if (diff_variant.index() == 0u) {
+        // Compact mode.
+        assert(sv_funcs_dc.empty() == !svf_ptr);
+    } else {
+        // Non-compact mode.
+        assert(svf_ptr == nullptr);
+    }
+#endif
+
+    auto &builder = s.builder();
 
     // Convert to std::uint32_t for overflow checking and use below.
     const auto n_sv_funcs = boost::numeric_cast<std::uint32_t>(sv_funcs_dc.size());
@@ -2692,10 +2740,6 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
         // Compact mode.
 
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
-
-        // Create a global read-only array containing the values in sv_funcs_dc, if any
-        // (otherwise, svf_ptr will be null).
-        auto *svf_ptr = taylor_c_make_sv_funcs_arr(s, sv_funcs_dc);
 
         // Write out the Taylor coefficients for the state variables.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
@@ -2864,18 +2908,22 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     assert(bb != nullptr);
     builder.SetInsertPoint(bb);
 
+    // Create a global read-only array containing the values in ev_dc, if there
+    // are any and we are in compact mode (otherwise, svf_ptr will be null).
+    auto *svf_ptr = compact_mode ? taylor_c_make_sv_funcs_arr(s, ev_dc) : nullptr;
+
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
                                               batch_size, compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size);
 
     // Store h to memory.
     store_vector_to_memory(builder, h_ptr, h);
 
     // Copy the jet of derivatives to jet_ptr.
-    taylor_write_tc(s, diff_variant, ev_dc, jet_ptr, n_eq, n_uvars, order, batch_size);
+    taylor_write_tc(s, diff_variant, ev_dc, svf_ptr, jet_ptr, n_eq, n_uvars, order, batch_size);
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -3390,7 +3438,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
                                               compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
@@ -3433,7 +3481,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
         [&]() {
             // tc_ptr is not null: copy the Taylor coefficients
             // for the state variables.
-            taylor_write_tc(s, diff_variant, {}, tc_ptr, n_eq, n_uvars, order, batch_size);
+            taylor_write_tc(s, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size);
         },
         [&]() {
             // Taylor coefficients were not requested,

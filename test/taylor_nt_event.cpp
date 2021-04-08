@@ -278,9 +278,7 @@ TEST_CASE("taylor nte multizero")
                                                cur_time = t;
                                            })}};
 
-        for (auto i = 0; i < 20; ++i) {
-            REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
-        }
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
 
         REQUIRE(counter == 12u);
 
@@ -350,9 +348,7 @@ TEST_CASE("taylor nte multizero")
                                           },
                                           event_direction::negative)}};
 
-        for (auto i = 0; i < 20; ++i) {
-            REQUIRE(std::get<0>(ta.step()) == taylor_outcome::success);
-        }
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
 
         REQUIRE(counter == 10u);
     };
@@ -440,9 +436,7 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                cur_time = t;
                                            })}};
 
-        for (auto i = 0; i < 20; ++i) {
-            REQUIRE(std::get<0>(ta.step_backward()) == taylor_outcome::success);
-        }
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(-4))) == taylor_outcome::time_limit);
 
         REQUIRE(counter == 12u);
     };

@@ -4,9 +4,18 @@ Changelog
 0.6.1 (unreleased)
 ------------------
 
+Changes
+~~~~~~~
+
+- The event equations are now taken into account in the
+  determination of the adaptive timestep
+  (`#124 <https://github.com/bluescarni/heyoka/pull/124>`__).
+
 Fix
 ~~~
 
+- Fix an initialisation order issue in the event detection code
+  (`#124 <https://github.com/bluescarni/heyoka/pull/124>`__).
 - Fix an assertion misfiring in the event detection function
   (`#123 <https://github.com/bluescarni/heyoka/pull/123>`__).
 

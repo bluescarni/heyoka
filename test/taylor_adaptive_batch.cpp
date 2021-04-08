@@ -275,3 +275,24 @@ TEST_CASE("propagate grid")
         }
     }
 }
+
+// A test to make sure the propagate functions deal correctly
+// with trivial dynamics.
+TEST_CASE("propagate trivial")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0, 0.1, 0.1}, 2};
+
+    ta.propagate_for({1.2, 1.3});
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    ta.propagate_until({2.3, 4.5});
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    ta.propagate_grid({5, 6, 7, 8.});
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+}
