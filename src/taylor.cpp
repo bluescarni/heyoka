@@ -1540,7 +1540,7 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
 
-        // These will end up containing the norm infinity of the state vector and the
+        // These will end up containing the norm infinity of the state vector + sv_funcs and the
         // norm infinity of the derivatives at orders order and order - 1.
         auto vec_t = to_llvm_vector_type<T>(context, batch_size);
         max_abs_state = builder.CreateAlloca(vec_t);
@@ -1623,6 +1623,9 @@ llvm::Value *taylor_determine_h(llvm_state &s,
         // order * (n_eq + n_sv_funcs).
         max_abs_diff_o = taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs)]);
         max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs)]);
+        // NOTE: iterate up to n_eq + n_sv_funcs in order to
+        // consider also the functions of state variables for
+        // the computation of the timestep.
         for (std::uint32_t i = 1; i < n_eq + n_sv_funcs; ++i) {
             max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
             max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * (n_eq + n_sv_funcs) + i]);
