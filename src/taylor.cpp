@@ -1521,7 +1521,8 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
 // Helper to generate the LLVM code to determine the timestep in an adaptive Taylor integrator,
 // following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
 // the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
-// the clamping values for the timesteps.
+// the clamping values for the timesteps. svf_ptr is a pointer to an LLVM array containing the
+// values in sv_funcs_dc.
 template <typename T>
 llvm::Value *
 taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
