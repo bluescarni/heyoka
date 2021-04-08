@@ -904,3 +904,16 @@ TEST_CASE("taylor scalar move")
     REQUIRE(tes_data == ta.get_t_events().data());
     REQUIRE(ntes_data == ta.get_nt_events().data());
 }
+
+// A test to make sure the propagate functions deal correctly
+// with trivial dynamics.
+TEST_CASE("propagate trivial")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0}};
+
+    REQUIRE(std::get<0>(ta.propagate_for(1.2)) == taylor_outcome::time_limit);
+    REQUIRE(std::get<0>(ta.propagate_until(2.3)) == taylor_outcome::time_limit);
+    REQUIRE(std::get<0>(ta.propagate_grid({3, 4, 5, 6, 7.})) == taylor_outcome::time_limit);
+}
