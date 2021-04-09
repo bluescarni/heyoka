@@ -3512,7 +3512,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Assign the data members.
     m_state = std::move(state);
-    m_time = time;
+    m_time = dfloat<T>(time);
     m_pars = std::move(pars);
     m_tes = std::move(tes);
     m_ntes = std::move(ntes);
@@ -3532,7 +3532,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
-            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
+            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(
+                static_cast<T>(m_time)));
     }
 
     if (!isfinite(tol) || tol <= 0) {
@@ -3718,7 +3719,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         assert(m_tes.empty() && m_ntes.empty());
 
         // Invoke the vanilla stepper.
-        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
+        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
 
         // Update the time.
         m_time += h;
@@ -3740,7 +3741,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         using std::abs;
 
         // Invoke the stepper for event handling.
-        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time, &h);
+        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h);
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
@@ -3826,7 +3827,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
 
-            m_ntes[std::get<0>(t)].get_callback()(*this, m_time - (m_last_h - std::get<1>(t)));
+            m_ntes[std::get<0>(t)].get_callback()(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
         }
 
         // The return value of the first
@@ -3915,7 +3916,8 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(const dfloat<T> &t,
+                                                                                       std::size_t max_steps)
 {
     using std::isfinite;
 
@@ -3946,7 +3948,7 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         // and at the first iteration we have checked above the value of m_time.
         // At successive iterations, we know that m_time must be finite because
         // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(t - m_time, false);
+        const auto [res, h] = step_impl(static_cast<T>(t - m_time), false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -3986,6 +3988,12 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
             return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
         }
     }
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+{
+    return propagate_until(dfloat<T>(t), max_steps);
 }
 
 template <typename T>
@@ -4125,7 +4133,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         // NOTE: grid.back() - m_time cannot be nan as the grid times
         // are all finite and the current time must also be finite
         // (otherwise we would have exited the integration earlier).
-        const auto [res, h] = step_impl(grid.back() - m_time, true);
+        const auto [res, h] = step_impl(static_cast<T>(grid.back() - m_time), true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -4186,15 +4194,23 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
+const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, we need to compute:
-    const auto h = time - (m_time - m_last_h);
+    // the *previous* timestep.
+    if (rel_time) {
+        // Time coordinate relative to the current time.
+        const auto h = m_last_h + time;
 
-    m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+        m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+    } else {
+        // Absolute time coordinate.
+        const auto h = time - (m_time - m_last_h);
+
+        m_d_out_f(m_d_out.data(), m_tc.data(), &h.hi);
+    }
 
     return m_d_out;
 }

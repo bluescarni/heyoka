@@ -590,11 +590,11 @@ TEST_CASE("dense output")
 
                     REQUIRE(oc == taylor_outcome::success);
 
-                    ta.update_d_output(ta.get_time() - ta.get_last_h());
+                    ta.update_d_output(-ta.get_last_h(), true);
                     REQUIRE(d_out[0] == approximately(old_state2[0], 1000.));
                     REQUIRE(d_out[1] == approximately(old_state2[1], 1000.));
 
-                    ta.update_d_output(ta.get_time());
+                    ta.update_d_output(0., true);
                     REQUIRE(d_out[0] == approximately(ta.get_state()[0], 1000.));
                     REQUIRE(d_out[1] == approximately(ta.get_state()[1], 1000.));
                 }

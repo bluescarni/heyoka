@@ -71,7 +71,7 @@ TEST_CASE("batch consistency")
     for (auto i = 0u; i < batch_size; ++i) {
         t_scal[i].propagate_until(20 + i);
 
-        REQUIRE(t_scal[i].get_state()[0] == approximately(s_arr(0, i)));
+        REQUIRE(t_scal[i].get_state()[0] == approximately(s_arr(0, i), 1000.));
     }
 }
 
