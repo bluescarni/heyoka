@@ -785,7 +785,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // cases. The second check is that we cannot possibly find more isolating
                 // intervals than the degree of the polynomial.
                 if (wl.size() > 250u || isol.size() > order) {
-                    // LCOV_EXCL_START
                     get_logger()->warn(
                         "the polynomial root isolation algorithm failed during event detection: the working "
                         "list size is {} and the number of isolating intervals is {}",
@@ -794,7 +793,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     loop_failed = true;
 
                     break;
-                    // LCOV_EXCL_STOP
                 }
 
             } while (!wl.empty());
