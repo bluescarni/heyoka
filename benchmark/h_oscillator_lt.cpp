@@ -65,5 +65,5 @@ int main(int argc, char *argv[])
         err += std::abs((exact - ta.get_state()[0]) / exact);
     }
 
-    std::cout << "Average relative error: " << err << '\n';
+    std::cout << "Average relative error: " << err / ntrials << '\n';
 }
