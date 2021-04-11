@@ -4,8 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Customising the adaptive integrator &#8212; heyoka 0.7.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
@@ -268,13 +267,13 @@
         
               <div>
                 
-  <section id="customising-the-adaptive-integrator">
+  <div class="section" id="customising-the-adaptive-integrator">
 <span id="tut-adaptive-custom"></span><h1>Customising the adaptive integrator<a class="headerlink" href="#customising-the-adaptive-integrator" title="Permalink to this headline">¶</a></h1>
 <p>In the <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">previous section</span></a> we showed a few
 usage examples of the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class using the default
 options. Here, we will show how the behaviour of the integrator
 can be customised in a variety of ways.</p>
-<section id="error-tolerance">
+<div class="section" id="error-tolerance">
 <h2>Error tolerance<a class="headerlink" href="#error-tolerance" title="Permalink to this headline">¶</a></h2>
 <p>As we mentioned earlier, by default the <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class
 uses an error tolerance equal to the machine
@@ -337,8 +336,8 @@ integration is reduced with respect to the default tolerance value:</p>
 <span class="go">State       : [0.050000000001312876, 0.024999999997558964]</span>
 </pre></div>
 </div>
-</section>
-<section id="compact-mode">
+</div>
+<div class="section" id="compact-mode">
 <h2>Compact mode<a class="headerlink" href="#compact-mode" title="Permalink to this headline">¶</a></h2>
 <p>By default, the just-in-time compilation process of heyoka
 aims at maximising runtime performance over everything else.
@@ -403,8 +402,8 @@ keyword argument):</p>
 faster than the default
 code generation mode when it comes to the construction of the integrator
 object. For larger ODE systems, the gap will be even wider.</p>
-</section>
-<section id="high-accuracy-mode">
+</div>
+<div class="section" id="high-accuracy-mode">
 <h2>High-accuracy mode<a class="headerlink" href="#high-accuracy-mode" title="Permalink to this headline">¶</a></h2>
 <p>For long-term integrations at very low error tolerances, heyoka offers
 an opt-in <em>high-accuracy</em> mode. In high-accuracy mode, heyoka
@@ -420,8 +419,8 @@ which prevents catastrophic cancellation issues and ultimately helps maintaining
 machine precision over very long integrations.</p>
 <p>High-accuracy mode can be enabled via the <code class="docutils literal notranslate"><span class="pre">high_accuracy</span></code> keyword
 argument.</p>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>

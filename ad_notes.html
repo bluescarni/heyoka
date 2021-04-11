@@ -4,8 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Notes on automatic differentiation &#8212; heyoka 0.7.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
@@ -414,9 +413,9 @@
         
               <div>
                 
-  <section id="notes-on-automatic-differentiation">
+  <div class="section" id="notes-on-automatic-differentiation">
 <span id="ad-notes"></span><h1>Notes on automatic differentiation<a class="headerlink" href="#notes-on-automatic-differentiation" title="Permalink to this headline">¶</a></h1>
-<section id="preliminaries">
+<div class="section" id="preliminaries">
 <h2>Preliminaries<a class="headerlink" href="#preliminaries" title="Permalink to this headline">¶</a></h2>
 <p>Definition of normalised derivative:</p>
 <div class="math notranslate nohighlight" id="equation-eq-norm-der-00">
@@ -425,21 +424,21 @@
 <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) c\left( t \right)\)</span>, then</p>
 <div class="math notranslate nohighlight" id="equation-eq-leibniz-00">
 <span class="eqno">(2)<a class="headerlink" href="#equation-eq-leibniz-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n\right]}\left( t \right) = \sum_{j=0}^n b^{\left[ n - j\right]}\left( t \right) c^{\left[ j\right]}\left( t \right).\]</div>
-</section>
-<section id="basic-arithmetic">
+</div>
+<div class="section" id="basic-arithmetic">
 <h2>Basic arithmetic<a class="headerlink" href="#basic-arithmetic" title="Permalink to this headline">¶</a></h2>
-<section id="addition-and-subtraction">
+<div class="section" id="addition-and-subtraction">
 <h3>Addition and subtraction<a class="headerlink" href="#addition-and-subtraction" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) \pm c\left( t \right)\)</span>, trivially</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-addsub-00">
 <span class="eqno">(3)<a class="headerlink" href="#equation-eq-ad-addsub-00" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) \pm c^{\left[ n \right]}\left( t \right).\]</div>
-</section>
-<section id="multiplication">
+</div>
+<div class="section" id="multiplication">
 <h3>Multiplication<a class="headerlink" href="#multiplication" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right) c\left( t \right)\)</span>, the derivative <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span>
 is given directly by the application of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>.</p>
-</section>
-<section id="division">
+</div>
+<div class="section" id="division">
 <h3>Division<a class="headerlink" href="#division" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \frac{b\left( t \right)}{c\left( t \right)}\)</span>, we can write</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-0">
@@ -447,9 +446,9 @@ is given directly by the application of the general Leibniz rule <a class="refer
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n\)</span> to both sides, use <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and re-arrange to obtain:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-1">
 <span class="eqno">(5)<a class="headerlink" href="#equation-ad-notes-1" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{c^{\left[ 0 \right]}\left( t \right)}\left[ b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^n a^{\left[ n - j \right]}\left( t \right) c^{\left[ j \right]}\left( t \right)\right].\]</div>
-</section>
-</section>
-<section id="squaring">
+</div>
+</div>
+<div class="section" id="squaring">
 <h2>Squaring<a class="headerlink" href="#squaring" title="Permalink to this headline">¶</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right)^2\)</span>, the computation of <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is a special
 case of <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> in which we take advantage of the summation’s symmetry in order to halve the computational
@@ -460,8 +459,8 @@ complexity:</p>
 2\sum_{j=0}^{\frac{n}{2}-1} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + \left( b^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \mbox{ if $n$ is even}, \\
 2\sum_{j=0}^{\frac{n-1}{2}} b^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) \mbox{ if $n$ is odd}.
 \end{cases}\end{split}\]</div>
-</section>
-<section id="square-root">
+</div>
+<div class="section" id="square-root">
 <h2>Square root<a class="headerlink" href="#square-root" title="Permalink to this headline">¶</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) =\sqrt{b\left( t \right)}\)</span>, we can write</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-2">
@@ -480,8 +479,8 @@ complexity:</p>
 \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=1}^{\frac{n}{2}-1} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) - \left( a^{\left[ \frac{n}{2} \right]}\left( t \right) \right)^2 \right] \mbox{ if $n$ is even}, \\
 \frac{1}{2a^{\left[ 0 \right]}\left( t \right)} \left[ b^{\left[ n \right]}\left( t \right) - 2\sum_{j=0}^{\frac{n-1}{2}} a^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right] \mbox{ if $n$ is odd}.
 \end{cases}\end{split}\]</div>
-</section>
-<section id="exponentiation">
+</div>
+<div class="section" id="exponentiation">
 <h2>Exponentiation<a class="headerlink" href="#exponentiation" title="Permalink to this headline">¶</a></h2>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = b\left( t \right)^\alpha\)</span>, with <span class="math notranslate nohighlight">\(\alpha \neq 0\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-5">
@@ -496,10 +495,10 @@ b\left( t \right) a^\prime\left( t \right) &amp; = b\left( t \right) \alpha b\le
 for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-7">
 <span class="eqno">(12)<a class="headerlink" href="#equation-ad-notes-7" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \sum_{j=0}^{n-1} \left[ n\alpha - j \left( \alpha + 1 \right) \right] b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-<section id="exponentials">
+</div>
+<div class="section" id="exponentials">
 <h2>Exponentials<a class="headerlink" href="#exponentials" title="Permalink to this headline">¶</a></h2>
-<section id="natural-exponential">
+<div class="section" id="natural-exponential">
 <h3>Natural exponential<a class="headerlink" href="#natural-exponential" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = e^{b\left( t \right)}\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-8">
@@ -508,8 +507,8 @@ for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 and obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-9">
 <span class="eqno">(14)<a class="headerlink" href="#equation-ad-notes-9" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n} \sum_{j=1}^{n} j a^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-<section id="standard-logistic-function">
+</div>
+<div class="section" id="standard-logistic-function">
 <h3>Standard logistic function<a class="headerlink" href="#standard-logistic-function" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{sig} {b\left( t \right)}\)</span>, where <span class="math notranslate nohighlight">\(\operatorname{sig}\left( x \right)\)</span>
 is the <a class="reference external" href="https://en.wikipedia.org/wiki/Logistic_function">standard logistic function</a></p>
@@ -528,11 +527,11 @@ is the <a class="reference external" href="https://en.wikipedia.org/wiki/Logisti
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-14">
 <span class="eqno">(19)<a class="headerlink" href="#equation-ad-notes-14" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j \left[ a^{\left[ n - j \right]} \left( t \right)- c^{\left[ n - j \right]}\left( t \right)\right] b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-</section>
-<section id="logarithms">
+</div>
+</div>
+<div class="section" id="logarithms">
 <h2>Logarithms<a class="headerlink" href="#logarithms" title="Permalink to this headline">¶</a></h2>
-<section id="natural-logarithm">
+<div class="section" id="natural-logarithm">
 <h3>Natural logarithm<a class="headerlink" href="#natural-logarithm" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \log b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-15">
@@ -544,11 +543,11 @@ is the <a class="reference external" href="https://en.wikipedia.org/wiki/Logisti
 and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-17">
 <span class="eqno">(22)<a class="headerlink" href="#equation-ad-notes-17" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n b^{\left[ 0 \right]}\left( t \right)} \left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j b^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-</section>
-<section id="trigonometric-functions">
+</div>
+</div>
+<div class="section" id="trigonometric-functions">
 <h2>Trigonometric functions<a class="headerlink" href="#trigonometric-functions" title="Permalink to this headline">¶</a></h2>
-<section id="tangent">
+<div class="section" id="tangent">
 <span id="ad-tan"></span><h3>Tangent<a class="headerlink" href="#tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-18">
@@ -563,11 +562,11 @@ and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-21">
 <span class="eqno">(26)<a class="headerlink" href="#equation-ad-notes-21" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) + b^{\left[ n \right]}\left( t \right).\]</div>
-</section>
-</section>
-<section id="inverse-trigonometric-functions">
+</div>
+</div>
+<div class="section" id="inverse-trigonometric-functions">
 <h2>Inverse trigonometric functions<a class="headerlink" href="#inverse-trigonometric-functions" title="Permalink to this headline">¶</a></h2>
-<section id="inverse-sine">
+<div class="section" id="inverse-sine">
 <span id="ad-asin"></span><h3>Inverse sine<a class="headerlink" href="#inverse-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arcsin b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-22">
@@ -588,8 +587,8 @@ and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt
 the terms to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-26">
 <span class="eqno">(32)<a class="headerlink" href="#equation-ad-notes-26" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-<section id="inverse-cosine">
+</div>
+<div class="section" id="inverse-cosine">
 <span id="ad-acos"></span><h3>Inverse cosine<a class="headerlink" href="#inverse-cosine" title="Permalink to this headline">¶</a></h3>
 <p>The derivation is identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change.
 Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arccos b\left( t \right)\)</span>,
@@ -599,8 +598,8 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <p>with <span class="math notranslate nohighlight">\(c\left( t \right)\)</span> defined as:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-28">
 <span class="eqno">(34)<a class="headerlink" href="#equation-ad-notes-28" title="Permalink to this equation">¶</a></span>\[c\left( t \right)  = \sqrt{1 - b^2\left( t \right) }.\]</div>
-</section>
-<section id="inverse-tangent">
+</div>
+<div class="section" id="inverse-tangent">
 <span id="ad-atan"></span><h3>Inverse tangent<a class="headerlink" href="#inverse-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \arctan b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-29">
@@ -620,11 +619,11 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <p>With the help of the general Leibniz rule <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, after re-arranging we obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-33">
 <span class="eqno">(40)<a class="headerlink" href="#equation-ad-notes-33" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-</section>
-<section id="hyperbolic-functions">
+</div>
+</div>
+<div class="section" id="hyperbolic-functions">
 <h2>Hyperbolic functions<a class="headerlink" href="#hyperbolic-functions" title="Permalink to this headline">¶</a></h2>
-<section id="hyperbolic-sine">
+<div class="section" id="hyperbolic-sine">
 <span id="ad-sinh"></span><h3>Hyperbolic sine<a class="headerlink" href="#hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \sinh b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-eq-ad-sinh-00">
@@ -638,8 +637,8 @@ the final result is, for <span class="math notranslate nohighlight">\(n &gt; 0\)
 <p>We can now apply the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, and, via <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a>, obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-36">
 <span class="eqno">(44)<a class="headerlink" href="#equation-ad-notes-36" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-<section id="hyperbolic-cosine">
+</div>
+<div class="section" id="hyperbolic-cosine">
 <h3>Hyperbolic cosine<a class="headerlink" href="#hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \cosh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-sinh"><span class="std std-ref">hyperbolic sine</span></a>. After the definition of the auxiliary function</p>
@@ -648,8 +647,8 @@ identical to the <a class="reference internal" href="#ad-sinh"><span class="std 
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-38">
 <span class="eqno">(46)<a class="headerlink" href="#equation-ad-notes-38" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right)  = \frac{1}{n} \sum_{j=1}^{n} j s^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-<section id="hyperbolic-tangent">
+</div>
+<div class="section" id="hyperbolic-tangent">
 <h3>Hyperbolic tangent<a class="headerlink" href="#hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \tanh b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-tan"><span class="std std-ref">tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
@@ -658,11 +657,11 @@ identical to the <a class="reference internal" href="#ad-tan"><span class="std s
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-40">
 <span class="eqno">(48)<a class="headerlink" href="#equation-ad-notes-40" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = b^{\left[ n \right]}\left( t \right) - \frac{1}{n}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-</section>
-<section id="inverse-hyperbolic-functions">
+</div>
+</div>
+<div class="section" id="inverse-hyperbolic-functions">
 <h2>Inverse hyperbolic functions<a class="headerlink" href="#inverse-hyperbolic-functions" title="Permalink to this headline">¶</a></h2>
-<section id="inverse-hyperbolic-sine">
+<div class="section" id="inverse-hyperbolic-sine">
 <span id="ad-asinh"></span><h3>Inverse hyperbolic sine<a class="headerlink" href="#inverse-hyperbolic-sine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arsinh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asin"><span class="std std-ref">inverse sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
@@ -671,8 +670,8 @@ identical to the <a class="reference internal" href="#ad-asin"><span class="std 
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-42">
 <span class="eqno">(50)<a class="headerlink" href="#equation-ad-notes-42" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-<section id="inverse-hyperbolic-cosine">
+</div>
+<div class="section" id="inverse-hyperbolic-cosine">
 <h3>Inverse hyperbolic cosine<a class="headerlink" href="#inverse-hyperbolic-cosine" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{arcosh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-asinh"><span class="std std-ref">inverse hyperbolic sine</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
@@ -681,8 +680,8 @@ identical to the <a class="reference internal" href="#ad-asinh"><span class="std
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-44">
 <span class="eqno">(52)<a class="headerlink" href="#equation-ad-notes-44" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n c^{\left[ 0 \right]}\left( t \right)}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-<section id="inverse-hyperbolic-tangent">
+</div>
+<div class="section" id="inverse-hyperbolic-tangent">
 <h3>Inverse hyperbolic tangent<a class="headerlink" href="#inverse-hyperbolic-tangent" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{artanh} b\left( t \right)\)</span>, the process of deriving <span class="math notranslate nohighlight">\(a^{\left[ n \right]}\left( t \right)\)</span> is
 identical to the <a class="reference internal" href="#ad-atan"><span class="std std-ref">inverse tangent</span></a>, apart from a sign change. After the definition of the auxiliary function</p>
@@ -691,11 +690,11 @@ identical to the <a class="reference internal" href="#ad-atan"><span class="std 
 <p>the final result, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>, is:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-46">
 <span class="eqno">(54)<a class="headerlink" href="#equation-ad-notes-46" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].\]</div>
-</section>
-</section>
-<section id="special-functions">
+</div>
+</div>
+<div class="section" id="special-functions">
 <h2>Special functions<a class="headerlink" href="#special-functions" title="Permalink to this headline">¶</a></h2>
-<section id="error-function">
+<div class="section" id="error-function">
 <span id="ad-erf"></span><h3>Error function<a class="headerlink" href="#error-function" title="Permalink to this headline">¶</a></h3>
 <p>Given <span class="math notranslate nohighlight">\(a\left( t \right) = \operatorname{erf} b\left( t \right)\)</span>, we have</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-47">
@@ -710,9 +709,9 @@ identical to the <a class="reference internal" href="#ad-atan"><span class="std 
 <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-50">
 <span class="eqno">(58)<a class="headerlink" href="#equation-ad-notes-50" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
-</section>
-</section>
-</section>
+</div>
+</div>
+</div>
 
 
               </div>

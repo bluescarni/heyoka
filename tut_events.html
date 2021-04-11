@@ -4,8 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Event detection &#8212; heyoka 0.7.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
@@ -292,7 +291,7 @@
         
               <div>
                 
-  <section id="event-detection">
+  <div class="section" id="event-detection">
 <span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.6.0.</span></p>
@@ -321,7 +320,7 @@ in powers of time is available. Polynomial root finding techniques <span id="id1
 on the Taylor series of the event equations to accurately locate the time of occurrence of an event within the timestep.</p>
 <p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
 We will begin with non-terminal events, as they are conceptually simpler.</p>
-<section id="non-terminal-events">
+<div class="section" id="non-terminal-events">
 <h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this headline">¶</a></h2>
 <p>Non-terminal events are events that do not modify the state of an ODE system. That is, the occurrence of a non-terminal event does not
 change the system’s dynamics and it does not alter the state vector of the system. A typical use of non-terminal events is to detect and log
@@ -450,7 +449,7 @@ which can be computed exactly via elliptic functions. With the specific
 initial conditions of this example, <span class="math notranslate nohighlight">\(T = 2.0074035758801299\ldots\)</span>, and
 we can see from the event times printed to screen
 how the event detection system was accurate to machine precision.</p>
-<section id="event-direction">
+<div class="section" id="event-direction">
 <h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this headline">¶</a></h3>
 <p>By default, heyoka will detect all zeroes of the event equations regardless
 of the <em>direction</em> of the zero crossing (i.e., the value of the time derivative
@@ -495,8 +494,8 @@ Let us take a look at the event times:</p>
 <p>Indeed, the event now triggers only 3 times (instead of 5), and the times confirm
 that the event is detected only when <span class="math notranslate nohighlight">\(v\)</span> switches from negative to positive, i.e.,
 at <span class="math notranslate nohighlight">\(t=0\)</span>, <span class="math notranslate nohighlight">\(t=T\)</span> and <span class="math notranslate nohighlight">\(t=2T\)</span>.</p>
-</section>
-<section id="multiple-events">
+</div>
+<div class="section" id="multiple-events">
 <h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this headline">¶</a></h3>
 <p>When multiple events trigger within the same timestep (or if the same event triggers
 multiple times), heyoka will process the events in chronological order
@@ -549,9 +548,9 @@ modifying the <code class="docutils literal notranslate"><span class="pre">zero_
 </div>
 <p>Note how the events are indeed processed in chronological order, and how the event detection system is able to
 successfully recognize the second event triggering twice in close succession.</p>
-</section>
-</section>
-<section id="terminal-events">
+</div>
+</div>
+<div class="section" id="terminal-events">
 <h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this headline">¶</a></h2>
 <p>The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
 they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
@@ -705,7 +704,7 @@ execution of the callback:</p>
 <p>The screen output confirms that indeed the integration continued up to the final time <span class="math notranslate nohighlight">\(t = 10\)</span>. The values
 of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
 for half of the total integration time) progressively slowed the bob down.</p>
-<section id="cooldown">
+<div class="section" id="cooldown">
 <span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">¶</a></h3>
 <p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
@@ -724,9 +723,9 @@ that multiple roots do not exist, just that they were not detected.</p>
 for terminal events. This could in principle lead to missing terminal events when the integration restarts.
 For this reason, a member function called <code class="docutils literal notranslate"><span class="pre">reset_cooldowns()</span></code> is available to clear the cooldown timers of
 all terminal events.</p>
-</section>
-</section>
-<section id="limitations-and-caveats">
+</div>
+</div>
+<div class="section" id="limitations-and-caveats">
 <h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this headline">¶</a></h2>
 <p>Because heyoka’s event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
@@ -742,8 +741,8 @@ This, at best, will result in reduced performance and, at worst, in missing even
 <p>As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.</p>
 <p>Note that missed events due to ill-conditioned polynomials will be flagged by heyoka’s logging system.</p>
-</section>
-<section id="full-code-listing">
+</div>
+<div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
@@ -884,8 +883,8 @@ are stationary points.</p>
 <span class="p">}</span>
 </pre></div>
 </div>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>
