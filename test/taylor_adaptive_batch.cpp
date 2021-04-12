@@ -56,7 +56,7 @@ TEST_CASE("batch consistency")
                                             kw::pars = std::move(pars)};
 
     auto t_arr = xt::adapt(ta.get_time_data(), {batch_size});
-    t_arr = xt::xarray<double>{0.1, 0.2, 0.3, 0.4};
+    ta.set_time({0.1, 0.2, 0.3, 0.4});
 
     std::vector<taylor_adaptive<double>> t_scal;
     for (auto i = 0u; i < batch_size; ++i) {
@@ -102,13 +102,13 @@ TEST_CASE("propagate grid")
         Message("Invalid grid size detected in propagate_grid() for an adaptive Taylor integrator in batch mode: "
                 "the grid has a size of 5, which is not a multiple of the batch size (4)"));
 
-    ta.get_time_data()[2] = std::numeric_limits<double>::infinity();
+    ta.set_time({0., 0., std::numeric_limits<double>::infinity(), 0.});
 
     REQUIRE_THROWS_MATCHES(ta.propagate_grid({0., 0., 0., 0.}), std::invalid_argument,
                            Message("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
                                    "the current time is not finite"));
 
-    ta.get_time_data()[2] = 0;
+    ta.set_time({0., 0., 0., 0.});
 
     REQUIRE_THROWS_MATCHES(
         ta.propagate_grid({0., 0., std::numeric_limits<double>::infinity(), 0.}), std::invalid_argument,
@@ -295,4 +295,27 @@ TEST_CASE("propagate trivial")
     ta.propagate_grid({5, 6, 7, 8.});
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+}
+
+TEST_CASE("set time")
+{
+    using Catch::Matchers::Message;
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0, 0.1, 0.1}, 2};
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_time({}), std::invalid_argument,
+        Message("Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified times is 0"));
+    REQUIRE_THROWS_MATCHES(
+        ta.set_time({1, 2, 3}), std::invalid_argument,
+        Message("Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified times is 3"));
+
+    REQUIRE(ta.get_time() == std::vector{0., 0.});
+
+    ta.set_time({1, -2});
+
+    REQUIRE(ta.get_time() == std::vector{1., -2.});
 }

@@ -683,16 +683,23 @@ TEST_CASE("dense output")
 
                         ta.step(true);
 
-                        ta.update_d_output(old_time);
-                        for (auto i = 0u; i < batch_size; ++i) {
-                            REQUIRE(coa(0u, i) == approximately(osta(0u, i), 10000.));
-                            REQUIRE(coa(1u, i) == approximately(osta(1u, i), 10000.));
+                        auto neg_last_h = ta.get_last_h();
+                        for (auto &tmp : neg_last_h) {
+                            tmp = -tmp;
                         }
 
-                        ta.update_d_output(ta.get_time());
+                        ta.update_d_output(neg_last_h, true);
                         for (auto i = 0u; i < batch_size; ++i) {
-                            REQUIRE(coa(0u, i) == approximately(sa(0u, i), 10000.));
-                            REQUIRE(coa(1u, i) == approximately(sa(1u, i), 10000.));
+                            REQUIRE(coa(0u, i) == approximately(osta(0u, i), 1000.));
+                            REQUIRE(coa(1u, i) == approximately(osta(1u, i), 1000.));
+                        }
+
+                        std::vector<double> zero_vec(batch_size, 0.);
+
+                        ta.update_d_output(zero_vec, true);
+                        for (auto i = 0u; i < batch_size; ++i) {
+                            REQUIRE(coa(0u, i) == approximately(sa(0u, i), 1000.));
+                            REQUIRE(coa(1u, i) == approximately(sa(1u, i), 1000.));
                         }
                     }
 
