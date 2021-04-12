@@ -4,6 +4,13 @@ Changelog
 0.7.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- ``update_d_output()`` can now be called with a relative
+  (rather than absolute) time argument
+  (`#126 <https://github.com/bluescarni/heyoka/pull/126>`__).
+
 Fix
 ~~~
 
