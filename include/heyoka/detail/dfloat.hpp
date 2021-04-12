@@ -70,6 +70,14 @@ inline dfloat<F> operator+(const dfloat<F> &x, const dfloat<F> &y)
     return dfloat<F>(e, f);
 }
 
+// Subtraction.
+template <typename F>
+inline dfloat<F> operator-(const dfloat<F> &x, const dfloat<F> &y)
+{
+    return x + dfloat<F>(-y.hi, -y.lo);
+}
+
+// A few convenience overloads.
 template <typename F>
 inline dfloat<F> operator+(const dfloat<F> &x, const F &y)
 {
@@ -86,43 +94,6 @@ template <typename F>
 inline dfloat<F> &operator+=(dfloat<F> &x, const F &y)
 {
     return x = x + dfloat<F>(y);
-}
-
-template <typename F>
-inline dfloat<F> operator-(const dfloat<F> &x, const dfloat<F> &y)
-{
-    F H, h, T, t, S, s, e, f;
-    F t1, yhi, ylo;
-
-    yhi = -y.hi;
-    ylo = -y.lo;
-
-    S = x.hi + yhi;
-    T = x.lo + ylo;
-    e = S - x.hi;
-    f = T - x.lo;
-
-    t1 = S - e;
-    t1 = x.hi - t1;
-    s = yhi - e;
-    s = s + t1;
-
-    t1 = T - f;
-    t1 = x.lo - t1;
-    t = ylo - f;
-    t = t + t1;
-
-    s = s + T;
-    H = S + s;
-    h = S - H;
-    h = h + s;
-
-    h = h + t;
-    e = H + h;
-    f = H - e;
-    f = f + h;
-
-    return dfloat<F>(e, f);
 }
 
 template <typename F>
@@ -145,6 +116,7 @@ inline bool isfinite(const dfloat<F> &x)
     return isfinite(x.hi) && isfinite(x.lo);
 }
 
+// Comparisons.
 template <typename F>
 inline bool operator<(const dfloat<F> &x, const dfloat<F> &y)
 {
