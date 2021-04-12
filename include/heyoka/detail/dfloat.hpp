@@ -15,6 +15,8 @@
 namespace heyoka::detail
 {
 
+// A minimal class for double-length float arithmetic.
+// F can be any floating-point type supported by heyoka.
 template <typename F>
 struct dfloat {
     F hi, lo;
@@ -29,6 +31,11 @@ struct dfloat {
     }
 };
 
+// NOTE: taken with minimal adaptations from NTL. My understanding
+// here is the following: given input (x, xx) and (y, yy), the error-free
+// additions x + y and xx + yy are computed. The components of xx + yy
+// are then added to the low part of the result of x + y, each addition
+// being followed by a normalisation step.
 template <typename F>
 inline dfloat<F> operator+(const dfloat<F> &x, const dfloat<F> &y)
 {
