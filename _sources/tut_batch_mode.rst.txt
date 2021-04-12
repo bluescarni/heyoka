@@ -135,6 +135,10 @@ all initialised to zero, as we can verify by printing to screen the time array:
 
    Time array: { 0.,  0.,  0.,  0.}
 
+Note that, contrary to the scalar integrator, in the batch integrator it is not
+possible to write directly into the array of time coordinates. The function ``set_time()``,
+accepting a ``std::vector`` of time coordinates in input, must be used instead.
+
 Step-by-step integration
 ^^^^^^^^^^^^^^^^^^^^^^^^
 

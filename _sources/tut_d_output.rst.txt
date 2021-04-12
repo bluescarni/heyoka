@@ -80,6 +80,8 @@ which is about halfway through the timestep that was just taken:
 The ``update_d_output()`` member function takes in input an *absolute* time coordinate
 and returns a reference to an internal array that will contain the state of the system
 at the specified time coordinate, as computed by the evaluation of the Taylor series.
+``update_d_output()`` can also be called with a time coordinate *relative* to the current
+time by passing ``true`` as a second function argument.
 
 Let's now ask for the dense output at the very end of the timestep that was just taken,
 and let's compare it to the current state vector:
