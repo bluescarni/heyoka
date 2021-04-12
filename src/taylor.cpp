@@ -4506,7 +4506,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
                 m_time_hi.size(), m_batch_size));
     }
-
+    // NOTE: no need to check m_time_lo for finiteness, as it
+    // was inited to zero already.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &x) { return !isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
@@ -4779,12 +4780,9 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<dfloat<T>>
 {
     using std::isfinite;
 
-    // Check the dimensionality of ts.
-    if (ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
-            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
-    }
+    // NOTE: this function is called from either the other propagate_until() overload,
+    // or propagate_for(). In both cases, we have already set up correctly the dimension of ts.
+    assert(ts.size() == m_batch_size);
 
     // Check the current times.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
@@ -5047,7 +5045,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
         boost::numeric_cast<typename std::vector<decltype(grid.size())>::size_type>(m_batch_size), 1);
 
     // Vectors to keep track of the time range of the last taken timestep.
-    std::vector<dfloat<T>> t0(boost::numeric_cast<typename std::vector<T>::size_type>(m_batch_size)), t1(t0);
+    std::vector<dfloat<T>> t0(boost::numeric_cast<typename std::vector<dfloat<T>>::size_type>(m_batch_size)), t1(t0);
 
     // Vector of flags to keep track of the batch elements
     // we can compute dense output for.
