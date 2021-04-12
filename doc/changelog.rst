@@ -7,8 +7,22 @@ Changelog
 New
 ~~~
 
+- The time coordinate in the Taylor integrator classes
+  is now represented internally in double-length format. This change
+  greatly reduces the error in long-term integrations of
+  non-autonomous systems and improves the time accuracy
+  of the predicted state
+  (`#126 <https://github.com/bluescarni/heyoka/pull/126>`__).
 - ``update_d_output()`` can now be called with a relative
   (rather than absolute) time argument
+  (`#126 <https://github.com/bluescarni/heyoka/pull/126>`__).
+
+Changes
+~~~~~~~
+
+- **BREAKING**: the time coordinates in batch integrators
+  cannot be directly modified any more, and the new
+  ``set_time()`` function must be used instead
   (`#126 <https://github.com/bluescarni/heyoka/pull/126>`__).
 
 Fix
