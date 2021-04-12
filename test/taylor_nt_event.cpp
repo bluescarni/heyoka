@@ -511,3 +511,37 @@ TEST_CASE("taylor nte basic")
         }
     }
 }
+
+// Another test for event direction.
+TEST_CASE("nt dir test")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    bool fwd = true;
+
+    std::vector<double> tlist;
+
+    std::vector<double>::reverse_iterator rit;
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                      {-0.25, 0.},
+                                      kw::nt_events = {nt_event<double>(
+                                          v,
+                                          [&fwd, &tlist, &rit](taylor_adaptive<double> &, double t) {
+                                              if (fwd) {
+                                                  tlist.push_back(t);
+                                              } else if (rit != tlist.rend()) {
+                                                  REQUIRE(*rit == approximately(t));
+
+                                                  ++rit;
+                                              }
+                                          },
+                                          event_direction::positive)}};
+
+    ta.propagate_until(20);
+
+    fwd = false;
+    rit = tlist.rbegin();
+
+    ta.propagate_until(0);
+}
