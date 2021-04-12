@@ -3767,6 +3767,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
 
+        // Store the timestep that was used during event
+        // detection, before possibly modifying it.
+        const auto orig_h = h;
+
         // If we have terminal events we need
         // to update the value of h.
         if (!m_d_tes.empty()) {
@@ -3847,7 +3851,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(h));
+                // NOTE: the automatic cooldown deduction is done on the
+                // timestep that was used for event detection, not on the timestep
+                // which was clamped by the occurrence of a terminal event.
+                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(orig_h));
             }
 
             // Invoke the callback of the first terminal event, if it has one.

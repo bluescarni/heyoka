@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.7.0 (unreleased)
+------------------
+
+Fix
+~~~
+
+- Fix an issue in the automatic deduction of the cooldown time
+  for terminal events
+  (`#126 <https://github.com/bluescarni/heyoka/pull/126>`__).
+
 0.6.1 (2021-04-08)
 ------------------
 
