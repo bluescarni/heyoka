@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
@@ -529,7 +530,7 @@ private:
     // State vector.
     std::vector<T> m_state;
     // Time.
-    T m_time;
+    dfloat<T> m_time;
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
@@ -661,11 +662,11 @@ public:
 
     T get_time() const
     {
-        return m_time;
+        return static_cast<T>(m_time);
     }
     void set_time(T t)
     {
-        m_time = t;
+        m_time = dfloat<T>(t);
     }
 
     const std::vector<T> &get_state() const
@@ -708,7 +709,7 @@ public:
     {
         return m_d_out;
     }
-    const std::vector<T> &update_d_output(T);
+    const std::vector<T> &update_d_output(T, bool = false);
 
     void reset_cooldowns();
     const std::vector<t_event_t> &get_t_events() const
@@ -724,6 +725,10 @@ public:
     std::tuple<taylor_outcome, T> step_backward(bool = false);
     std::tuple<taylor_outcome, T> step(T, bool = false);
 
+private:
+    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(const dfloat<T> &, std::size_t);
+
+public:
     // NOTE: return values:
     // - outcome,
     // - min abs(timestep),
@@ -757,7 +762,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // State vectors.
     std::vector<T> m_state;
     // Times.
-    std::vector<T> m_time;
+    std::vector<T> m_time_hi, m_time_lo;
     // The LLVM machinery.
     llvm_state m_llvm;
     // Dimension of the system.
@@ -795,7 +800,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
-    std::vector<T> m_pfor_ts;
+    std::vector<dfloat<T>> m_pfor_ts;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
 
@@ -866,16 +871,13 @@ public:
 
     const std::vector<T> &get_time() const
     {
-        return m_time;
+        return m_time_hi;
     }
     const T *get_time_data() const
     {
-        return m_time.data();
+        return m_time_hi.data();
     }
-    T *get_time_data()
-    {
-        return m_time.data();
-    }
+    void set_time(const std::vector<T> &);
 
     const std::vector<T> &get_state() const
     {
@@ -917,7 +919,7 @@ public:
     {
         return m_d_out;
     }
-    const std::vector<T> &update_d_output(const std::vector<T> &);
+    const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
 
     void step(bool = false);
     void step_backward(bool = false);
@@ -927,6 +929,10 @@ public:
         return m_step_res;
     }
 
+private:
+    HEYOKA_DLL_LOCAL void propagate_until(const std::vector<dfloat<T>> &, std::size_t = 0);
+
+public:
     void propagate_for(const std::vector<T> &, std::size_t = 0);
     void propagate_until(const std::vector<T> &, std::size_t = 0);
     std::vector<T> propagate_grid(const std::vector<T> &, std::size_t = 0);

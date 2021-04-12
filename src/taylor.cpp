@@ -3512,7 +3512,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     // Assign the data members.
     m_state = std::move(state);
-    m_time = time;
+    m_time = dfloat<T>(time);
     m_pars = std::move(pars);
     m_tes = std::move(tes);
     m_ntes = std::move(ntes);
@@ -3532,7 +3532,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
-            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(m_time));
+            "Cannot initialise an adaptive Taylor integrator with a non-finite initial time of {}"_format(
+                static_cast<T>(m_time)));
     }
 
     if (!isfinite(tol) || tol <= 0) {
@@ -3718,7 +3719,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         assert(m_tes.empty() && m_ntes.empty());
 
         // Invoke the vanilla stepper.
-        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time, &h, wtc ? m_tc.data() : nullptr);
+        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
 
         // Update the time.
         m_time += h;
@@ -3740,7 +3741,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         using std::abs;
 
         // Invoke the stepper for event handling.
-        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time, &h);
+        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h);
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
@@ -3765,6 +3766,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
+
+        // Store the timestep that was used during event
+        // detection, before possibly modifying it.
+        const auto orig_h = h;
 
         // If we have terminal events we need
         // to update the value of h.
@@ -3826,7 +3831,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
 
-            m_ntes[std::get<0>(t)].get_callback()(*this, m_time - (m_last_h - std::get<1>(t)));
+            m_ntes[std::get<0>(t)].get_callback()(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
         }
 
         // The return value of the first
@@ -3846,7 +3851,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(h));
+                // NOTE: the automatic cooldown deduction is done on the
+                // timestep that was used for event detection, not on the timestep
+                // which was clamped by the occurrence of a terminal event.
+                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(orig_h));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
@@ -3915,7 +3923,8 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(const dfloat<T> &t,
+                                                                                       std::size_t max_steps)
 {
     using std::isfinite;
 
@@ -3946,7 +3955,7 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
         // and at the first iteration we have checked above the value of m_time.
         // At successive iterations, we know that m_time must be finite because
         // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(t - m_time, false);
+        const auto [res, h] = step_impl(static_cast<T>(t - m_time), false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -3986,6 +3995,12 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
             return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
         }
     }
+}
+
+template <typename T>
+std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
+{
+    return propagate_until(dfloat<T>(t), max_steps);
 }
 
 template <typename T>
@@ -4125,7 +4140,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         // NOTE: grid.back() - m_time cannot be nan as the grid times
         // are all finite and the current time must also be finite
         // (otherwise we would have exited the integration earlier).
-        const auto [res, h] = step_impl(grid.back() - m_time, true);
+        const auto [res, h] = step_impl(static_cast<T>(grid.back() - m_time), true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -4186,15 +4201,23 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time)
+const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, we need to compute:
-    const auto h = time - (m_time - m_last_h);
+    // the *previous* timestep.
+    if (rel_time) {
+        // Time coordinate relative to the current time.
+        const auto h = m_last_h + time;
 
-    m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+        m_d_out_f(m_d_out.data(), m_tc.data(), &h);
+    } else {
+        // Absolute time coordinate.
+        const auto h = time - (m_time - m_last_h);
+
+        m_d_out_f(m_d_out.data(), m_tc.data(), &h.hi);
+    }
 
     return m_d_out;
 }
@@ -4449,7 +4472,8 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     // Init the data members.
     m_batch_size = batch_size;
     m_state = std::move(state);
-    m_time = std::move(time);
+    m_time_hi = std::move(time);
+    m_time_lo.resize(m_time_hi.size());
     m_pars = std::move(pars);
 
     // Check input params.
@@ -4476,14 +4500,15 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             "while the number of equations is {}"_format(m_state.size() / m_batch_size, m_batch_size, sys.size()));
     }
 
-    if (m_time.size() != m_batch_size) {
+    if (m_time_hi.size() != m_batch_size) {
         throw std::invalid_argument(
             "Invalid size detected in the initialization of an adaptive Taylor "
             "integrator: the time vector has a size of {}, which is not equal to the batch size ({})"_format(
-                m_time.size(), m_batch_size));
+                m_time_hi.size(), m_batch_size));
     }
-
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &x) { return !isfinite(x); })) {
+    // NOTE: no need to check m_time_lo for finiteness, as it
+    // was inited to zero already.
+    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &x) { return !isfinite(x); })) {
         throw std::invalid_argument(
             "A non-finite initial time was detected in the initialisation of an adaptive Taylor integrator");
     }
@@ -4584,9 +4609,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm),
-      m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc),
-      m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+    : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
+      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_d_out_time(other.m_d_out_time)
@@ -4614,6 +4639,22 @@ taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
+{
+    // Check the dimensionality of new_time.
+    if (new_time.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is {}, "
+            "but the number of specified times is {}"_format(m_batch_size, new_time.size()));
+    }
+
+    // Copy over the new times.
+    std::copy(new_time.begin(), new_time.end(), m_time_hi.begin());
+    // Reset the lo part.
+    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+}
 
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced for each
@@ -4645,7 +4686,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
     // Invoke the stepper.
-    m_step_f(m_state.data(), m_pars.data(), m_time.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
+    m_step_f(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -4663,12 +4704,16 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
         // The timestep that was actually used for
         // this batch element.
         const auto h = m_delta_ts[i];
-        m_time[i] += h;
+
+        // Compute the new time in double-length arithmetic.
+        const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+        m_time_hi[i] = new_time.hi;
+        m_time_lo[i] = new_time.lo;
 
         // Update the size of the last timestep.
         m_last_h[i] = h;
 
-        if (!isfinite(m_time[i]) || check_nf_batch(i)) {
+        if (!isfinite(new_time) || check_nf_batch(i)) {
             // Either the new time or state contain non-finite values,
             // return an error condition.
             m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
@@ -4724,26 +4769,24 @@ void taylor_adaptive_batch_impl<T>::propagate_for(const std::vector<T> &delta_ts
     }
 
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_pfor_ts[i] = m_time[i] + delta_ts[i];
+        m_pfor_ts[i] = dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_ts[i];
     }
 
     propagate_until(m_pfor_ts, max_steps);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
+void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<dfloat<T>> &ts, std::size_t max_steps)
 {
     using std::isfinite;
 
-    // Check the dimensionality of ts.
-    if (ts.size() != m_batch_size) {
-        throw std::invalid_argument(
-            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
-            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
-    }
+    // NOTE: this function is called from either the other propagate_until() overload,
+    // or propagate_for(). In both cases, we have already set up correctly the dimension of ts.
+    assert(ts.size() == m_batch_size);
 
     // Check the current times.
-    if (std::any_of(m_time.begin(), m_time.end(), [](const auto &t) { return !isfinite(t); })) {
+    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
+        || std::any_of(m_time_lo.begin(), m_time_lo.end(), [](const auto &t) { return !isfinite(t); })) {
         throw std::invalid_argument(
             "Cannot invoke the propagate_until() function of an adaptive Taylor integrator in batch mode if "
             "one of the current times is not finite");
@@ -4770,7 +4813,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
         // At successive iterations, we know that m_time[i] must be finite because
         // otherwise we would have exited the loop when checking m_step_res.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            m_cur_max_delta_ts[i] = ts[i] - m_time[i];
+            m_cur_max_delta_ts[i] = static_cast<T>(ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]));
         }
 
         // Run the integration timestep.
@@ -4847,6 +4890,25 @@ void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, st
 }
 
 template <typename T>
+void taylor_adaptive_batch_impl<T>::propagate_until(const std::vector<T> &ts, std::size_t max_steps)
+{
+    // Check the dimensionality of ts.
+    if (ts.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid number of time limits specified in a Taylor integrator in batch mode: the "
+            "batch size is {}, but the number of specified time limits is {}"_format(m_batch_size, ts.size()));
+    }
+
+    // NOTE: re-use m_pfor_ts as tmp storage.
+    assert(m_pfor_ts.size() == m_batch_size);
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_pfor_ts[i] = dfloat<T>(ts[i]);
+    }
+
+    propagate_until(m_pfor_ts, max_steps);
+}
+
+template <typename T>
 std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
 {
     using std::abs;
@@ -4870,7 +4932,8 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
                                                                                                m_batch_size));
     }
 
-    if (std::any_of(m_time.begin(), m_time.end(), is_nf)) {
+    if (std::any_of(m_time_hi.begin(), m_time_hi.end(), is_nf)
+        || std::any_of(m_time_lo.begin(), m_time_lo.end(), is_nf)) {
         throw std::invalid_argument("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
                                     "the current time is not finite");
     }
@@ -4982,7 +5045,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
         boost::numeric_cast<typename std::vector<decltype(grid.size())>::size_type>(m_batch_size), 1);
 
     // Vectors to keep track of the time range of the last taken timestep.
-    std::vector<T> t0(boost::numeric_cast<typename std::vector<T>::size_type>(m_batch_size)), t1(t0);
+    std::vector<dfloat<T>> t0(boost::numeric_cast<typename std::vector<dfloat<T>>::size_type>(m_batch_size)), t1(t0);
 
     // Vector of flags to keep track of the batch elements
     // we can compute dense output for.
@@ -5000,8 +5063,10 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
         // taken timestep.
         // NOTE: t0 < t1.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            t0[i] = std::min(m_time[i], m_time[i] - m_last_h[i]);
-            t1[i] = std::max(m_time[i], m_time[i] - m_last_h[i]);
+            const dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]), cmp = cur_time - m_last_h[i];
+
+            t0[i] = std::min(cur_time, cmp);
+            t1[i] = std::max(cur_time, cmp);
         }
 
         // Reset dflags.
@@ -5081,7 +5146,8 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid(const std::vector<T
         // as the grid values are all finite and the current times must also
         // be finite (otherwise we would have exited the integration earlier).
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            pgrid_tmp[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - m_time[i];
+            pgrid_tmp[i] = static_cast<T>(grid_ptr[(n_grid_points - 1u) * m_batch_size + i]
+                                          - dfloat<T>(m_time_hi[i], m_time_lo[i]));
         }
         step_impl(pgrid_tmp, true);
 
@@ -5180,7 +5246,7 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_dim() const
 }
 
 template <typename T>
-const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::vector<T> &time)
+const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::vector<T> &time, bool rel_time)
 {
     // Check the dimensionality of time.
     if (time.size() != m_batch_size) {
@@ -5192,10 +5258,17 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
     // NOTE: "time" needs to be translated
     // because m_d_out_f expects a time coordinate
     // with respect to the starting time t0 of
-    // the *previous* timestep. Thus, we need to compute:
-    // time - (m_time - m_last_h);
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_d_out_time[i] = time[i] - (m_time[i] - m_last_h[i]);
+    // the *previous* timestep.
+    if (rel_time) {
+        // Time coordinate relative to the current time.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_d_out_time[i] = m_last_h[i] + time[i];
+        }
+    } else {
+        // Absolute time coordinate.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_d_out_time[i] = static_cast<T>(time[i] - (dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
+        }
     }
 
     m_d_out_f(m_d_out.data(), m_tc.data(), m_d_out_time.data());
