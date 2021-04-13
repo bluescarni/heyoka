@@ -3917,16 +3917,12 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_for(T delta_t, std::size_t max_steps)
-{
-    return propagate_until(m_time + delta_t, max_steps);
-}
-
-template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(const dfloat<T> &t,
-                                                                                       std::size_t max_steps)
+std::tuple<taylor_outcome, T, T, std::size_t>
+taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
+                                              std::function<void(taylor_adaptive_impl &)> cb)
 {
     using std::isfinite;
+    using std::isnan;
 
     // Check the current time.
     if (!isfinite(m_time)) {
@@ -3940,6 +3936,16 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
             "A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator");
     }
 
+    // Check max_delta_t.
+    if (isnan(max_delta_t)) {
+        throw std::invalid_argument(
+            "A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
+    }
+    if (max_delta_t <= 0) {
+        throw std::invalid_argument(
+            "A non-positive max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator");
+    }
+
     // Initial values for the counters
     // and the min/max abs of the integration
     // timesteps.
@@ -3950,17 +3956,27 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
     std::size_t iter_counter = 0, step_counter = 0;
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
 
+    // Cache the integration direction.
+    const auto t_dir = t >= m_time;
+
     while (true) {
         // NOTE: t - m_time is guaranteed not to be nan: t is never non-finite,
         // and at the first iteration we have checked above the value of m_time.
         // At successive iterations, we know that m_time must be finite because
         // otherwise we would have exited the loop when checking res.
-        const auto [res, h] = step_impl(static_cast<T>(t - m_time), false);
+        const auto dt_limit
+            = t_dir ? std::min(dfloat<T>(max_delta_t), t - m_time) : std::max(dfloat<T>(-max_delta_t), t - m_time);
+        const auto [res, h] = step_impl(static_cast<T>(dt_limit), false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
             // a stopping terminal event
             return std::tuple{res, min_h, max_h, step_counter};
+        }
+
+        // The step was successful, execute the callback.
+        if (cb) {
+            cb(*this);
         }
 
         // Update the number of iterations.
@@ -3998,29 +4014,35 @@ std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate
 }
 
 template <typename T>
-std::tuple<taylor_outcome, T, T, std::size_t> taylor_adaptive_impl<T>::propagate_until(T t, std::size_t max_steps)
-{
-    return propagate_until(dfloat<T>(t), max_steps);
-}
-
-template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t max_steps)
+taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
+                                             std::function<void(taylor_adaptive_impl &, std::size_t)> cb)
 {
     using std::abs;
     using std::isfinite;
-
-    if (grid.empty()) {
-        throw std::invalid_argument(
-            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
-    }
+    using std::isnan;
 
     if (!isfinite(m_time)) {
         throw std::invalid_argument(
             "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the current time is not finite");
     }
 
-    // Check the input grid points.
+    // Check max_delta_t.
+    if (isnan(max_delta_t)) {
+        throw std::invalid_argument(
+            "A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
+    }
+    if (max_delta_t <= 0) {
+        throw std::invalid_argument(
+            "A non-positive max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator");
+    }
+
+    // Check the grid.
+    if (grid.empty()) {
+        throw std::invalid_argument(
+            "Cannot invoke propagate_grid() in an adaptive Taylor integrator if the time grid is empty");
+    }
+
     constexpr auto nf_err_msg
         = "A non-finite time value was passed to propagate_grid() in an adaptive Taylor integrator";
     constexpr auto ig_err_msg
@@ -4081,7 +4103,7 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
     // know that the grid is strictly monotonic, we know that we
     // will take at least 1 TC-writing timestep before starting
     // to use the dense output.
-    const auto oc = std::get<0>(propagate_until(grid[0]));
+    const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
         // The outcome is not time_limit and it is not a continuing
@@ -4090,8 +4112,16 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
     }
 
+    // The first step was successful, invoke cb.
+    if (cb) {
+        cb(*this, 0);
+    }
+
     // Add the first result to retval.
     retval.insert(retval.end(), m_state.begin(), m_state.end());
+
+    // Cache the direction of the integration.
+    const auto t_dir = grid.back() >= m_time;
 
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
@@ -4116,6 +4146,11 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
 
                 // Add the result to retval.
                 retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
+
+                // Invoke the callback, if needed.
+                if (cb) {
+                    cb(*this, boost::numeric_cast<std::size_t>(cur_grid_idx));
+                }
             } else {
                 // Cannot use dense output on the current time target,
                 // need to take another step.
@@ -4140,7 +4175,9 @@ taylor_adaptive_impl<T>::propagate_grid(const std::vector<T> &grid, std::size_t 
         // NOTE: grid.back() - m_time cannot be nan as the grid times
         // are all finite and the current time must also be finite
         // (otherwise we would have exited the integration earlier).
-        const auto [res, h] = step_impl(static_cast<T>(grid.back() - m_time), true);
+        const auto dt_limit = t_dir ? std::min(dfloat<T>(max_delta_t), grid.back() - m_time)
+                                    : std::max(dfloat<T>(-max_delta_t), grid.back() - m_time);
+        const auto [res, h] = step_impl(static_cast<T>(dt_limit), true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached

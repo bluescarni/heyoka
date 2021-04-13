@@ -304,6 +304,11 @@ IGOR_MAKE_NAMED_ARGUMENT(callback);
 IGOR_MAKE_NAMED_ARGUMENT(cooldown);
 IGOR_MAKE_NAMED_ARGUMENT(direction);
 
+// NOTE: these are used in the
+// propagate_*() functions.
+IGOR_MAKE_NAMED_ARGUMENT(max_steps);
+IGOR_MAKE_NAMED_ARGUMENT(max_delta_t);
+
 } // namespace kw
 
 namespace detail
@@ -517,6 +522,58 @@ using t_event = detail::t_event_impl<T>;
 namespace detail
 {
 
+// Parser for the common kwargs options for the propagate_*() functions.
+template <typename T, typename... KwArgs>
+inline auto propagate_common_ops(KwArgs &&...kw_args)
+{
+    igor::parser p{kw_args...};
+
+    if constexpr (p.has_unnamed_arguments()) {
+        static_assert(detail::always_false_v<KwArgs...>, "The variadic arguments to a propagate_*() function in an "
+                                                         "adaptive Taylor integrator contain unnamed arguments.");
+        throw;
+    } else {
+        // Max number of steps (defaults to zero).
+        auto max_steps = [&p]() -> std::size_t {
+            if constexpr (p.has(kw::max_steps)) {
+                return std::forward<decltype(p(kw::max_steps))>(p(kw::max_steps));
+            } else {
+                return 0;
+            }
+        }();
+
+        // Max delta_t (defaults to infinity).
+        auto max_delta_t = [&p]() -> T {
+            if constexpr (p.has(kw::max_delta_t)) {
+                return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+            } else {
+                return std::numeric_limits<T>::infinity();
+            }
+        }();
+
+        return std::tuple{max_steps, max_delta_t};
+    }
+}
+
+// Parser for the kwargs options for propagate_for/until().
+template <typename T, typename... KwArgs>
+inline auto propagate_common_ops1(KwArgs &&...kw_args)
+{
+    auto ret = propagate_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+
+    igor::parser p{kw_args...};
+
+    auto callback = [&p]() -> std::function<void(taylor_adaptive_impl<T> &)> {
+        if constexpr (p.has(kw::callback)) {
+            return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+        } else {
+            return {};
+        }
+    }();
+
+    return std::tuple_cat(std::move(ret), std::tuple{std::move(callback)});
+}
+
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
@@ -726,7 +783,11 @@ public:
     std::tuple<taylor_outcome, T> step(T, bool = false);
 
 private:
-    HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(const dfloat<T> &, std::size_t);
+    std::tuple<taylor_outcome, T, T, std::size_t> propagate_until_impl(const dfloat<T> &, std::size_t, T,
+                                                                       std::function<void(taylor_adaptive_impl &)>);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
+    propagate_grid_impl(const std::vector<T> &, std::size_t, T,
+                        std::function<void(taylor_adaptive_impl &, std::size_t)>);
 
 public:
     // NOTE: return values:
@@ -738,10 +799,38 @@ public:
     // - grid of state vectors (only for propagate_grid()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T, std::size_t = 0);
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T, std::size_t = 0);
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &,
-                                                                                 std::size_t = 0);
+    template <typename... KwArgs>
+    std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T t, KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_t, cb] = propagate_common_ops1<T>(std::forward<KwArgs>(kw_args)...);
+
+        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, std::move(cb));
+    }
+    template <typename... KwArgs>
+    std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T delta_t, KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_t, cb] = propagate_common_ops1<T>(std::forward<KwArgs>(kw_args)...);
+
+        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb));
+    }
+    template <typename... KwArgs>
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &grid,
+                                                                                 KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_t] = propagate_common_ops<T>(std::forward<KwArgs>(kw_args)...);
+
+        igor::parser p{kw_args...};
+
+        auto cb = [&p]() -> std::function<void(taylor_adaptive_impl &, std::size_t)> {
+            if constexpr (p.has(kw::callback)) {
+                return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+            } else {
+                return {};
+            }
+        }();
+
+        return propagate_grid_impl(grid, max_steps, max_delta_t, std::move(cb));
+    }
 };
 
 } // namespace detail
