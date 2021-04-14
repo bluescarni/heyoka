@@ -1020,12 +1020,92 @@ public:
     }
 
 private:
-    HEYOKA_DLL_LOCAL void propagate_until(const std::vector<dfloat<T>> &, std::size_t = 0);
+    // Parser for the common kwargs options for the propagate_*() functions.
+    template <typename... KwArgs>
+    auto propagate_common_ops(KwArgs &&...kw_args) const
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments to a propagate_*() function in an "
+                          "adaptive Taylor integrator in batch mode contain unnamed arguments.");
+            throw;
+        } else {
+            // Max number of steps (defaults to zero).
+            auto max_steps = [&p]() -> std::size_t {
+                if constexpr (p.has(kw::max_steps)) {
+                    return std::forward<decltype(p(kw::max_steps))>(p(kw::max_steps));
+                } else {
+                    return 0;
+                }
+            }();
+
+            // Max delta_t (defaults to positive infinities).
+            auto max_delta_t = [this, &p]() -> std::reference_wrapper<const std::vector<T>> {
+                if constexpr (p.has(kw::max_delta_t)) {
+                    return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                } else {
+                    return m_pinf;
+                }
+            }();
+
+            // NOTE: use make_tuple so that max_delta_t is transformed
+            // into a reference.
+            return std::make_tuple(max_steps, max_delta_t);
+        }
+    }
+
+    // Parser for the kwargs options for propagate_for/until().
+    template <typename... KwArgs>
+    auto propagate_common_ops1(KwArgs &&...kw_args) const
+    {
+        auto ret = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+
+        igor::parser p{kw_args...};
+
+        auto callback = [&p]() -> std::function<void(taylor_adaptive_batch_impl &)> {
+            if constexpr (p.has(kw::callback)) {
+                return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+            } else {
+                return {};
+            }
+        }();
+
+        return std::tuple_cat(std::move(ret), std::tuple{std::move(callback)});
+    }
+
+    // Implementations of the propagate_*() functions.
+    HEYOKA_DLL_LOCAL void propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
+                                               std::function<void(taylor_adaptive_batch_impl &)>);
+    void propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
+                              std::function<void(taylor_adaptive_batch_impl &)>);
+    void propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
+                            std::function<void(taylor_adaptive_batch_impl &)>);
+    std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &);
 
 public:
-    void propagate_for(const std::vector<T> &, std::size_t = 0);
-    void propagate_until(const std::vector<T> &, std::size_t = 0);
-    std::vector<T> propagate_grid(const std::vector<T> &, std::size_t = 0);
+    template <typename... KwArgs>
+    void propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_ts, cb] = propagate_common_ops1(std::forward<KwArgs>(kw_args)...);
+
+        propagate_until_impl(ts, max_steps, max_delta_ts, std::move(cb));
+    }
+    template <typename... KwArgs>
+    void propagate_for(const std::vector<T> &ts, KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_ts, cb] = propagate_common_ops1(std::forward<KwArgs>(kw_args)...);
+
+        propagate_for_impl(ts, max_steps, max_delta_ts, std::move(cb));
+    }
+    template <typename... KwArgs>
+    std::vector<T> propagate_grid(const std::vector<T> &grid, KwArgs &&...kw_args)
+    {
+        auto [max_steps, max_delta_ts] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+
+        return propagate_grid_impl(grid, max_steps, max_delta_ts);
+    }
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
         return m_prop_res;
