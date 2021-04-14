@@ -1043,6 +1043,8 @@ private:
 
             // Max delta_t (defaults to positive infinities).
             auto max_delta_t = [this, &p]() -> std::reference_wrapper<const std::vector<T>> {
+                // NOTE: quench clang warning about unused capture.
+                (void)this;
                 if constexpr (p.has(kw::max_delta_t)) {
                     return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
                 } else {
