@@ -4016,7 +4016,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
 taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
-                                             std::function<void(taylor_adaptive_impl &, std::size_t)> cb)
+                                             std::function<void(taylor_adaptive_impl &)> cb)
 {
     using std::abs;
     using std::isfinite;
@@ -4117,7 +4117,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
     // The first step was successful, invoke cb.
     if (cb) {
-        cb(*this, 0);
+        cb(*this);
     }
 
     // Add the first result to retval.
@@ -4146,11 +4146,6 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
                 // Add the result to retval.
                 retval.insert(retval.end(), m_d_out.begin(), m_d_out.end());
-
-                // Invoke the callback, if needed.
-                if (cb) {
-                    cb(*this, boost::numeric_cast<std::size_t>(cur_grid_idx));
-                }
             } else {
                 // Cannot use dense output on the current time target,
                 // need to take another step.
@@ -4183,6 +4178,11 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             // Something went wrong in the propagation of the timestep, or we reached
             // a stopping terminal event.
             return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Step successful: invoke the callback, if needed.
+        if (cb) {
+            cb(*this);
         }
 
         // Update the number of iterations.
@@ -4989,7 +4989,8 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
 
 template <typename T>
 std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
-                                                                  const std::vector<T> &max_delta_ts)
+                                                                  const std::vector<T> &max_delta_ts,
+                                                                  std::function<void(taylor_adaptive_batch_impl &)> cb)
 {
     using std::abs;
     using std::isnan;
@@ -5123,6 +5124,11 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
         }
 
         return retval;
+    }
+
+    // The first step was successful, invoke cb.
+    if (cb) {
+        cb(*this);
     }
 
     // Add the first result to retval.
@@ -5273,6 +5279,11 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             }
 
             return retval;
+        }
+
+        // Step successful: invoke the callback, if needed.
+        if (cb) {
+            cb(*this);
         }
 
         // Update the number of iterations.
