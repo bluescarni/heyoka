@@ -4115,11 +4115,6 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
     }
 
-    // The first step was successful, invoke cb.
-    if (cb) {
-        cb(*this);
-    }
-
     // Add the first result to retval.
     retval.insert(retval.end(), m_state.begin(), m_state.end());
 
@@ -5124,11 +5119,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
         }
 
         return retval;
-    }
-
-    // The first step was successful, invoke cb.
-    if (cb) {
-        cb(*this);
     }
 
     // Add the first result to retval.
