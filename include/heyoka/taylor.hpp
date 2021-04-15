@@ -870,6 +870,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
     std::vector<dfloat<T>> m_pfor_ts;
+    std::vector<int> m_t_dir;
+    std::vector<dfloat<T>> m_rem_time;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
 

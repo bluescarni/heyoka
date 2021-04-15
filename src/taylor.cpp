@@ -3921,6 +3921,7 @@ std::tuple<taylor_outcome, T, T, std::size_t>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
                                               std::function<void(taylor_adaptive_impl &)> cb)
 {
+    using std::abs;
     using std::isfinite;
     using std::isnan;
 
@@ -3956,16 +3957,28 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
     std::size_t iter_counter = 0, step_counter = 0;
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
 
+    // Init the remaining time.
+    auto rem_time = t - m_time;
+
+    // Check it.
+    if (!isfinite(rem_time)) {
+        throw std::invalid_argument("The final time passed to the propagate_until() function of an adaptive Taylor "
+                                    "integrator results in an overflow condition");
+    }
+
     // Cache the integration direction.
-    const auto t_dir = t >= m_time;
+    const auto t_dir = (rem_time >= T(0));
 
     while (true) {
-        // NOTE: t - m_time is guaranteed not to be nan: t is never non-finite,
-        // and at the first iteration we have checked above the value of m_time.
-        // At successive iterations, we know that m_time must be finite because
-        // otherwise we would have exited the loop when checking res.
+        // Compute the max integration times for this timestep.
+        // NOTE: rem_time is guaranteed to be finite: we check it explicitly above
+        // and we keep on decreasing its magnitude at the following iterations.
+        // If some non-finite state/time is generated in
+        // the step function, the integration will be stopped.
+        assert((rem_time >= T(0)) == t_dir || rem_time == T(0));
         const auto dt_limit
-            = t_dir ? std::min(dfloat<T>(max_delta_t), t - m_time) : std::max(dfloat<T>(-max_delta_t), t - m_time);
+            = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
+        // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         const auto [res, h] = step_impl(static_cast<T>(dt_limit), false);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
@@ -3985,6 +3998,23 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
 
+        // Update the remaining time.
+        rem_time = t - m_time;
+
+        // Check the integration direction. This could
+        // change because dt_limit is computed in extended
+        // precision, but it is cast to normal precision
+        // before being added to m_time in step_impl().
+        // Most of the time, if the direction changes, we will
+        // be in the time_limit case, but in the unlikely
+        // case we are not, we set rem_time to zero. Doing this,
+        // the next loop iteration dt_limit will be set to zero,
+        // which will certainly trigger the time_limit outcome,
+        // which will make us bail out from the loop.
+        if ((rem_time >= T(0)) != t_dir) {
+            rem_time = dfloat<T>(T(0));
+        }
+
         // Break out if the time limit is reached,
         // *before* updating the min_h/max_h values.
         // NOTE: the idea is that if we reached the time
@@ -3997,7 +4027,6 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // Update min_h/max_h, but only if we did not trigger a terminal event
         // (in which case the timestep is artificially clamped).
         if (res == taylor_outcome::success) {
-            using std::abs;
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
@@ -4118,6 +4147,29 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // Add the first result to retval.
     retval.insert(retval.end(), m_state.begin(), m_state.end());
 
+    // Init the remaining time.
+    auto rem_time = grid.back() - m_time;
+
+    // NOTE: these checks make sense only if we have more than
+    // 1 grid point.
+    if (grid.size() > 1u) {
+        // Check rem_time.
+        if (!isfinite(rem_time)) {
+            throw std::invalid_argument("The final time passed to the propagate_grid() function of an adaptive Taylor "
+                                        "integrator results in an overflow condition");
+        }
+
+        // Check that the integration direction is consistent with
+        // the one we determined initially. There could be corner
+        // cases in which this is not true any more due to
+        // mixing single-length and double-length arithmetics.
+        if (m_time == dfloat<T>(grid[1]) || (grid[1] > m_time) != t_dir) {
+            throw std::invalid_argument(
+                "The integration direction has become inconsistent with the grid direction after the initial "
+                "propagation in the propagate_grid() function of an adaptive Taylor integrator");
+        }
+    }
+
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
         // Establish the time range of the last
@@ -4161,12 +4213,14 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
         // Take the next step, making sure to write the Taylor coefficients
         // and to cap the timestep size so that we don't go past the
-        // last grid point.
-        // NOTE: grid.back() - m_time cannot be nan as the grid times
-        // are all finite and the current time must also be finite
-        // (otherwise we would have exited the integration earlier).
-        const auto dt_limit = t_dir ? std::min(dfloat<T>(max_delta_t), grid.back() - m_time)
-                                    : std::max(dfloat<T>(-max_delta_t), grid.back() - m_time);
+        // last grid point and we don't use a timestep exceeding max_delta_t.
+        // NOTE: rem_time is guaranteed to be finite: we check it explicitly above
+        // and we keep on decreasing its magnitude at the following iterations.
+        // If some non-finite state/time is generated in
+        // the step function, the integration will be stopped.
+        assert((rem_time >= T(0)) == t_dir);
+        const auto dt_limit
+            = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         const auto [res, h] = step_impl(static_cast<T>(dt_limit), true);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
@@ -4185,6 +4239,13 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
+
+        // Update the remaining time.
+        // NOTE: it's possible that the last timestep brings us
+        // past the last grid point, leading to a sign flip for rem_time,
+        // but in such a case we will just fill up the last remaining
+        // grid points and then exit before re-invoking the stepper.
+        rem_time = grid.back() - m_time;
 
         // Update the min/max h value, but only if we did not trigger a continuing
         // terminal event and we did not hit the time limit at the end of the grid
@@ -4633,7 +4694,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_min_abs_h.resize(m_batch_size);
     m_max_abs_h.resize(m_batch_size);
     m_cur_max_delta_ts.resize(m_batch_size);
-    m_pfor_ts.resize(m_batch_size);
+    m_pfor_ts.resize(boost::numeric_cast<decltype(m_pfor_ts.size())>(m_batch_size));
+    m_t_dir.resize(boost::numeric_cast<decltype(m_t_dir.size())>(m_batch_size));
+    m_rem_time.resize(m_batch_size);
 
     m_d_out_time.resize(boost::numeric_cast<decltype(m_d_out_time.size())>(m_batch_size));
 }
@@ -4646,7 +4709,8 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
       m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
-      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_d_out_time(other.m_d_out_time)
+      m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
+      m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
 {
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
@@ -4861,28 +4925,37 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         m_max_abs_h[i] = 0;
     }
 
+    // Compute the integration directions and init
+    // the remaining times.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+        if (!isfinite(m_rem_time[i])) {
+            throw std::invalid_argument("The final time passed to the propagate_until() function of an adaptive Taylor "
+                                        "integrator in batch mode results in an overflow condition");
+        }
+
+        m_t_dir[i] = (m_rem_time[i] >= T(0));
+    }
+
     while (true) {
         // Compute the max integration times for this timestep.
-        // NOTE: ts[i] - m_time[i] is guaranteed not to be nan: ts[i] is never non-finite,
-        // and at the first iteration we have checked above the value of m_time.
-        // At successive iterations, we know that m_time[i] must be finite because
-        // otherwise we would have exited the loop when checking m_step_res.
+        // NOTE: m_rem_time[i] is guaranteed to be finite: we check it explicitly above
+        // and we keep on decreasing its magnitude at the following iterations.
+        // If some non-finite state/time is generated in
+        // the step function, the integration will be stopped.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // Build the double-length version of the current time.
-            const dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]);
-
-            // Compute the integration direction.
-            const auto t_dir = ts[i] >= cur_time;
+            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0));
 
             // Compute the time limit.
-            const auto dt_limit = t_dir ? std::min(dfloat<T>(max_delta_ts[i]), ts[i] - cur_time)
-                                        : std::max(dfloat<T>(-max_delta_ts[i]), ts[i] - cur_time);
+            const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_ts[i]), m_rem_time[i])
+                                             : std::max(dfloat<T>(-max_delta_ts[i]), m_rem_time[i]);
 
             // Store it.
             m_cur_max_delta_ts[i] = static_cast<T>(dt_limit);
         }
 
         // Run the integration timestep.
+        // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         step_impl(m_cur_max_delta_ts, false);
 
         // Check if the integration timestep produced an error condition or we reached
@@ -4907,8 +4980,20 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // Update the iteration counter.
         ++iter_counter;
 
-        // Update the local step counters.
+        // Update the local step counters and the remaining times.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Compute the remaining time.
+            m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+
+            // Check the integration direction. If it flipped, it means
+            // we reached the time limit for this batch element, thus
+            // we set m_rem_time[i] to zero: this will make the stepper
+            // take steps of zero length for the batch element, thus
+            // triggering the time_limit outcome.
+            if ((m_rem_time[i] >= T(0)) != m_t_dir[i]) {
+                m_rem_time[i] = dfloat<T>(T(0));
+            }
+
             // NOTE: the local step counters increase only if we integrated
             // for a nonzero time.
             m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
@@ -5124,6 +5209,35 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     // Add the first result to retval.
     std::copy(m_state.begin(), m_state.end(), retval.begin());
 
+    // Init the remaining times.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_rem_time[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+    }
+
+    // NOTE: these checks make sense only if we have more than
+    // 1 grid point.
+    if (n_grid_points > 1u) {
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // Check m_rem_time.
+            if (!isfinite(m_rem_time[i])) {
+                throw std::invalid_argument(
+                    "The final time passed to the propagate_grid() function of an adaptive Taylor "
+                    "integrator in batch mode results in an overflow condition");
+            }
+
+            // Check that the integration direction is consistent with
+            // the one we determined initially. There could be corner
+            // cases in which this is not true any more due to
+            // mixing single-length and double-length arithmetics.
+            const auto cur_time = dfloat<T>(m_time_hi[i], m_time_lo[i]);
+            if (cur_time == dfloat<T>(grid_ptr[m_batch_size + i]) || (grid_ptr[m_batch_size + i] > cur_time) != t_dir) {
+                throw std::invalid_argument(
+                    "The integration direction has become inconsistent with the grid direction after the initial "
+                    "propagation in the propagate_grid() function of an adaptive Taylor integrator in batch mode");
+            }
+        }
+    }
+
     // Reset the counters and the min/max abs(h) vectors.
     std::size_t iter_counter = 0;
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -5237,21 +5351,20 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
 
         // Take the next step, making sure to write the Taylor coefficients
         // and to cap the timestep size so that we don't go past the
-        // last grid point.
-        // NOTE: we are sure that no elements in pgrid_tmp can be nan,
-        // as the grid values are all finite and the current times must also
-        // be finite (otherwise we would have exited the integration earlier).
+        // last grid point and we don't use a timestep exceeding max_delta_t.
+        // NOTE: m_rem_time is guaranteed to be finite: we check it explicitly above
+        // and we keep on decreasing its magnitude at the following iterations.
+        // If some non-finite state/time is generated in
+        // the step function, the integration will be stopped.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // The last grid point for the current batch element.
-            const auto last_gp = grid_ptr[(n_grid_points - 1u) * m_batch_size + i];
-            // Double-length version of the current time for
-            // the current batch element.
-            const dfloat<T> cur_time(m_time_hi[i], m_time_lo[i]);
             // Max delta_t for the current batch element.
             const auto max_delta_t = max_delta_ts[i];
+
             // Compute the step limit for the current batch element.
-            const auto dt_limit = t_dir ? std::min(dfloat<T>(max_delta_t), last_gp - cur_time)
-                                        : std::max(dfloat<T>(-max_delta_t), last_gp - cur_time);
+            assert((m_rem_time[i] >= T(0)) == t_dir || m_rem_time[i] == T(0));
+            const auto dt_limit = t_dir ? std::min(dfloat<T>(max_delta_t), m_rem_time[i])
+                                        : std::max(dfloat<T>(-max_delta_t), m_rem_time[i]);
+
             pgrid_tmp[i] = static_cast<T>(dt_limit);
         }
         step_impl(pgrid_tmp, true);
@@ -5279,8 +5392,18 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
         // Update the number of iterations.
         ++iter_counter;
 
-        // Update the local step counters and min_h/max_h.
+        // Update m_rem_time, the local step counters and min_h/max_h.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_rem_time[i] = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+
+            // Check the integration direction. If it flipped, it means
+            // we reached the time limit for this batch element, thus
+            // we set m_rem_time[i] to zero: this will make the stepper
+            // take steps of zero length for the batch element.
+            if ((m_rem_time[i] >= T(0)) != t_dir) {
+                m_rem_time[i] = dfloat<T>(T(0));
+            }
+
             // NOTE: the local step counters increase only if we integrated
             // for a nonzero time.
             m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
