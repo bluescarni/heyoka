@@ -751,7 +751,7 @@ private:
                 }
             }();
 
-            // Max delta_t (defaults to infinity).
+            // Max delta_t (defaults to positive infinity).
             auto max_delta_t = [&p]() -> T {
                 if constexpr (p.has(kw::max_delta_t)) {
                     return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));

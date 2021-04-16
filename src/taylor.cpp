@@ -4135,7 +4135,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // know that the grid is strictly monotonic, we know that we
     // will take at least 1 TC-writing timestep before starting
     // to use the dense output.
-    const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t));
+    // NOTE: use the same max_steps for the initial propagation.
+    const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
         // The outcome is not time_limit and it is not a continuing
@@ -5184,7 +5185,8 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
-    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts);
+    // NOTE: use the same max_steps for the initial propagation.
+    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
 
     // Check the result of the integration.
     if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
