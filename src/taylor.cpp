@@ -4699,7 +4699,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_t_dir.resize(boost::numeric_cast<decltype(m_t_dir.size())>(m_batch_size));
     m_rem_time.resize(m_batch_size);
 
-    m_d_out_time.resize(boost::numeric_cast<decltype(m_d_out_time.size())>(m_batch_size));
+    m_d_out_time.resize(m_batch_size);
 }
 
 template <typename T>

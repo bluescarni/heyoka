@@ -865,7 +865,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // and propagate functions.
     std::vector<std::tuple<taylor_outcome, T>> m_step_res;
     std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> m_prop_res;
-    // Temporary vectors used in the propagate_until() implementation.
+    // Temporary vectors used in the propagate_*() implementations.
     std::vector<std::size_t> m_ts_count;
     std::vector<T> m_min_abs_h, m_max_abs_h;
     std::vector<T> m_cur_max_delta_ts;
