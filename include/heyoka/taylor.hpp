@@ -1022,14 +1022,17 @@ private:
                 }
             }();
 
-            // Max delta_t (defaults to positive infinities).
-            auto max_delta_t = [this, &p]() -> std::reference_wrapper<const std::vector<T>> {
-                // NOTE: quench clang warning about unused capture.
-                (void)this;
+            // Max delta_t (defaults to empty vector).
+            auto max_delta_t = [&p]() {
                 if constexpr (p.has(kw::max_delta_t)) {
-                    return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                    if constexpr (std::is_same_v<std::vector<T>, uncvref_t<decltype(p(kw::max_delta_t))>>) {
+                        return std::reference_wrapper<const std::vector<T>>(
+                            static_cast<const std::vector<T> &>(p(kw::max_delta_t)));
+                    } else {
+                        return std::vector<T>(std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t)));
+                    }
                 } else {
-                    return m_pinf;
+                    return std::vector<T>{};
                 }
             }();
 
@@ -1043,8 +1046,8 @@ private:
             }();
 
             // NOTE: use make_tuple so that max_delta_t is transformed
-            // into a reference.
-            return std::make_tuple(max_steps, max_delta_t, std::move(cb));
+            // into a reference if it is a reference wrapper.
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb));
         }
     }
 
@@ -1064,21 +1067,21 @@ public:
     {
         auto [max_steps, max_delta_ts, cb] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
 
-        propagate_until_impl(ts, max_steps, max_delta_ts, std::move(cb));
+        propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }
     template <typename... KwArgs>
     void propagate_for(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
 
-        propagate_for_impl(ts, max_steps, max_delta_ts, std::move(cb));
+        propagate_for_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }
     template <typename... KwArgs>
     std::vector<T> propagate_grid(const std::vector<T> &grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_ts, std::move(cb));
+        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {

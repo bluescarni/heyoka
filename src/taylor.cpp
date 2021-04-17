@@ -3998,28 +3998,13 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
 
-        // Update the remaining time.
-        // NOTE: in principle, due to the fact that
-        // dt_limit is computed in extended
-        // precision but it is cast to normal precision
-        // before being added to m_time in step_impl(),
-        // there could be numerical inconsistencies
-        // at the last timestep which could result in rem_time
-        // not exactly zero or with a flipped sign.
-        // For this function, this should
-        // not matter because if static_cast<T>(rem_time) was used
-        // as an integration step, res will be time_limit
-        // and we will exit below before anything bad can
-        // happen. If anything smaller than static_cast<T>(rem_time)
-        // was used as timestep, rem_time should not change sign.
-        rem_time = t - m_time;
-
-        // Break out if the time limit is reached,
+        // Break out if the final time is reached,
         // *before* updating the min_h/max_h values.
         // NOTE: the idea is that if we reached the time
         // limit the timestep has been artificially
         // reduced, thus we don't want to count it.
-        if (res == taylor_outcome::time_limit) {
+        if (h == static_cast<T>(rem_time)) {
+            assert(res == taylor_outcome::time_limit);
             return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
 
@@ -4038,6 +4023,22 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         if (iter_counter == max_steps) {
             return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter};
         }
+
+        // Update the remaining time.
+        // NOTE: in principle, due to the fact that
+        // dt_limit is computed in extended
+        // precision but it is cast to normal precision
+        // before being added to m_time in step_impl(),
+        // there could be numerical inconsistencies
+        // at the last timestep which could result in rem_time
+        // not exactly zero or with a flipped sign.
+        // For this function, this should
+        // not matter because if static_cast<T>(rem_time) was used
+        // as an integration step, we will have already exited
+        // above before anything bad can
+        // happen. If anything smaller than static_cast<T>(rem_time)
+        // was used as timestep, rem_time should not change sign.
+        rem_time = t - m_time;
     }
 }
 
@@ -4231,19 +4232,6 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
 
-        // Update the remaining time.
-        // NOTE: if static_cast<T>(rem_time) was used as a timestep,
-        // it means that we hit the time limit. Force rem_time to zero
-        // to signal this, avoiding inconsistencies with grid.back() - m_time
-        // not going exactly to zero due to numerical issues. A zero rem_time
-        // will also force the processing of all remaining grid points.
-        if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
-            rem_time = dfloat<T>(T(0));
-        } else {
-            rem_time = grid.back() - m_time;
-        }
-
         // Update the min/max h value, but only if we did not trigger a continuing
         // terminal event and we did not hit the time limit at the end of the grid
         // (in which case the timestep is artificially clamped).
@@ -4259,6 +4247,19 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
             return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, std::move(retval)};
+        }
+
+        // Update the remaining time.
+        // NOTE: if static_cast<T>(rem_time) was used as a timestep,
+        // it means that we hit the time limit. Force rem_time to zero
+        // to signal this, avoiding inconsistencies with grid.back() - m_time
+        // not going exactly to zero due to numerical issues. A zero rem_time
+        // will also force the processing of all remaining grid points.
+        if (h == static_cast<T>(rem_time)) {
+            assert(res == taylor_outcome::time_limit);
+            rem_time = dfloat<T>(T(0));
+        } else {
+            rem_time = grid.back() - m_time;
         }
     }
 
@@ -4876,6 +4877,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                                                          const std::vector<T> &max_delta_ts,
                                                          std::function<void(taylor_adaptive_batch_impl &)> cb)
 {
+    using std::abs;
     using std::isfinite;
     using std::isnan;
 
@@ -4977,35 +4979,23 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // Update the iteration counter.
         ++iter_counter;
 
-        // Update the local step counters and the remaining times.
+        // Update the local step counters.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto [res, h] = m_step_res[i];
-
             // NOTE: the local step counters increase only if we integrated
             // for a nonzero time.
-            m_ts_count[i] += static_cast<std::size_t>(h != 0);
-
-            // Update the remaining time.
-            // NOTE: if static_cast<T>(m_rem_time[i]) was used as a timestep,
-            // it means that we hit the time limit. Force rem_time to zero
-            // to signal this, so that zero-length steps will be taken
-            // for all remaining iterations, thus always triggering the
-            // time_limit outcome.
-            // NOTE: if m_rem_time[i] was previously set to zero, it
-            // will end up being repeatedly set to zero here. This
-            // should be harmless.
-            if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit);
-                m_rem_time[i] = dfloat<T>(T(0));
-            } else {
-                m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
-            }
+            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
         }
 
-        // Break out if we have reached the time limit for all
-        // batch elements.
-        if (std::all_of(m_step_res.begin(), m_step_res.end(),
-                        [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::time_limit; })) {
+        // Break out if we have reached the final time
+        // for all batch elements.
+        bool all_done = true;
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            if (std::get<1>(m_step_res[i]) != static_cast<T>(m_rem_time[i])) {
+                all_done = false;
+                break;
+            }
+        }
+        if (all_done) {
             // Setup m_prop_res before exiting. The outcomes will all be time_limit.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
@@ -5023,7 +5013,6 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                 continue;
             }
 
-            using std::abs;
             const auto abs_h = abs(std::get<1>(m_step_res[i]));
             m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
             m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
@@ -5044,6 +5033,25 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             }
 
             return;
+        }
+
+        // Update the remaining times.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto [res, h] = m_step_res[i];
+
+            // NOTE: if static_cast<T>(m_rem_time[i]) was used as a timestep,
+            // it means that we hit the time limit. Force rem_time to zero
+            // to signal this, so that zero-length steps will be taken
+            // for all remaining iterations
+            // NOTE: if m_rem_time[i] was previously set to zero, it
+            // will end up being repeatedly set to zero here. This
+            // should be harmless.
+            if (h == static_cast<T>(m_rem_time[i])) {
+                assert(res == taylor_outcome::time_limit);
+                m_rem_time[i] = dfloat<T>(T(0));
+            } else {
+                m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+            }
         }
     }
 }

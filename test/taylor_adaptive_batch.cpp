@@ -319,3 +319,131 @@ TEST_CASE("set time")
 
     REQUIRE(ta.get_time() == std::vector{1., -2.});
 }
+
+TEST_CASE("propagate for_until")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+    auto ta_copy = ta;
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(ta.propagate_until({0., std::numeric_limits<double>::infinity()}), std::invalid_argument,
+                           Message("A non-finite time was passed to the propagate_until() function of an adaptive "
+                                   "Taylor integrator in batch mode"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until({10., 11.}, kw::max_delta_t = std::vector<double>{1}), std::invalid_argument,
+        Message("Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified timesteps is 1"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until({10., 11.}, kw::max_delta_t = {1., 2., 3.}), std::invalid_argument,
+        Message("Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified timesteps is 3"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until({10., 11.}, kw::max_delta_t = {1., std::numeric_limits<double>::quiet_NaN()}),
+        std::invalid_argument,
+        Message("A nan max_delta_t was passed to the propagate_until() function of an adaptive "
+                "Taylor integrator in batch mode"));
+    REQUIRE_THROWS_MATCHES(ta.propagate_until({10., 11.}, kw::max_delta_t = {1., -1.}), std::invalid_argument,
+                           Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
+                                   "adaptive Taylor integrator in batch mode"));
+
+    ta.set_time({0., std::numeric_limits<double>::lowest()});
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until({10., std::numeric_limits<double>::max()}, kw::max_delta_t = std::vector<double>{}),
+        std::invalid_argument,
+        Message("The final time passed to the propagate_until() function of an adaptive Taylor "
+                "integrator in batch mode results in an overflow condition"));
+
+    ta.set_time({0., 0.});
+
+    // Propagate forward in time limiting the timestep size and passing in a callback.
+    auto counter0 = 0ul, counter1 = counter0;
+
+    auto cb = [&counter0, &counter1](taylor_adaptive_batch<double> &t) {
+        if (t.get_last_h()[0] != 0) {
+            ++counter0;
+        }
+        if (t.get_last_h()[1] != 0) {
+            ++counter1;
+        }
+    };
+
+    ta.propagate_until({10., 11.}, kw::max_delta_t = {1e-4, 5e-5}, kw::callback = cb);
+    ta_copy.propagate_until({10., 11.});
+
+    REQUIRE(ta.get_time() == std::vector{10., 11.});
+    REQUIRE(counter0 == 100000ul);
+    REQUIRE(counter1 == 220000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{10., 11.});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+    REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
+    REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+
+    // Do propagate_for() too.
+    ta.propagate_for({10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
+    ta_copy.propagate_for({10., 11.});
+
+    REQUIRE(ta.get_time() == std::vector{20., 22.});
+    REQUIRE(counter0 == 200000ul);
+    REQUIRE(counter1 == 440000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{20., 22.});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+    REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
+    REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+
+    // Do backwards in time too.
+    ta.propagate_for({-10., -11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
+    ta_copy.propagate_for({-10., -11.});
+
+    REQUIRE(ta.get_time() == std::vector{10., 11.});
+    REQUIRE(counter0 == 300000ul);
+    REQUIRE(counter1 == 660000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{10., 11.});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+    REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
+    REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+
+    ta.propagate_until({0., 0.}, kw::max_delta_t = {1e-4, 5e-5}, kw::callback = cb);
+    ta_copy.propagate_until({0., 0.});
+
+    REQUIRE(ta.get_time() == std::vector{0., 0.});
+    REQUIRE(counter0 == 400000ul);
+    REQUIRE(counter1 == 880000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{0., 0.});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+    REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
+    REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+}
