@@ -4136,8 +4136,9 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
         // The outcome is not time_limit and it is not a continuing
-        // terminal event. This means that either a non-finite state was
-        // encountered, or a stopping terminal event triggered.
+        // terminal event. This means that a non-finite state was
+        // encountered, or a stopping terminal event triggered, or
+        // the step limit was hit.
         return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
     }
 
@@ -5190,8 +5191,9 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     // Check the result of the integration.
     if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
             // Check if the outcome is not time_limit and it is not a continuing
-            // terminal event. This means that either a non-finite state was
-            // encountered, or a stopping terminal event triggered.
+            // terminal event. This means that a non-finite state was
+            // encountered, or a stopping terminal event triggered, or the step
+            // limit was hit.
             const auto oc = std::get<0>(t);
             return oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
         })) {
