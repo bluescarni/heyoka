@@ -969,8 +969,8 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta_copy.get_time() == 10.);
     REQUIRE(oc_copy == taylor_outcome::time_limit);
 
-    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0]));
-    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1]));
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 
     // Do propagate_for() too.
     oc = std::get<0>(ta.propagate_for(
@@ -984,8 +984,8 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta_copy.get_time() == 20.);
     REQUIRE(oc_copy == taylor_outcome::time_limit);
 
-    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0]));
-    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1]));
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 
     // Do backwards in time too.
     oc = std::get<0>(ta.propagate_for(
@@ -999,8 +999,8 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta_copy.get_time() == 10.);
     REQUIRE(oc_copy == taylor_outcome::time_limit);
 
-    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0]));
-    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1]));
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 
     oc = std::get<0>(ta.propagate_until(
         0., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
@@ -1013,6 +1013,6 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta_copy.get_time() == 0.);
     REQUIRE(oc_copy == taylor_outcome::time_limit);
 
-    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0]));
-    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1]));
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 }
