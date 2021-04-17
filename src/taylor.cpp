@@ -4088,7 +4088,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         if (grid[1] == grid[0]) {
             throw std::invalid_argument(ig_err_msg);
         }
-        const auto t_dir = grid[1] > grid[0];
+        const auto grid_direction = grid[1] > grid[0];
 
         // Check that the remaining points are finite and that
         // they are ordered monotonically.
@@ -4097,7 +4097,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
                 throw std::invalid_argument(nf_err_msg);
             }
 
-            if ((grid[i] > grid[i - 1u]) != t_dir) {
+            if ((grid[i] > grid[i - 1u]) != grid_direction) {
                 throw std::invalid_argument(ig_err_msg);
             }
         }
@@ -5145,9 +5145,9 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             throw std::invalid_argument(ig_err_msg);
         }
 
-        const auto t_dir = grid_ptr[m_batch_size] > grid_ptr[0];
+        const auto grid_direction = grid_ptr[m_batch_size] > grid_ptr[0];
         for (std::uint32_t i = 1; i < m_batch_size; ++i) {
-            if ((grid_ptr[m_batch_size + i] > grid_ptr[i]) != t_dir) {
+            if ((grid_ptr[m_batch_size + i] > grid_ptr[i]) != grid_direction) {
                 throw std::invalid_argument(ig_err_msg);
             }
         }
@@ -5159,8 +5159,9 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                 throw std::invalid_argument(nf_err_msg);
             }
 
-            if (std::any_of(grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
-                            [this, t_dir](const T &t) { return (t > *(&t - m_batch_size)) != t_dir; })) {
+            if (std::any_of(
+                    grid_ptr + i * m_batch_size, grid_ptr + (i + 1u) * m_batch_size,
+                    [this, grid_direction](const T &t) { return (t > *(&t - m_batch_size)) != grid_direction; })) {
                 throw std::invalid_argument(ig_err_msg);
             }
         }
