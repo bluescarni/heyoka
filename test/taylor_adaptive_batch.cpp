@@ -333,7 +333,6 @@ TEST_CASE("propagate for_until")
     REQUIRE_THROWS_MATCHES(ta.propagate_until({0., std::numeric_limits<double>::infinity()}), std::invalid_argument,
                            Message("A non-finite time was passed to the propagate_until() function of an adaptive "
                                    "Taylor integrator in batch mode"));
-
     REQUIRE_THROWS_MATCHES(
         ta.propagate_until({10., 11.}, kw::max_delta_t = std::vector<double>{1}), std::invalid_argument,
         Message("Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is 2, "
@@ -446,4 +445,97 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
     REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+}
+
+TEST_CASE("propagate grid 2")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+    auto ta_copy = ta;
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({10., 11.}, kw::max_delta_t = std::vector<double>{1}), std::invalid_argument,
+        Message("Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified timesteps is 1"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({10., 11.}, kw::max_delta_t = {1., 2., 3.}), std::invalid_argument,
+        Message("Invalid number of max timesteps specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified timesteps is 3"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({10., 11.}, kw::max_delta_t = {1., std::numeric_limits<double>::quiet_NaN()}),
+        std::invalid_argument,
+        Message("A nan max_delta_t was passed to the propagate_grid() function of an adaptive "
+                "Taylor integrator in batch mode"));
+    REQUIRE_THROWS_MATCHES(ta.propagate_grid({10., 11.}, kw::max_delta_t = {1., -1.}), std::invalid_argument,
+                           Message("A non-positive max_delta_t was passed to the propagate_grid() function of an "
+                                   "adaptive Taylor integrator in batch mode"));
+
+    ta.set_time({0., std::numeric_limits<double>::lowest()});
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({0., std::numeric_limits<double>::lowest(), 1., std::numeric_limits<double>::max()},
+                          kw::max_delta_t = std::vector<double>{}),
+        std::invalid_argument,
+        Message("The final time passed to the propagate_grid() function of an adaptive Taylor "
+                "integrator in batch mode results in an overflow condition"));
+
+    ta.set_time({0., 0.});
+
+    // Propagate forward in time limiting the timestep size and passing in a callback.
+    auto counter0 = 0ul, counter1 = counter0;
+
+    auto cb = [&counter0, &counter1](taylor_adaptive_batch<double> &t) {
+        if (t.get_last_h()[0] != 0) {
+            ++counter0;
+        }
+        if (t.get_last_h()[1] != 0) {
+            ++counter1;
+        }
+    };
+
+    auto out
+        = ta.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
+    auto out_copy = ta_copy.propagate_grid({1., 1.5, 5., 5.6, 10., 11.});
+
+    REQUIRE(ta.get_time() == std::vector{10., 11.});
+    REQUIRE(counter0 == 90000ul);
+    REQUIRE(counter1 == 190000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{10., 11.});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    for (auto i = 0u; i < 3u; ++i) {
+        REQUIRE(out[4u * i + 0u] == approximately(out_copy[4u * i + 0u], 1000.));
+        REQUIRE(out[4u * i + 1u] == approximately(out_copy[4u * i + 1u], 1000.));
+        REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
+        REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
+    }
+
+    // Do backward in time too.
+    out = ta.propagate_grid({10., 11., 5., 5.6, 1., 1.5}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
+    out_copy = ta_copy.propagate_grid({10., 11., 5., 5.6, 1., 1.5});
+
+    REQUIRE(ta.get_time() == std::vector{1., 1.5});
+    REQUIRE(counter0 == 180000ul);
+    REQUIRE(counter1 == 380000ul);
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    REQUIRE(ta_copy.get_time() == std::vector{1., 1.5});
+    REQUIRE(std::all_of(ta_copy.get_propagate_res().begin(), ta_copy.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    for (auto i = 0u; i < 3u; ++i) {
+        REQUIRE(out[4u * i + 0u] == approximately(out_copy[4u * i + 0u], 1000.));
+        REQUIRE(out[4u * i + 1u] == approximately(out_copy[4u * i + 1u], 1000.));
+        REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
+        REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
+    }
 }

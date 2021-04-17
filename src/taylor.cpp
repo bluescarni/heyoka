@@ -4174,7 +4174,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             const auto cur_tt = grid[cur_grid_idx];
 
             // NOTE: we force processing of all remaining grid points
-            // if we are at the last timestep. We do this to avoid
+            // if we are at the last timestep. We do this in order to avoid
             // numerical issues when deciding if the last grid point
             // falls within the range of validity of the dense output.
             if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == dfloat<T>(T(0)))) {
@@ -5105,6 +5105,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                                                                                                m_batch_size));
     }
 
+    // Check the current time coordinates.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), is_nf)
         || std::any_of(m_time_lo.begin(), m_time_lo.end(), is_nf)) {
         throw std::invalid_argument("Cannot invoke propagate_grid() in an adaptive Taylor integrator in batch mode if "
