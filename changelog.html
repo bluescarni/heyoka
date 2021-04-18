@@ -397,6 +397,11 @@
 <div class="section" id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions now accept an optional
+<code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code> argument to limit the size of a timestep,
+and an optional <code class="docutils literal notranslate"><span class="pre">callback</span></code> argument that will be invoked
+at the end of each timestep
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/127">#127</a>).</p></li>
 <li><p>The time coordinate in the Taylor integrator classes
 is now represented internally in double-length format. This change
 greatly reduces the error in long-term integrations of
