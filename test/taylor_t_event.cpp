@@ -26,6 +26,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -935,4 +936,28 @@ TEST_CASE("taylor te boolean callback")
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 3, f, cm); });
         }
     }
+}
+
+// Test a terminal event exactly at the end of a timestep.
+TEST_CASE("step end")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive<double>::t_event_t;
+
+    auto counter = 0u;
+
+    auto ta
+        = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                  {0., 0.25},
+                                  kw::t_events = {t_ev_t(
+                                      heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta, bool) {
+                                          ++counter;
+                                          REQUIRE(ta.get_time() == 1.);
+                                          return true;
+                                      })}};
+
+    ta.propagate_until(10., kw::max_delta_t = 0.005);
+
+    REQUIRE(counter == 1u);
 }

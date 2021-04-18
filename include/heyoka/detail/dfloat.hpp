@@ -118,6 +118,24 @@ inline bool isfinite(const dfloat<F> &x)
 
 // Comparisons.
 template <typename F>
+inline bool operator==(const dfloat<F> &x, const dfloat<F> &y)
+{
+    return x.hi == y.hi && x.lo == y.lo;
+}
+
+template <typename F>
+inline bool operator==(const dfloat<F> &x, const F &y)
+{
+    return x == dfloat<F>(y);
+}
+
+template <typename F>
+inline bool operator!=(const dfloat<F> &x, const dfloat<F> &y)
+{
+    return !(x == y);
+}
+
+template <typename F>
 inline bool operator<(const dfloat<F> &x, const dfloat<F> &y)
 {
     return (x.hi < y.hi) || (x.hi == y.hi && x.lo < y.lo);
@@ -127,6 +145,12 @@ template <typename F>
 inline bool operator>(const dfloat<F> &x, const dfloat<F> &y)
 {
     return (x.hi > y.hi) || (x.hi == y.hi && x.lo > y.lo);
+}
+
+template <typename F>
+inline bool operator>(const F &x, const dfloat<F> &y)
+{
+    return dfloat<F>(x) > y;
 }
 
 template <typename F>
@@ -145,6 +169,12 @@ template <typename F>
 inline bool operator>=(const dfloat<F> &x, const dfloat<F> &y)
 {
     return (x.hi > y.hi) || (x.hi == y.hi && x.lo >= y.lo);
+}
+
+template <typename F>
+inline bool operator>=(const dfloat<F> &x, const F &y)
+{
+    return x >= dfloat<F>(y);
 }
 
 template <typename F>

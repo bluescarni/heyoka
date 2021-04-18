@@ -7,6 +7,11 @@ Changelog
 New
 ~~~
 
+- The ``propagate_*()`` functions now accept an optional
+  ``max_delta_t`` argument to limit the size of a timestep,
+  and an optional ``callback`` argument that will be invoked
+  at the end of each timestep
+  (`#127 <https://github.com/bluescarni/heyoka/pull/127>`__).
 - The time coordinate in the Taylor integrator classes
   is now represented internally in double-length format. This change
   greatly reduces the error in long-term integrations of

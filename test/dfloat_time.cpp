@@ -52,7 +52,7 @@ TEST_CASE("scalar test")
 
         auto [x, v] = make_vars("x", "v");
 
-        auto ta = taylor_adaptive<fp_t>({prime(x) = v, prime(v) = -x}, {0, 1});
+        auto ta = taylor_adaptive<fp_t>({prime(x) = v, prime(v) = -x}, {0, 1}, kw::compact_mode = true);
 
         const int ntrials = 100;
         const auto final_time = fp_t(10000.);
@@ -68,13 +68,87 @@ TEST_CASE("scalar test")
             ta.get_state_data()[0] = 0;
             ta.get_state_data()[1] = v0;
 
-            ta.propagate_until(final_time);
+            if (i % 2) {
+                ta.propagate_until(final_time);
+            } else {
+                ta.propagate_for(final_time);
+            }
 
             const auto exact = v0 * sin(final_time);
             err += abs((exact - ta.get_state()[0]) / exact);
         }
 
         REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(1000)));
+
+        // Backwards.
+        err = 0;
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = v0;
+
+            if (i % 2) {
+                ta.propagate_until(-final_time);
+            } else {
+                ta.propagate_for(-final_time);
+            }
+
+            const auto exact = v0 * sin(-final_time);
+            err += abs((exact - ta.get_state()[0]) / exact);
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(1000)));
+
+        // Some testing for propagate_grid() too.
+        err = 0;
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = v0;
+
+            const auto grid = std::vector{fp_t{1.}, fp_t{10.}, final_time};
+
+            const auto out = std::get<4>(ta.propagate_grid(grid));
+
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t = grid[j];
+
+                const auto exact = v0 * sin(t);
+                err += abs((exact - out[2u * j]) / exact);
+            }
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
+
+        // Backwards.
+        err = 0;
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = v0;
+
+            const auto grid = std::vector{fp_t{-1.}, fp_t{-10.}, -final_time};
+
+            const auto out = std::get<4>(ta.propagate_grid(grid));
+
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t = grid[j];
+
+                const auto exact = v0 * sin(t);
+                err += abs((exact - out[2u * j]) / exact);
+            }
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
@@ -90,10 +164,10 @@ TEST_CASE("batch test")
 
         auto [x, v] = make_vars("x", "v");
 
-        auto ta = taylor_adaptive_batch<fp_t>({prime(x) = v, prime(v) = -x}, {0, 0, 1, 1}, 2u);
+        auto ta = taylor_adaptive_batch<fp_t>({prime(x) = v, prime(v) = -x}, {0, 0, 1, 1}, 2u, kw::compact_mode = true);
 
         const int ntrials = 100;
-        const auto final_time = std::vector{fp_t(10000.), fp_t(11000.)};
+        auto final_time = std::vector{fp_t(10000.), fp_t(11000.)};
 
         fp_t err = 0;
 
@@ -109,7 +183,11 @@ TEST_CASE("batch test")
             ta.get_state_data()[2] = v0;
             ta.get_state_data()[3] = v1;
 
-            ta.propagate_until(final_time);
+            if (i % 2) {
+                ta.propagate_until(final_time);
+            } else {
+                ta.propagate_for(final_time);
+            }
 
             const auto exact0 = v0 * sin(final_time[0]);
             const auto exact1 = v1 * sin(final_time[1]);
@@ -119,6 +197,96 @@ TEST_CASE("batch test")
         }
 
         REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(1000)));
+
+        // Backwards.
+        err = 0;
+
+        final_time = std::vector{fp_t(-10000.), fp_t(-11000.)};
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v1 = fp_t(1) + rdist(rng);
+
+            ta.set_time({0, 0});
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = 0;
+            ta.get_state_data()[2] = v0;
+            ta.get_state_data()[3] = v1;
+
+            if (i % 2) {
+                ta.propagate_until(final_time);
+            } else {
+                ta.propagate_for(final_time);
+            }
+
+            const auto exact0 = v0 * sin(final_time[0]);
+            const auto exact1 = v1 * sin(final_time[1]);
+
+            err += abs((exact0 - ta.get_state()[0]) / exact0);
+            err += abs((exact1 - ta.get_state()[1]) / exact1);
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(1000)));
+
+        // Some testing for propagate_grid() too.
+        err = 0;
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v1 = fp_t(1) + rdist(rng);
+
+            ta.set_time({0, 0});
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = 0;
+            ta.get_state_data()[2] = v0;
+            ta.get_state_data()[3] = v1;
+
+            const auto grid = std::vector{fp_t{1.}, fp_t{2.}, fp_t{10.}, fp_t{20.}, fp_t(10000.), fp_t(11000.)};
+
+            const auto out = ta.propagate_grid(grid);
+
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t0 = grid[2u * j];
+                auto t1 = grid[2u * j + 1u];
+
+                const auto exact0 = v0 * sin(t0);
+                const auto exact1 = v1 * sin(t1);
+                err += abs((exact0 - out[4u * j]) / exact0);
+                err += abs((exact1 - out[4u * j + 1u]) / exact1);
+            }
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
+
+        // Backwards.
+        err = 0;
+
+        for (auto i = 0; i < ntrials; ++i) {
+            const auto v0 = fp_t(1) + rdist(rng);
+            const auto v1 = fp_t(1) + rdist(rng);
+
+            ta.set_time({0, 0});
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = 0;
+            ta.get_state_data()[2] = v0;
+            ta.get_state_data()[3] = v1;
+
+            const auto grid = std::vector{fp_t{-1.}, fp_t{-2.}, fp_t{-10.}, fp_t{-20.}, fp_t(-10000.), fp_t(-11000.)};
+
+            const auto out = ta.propagate_grid(grid);
+
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t0 = grid[2u * j];
+                auto t1 = grid[2u * j + 1u];
+
+                const auto exact0 = v0 * sin(t0);
+                const auto exact1 = v1 * sin(t1);
+                err += abs((exact0 - out[4u * j]) / exact0);
+                err += abs((exact1 - out[4u * j + 1u]) / exact1);
+            }
+        }
+
+        REQUIRE(err / ntrials == approximately(fp_t(0), fp_t(3000)));
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x); });

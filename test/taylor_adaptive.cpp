@@ -924,3 +924,160 @@ TEST_CASE("propagate trivial")
     REQUIRE(std::get<0>(ta.propagate_until(2.3)) == taylor_outcome::time_limit);
     REQUIRE(std::get<0>(ta.propagate_grid({3, 4, 5, 6, 7.})) == taylor_outcome::time_limit);
 }
+
+TEST_CASE("propagate for_until")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+    auto ta_copy = ta;
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until(std::numeric_limits<double>::infinity()), std::invalid_argument,
+        Message("A non-finite time was passed to the propagate_until() function of an adaptive Taylor integrator"));
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_until(10., kw::max_delta_t = std::numeric_limits<double>::quiet_NaN()), std::invalid_argument,
+        Message("A nan max_delta_t was passed to the propagate_until() function of an adaptive Taylor integrator"));
+
+    REQUIRE_THROWS_MATCHES(ta.propagate_until(10., kw::max_delta_t = -1), std::invalid_argument,
+                           Message("A non-positive max_delta_t was passed to the propagate_until() function of an "
+                                   "adaptive Taylor integrator"));
+
+    ta.set_time(std::numeric_limits<double>::lowest());
+
+    REQUIRE_THROWS_MATCHES(ta.propagate_until(std::numeric_limits<double>::max()), std::invalid_argument,
+                           Message("The final time passed to the propagate_until() function of an adaptive Taylor "
+                                   "integrator results in an overflow condition"));
+
+    ta.set_time(0.);
+
+    // Propagate forward in time limiting the timestep size and passing in a callback.
+    auto counter = 0ul;
+
+    auto oc = std::get<0>(ta.propagate_until(
+        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+    auto oc_copy = std::get<0>(ta_copy.propagate_until(10.));
+
+    REQUIRE(ta.get_time() == 10.);
+    REQUIRE(counter == 100000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 10.);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+
+    // Do propagate_for() too.
+    oc = std::get<0>(ta.propagate_for(
+        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+    oc_copy = std::get<0>(ta_copy.propagate_for(10.));
+
+    REQUIRE(ta.get_time() == 20.);
+    REQUIRE(counter == 200000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 20.);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+
+    // Do backwards in time too.
+    oc = std::get<0>(ta.propagate_for(
+        -10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+    oc_copy = std::get<0>(ta_copy.propagate_for(-10.));
+
+    REQUIRE(ta.get_time() == 10.);
+    REQUIRE(counter == 300000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 10.);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+
+    oc = std::get<0>(ta.propagate_until(
+        0., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+    oc_copy = std::get<0>(ta_copy.propagate_until(0.));
+
+    REQUIRE(ta.get_time() == 0.);
+    REQUIRE(counter == 400000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 0.);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
+    REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+}
+
+TEST_CASE("propagate grid")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+    auto ta_copy = ta;
+
+    // Error modes.
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({1.}, kw::max_delta_t = std::numeric_limits<double>::quiet_NaN()), std::invalid_argument,
+        Message("A nan max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator"));
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({1.}, kw::max_delta_t = -1.), std::invalid_argument,
+        Message(
+            "A non-positive max_delta_t was passed to the propagate_grid() function of an adaptive Taylor integrator"));
+
+    ta.set_time(std::numeric_limits<double>::lowest());
+
+    REQUIRE_THROWS_MATCHES(
+        ta.propagate_grid({std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max()}),
+        std::invalid_argument,
+        Message("The final time passed to the propagate_grid() function of an adaptive Taylor "
+                "integrator results in an overflow condition"));
+
+    ta.set_time(0.);
+
+    // Propagate forward in time limiting the timestep size and passing in a callback.
+    auto counter = 0ul;
+
+    auto [oc, _1, _2, _3, out] = ta.propagate_grid(
+        {1., 5., 10.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; });
+    auto [oc_copy, _4, _5, _6, out_copy] = ta_copy.propagate_grid({1., 5., 10.});
+
+    REQUIRE(ta.get_time() == 10.);
+    REQUIRE(counter == 90000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 10.);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 3u; ++i) {
+        REQUIRE(out[2u * i] == approximately(out_copy[2u * i], 1000.));
+        REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
+    }
+
+    // Backwards.
+    std::tie(oc, _1, _2, _3, out) = ta.propagate_grid(
+        {10., 5., 1.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; });
+    std::tie(oc_copy, _4, _5, _6, out_copy) = ta_copy.propagate_grid({10., 5., 1.});
+
+    REQUIRE(ta.get_time() == 1);
+    REQUIRE(counter == 180000ul);
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta_copy.get_time() == 1);
+    REQUIRE(oc_copy == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 3u; ++i) {
+        REQUIRE(out[2u * i] == approximately(out_copy[2u * i], 1000.));
+        REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
+    }
+}
