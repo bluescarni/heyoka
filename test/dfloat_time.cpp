@@ -116,11 +116,11 @@ TEST_CASE("scalar test")
 
             const auto out = std::get<4>(ta.propagate_grid(grid));
 
-            for (auto i = 0u; i < 3u; ++i) {
-                auto t = grid[i];
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t = grid[j];
 
                 const auto exact = v0 * sin(t);
-                err += abs((exact - out[2u * i]) / exact);
+                err += abs((exact - out[2u * j]) / exact);
             }
         }
 
@@ -140,11 +140,11 @@ TEST_CASE("scalar test")
 
             const auto out = std::get<4>(ta.propagate_grid(grid));
 
-            for (auto i = 0u; i < 3u; ++i) {
-                auto t = grid[i];
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t = grid[j];
 
                 const auto exact = v0 * sin(t);
-                err += abs((exact - out[2u * i]) / exact);
+                err += abs((exact - out[2u * j]) / exact);
             }
         }
 
@@ -245,14 +245,14 @@ TEST_CASE("batch test")
 
             const auto out = ta.propagate_grid(grid);
 
-            for (auto i = 0u; i < 3u; ++i) {
-                auto t0 = grid[2u * i];
-                auto t1 = grid[2u * i + 1u];
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t0 = grid[2u * j];
+                auto t1 = grid[2u * j + 1u];
 
                 const auto exact0 = v0 * sin(t0);
                 const auto exact1 = v1 * sin(t1);
-                err += abs((exact0 - out[4u * i]) / exact0);
-                err += abs((exact1 - out[4u * i + 1u]) / exact1);
+                err += abs((exact0 - out[4u * j]) / exact0);
+                err += abs((exact1 - out[4u * j + 1u]) / exact1);
             }
         }
 
@@ -275,14 +275,14 @@ TEST_CASE("batch test")
 
             const auto out = ta.propagate_grid(grid);
 
-            for (auto i = 0u; i < 3u; ++i) {
-                auto t0 = grid[2u * i];
-                auto t1 = grid[2u * i + 1u];
+            for (auto j = 0u; j < 3u; ++j) {
+                auto t0 = grid[2u * j];
+                auto t1 = grid[2u * j + 1u];
 
                 const auto exact0 = v0 * sin(t0);
                 const auto exact1 = v1 * sin(t1);
-                err += abs((exact0 - out[4u * i]) / exact0);
-                err += abs((exact1 - out[4u * i + 1u]) / exact1);
+                err += abs((exact0 - out[4u * j]) / exact0);
+                err += abs((exact1 - out[4u * j + 1u]) / exact1);
             }
         }
 

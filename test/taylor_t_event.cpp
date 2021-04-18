@@ -945,13 +945,19 @@ TEST_CASE("step end")
 
     using t_ev_t = typename taylor_adaptive<double>::t_event_t;
 
-    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                      {0., 0.25},
-                                      kw::t_events = {t_ev_t(
-                                          heyoka::time - 1., kw::callback = [](taylor_adaptive<double> &ta, bool) {
-                                              REQUIRE(ta.get_time() == 1.);
-                                              return true;
-                                          })}};
+    auto counter = 0u;
+
+    auto ta
+        = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                  {0., 0.25},
+                                  kw::t_events = {t_ev_t(
+                                      heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta, bool) {
+                                          ++counter;
+                                          REQUIRE(ta.get_time() == 1.);
+                                          return true;
+                                      })}};
 
     ta.propagate_until(10., kw::max_delta_t = 0.005);
+
+    REQUIRE(counter == 1u);
 }
