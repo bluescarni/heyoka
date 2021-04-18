@@ -137,6 +137,28 @@ if(YACMA_COMPILER_IS_MSVC)
   unset(_HEYOKA_MSVC_SUPPORTS_STRICT_CONFORMANCE)
 endif()
 
+# Mandatory dependency on LLVM.
+# NOTE: do it early so that we can set up
+# compiler flags based on the LLVM version
+# (see below).
+find_package(LLVM REQUIRED CONFIG)
+
+if(${LLVM_VERSION_MAJOR} LESS 10)
+  message(FATAL_ERROR "LLVM >= 10 is required.")
+endif()
+
+# NOTE: LLVM >= 12 deprecates the use of llvm::VectorType::getNumElements()
+# in favour of llvm::FixedVectorType::getNumElements(), which is however not
+# available in LLVM 10. Thus, as long as we support LLVM 10, we suppress
+# these deprecation warnings. Moving forward, we need to either drop support
+# for LLVM 10 or find a better solution.
+if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 12)
+    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
+        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
+        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
+    endif()
+endif()
+
 # Explanation: on MSVC, when building static libraries, it is good practice to link
 # to the static runtime. CMake, however, is hard-coded to link to the dynamic runtime.
 # Hence we hackishly replace the /MD flag with /MT. This is the approach suggested
@@ -248,13 +270,6 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
         unset(_HEYOKA_IPO_RESULT)
         unset(_HEYOKA_IPO_OUTPUT)
     endif()
-endif()
-
-# Mandatory dependency on LLVM.
-find_package(LLVM REQUIRED CONFIG)
-
-if(${LLVM_VERSION_MAJOR} LESS 10)
-  message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")

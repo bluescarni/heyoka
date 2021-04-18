@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Support LLVM 12
+  (`#128 <https://github.com/bluescarni/heyoka/pull/128>`__).
 - The ``propagate_*()`` functions now accept an optional
   ``max_delta_t`` argument to limit the size of a timestep,
   and an optional ``callback`` argument that will be invoked
