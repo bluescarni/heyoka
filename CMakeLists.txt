@@ -285,7 +285,7 @@ endif()
 # Add the LLVM include dirs.
 target_include_directories(heyoka SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
-if(TARGET LLVM)
+if(TARGET LLVM AND FALSE)
     # On some platforms, LLVM is built as a single library,
     # which is exported by LLVM's CMake config-file package as
     # a target called LLVM.
@@ -322,6 +322,12 @@ else()
     unset(_HEYOKA_LLVM_COMPONENTS)
     unset(_HEYOKA_LLVM_LIBS_DIRECT)
     unset(_HEYOKA_LLVM_LIBS)
+
+    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,__ZTVN4llvm* -Wl,-unexported_symbol,__ZNK4llvm*")
+    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,__ZN4llvm* -Wl,-unexported_symbol,__ZTIN4llvm*")
+    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,_LLVM* -Wl,-unexported_symbol,__ZTSN4llvm*")
+    set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,--version-script=/home/yardbird/repos/heyoka/src/libheyoka.version")
+    set_property(TARGET heyoka APPEND_STRING PROPERTY LINK_FLAGS "${LLVM_SYMBOLS_AVOID}")
 endif()
 
 # Mandatory dependency on fmt.
