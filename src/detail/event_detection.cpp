@@ -188,16 +188,12 @@ std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
     std::uint32_t retval = 0;
 
     // Start from index 0 and move forward
-    // until we find a nonzero coefficient.
+    // until we either find a nonzero coefficient,
+    // or we reach the last coefficient in the polynomial.
+    // In the latter case, the next loop will be skipped
+    // and the return value will remain 0.
     std::uint32_t last_nz_idx = 0;
-    while (a[last_nz_idx] == 0) {
-        if (last_nz_idx == n - 1u) {
-            // The second-to-last coefficient is
-            // zero, no sign changes are possible
-            // regardless of the sign of the
-            // last coefficient.
-            return 0;
-        }
+    while (a[last_nz_idx] == 0 && last_nz_idx != n) {
         ++last_nz_idx;
     }
 
