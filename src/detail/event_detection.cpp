@@ -63,22 +63,23 @@ namespace heyoka::detail
 namespace
 {
 
+// The polynomial cache type.
+template <typename T>
+using poly_cache_t = std::vector<std::vector<std::vector<T>>>;
+
 // Helper to fetch the per-thread poly cache.
 template <typename T>
-auto &get_poly_cache()
+poly_cache_t<T> &get_poly_cache()
 {
-    thread_local std::vector<std::vector<std::vector<T>>> ret;
+    thread_local poly_cache_t<T> ret;
 
     return ret;
 }
 
 // Extract a poly of order n from the cache (or create a new one).
 template <typename T>
-auto get_poly_from_cache(std::uint32_t n)
+auto get_poly_from_cache(poly_cache_t<T> &cache, std::uint32_t n)
 {
-    // Get/create the thread-local cache.
-    auto &cache = get_poly_cache<T>();
-
     // Look if we have inited the cache for order n.
     if (n >= cache.size()) {
         // The cache was never used for polynomials of order
@@ -105,11 +106,8 @@ auto get_poly_from_cache(std::uint32_t n)
 
 // Insert a poly into the cache.
 template <typename T>
-void put_poly_in_cache(std::vector<T> &&v)
+void put_poly_in_cache(poly_cache_t<T> &cache, std::vector<T> &&v)
 {
-    // Get/create the thread-local cache.
-    auto &cache = get_poly_cache<T>();
-
     // Fetch the order of the polynomial.
     // NOTE: the order is the size - 1.
     assert(!v.empty());
@@ -277,27 +275,53 @@ auto poly_eval(InputIt a, T x, std::uint32_t n)
 // A RAII helper to extract polys from the cache and
 // return them to the cache upon destruction.
 template <typename T>
-struct pwrap {
-    explicit pwrap(std::uint32_t n) : v(get_poly_from_cache<T>(n)) {}
-
-    // NOTE: upon move, the v of other is guaranteed
-    // to become empty().
-    pwrap(pwrap &&) noexcept = default;
-
-    // Delete the rest.
-    pwrap(const pwrap &) = delete;
-    pwrap &operator=(const pwrap &) = delete;
-    pwrap &operator=(pwrap &&) = delete;
-
-    ~pwrap()
+class pwrap
+{
+    void back_to_cache()
     {
-        // NOTE: put back into cache only
-        // if this was not moved-from.
+        // NOTE: the cache does not allow empty vectors.
         if (!v.empty()) {
-            put_poly_in_cache(std::move(v));
+            put_poly_in_cache(pc, std::move(v));
         }
     }
 
+public:
+    explicit pwrap(poly_cache_t<T> &cache, std::uint32_t n) : pc(cache), v(get_poly_from_cache<T>(pc, n)) {}
+
+    pwrap(pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
+    {
+        // Make sure we moved from a valid pwrap.
+        assert(!v.empty());
+    }
+    pwrap &operator=(pwrap &&other) noexcept
+    {
+        // Make sure the polyomial caches match.
+        assert(&pc == &other.pc);
+
+        // Make sure we are not moving from an
+        // invalid pwrap.
+        assert(!other.v.empty());
+
+        // Put the current v in the cache.
+        back_to_cache();
+
+        // Do the move-assignment.
+        v = std::move(other.v);
+
+        return *this;
+    }
+
+    // Delete copy semantics.
+    pwrap(const pwrap &) = delete;
+    pwrap &operator=(const pwrap &) = delete;
+
+    ~pwrap()
+    {
+        // Put the current v in the cache.
+        back_to_cache();
+    }
+
+    poly_cache_t<T> &pc;
     std::vector<T> v;
 };
 
@@ -547,7 +571,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     // the poly cache will be destroyed before the working
     // list, and the destructors in the working list will
     // interact with invalid memory.
-    [[maybe_unused]] auto *pc = &get_poly_cache<T>();
+    auto &pc = get_poly_cache<T>();
 
     // Fetch a reference to the list of isolating intervals.
     auto &isol = get_isol<T>();
@@ -557,6 +581,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
     // Fetch the polynomial translation function.
     auto pt1 = get_poly_translator_1<T>(order);
+
+    // Temporary polynomials used in the bisection loop.
+    pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
@@ -678,7 +705,14 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
             // Rescale it so that the range [0, h)
             // becomes [0, 1).
-            pwrap<T> tmp(order);
+            // NOTE: at the first iteration (i.e., for the first event),
+            // tmp has been constructed correctly outside this function.
+            // Below, tmp will first be moved into wl (thus rendering
+            // it invalid) but it will immediately be revived at the
+            // first iteration of the do/while loop. Thus, when we get
+            // here again, tmp will be again in a well-formed state.
+            assert(!tmp.v.empty());
+            assert(tmp.v.size() - 1u == order);
             poly_rescale(tmp.v.data(), ptr, h, order);
 
             // Place the first element in the working list.
@@ -694,10 +728,16 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
             do {
                 // Fetch the current interval and polynomial from the working list.
+                // NOTE: from now on, tmp contains the polynomial referred
+                // to as q(x) in the real-root isolation wikipedia page.
                 // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
                 // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
                 // [0, 1) range.
-                auto [lb, ub, q] = std::move(wl.back());
+                auto lb = std::get<0>(wl.back());
+                auto ub = std::get<1>(wl.back());
+                // NOTE: this will either revive an invalid tmp (first iteration),
+                // or it will replace it with one of the bisecting polynomials.
+                tmp = std::move(std::get<2>(wl.back()));
                 wl.pop_back();
 
                 // Check for an event at the lower bound, which occurs
@@ -707,8 +747,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // When we do proper root finding below, the
                 // algorithm should be able to detect non-finite
                 // polynomials.
-                if (q.v[0] == T(0) // LCOV_EXCL_LINE
-                    && std::all_of(q.v.data() + 1, q.v.data() + 1 + order, [](const auto &x) { return isfinite(x); })) {
+                if (tmp.v[0] == T(0) // LCOV_EXCL_LINE
+                    && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
+                                   [](const auto &x) { return isfinite(x); })) {
                     // NOTE: we will have to skip the event if we are dealing
                     // with a terminal event on cooldown and the lower bound
                     // falls within the cooldown time.
@@ -732,11 +773,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 }
 
                 // Reverse it.
-                pwrap<T> tmp1(order);
-                std::copy(q.v.rbegin(), q.v.rend(), tmp1.v.data());
+                std::copy(tmp.v.rbegin(), tmp.v.rend(), tmp1.v.data());
 
                 // Translate it.
-                pwrap<T> tmp2(order);
                 pt1(tmp2.v.data(), tmp1.v.data());
 
                 // Count the sign changes.
@@ -750,7 +789,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 
                     // First we transform q into 2**n * q(x/2) and store the result
                     // into tmp1.
-                    poly_rescale_p2(tmp1.v.data(), q.v.data(), order);
+                    poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
                     pt1(tmp2.v.data(), tmp1.v.data());
 
@@ -760,6 +799,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // entirely within the cooldown range.
                     if (lb_offset < mid) {
                         wl.emplace_back(lb, mid, std::move(tmp1));
+
+                        // Revive tmp1.
+                        tmp1 = pwrap<T>(pc, order);
                     } else {
                         // LCOV_EXCL_START
                         SPDLOG_LOGGER_DEBUG(
@@ -768,6 +810,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                         // LCOV_EXCL_STOP
                     }
                     wl.emplace_back(mid, ub, std::move(tmp2));
+
+                    // Revive tmp2.
+                    tmp2 = pwrap<T>(pc, order);
                 }
 
 #if !defined(NDEBUG)
@@ -809,7 +854,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
             // in which the range [0, h) is rescaled to [0, 1). We need
             // to do root finding on the rescaled polynomial because the
             // isolating intervals are also rescaled to [0, 1).
-            pwrap<T> tmp1(order);
+            // NOTE: tmp1 was either created with the correct size outside this
+            // function, or it was re-created in the bisection above.
             poly_rescale(tmp1.v.data(), ptr, h, order);
 
             // Run the root finding in the isolating intervals.
