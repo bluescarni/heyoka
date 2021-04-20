@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
 
     // Create the integrator.
     auto ta = taylor_adaptive<double>(eqns, std::vector<double>(N * 4u), kw::compact_mode = true,
-                                      kw::t_events = t_events, kw::tol = 1e-2);
+                                      kw::t_events = t_events, kw::tol = 1.);
 
     logger->trace("Integrator creation time: {}", sw);
 
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
     sw.reset();
 
     // Propagate.
-    auto [oc, _1, _2, _3, res] = ta.propagate_grid(t_grid, kw::max_delta_t = 1.);
+    auto [oc, _1, _2, _3, res] = ta.propagate_grid(t_grid, kw::max_delta_t = 5.);
 
     logger->trace("Integration time:    {}", sw);
     logger->info("Integration outcome:  {}", oc);
