@@ -1,0 +1,7 @@
+heyoka {
+   global:
+      *llvm_state*;
+   local:
+      *llvm*;
+      *LLVM*;
+};

@@ -323,11 +323,7 @@ else()
     unset(_HEYOKA_LLVM_LIBS_DIRECT)
     unset(_HEYOKA_LLVM_LIBS)
 
-    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,__ZTVN4llvm* -Wl,-unexported_symbol,__ZNK4llvm*")
-    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,__ZN4llvm* -Wl,-unexported_symbol,__ZTIN4llvm*")
-    #set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,-unexported_symbol,_LLVM* -Wl,-unexported_symbol,__ZTSN4llvm*")
-    set(LLVM_SYMBOLS_AVOID "${LLVM_SYMBOLS_AVOID} -Wl,--version-script=/home/yardbird/repos/heyoka/src/libheyoka.version")
-    set_property(TARGET heyoka APPEND_STRING PROPERTY LINK_FLAGS "${LLVM_SYMBOLS_AVOID}")
+    set_property(TARGET heyoka APPEND_STRING PROPERTY LINK_FLAGS "-Wl,--version-script=\"${CMAKE_CURRENT_SOURCE_DIR}/libheyoka.version\"")
 endif()
 
 # Mandatory dependency on fmt.
