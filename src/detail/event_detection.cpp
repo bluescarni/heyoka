@@ -295,6 +295,9 @@ public:
     }
     pwrap &operator=(pwrap &&other) noexcept
     {
+        // Disallow self move.
+        assert(this != &other);
+
         // Make sure the polyomial caches match.
         assert(&pc == &other.pc);
 
