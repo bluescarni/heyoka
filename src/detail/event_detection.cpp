@@ -328,10 +328,50 @@ public:
     std::vector<T> v;
 };
 
+// Helper to check if a poly root is past the first detected terminal event.
+// NOTE: the root here is expected to be already rescaled to the [0, h) range.
+template <typename DTEs, typename T>
+auto past_first_te(const DTEs &d_tes, T h, T root)
+{
+    using std::isfinite;
+
+    assert(isfinite(h));
+    assert(h != 0);
+
+    if (!d_tes.empty()) {
+        if ((h > 0 && root > std::get<1>(d_tes[0])) || (h < 0 && root < std::get<1>(d_tes[0]))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Helper to check if an interval starting at lb is after the first detected terminal event.
+// NOTE: contrary to the above, here the range is within [0, 1) and the terminal
+// event time needs to be rescaled because it is in the [0, h) range.
+template <typename DTEs, typename T>
+auto past_first_te_lb(const DTEs &d_tes, T h, T lb)
+{
+    using std::isfinite;
+
+    assert(isfinite(h));
+    assert(h != 0);
+
+    if (!d_tes.empty()) {
+        // Rescale the event time.
+        const auto te_time = std::get<1>(d_tes[0]) / h;
+
+        return lb > te_time;
+    }
+
+    return false;
+}
+
 // Find the only existing root for the polynomial poly of the given order
 // existing in [lb, ub].
-template <typename T>
-std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
+template <typename DTEs, typename T>
+std::tuple<T, int> bracketed_root_find(const DTEs &d_tes, T h, const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
 {
     // NOTE: perhaps this should depend on T?
     constexpr boost::uintmax_t iter_limit = 100;
@@ -353,9 +393,26 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     // Clear out errno before running the root finding.
     errno = 0;
 
+    bool past_first_te = false;
+
     // Run the root finder.
-    const auto p = boost::math::tools::toms748_solve([d = poly.v.data(), order](T x) { return poly_eval(d, x, order); },
-                                                     lb, ub, boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
+    const auto p = boost::math::tools::toms748_solve(
+        [d = poly.v.data(), order](T x) { return poly_eval(d, x, order); }, lb, ub,
+        [bm_tol = boost::math::tools::eps_tolerance<T>{}, &past_first_te, &d_tes, h](const T &a, const T &b) mutable {
+            if (past_first_te_lb(d_tes, h, a)) {
+                past_first_te = true;
+
+                return true;
+            }
+
+            return bm_tol(a, b);
+        },
+        max_iter, pol{});
+
+    if (past_first_te) {
+        return std::tuple{T(0), -2};
+    }
+
     const auto ret = (p.first + p.second) / 2;
 
     SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
@@ -622,6 +679,12 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // LCOV_EXCL_STOP
                 }
 
+                // Do not add the event if it happens after the first
+                // terminal event.
+                if (past_first_te(d_tes, h, root)) {
+                    return;
+                }
+
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
                     if constexpr (is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
@@ -800,6 +863,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     const auto mid = (lb + ub) / 2;
                     // NOTE: don't add the lower range if it falls
                     // entirely within the cooldown range.
+                    // TODO: don't add the intervals if they are after
+                    // the first terminal event.
                     if (lb_offset < mid) {
                         wl.emplace_back(lb, mid, std::move(tmp1));
 
@@ -888,13 +953,13 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 }
 
                 // Run the root finding.
-                const auto [root, cflag] = bracketed_root_find(tmp1, order, lb, ub);
+                const auto [root, cflag] = bracketed_root_find(d_tes, h, tmp1, order, lb, ub);
 
                 if (cflag == 0) {
                     // Root finding finished successfully, record the event.
                     // The found root needs to be rescaled by h.
                     add_d_event(root * h);
-                } else {
+                } else if (cflag != -2) {
                     // Root finding encountered some issue. Ignore the
                     // event and log the issue.
                     if (cflag == -1) {
