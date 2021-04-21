@@ -27,6 +27,8 @@ New
 Changes
 ~~~~~~~
 
+- Performance improvements for the event detection system
+  (`#129 <https://github.com/bluescarni/heyoka/pull/129>`__).
 - **BREAKING**: the time coordinates in batch integrators
   cannot be directly modified any more, and the new
   ``set_time()`` function must be used instead
