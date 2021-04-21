@@ -216,9 +216,10 @@ int main(int argc, char *argv[])
     sw.reset();
 
     // Propagate.
-    auto [oc, _1, _2, _3, res] = ta.propagate_grid(t_grid, kw::max_delta_t = 5.);
+    auto [oc, _1, _2, nsteps, res] = ta.propagate_grid(t_grid, kw::max_delta_t = 1.);
 
-    logger->trace("Integration time:    {}", sw);
-    logger->info("Integration outcome:  {}", oc);
+    logger->trace("Integration time   : {}", sw);
+    logger->info("Integration outcome : {}", oc);
+    logger->info("N of steps          : {}", nsteps);
     logger->info("Number of collisions: {}", coll_counter);
 }
