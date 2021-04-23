@@ -70,10 +70,11 @@ auto make_wavy_ramp(bool check_event)
     auto eq_w_curve = y - (1. - x + 0.05 * cos(11 * pi_const * x));
     auto eq_bottom = y;
 
-    auto ta
-        = taylor_adaptive<double>({prime(x) = vx, prime(y) = vy, prime(vx) = 0_dbl, prime(vy) = -1_dbl}, {0, 1.2, 0, 0},
-                                  kw::t_events = {t_event<double>(eq_w_curve, kw::callback = cb_curve),
-                                                  t_event<double>(eq_bottom, kw::callback = cb_bottom)});
+    auto ta = taylor_adaptive<double>(
+        {prime(x) = vx, prime(y) = vy, prime(vx) = 0_dbl, prime(vy) = -1_dbl}, {0, 1.2, 0, 0},
+        kw::t_events
+        = {t_event<double>(eq_w_curve, kw::callback = cb_curve, kw::direction = event_direction::negative),
+           t_event<double>(eq_bottom, kw::callback = cb_bottom, kw::direction = event_direction::negative)});
 
     return ta;
 }

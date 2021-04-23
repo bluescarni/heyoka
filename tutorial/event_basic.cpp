@@ -27,7 +27,7 @@ int main()
         // The left-hand side of the event equation
         v,
         // The callback.
-        [&zero_vel_times](taylor_adaptive<double> &ta, double time) {
+        kw::callback = [&zero_vel_times](taylor_adaptive<double> &ta, double time) {
             // Compute the state of the system when the
             // event triggered and print the value of x.
             ta.update_d_output(time);
@@ -63,9 +63,9 @@ int main()
     // Redefine ev to detect only events
     // in the positive direction.
     ev = nt_event<double>(
-        v, [&zero_vel_times](taylor_adaptive<double> &, double time) { zero_vel_times.push_back(time); },
+        v, kw::callback = [&zero_vel_times](taylor_adaptive<double> &, double time) { zero_vel_times.push_back(time); },
         // Specify the direction.
-        event_direction::positive);
+        kw::direction = event_direction::positive);
 
     // Reset zero_vel_times and the integrator.
     zero_vel_times.clear();
@@ -81,10 +81,12 @@ int main()
 
     // Define two close non-terminal events.
     nt_event<double> ev0(
-        v, [](taylor_adaptive<double> &, double time) { std::cout << "Event 0 triggering at t=" << time << '\n'; });
-    nt_event<double> ev1(v * v - 1e-12, [](taylor_adaptive<double> &, double time) {
-        std::cout << "Event 1 triggering at t=" << time << '\n';
-    });
+        v, kw::callback
+           = [](taylor_adaptive<double> &, double time) { std::cout << "Event 0 triggering at t=" << time << '\n'; });
+    nt_event<double> ev1(
+        v * v - 1e-12, kw::callback = [](taylor_adaptive<double> &, double time) {
+            std::cout << "Event 1 triggering at t=" << time << '\n';
+        });
 
     // Reset the integrator.
     ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {-0.05, 0.}, kw::nt_events = {ev0, ev1}};

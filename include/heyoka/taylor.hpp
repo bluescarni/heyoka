@@ -298,8 +298,7 @@ IGOR_MAKE_NAMED_ARGUMENT(pars);
 IGOR_MAKE_NAMED_ARGUMENT(t_events);
 IGOR_MAKE_NAMED_ARGUMENT(nt_events);
 
-// NOTE: these are used for constructing
-// a terminal event.
+// NOTE: these are used for constructing events.
 IGOR_MAKE_NAMED_ARGUMENT(callback);
 IGOR_MAKE_NAMED_ARGUMENT(cooldown);
 IGOR_MAKE_NAMED_ARGUMENT(direction);
@@ -374,8 +373,42 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
 public:
     using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
 
-    explicit nt_event_impl(expression, callback_t);
-    explicit nt_event_impl(expression, callback_t, event_direction);
+private:
+    void finalise_ctor(callback_t, event_direction);
+
+public:
+    template <typename... KwArgs>
+    explicit nt_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    {
+        igor::parser p{kw_args...};
+
+        if constexpr (p.has_unnamed_arguments()) {
+            static_assert(detail::always_false_v<KwArgs...>,
+                          "The variadic arguments in the construction of a non-terminal event contain "
+                          "unnamed arguments.");
+            throw;
+        } else {
+            // Callback (defaults to empty).
+            auto cb = [&p]() -> callback_t {
+                if constexpr (p.has(kw::callback)) {
+                    return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+                } else {
+                    return {};
+                }
+            }();
+
+            // Direction (defaults to any).
+            auto d = [&p]() -> event_direction {
+                if constexpr (p.has(kw::direction)) {
+                    return std::forward<decltype(p(kw::direction))>(p(kw::direction));
+                } else {
+                    return event_direction::any;
+                }
+            }();
+
+            finalise_ctor(std::move(cb), d);
+        }
+    }
 
     nt_event_impl(const nt_event_impl &);
     nt_event_impl(nt_event_impl &&) noexcept;
@@ -392,7 +425,7 @@ public:
 private:
     expression eq;
     callback_t callback;
-    event_direction dir = event_direction::any;
+    event_direction dir;
 };
 
 template <typename T>
@@ -444,7 +477,7 @@ public:
                 if constexpr (p.has(kw::callback)) {
                     return std::forward<decltype(p(kw::callback))>(p(kw::callback));
                 } else {
-                    return callback_t{};
+                    return {};
                 }
             }();
 
