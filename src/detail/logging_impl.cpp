@@ -21,7 +21,9 @@ namespace
 auto make_logger()
 {
     auto ret = spdlog::stdout_color_mt("heyoka");
+#if !defined(NDEBUG)
     ret->info("heyoka logger initialised");
+#endif
 
     return ret;
 }
