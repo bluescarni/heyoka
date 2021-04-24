@@ -961,3 +961,30 @@ TEST_CASE("step end")
 
     REQUIRE(counter == 1u);
 }
+
+// Bug: mr always being true for an
+// event with zero cooldown.
+TEST_CASE("taylor zero cd mor bug")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive<double>::t_event_t;
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                      {0., 0.25},
+                                      kw::t_events = {
+                                          t_ev_t(
+                                              v,
+                                              kw::callback =
+                                                  [](taylor_adaptive<double> &, bool mr) {
+                                                      REQUIRE(!mr);
+
+                                                      return false;
+                                                  },
+                                              kw::cooldown = 0),
+                                      }};
+
+    auto oc = std::get<0>(ta.propagate_until(10.));
+
+    REQUIRE(static_cast<int>(oc) == -1);
+}

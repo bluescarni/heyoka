@@ -622,6 +622,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // LCOV_EXCL_STOP
                 }
 
+                // Check if detect multiple roots in the cooldown
+                // period for the detected event.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
                     if constexpr (is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
@@ -630,6 +632,12 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                         // to a detected terminal event.
                         const auto cd
                             = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown() : taylor_deduce_cooldown(h);
+
+                        // NOTE: if the cooldown is zero, no sense to
+                        // run the check.
+                        if (cd == 0) {
+                            return false;
+                        }
 
                         // Evaluate the polynomial at the cooldown boundaries.
                         const auto e1 = poly_eval(ptr, root + cd, order);
