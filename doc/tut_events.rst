@@ -86,8 +86,7 @@ class, ``nt_event`` is parametrised over the floating-point type we want to use 
 (in this case, ``double``). The first mandatory argument for the construction of a non-terminal event is the left-hand
 side of the event equation, which in this case is simply :math:`v`.
 
-The second construction argument (specified with the keyword ``kw::callback``)
-is a callback function that will be invoked when the event is detected.
+The second mandatory construction argument is a callback function that will be invoked when the event is detected.
 The callback function can be a lambda, a regular function, or a function object - the only requirement is that the
 callback is a callable object with the following signature:
 
@@ -181,7 +180,7 @@ in heyoka by the ``event_direction`` enum, whose values can be
 - ``event_direction::positive`` (derivative > 0),
 - ``event_direction::negative`` (derivative < 0).
 
-Event direction can be specified upon construction:
+Event direction can be specified upon construction via the ``kw::direction`` keyword:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
@@ -231,7 +230,7 @@ Let's begin by defining the two events:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 82-89
+    :lines: 82-87
 
 This time the events' callbacks just print the event time to screen, without
 modifying the ``zero_vel_times`` list.
@@ -240,7 +239,7 @@ We can then reset the integrator, propagate for a few time units and check the s
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 91-95
+    :lines: 89-93
 
 .. code-block:: console
 
@@ -278,7 +277,9 @@ at the very least the expression corresponding to the left-hand side of the even
 A number of additional optional keyword arguments can be passed to customise the behaviour
 of a terminal event:
 
-- ``kw::callback``: a callback function that will be called when the event triggers;
+- ``kw::callback``: a callback function that will be called when the event triggers. Note that,
+  for terminal events, the presence of a callback is optional (whereas it is mandatory for
+  non-terminal events);
 - ``kw::cooldown``: a floating-point value representing the cooldown time for the terminal event
   (see :ref:`below <tut_t_event_cooldown>` for an explanation);
 - ``kw::direction``: a value of the ``event_direction`` enum which, like for non-terminal
@@ -311,7 +312,7 @@ Let us begin with the definition of the terminal event:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 97-115
+    :lines: 95-113
 
 Like in the case of non-terminal events, we specified as first construction argument
 the event equation. As second argument we passed a callback function that will be invoked
@@ -347,7 +348,7 @@ Let us proceed to the construction of the integrator:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 117-125
+    :lines: 115-123
 
 Similarly to the non-terminal events case, the list of terminal events
 is specified when constructing an integrator via the ``kw::t_events`` keyword argument.
@@ -357,7 +358,7 @@ the outcome of the integration will contain the index of the event that triggere
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 127-135
+    :lines: 125-133
 
 .. code-block:: console
 
@@ -373,7 +374,7 @@ execution of the callback:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 137-146
+    :lines: 135-144
 
 .. code-block:: console
 

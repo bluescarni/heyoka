@@ -374,11 +374,11 @@ public:
     using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
 
 private:
-    void finalise_ctor(callback_t, event_direction);
+    void finalise_ctor(event_direction);
 
 public:
     template <typename... KwArgs>
-    explicit nt_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
     {
         igor::parser p{kw_args...};
 
@@ -388,19 +388,6 @@ public:
                           "unnamed arguments.");
             throw;
         } else {
-            // Callback.
-            auto cb = [&p]() -> callback_t {
-                if constexpr (p.has(kw::callback)) {
-                    return std::forward<decltype(p(kw::callback))>(p(kw::callback));
-                } else {
-                    // LCOV_EXCL_START
-                    static_assert(detail::always_false_v<KwArgs...>,
-                                  "A callback must be provided when constructing a non-terminal event");
-                    throw;
-                    // LCOV_EXCL_STOP
-                }
-            }();
-
             // Direction (defaults to any).
             auto d = [&p]() -> event_direction {
                 if constexpr (p.has(kw::direction)) {
@@ -410,7 +397,7 @@ public:
                 }
             }();
 
-            finalise_ctor(std::move(cb), d);
+            finalise_ctor(d);
         }
     }
 

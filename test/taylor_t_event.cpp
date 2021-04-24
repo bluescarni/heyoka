@@ -163,25 +163,24 @@ TEST_CASE("taylor te basic")
             kw::opt_level = opt_level,
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
-            kw::nt_events = {nt_ev_t(
-                v * v - 1e-10, kw::callback =
-                                   [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t) {
-                                       // Make sure the callbacks are called in order.
-                                       if (direction) {
-                                           REQUIRE(t > cur_time);
-                                       } else {
-                                           REQUIRE(t < cur_time);
-                                       }
+            kw::nt_events = {nt_ev_t(v * v - 1e-10,
+                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t) {
+                                         // Make sure the callbacks are called in order.
+                                         if (direction) {
+                                             REQUIRE(t > cur_time);
+                                         } else {
+                                             REQUIRE(t < cur_time);
+                                         }
 
-                                       ta.update_d_output(t);
+                                         ta.update_d_output(t);
 
-                                       const auto v = ta.get_d_output()[1];
-                                       REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                         const auto v = ta.get_d_output()[1];
+                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
-                                       ++counter_nt;
+                                         ++counter_nt;
 
-                                       cur_time = t;
-                                   })},
+                                         cur_time = t;
+                                     })},
             kw::t_events = {t_ev_t(
                 v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr) {
                     const auto t = ta.get_time();

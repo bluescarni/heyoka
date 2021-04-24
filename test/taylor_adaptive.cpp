@@ -283,10 +283,10 @@ TEST_CASE("streaming op")
     }
 
     {
-        auto tad = taylor_adaptive<double>{sys,
-                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                           kw::nt_events = {nt_ev_t(
-                                               "x_0"_var, kw::callback = [](taylor_adaptive<double> &, double) {})}};
+        auto tad
+            = taylor_adaptive<double>{sys,
+                                      {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                      kw::nt_events = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double) {})}};
 
         oss << tad;
 
@@ -299,11 +299,11 @@ TEST_CASE("streaming op")
     }
 
     {
-        auto tad = taylor_adaptive<double>{sys,
-                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                           kw::t_events = {t_ev_t("x_0"_var)},
-                                           kw::nt_events = {nt_ev_t(
-                                               "x_0"_var, kw::callback = [](taylor_adaptive<double> &, double) {})}};
+        auto tad
+            = taylor_adaptive<double>{sys,
+                                      {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                      kw::t_events = {t_ev_t("x_0"_var)},
+                                      kw::nt_events = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double) {})}};
 
         oss << tad;
 
@@ -893,8 +893,7 @@ TEST_CASE("taylor scalar move")
     auto init_state = std::vector{-1., 0.};
     auto pars = std::vector{9.8};
     auto tes = std::vector{t_event<double>(v)};
-    auto ntes = std::vector{nt_event<double>(
-        v, kw::callback = [](taylor_adaptive<double> &, double) {})};
+    auto ntes = std::vector{nt_event<double>(v, [](taylor_adaptive<double> &, double) {})};
 
     auto s_data = init_state.data();
     auto p_data = pars.data();

@@ -4315,9 +4315,9 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 }
 
 template <typename T>
-void nt_event_impl<T>::finalise_ctor(callback_t f, event_direction d)
+void nt_event_impl<T>::finalise_ctor(event_direction d)
 {
-    if (!f) {
+    if (!callback) {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
     }
 
@@ -4325,7 +4325,6 @@ void nt_event_impl<T>::finalise_ctor(callback_t f, event_direction d)
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
     }
 
-    callback = std::move(f);
     dir = d;
 }
 
