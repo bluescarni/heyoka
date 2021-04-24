@@ -3831,9 +3831,8 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             const auto &cb = m_ntes[std::get<0>(t)].get_callback();
-            if (cb) {
-                cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
-            }
+            assert(cb);
+            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
         }
 
         // The return value of the first
@@ -4318,6 +4317,10 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 template <typename T>
 void nt_event_impl<T>::finalise_ctor(callback_t f, event_direction d)
 {
+    if (!f) {
+        throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
+    }
+
     if (d < event_direction::any || d > event_direction::negative) {
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
     }

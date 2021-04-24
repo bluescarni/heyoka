@@ -143,6 +143,8 @@ TEST_CASE("taylor nte")
     oss.str("");
 
     // Failure modes.
+    REQUIRE_THROWS_MATCHES(ev_t(v * v - 1e-10, kw::callback = ev_t::callback_t{}), std::invalid_argument,
+                           Message("Cannot construct a non-terminal event with an empty callback"));
     REQUIRE_THROWS_MATCHES(ev_t(
                                v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, double) {},
                                kw::direction = event_direction{50}),
@@ -561,20 +563,6 @@ TEST_CASE("nt dir test")
 
     fwd = false;
     rit = tlist.rbegin();
-
-    ta.propagate_until(0);
-}
-
-// Simple test with no callback.
-TEST_CASE("nt no cb test")
-{
-    auto [x, v] = make_vars("x", "v");
-
-    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                      {-0.25, 0.},
-                                      kw::nt_events = {nt_event<double>(v, kw::direction = event_direction::positive)}};
-
-    ta.propagate_until(20);
 
     ta.propagate_until(0);
 }

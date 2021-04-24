@@ -388,12 +388,16 @@ public:
                           "unnamed arguments.");
             throw;
         } else {
-            // Callback (defaults to empty).
+            // Callback.
             auto cb = [&p]() -> callback_t {
                 if constexpr (p.has(kw::callback)) {
                     return std::forward<decltype(p(kw::callback))>(p(kw::callback));
                 } else {
-                    return {};
+                    // LCOV_EXCL_START
+                    static_assert(detail::always_false_v<KwArgs...>,
+                                  "A callback must be provided when constructing a non-terminal event");
+                    throw;
+                    // LCOV_EXCL_STOP
                 }
             }();
 
