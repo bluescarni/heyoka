@@ -28,9 +28,9 @@ int main()
 
     taylor_adaptive<double> ta{sys, ic, kw::compact_mode = true};
 
-    taylor_adaptive<double> ta_ev{sys, ic, kw::compact_mode = true,
-                                  kw::nt_events
-                                  = {nt_event<double>("x_1"_var - 1000., [](taylor_adaptive<double> &, double) {})}};
+    taylor_adaptive<double> ta_ev{
+        sys, ic, kw::compact_mode = true,
+        kw::nt_events = {nt_event<double>("x_1"_var - 1000., [](taylor_adaptive<double> &, double, int) {})}};
 
     // NOTE: propagate for a while then reset, to prepare the caches.
     ta_ev.propagate_until(1000.);

@@ -49,9 +49,9 @@ mppp::real128 taylor_deduce_cooldown(mppp::real128);
 #endif
 
 template <typename T>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, T, bool>> &,
-                          std::vector<std::tuple<std::uint32_t, T>> &, const std::vector<detail::t_event_impl<T>> &,
-                          const std::vector<detail::nt_event_impl<T>> &,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, T, bool, int>> &,
+                          std::vector<std::tuple<std::uint32_t, T, int>> &,
+                          const std::vector<detail::t_event_impl<T>> &, const std::vector<detail::nt_event_impl<T>> &,
                           const std::vector<std::optional<std::pair<T, T>>> &, T, const std::vector<T> &, std::uint32_t,
                           std::uint32_t)
 {
@@ -59,16 +59,16 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, T, bool>> &,
 }
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &,
-                          std::vector<std::tuple<std::uint32_t, double>> &,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, int>> &,
+                          std::vector<std::tuple<std::uint32_t, double, int>> &,
                           const std::vector<detail::t_event_impl<double>> &,
                           const std::vector<detail::nt_event_impl<double>> &,
                           const std::vector<std::optional<std::pair<double, double>>> &, double,
                           const std::vector<double> &, std::uint32_t, std::uint32_t);
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool>> &,
-                          std::vector<std::tuple<std::uint32_t, long double>> &,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, int>> &,
+                          std::vector<std::tuple<std::uint32_t, long double, int>> &,
                           const std::vector<detail::t_event_impl<long double>> &,
                           const std::vector<detail::nt_event_impl<long double>> &,
                           const std::vector<std::optional<std::pair<long double, long double>>> &, long double,
@@ -77,8 +77,8 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, boo
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool>> &,
-                          std::vector<std::tuple<std::uint32_t, mppp::real128>> &,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, int>> &,
+                          std::vector<std::tuple<std::uint32_t, mppp::real128, int>> &,
                           const std::vector<detail::t_event_impl<mppp::real128>> &,
                           const std::vector<detail::nt_event_impl<mppp::real128>> &,
                           const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &, mppp::real128,

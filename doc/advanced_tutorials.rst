@@ -3,6 +3,11 @@
 Advanced tutorials
 ==================
 
+.. important::
+
+  More :ref:`tutorials <hypy:tutorials>` and :ref:`examples <hypy:examples>` are available in the documentation
+  of heyoka's `Python bindings <https://bluescarni.github.io/heyoka.py>`__.
+
 In this section we will show some of heyoka's more advanced functionalities,
 including multiprecision computations and vectorisation via batch mode.
 

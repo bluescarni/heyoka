@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -239,10 +240,11 @@ TEST_CASE("propagate grid scalar")
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out).empty());
 
-    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -x},
-                                 {0., 1.},
-                                 kw::t_events = {t_event<double>(
-                                     v - 0.999, kw::callback = [](taylor_adaptive<double> &, bool) { return false; })}};
+    ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 1.},
+        kw::t_events = {t_event<double>(
+            v - 0.999, kw::callback = [](taylor_adaptive<double> &, bool, int) { return false; })}};
     out = ta.propagate_grid({10., 100.});
     REQUIRE(std::get<0>(out) == taylor_outcome{-1});
     REQUIRE(std::get<4>(out).empty());
@@ -283,10 +285,10 @@ TEST_CASE("streaming op")
     }
 
     {
-        auto tad
-            = taylor_adaptive<double>{sys,
-                                      {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                      kw::nt_events = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double) {})}};
+        auto tad = taylor_adaptive<double>{sys,
+                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                           kw::nt_events
+                                           = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double, int) {})}};
 
         oss << tad;
 
@@ -299,11 +301,11 @@ TEST_CASE("streaming op")
     }
 
     {
-        auto tad
-            = taylor_adaptive<double>{sys,
-                                      {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                      kw::t_events = {t_ev_t("x_0"_var)},
-                                      kw::nt_events = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double) {})}};
+        auto tad = taylor_adaptive<double>{sys,
+                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                           kw::t_events = {t_ev_t("x_0"_var)},
+                                           kw::nt_events
+                                           = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double, int) {})}};
 
         oss << tad;
 
@@ -893,7 +895,7 @@ TEST_CASE("taylor scalar move")
     auto init_state = std::vector{-1., 0.};
     auto pars = std::vector{9.8};
     auto tes = std::vector{t_event<double>(v)};
-    auto ntes = std::vector{nt_event<double>(v, [](taylor_adaptive<double> &, double) {})};
+    auto ntes = std::vector{nt_event<double>(v, [](taylor_adaptive<double> &, double, int) {})};
 
     auto s_data = init_state.data();
     auto p_data = pars.data();
@@ -1017,6 +1019,37 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 }
 
+TEST_CASE("propagate for_until write_tc")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    ta.propagate_until(
+        10, kw::callback = [](auto &t) {
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta.propagate_until(
+        20, kw::write_tc = true, kw::callback = [](auto &t) {
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    ta.propagate_for(
+        10, kw::callback = [](auto &t) {
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta.propagate_for(
+        20, kw::write_tc = true, kw::callback = [](auto &t) {
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+}
+
 TEST_CASE("propagate grid")
 {
     using Catch::Matchers::Message;
@@ -1079,5 +1112,125 @@ TEST_CASE("propagate grid")
     for (auto i = 0u; i < 3u; ++i) {
         REQUIRE(out[2u * i] == approximately(out_copy[2u * i], 1000.));
         REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
+    }
+}
+
+// Test the stream operator of the outcome enum.
+TEST_CASE("outcome stream")
+{
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::success;
+
+        REQUIRE(oss.str() == "taylor_outcome::success");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::step_limit;
+
+        REQUIRE(oss.str() == "taylor_outcome::step_limit");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::time_limit;
+
+        REQUIRE(oss.str() == "taylor_outcome::time_limit");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::err_nf_state;
+
+        REQUIRE(oss.str() == "taylor_outcome::err_nf_state");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{0};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_0 (continuing)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{42};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_42 (continuing)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{-1};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_0 (stopping)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{-43};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_42 (stopping)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{static_cast<std::int64_t>(taylor_outcome::err_nf_state) - 1};
+
+        REQUIRE(oss.str() == "taylor_outcome::??");
+    }
+}
+
+// Test the stream operator of the event direction enum.
+TEST_CASE("event direction stream")
+{
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{-1};
+
+        REQUIRE(oss.str() == "event_direction::negative");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{0};
+
+        REQUIRE(oss.str() == "event_direction::any");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{1};
+
+        REQUIRE(oss.str() == "event_direction::positive");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{-2};
+
+        REQUIRE(oss.str() == "event_direction::??");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{2};
+
+        REQUIRE(oss.str() == "event_direction::??");
     }
 }

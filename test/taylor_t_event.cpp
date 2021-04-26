@@ -81,7 +81,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, bool) { return true; });
+        kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; });
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -90,7 +90,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, bool) { return true; }, kw::cooldown = -5);
+        kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; }, kw::cooldown = -5);
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
@@ -99,7 +99,7 @@ TEST_CASE("taylor te")
 
     oss << ev_t(
         v * v - 1e-10, kw::direction = event_direction::negative,
-        kw::callback = [](taylor_adaptive<double> &, bool) { return true; }, kw::cooldown = 1);
+        kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; }, kw::cooldown = 1);
     REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
     REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
     REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
@@ -108,12 +108,12 @@ TEST_CASE("taylor te")
 
     // Check the assignment operators.
     ev_t ev0(
-        v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool) { return true; }),
+        v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; }),
         ev1(
-            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool) { return true; },
+            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; },
             kw::direction = event_direction::negative),
         ev2(
-            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool) { return true; },
+            v * v - 1e-10, kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; },
             kw::direction = event_direction::positive);
     ev0 = ev1;
     oss << ev0;
@@ -130,13 +130,13 @@ TEST_CASE("taylor te")
     // Failure modes.
     REQUIRE_THROWS_MATCHES(ev_t(
                                v * v - 1e-10, kw::direction = event_direction::negative,
-                               kw::callback = [](taylor_adaptive<double> &, bool) { return true; },
+                               kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; },
                                kw::cooldown = std::numeric_limits<double>::quiet_NaN()),
                            std::invalid_argument,
                            Message("Cannot set a non-finite cooldown value for a terminal event"));
     REQUIRE_THROWS_MATCHES(ev_t(
                                v * v - 1e-10, kw::direction = event_direction{50},
-                               kw::callback = [](taylor_adaptive<double> &, bool) { return true; }),
+                               kw::callback = [](taylor_adaptive<double> &, bool, int) { return true; }),
                            std::invalid_argument,
                            Message("Invalid value selected for the direction of a terminal event"));
 }
@@ -164,7 +164,7 @@ TEST_CASE("taylor te basic")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t) {
+                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
                                          // Make sure the callbacks are called in order.
                                          if (direction) {
                                              REQUIRE(t > cur_time);
@@ -182,7 +182,7 @@ TEST_CASE("taylor te basic")
                                          cur_time = t;
                                      })},
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr) {
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
                     const auto t = ta.get_time();
 
                     REQUIRE(!mr);
@@ -342,7 +342,7 @@ TEST_CASE("taylor te close")
 
         t_ev_t ev1(x);
         t_ev_t ev2(
-            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, bool mr) {
+            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, bool mr, int) {
                 REQUIRE(!mr);
                 return true;
             });
@@ -470,8 +470,9 @@ TEST_CASE("taylor te dir")
         t_ev_t ev(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr) {
+                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
                     REQUIRE(!mr);
+                    REQUIRE(d_sgn == 1);
                     return true;
                 },
             kw::direction = event_direction::positive);
@@ -513,8 +514,9 @@ TEST_CASE("taylor te dir")
         auto ev1 = t_ev_t(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr) {
+                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
                     REQUIRE(!mr);
+                    REQUIRE(d_sgn == -1);
                     return true;
                 },
             kw::direction = event_direction::negative);
@@ -574,7 +576,7 @@ TEST_CASE("taylor te custom cooldown")
         t_ev_t ev(
             v * v - std::numeric_limits<fp_t>::epsilon() * 4,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr) {
+                [](taylor_adaptive<fp_t> &, bool mr, int) {
                     REQUIRE(mr);
                     return true;
                 },
@@ -620,7 +622,7 @@ TEST_CASE("taylor te propagate_for")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
                 ++counter;
                 REQUIRE(!mr);
                 return true;
@@ -672,7 +674,7 @@ TEST_CASE("taylor te propagate_grid")
         auto counter = 0u;
 
         t_ev_t ev(
-            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr) {
+            v, kw::callback = [&counter](taylor_adaptive<fp_t> &, bool mr, int) {
                 ++counter;
                 REQUIRE(!mr);
                 return true;
@@ -735,7 +737,7 @@ TEST_CASE("taylor te propagate_grid first step bug")
 
     {
         t_ev_t ev(
-            v, kw::callback = [](taylor_adaptive<double> &, bool mr) {
+            v, kw::callback = [](taylor_adaptive<double> &, bool mr, int) {
                 REQUIRE(!mr);
                 return true;
             });
@@ -776,7 +778,7 @@ TEST_CASE("taylor te damped pendulum")
 
     std::vector<double> zero_vel_times;
 
-    auto callback = [&zero_vel_times](taylor_adaptive<double> &ta, bool) {
+    auto callback = [&zero_vel_times](taylor_adaptive<double> &ta, bool, int) {
         const auto tm = ta.get_time();
 
         if (ta.get_pars()[0] == 0) {
@@ -845,7 +847,7 @@ TEST_CASE("taylor te boolean callback")
             kw::high_accuracy = high_accuracy,
             kw::compact_mode = compact_mode,
             kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr) {
+                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
                     const auto t = ta.get_time();
 
                     REQUIRE(!mr);
@@ -947,17 +949,44 @@ TEST_CASE("step end")
 
     auto counter = 0u;
 
-    auto ta
-        = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                  {0., 0.25},
-                                  kw::t_events = {t_ev_t(
-                                      heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta, bool) {
-                                          ++counter;
-                                          REQUIRE(ta.get_time() == 1.);
-                                          return true;
-                                      })}};
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0., 0.25},
+        kw::t_events = {t_ev_t(
+            heyoka::time - 1., kw::callback = [&counter](taylor_adaptive<double> &ta, bool, int) {
+                ++counter;
+                REQUIRE(ta.get_time() == 1.);
+                return true;
+            })}};
 
     ta.propagate_until(10., kw::max_delta_t = 0.005);
 
     REQUIRE(counter == 1u);
+}
+
+// Bug: mr always being true for an
+// event with zero cooldown.
+TEST_CASE("taylor zero cd mor bug")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive<double>::t_event_t;
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                      {0., 0.25},
+                                      kw::t_events = {
+                                          t_ev_t(
+                                              v,
+                                              kw::callback =
+                                                  [](taylor_adaptive<double> &, bool mr, int) {
+                                                      REQUIRE(!mr);
+
+                                                      return false;
+                                                  },
+                                              kw::cooldown = 0),
+                                      }};
+
+    auto oc = std::get<0>(ta.propagate_until(10.));
+
+    REQUIRE(static_cast<int>(oc) == -1);
 }

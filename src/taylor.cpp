@@ -3830,8 +3830,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // to happen before the first terminal event.
         for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
-
-            m_ntes[std::get<0>(t)].get_callback()(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
+            const auto &cb = m_ntes[std::get<0>(t)].get_callback();
+            assert(cb);
+            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
 
         // The return value of the first
@@ -3859,7 +3860,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]), std::get<3>(m_d_tes[0]));
             }
         }
 
@@ -3919,7 +3920,7 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              std::function<void(taylor_adaptive_impl &)> cb)
+                                              std::function<void(taylor_adaptive_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -3979,7 +3980,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [res, h] = step_impl(static_cast<T>(dt_limit), false);
+        const auto [res, h] = step_impl(static_cast<T>(dt_limit), wtc);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -4132,7 +4133,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // know that the grid is strictly monotonic, we know that we
     // will take at least 1 TC-writing timestep before starting
     // to use the dense output.
-    // NOTE: use the same max_steps for the initial propagation.
+    // NOTE: use the same max_steps for the initial propagation,
+    // and don't pass the callback.
     const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
@@ -4314,21 +4316,16 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 }
 
 template <typename T>
-nt_event_impl<T>::nt_event_impl(expression e, callback_t f) : eq(std::move(e)), callback(std::move(f))
+void nt_event_impl<T>::finalise_ctor(event_direction d)
 {
     if (!callback) {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
     }
-}
 
-template <typename T>
-// NOLINTNEXTLINE(performance-unnecessary-value-param)
-nt_event_impl<T>::nt_event_impl(expression e, callback_t f, event_direction d)
-    : nt_event_impl(std::move(e), std::move(f))
-{
-    if (d < event_direction::any || d > event_direction::negative) {
+    if (d < event_direction::negative || d > event_direction::positive) {
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
     }
+
     dir = d;
 }
 
@@ -4414,7 +4411,7 @@ void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
     }
     cooldown = cd;
 
-    if (d < event_direction::any || d > event_direction::negative) {
+    if (d < event_direction::negative || d > event_direction::positive) {
         throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
     }
     dir = d;
@@ -4855,7 +4852,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
                                                        const std::vector<T> &max_delta_ts,
-                                                       std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                       std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -4869,13 +4866,13 @@ void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &del
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb));
+    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
 }
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloat<T>> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -4955,7 +4952,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
         // Run the integration timestep.
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        step_impl(m_cur_max_delta_ts, false);
+        step_impl(m_cur_max_delta_ts, wtc);
 
         // Check if the integration timestep produced an error condition or we reached
         // a stopping terminal event.
@@ -5059,7 +5056,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -5075,7 +5072,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb));
+    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
 }
 
 template <typename T>
@@ -5194,7 +5191,8 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
-    // NOTE: use the same max_steps for the initial propagation.
+    // NOTE: use the same max_steps for the initial propagation,
+    // and don't pass the callback.
     propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
 
     // Check the result of the integration.
@@ -6177,9 +6175,14 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
         default:
-            if (oc > taylor_outcome::success) {
-                os << "taylor_outcome::terminal_event_{}"_format(static_cast<std::int64_t>(oc));
+            if (oc >= taylor_outcome{0}) {
+                // Continuing terminal event.
+                os << "taylor_outcome::terminal_event_{} (continuing)"_format(static_cast<std::int64_t>(oc));
+            } else if (oc > taylor_outcome::success) {
+                // Stopping terminal event.
+                os << "taylor_outcome::terminal_event_{} (stopping)"_format(-static_cast<std::int64_t>(oc) - 1);
             } else {
+                // Unknown value.
                 os << "taylor_outcome::??";
             }
     }
@@ -6194,6 +6197,7 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::positive);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::negative);
         default:
+            // Unknown value.
             os << "event_direction::??";
     }
 
