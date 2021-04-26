@@ -100,7 +100,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
     // the radius of jupiter to keep thing simple.
     const auto jradius = T(0.000477895);
     std::vector<nt_event<T>> evs;
-    auto cb = [](taylor_adaptive<T> &, T) { throw; };
+    auto cb = [](taylor_adaptive<T> &, T, event_direction) { throw; };
     for (auto i = 0; i < 6; ++i) {
         auto xi = expression("x_{}"_format(i));
         auto yi = expression("y_{}"_format(i));
@@ -314,13 +314,30 @@ int main(int argc, char *argv[])
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")(
-        "fp_type", po::value<std::string>(&fp_type)->default_value("double"), "floating-point type")(
-        "filename", po::value<std::string>(&filename)->default_value(""),
-        "name of the file into which the simulation data will be saved (if empty, no data will be saved)")(
-        "final_time", po::value<double>(&final_time)->default_value(1E6), "simulation end time (in years)")(
-        "perturb", po::value<double>(&perturb)->default_value(0.),
-        "magnitude of the perturbation on the initial state")("compact_mode", "compact mode")(
-        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be automatically deduced)");
+        "fp_type", po::value<std::string>(&fp_type)->default_value("double"),
+        "floating-point type")("filename", po::value<std::string>(&filename)->default_value(""),
+                               "name of the file into which the simulation data will be saved (if empty, no data will "
+                               "be saved)")("final_time", po::value<double>(&final_time)->default_value(1E6),
+                                            "simulation end time (in years)")("perturb",
+                                                                              po::value<double>(&perturb)
+                                                                                  ->default_value(0.),
+                                                                              "magnitude of the perturbation on the "
+                                                                              "initial state")("compact_mode",
+                                                                                               "compact mode")("tol",
+                                                                                                               po::value<
+                                                                                                                   double>(
+                                                                                                                   &tol)
+                                                                                                                   ->default_value(
+                                                                                                                       0.),
+                                                                                                               "toleran"
+                                                                                                               "ce (if "
+                                                                                                               "0, it "
+                                                                                                               "will "
+                                                                                                               "be "
+                                                                                                               "automat"
+                                                                                                               "ically "
+                                                                                                               "deduced"
+                                                                                                               ")");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

@@ -41,6 +41,11 @@ class HEYOKA_DLL_PUBLIC t_event_impl;
 
 } // namespace detail
 
+// Enum to represent the direction of an event.
+// NOTE: put it here because this is currently shared between
+// taylor.hpp and event_detection.hpp.
+enum class event_direction { negative = -1, any = 0, positive = 1 };
+
 } // namespace heyoka
 
 #endif

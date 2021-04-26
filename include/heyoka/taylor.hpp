@@ -282,9 +282,6 @@ enum class taylor_outcome : std::int64_t {
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
-// Enum to represent the direction of an event.
-enum class event_direction { any, positive, negative };
-
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
 namespace kw
@@ -371,7 +368,7 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T)>;
+    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, event_direction)>;
 
 private:
     void finalise_ctor(event_direction);
@@ -446,7 +443,7 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool)>;
+    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool, event_direction)>;
 
 private:
     void finalise_ctor(callback_t, T, event_direction);
@@ -592,7 +589,7 @@ private:
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
-    std::vector<std::tuple<std::uint32_t, T, bool>> m_d_tes;
+    std::vector<std::tuple<std::uint32_t, T, bool, event_direction>> m_d_tes;
     // The vector of cooldowns for the terminal events.
     // If an event is on cooldown, the corresponding optional
     // in this vector will contain the total time elapsed
@@ -600,7 +597,7 @@ private:
     // of the cooldown duration.
     std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
     // Vector of detected non-terminal events.
-    std::vector<std::tuple<std::uint32_t, T>> m_d_ntes;
+    std::vector<std::tuple<std::uint32_t, T, event_direction>> m_d_ntes;
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 

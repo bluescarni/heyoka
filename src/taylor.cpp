@@ -3832,7 +3832,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             const auto &t = *it;
             const auto &cb = m_ntes[std::get<0>(t)].get_callback();
             assert(cb);
-            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)));
+            cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
 
         // The return value of the first
@@ -3860,7 +3860,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]), std::get<3>(m_d_tes[0]));
             }
         }
 
@@ -4321,7 +4321,7 @@ void nt_event_impl<T>::finalise_ctor(event_direction d)
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
     }
 
-    if (d < event_direction::any || d > event_direction::negative) {
+    if (d < event_direction::negative || d > event_direction::positive) {
         throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
     }
 
@@ -4410,7 +4410,7 @@ void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
     }
     cooldown = cd;
 
-    if (d < event_direction::any || d > event_direction::negative) {
+    if (d < event_direction::negative || d > event_direction::positive) {
         throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
     }
     dir = d;

@@ -50,6 +50,7 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -538,9 +539,9 @@ auto get_poly_translator_1(std::uint32_t order)
 
 // Implementation of event detection.
 template <typename T>
-void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &d_tes,
-                               std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
-                               const std::vector<nt_event<T>> &ntes,
+void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, event_direction>> &d_tes,
+                               std::vector<std::tuple<std::uint32_t, T, event_direction>> &d_ntes,
+                               const std::vector<t_event<T>> &tes, const std::vector<nt_event<T>> &ntes,
                                const std::vector<std::optional<std::pair<T, T>>> &cooldowns, T h,
                                const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
@@ -651,29 +652,41 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     }
                 }();
 
-                // Fetch and cache the event direction.
+                // Evaluate the derivative.
+                const auto der = poly_eval_1(ptr, root, order);
+
+                // Check it before proceeding.
+                if (!isfinite(der)) {
+                    // LCOV_EXCL_START
+                    get_logger()->warn(
+                        "polynomial root finding produced a root of {} with nonfinite derivative - skipping the event",
+                        root);
+                    return;
+                    // LCOV_EXCL_STOP
+                }
+
+                // Compute the detected event direction.
+                const auto d_dir = static_cast<event_direction>(sgn(der));
+
+                // Fetch and cache the desired event direction.
                 const auto dir = ev_vec[i].get_direction();
 
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
                     if constexpr (is_terminal_event_v<ev_type>) {
-                        out.emplace_back(i, root, has_multi_roots);
+                        out.emplace_back(i, root, has_multi_roots, d_dir);
                     } else {
-                        out.emplace_back(i, root);
+                        out.emplace_back(i, root, d_dir);
                     }
                 } else {
-                    // Otherwise, we need to compute the derivative
-                    // and record the event only if its direction
+                    // Otherwise, we need to record the event only if its direction
                     // matches the sign of the derivative.
-                    const auto der = poly_eval_1(ptr, root, order);
-
-                    if ((der > 0 && dir == event_direction::positive)
-                        || (der < 0 && dir == event_direction::negative)) {
+                    if (d_dir == dir) {
                         if constexpr (is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, root, has_multi_roots);
+                            out.emplace_back(i, root, has_multi_roots, d_dir);
                         } else {
-                            out.emplace_back(i, root);
+                            out.emplace_back(i, root, d_dir);
                         }
                     }
                 }
@@ -927,8 +940,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 } // namespace
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, event_direction>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, double, event_direction>> &d_ntes,
                           const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
                           const std::vector<std::optional<std::pair<double, double>>> &cooldowns, double h,
                           const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
@@ -937,8 +950,8 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &
 }
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, event_direction>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, long double, event_direction>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
                           const std::vector<std::optional<std::pair<long double, long double>>> &cooldowns,
                           long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
@@ -949,8 +962,8 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, boo
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, event_direction>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, mppp::real128, event_direction>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
                           const std::vector<nt_event<mppp::real128>> &ntes,
                           const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &cooldowns,
