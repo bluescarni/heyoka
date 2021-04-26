@@ -470,8 +470,9 @@ TEST_CASE("taylor te dir")
         t_ev_t ev(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr, int) {
+                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
                     REQUIRE(!mr);
+                    REQUIRE(d_sgn == 1);
                     return true;
                 },
             kw::direction = event_direction::positive);
@@ -513,8 +514,9 @@ TEST_CASE("taylor te dir")
         auto ev1 = t_ev_t(
             v,
             kw::callback =
-                [](taylor_adaptive<fp_t> &, bool mr, int) {
+                [](taylor_adaptive<fp_t> &, bool mr, int d_sgn) {
                     REQUIRE(!mr);
+                    REQUIRE(d_sgn == -1);
                     return true;
                 },
             kw::direction = event_direction::negative);

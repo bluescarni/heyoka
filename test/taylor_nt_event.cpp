@@ -327,8 +327,10 @@ TEST_CASE("taylor nte multizero")
                                       ev_t(
                                           v,
 
-                                          [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                          [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int d_sgn) {
                                               using std::abs;
+
+                                              REQUIRE(d_sgn == -1);
 
                                               // Make sure the callbacks are called in order.
                                               REQUIRE(t > cur_time);
@@ -531,7 +533,9 @@ TEST_CASE("nt dir test")
                                       kw::nt_events = {nt_event<double>(
                                           v,
 
-                                          [&fwd, &tlist, &rit](taylor_adaptive<double> &, double t, int) {
+                                          [&fwd, &tlist, &rit](taylor_adaptive<double> &, double t, int d_sgn) {
+                                              REQUIRE(d_sgn == 1);
+
                                               if (fwd) {
                                                   tlist.push_back(t);
                                               } else if (rit != tlist.rend()) {
