@@ -92,10 +92,12 @@ callback is a callable object with the following signature:
 
 .. code-block:: c++
 
-   void (taylor_adaptive<double> &, double);
+   void (taylor_adaptive<double> &, double, int);
 
-The first function argument is a mutable reference to the integrator object, while the second argument is the absolute time
-at which the event was detected.
+The first argument is a mutable reference to the integrator object, the second argument is the absolute time
+at which the event was detected (i.e., the trigger time), and the last argument is the sign of the derivative
+of the event equation at the trigger time (-1 for negative derivative, 1 for positive derivative and 0 for
+zero derivative).
 
 Because non-terminal event detection is performed at the end of an integration step,
 when the callback is invoked the state and time of the integrator object are those *at the end* of the integration
@@ -110,7 +112,7 @@ function to compute the dense output at any time within the last timestep that w
     non-const functions on it (such as ``update_d_output()``). Do not try to assign a new integrator object
     from within the callback, as that will result in undefined behaviour.
 
-In this specific case, we perform two actions in the callback:
+In this example, we perform two actions in the callback:
 
 - first, we compute the dense output at the event trigger time and print
   the value of the ``x`` coordinate,
@@ -172,7 +174,7 @@ Event direction
 
 By default, heyoka will detect all zeroes of the event equations regardless
 of the *direction* of the zero crossing (i.e., the value of the time derivative
-of the event equation at the zero). However, it is sometimes useful to tigger the detection
+of the event equation at the zero). However, it is sometimes useful to trigger the detection
 of an event only if its direction is positive or negative. Event direction is represented
 in heyoka by the ``event_direction`` enum, whose values can be
 
@@ -180,14 +182,14 @@ in heyoka by the ``event_direction`` enum, whose values can be
 - ``event_direction::positive`` (derivative > 0),
 - ``event_direction::negative`` (derivative < 0).
 
-Event direction can be specified upon construction:
+Event direction can be specified upon construction via the ``kw::direction`` keyword:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
     :lines: 63-72
 
 In this specific case, constraining the event direction to be positive is equivalent
-to detect :math:`v = 0` only when the pendulum reaches the maximum amplitude on the left.
+to detecting :math:`v = 0` only when the pendulum reaches the maximum amplitude on the left.
 Let us take a look at the event times:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
@@ -230,7 +232,7 @@ Let's begin by defining the two events:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 82-87
+    :lines: 82-88
 
 This time the events' callbacks just print the event time to screen, without
 modifying the ``zero_vel_times`` list.
@@ -239,7 +241,7 @@ We can then reset the integrator, propagate for a few time units and check the s
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 89-93
+    :lines: 90-94
 
 .. code-block:: console
 
@@ -312,7 +314,7 @@ Let us begin with the definition of the terminal event:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 95-113
+    :lines: 96-114
 
 Like in the case of non-terminal events, we specified as first construction argument
 the event equation. As second argument we passed a callback function that will be invoked
@@ -340,6 +342,9 @@ We thus refer to terminal events without a callback or whose callback returns ``
 as *stopping* terminal events, because their occurrence will prevent the integrator from continuing
 without user intervention.
 
+Like for non-terminal events, the last callback argument is the sign of the time derivative
+of the event equation at the event trigger time.
+
 In this example, within the callback code we alter the value of the drag coefficient :math:`\alpha`
 (which is stored within the :ref:`runtime parameters <tut_param>` of the integrator): if :math:`\alpha`
 is currently 0, we set it to 1, otherwise we set it to 0.
@@ -348,7 +353,7 @@ Let us proceed to the construction of the integrator:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 115-123
+    :lines: 116-124
 
 Similarly to the non-terminal events case, the list of terminal events
 is specified when constructing an integrator via the ``kw::t_events`` keyword argument.
@@ -358,14 +363,15 @@ the outcome of the integration will contain the index of the event that triggere
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 125-133
+    :lines: 126-134
 
 .. code-block:: console
 
-   Integration outcome: taylor_outcome::terminal_event_0
+   Integration outcome: taylor_outcome::terminal_event_0 (continuing)
    Event index        : 0
 
-The screen output confirms that the first (and only) event triggered.
+The screen output confirms that the first (and only) event triggered. For stopping terminal events,
+the numerical value of the outcome is the opposite of the event index minus one.
 
 Because here we used the single step
 function, even if the event's callback returned ``true`` the integration was stopped in correpondence of the
@@ -374,7 +380,7 @@ execution of the callback:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 135-144
+    :lines: 136-145
 
 .. code-block:: console
 
@@ -424,6 +430,9 @@ all terminal events.
 Limitations and caveats
 -----------------------
 
+Badly-conditioned event equations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Because heyoka's event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
 not a problem in practice, unless the event equations are written in such a way to always generate polynomials
@@ -443,7 +452,15 @@ This, at best, will result in reduced performance and, at worst, in missing even
 As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.
 
-Note that missed events due to ill-conditioned polynomials will be flagged by heyoka's logging system.
+Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka's logging system.
+
+Event equations and timestepping
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+As explained earlier, the differential equations of the events are added to the ODE system and
+integrated together with the original equations. Because of this, event equations influence the
+selection of the adaptive timestep, even if no event is ever detected throughout the integration.
+
 
 Full code listing
 -----------------

@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The adaptive integrator &#8212; heyoka 0.7.0 documentation</title>
+    <title>The adaptive integrator &#8212; heyoka 0.8.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -58,7 +58,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.7.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.8.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -149,6 +149,11 @@
  <li class="toctree-l1">
   <a class="reference internal" href="changelog.html">
    Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="breaking_changes.html">
+   Breaking changes
   </a>
  </li>
  <li class="toctree-l1">
@@ -538,6 +543,22 @@ to propagate both forward and backward in time:</p>
 integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
 integration will be <code class="docutils literal notranslate"><span class="pre">taylor_outcome::err_nf_state</span></code>.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.7.0.</span></p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions
+can be invoked with two additional optional keyword arguments:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
+represents the maximum timestep size in absolute value;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">callback</span></code>: this is a callable with signature</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>which will be invoked at the end of each timestep, with the integrator
+object as argument.</p>
+</li>
+</ul>
 </div>
 <div class="section" id="propagation-over-a-time-grid">
 <h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Permalink to this headline">¶</a></h2>
@@ -586,6 +607,22 @@ contiguously in row-major order:</p>
 </div>
 <p>There are no special requirements on the time values in the grid (apart from the
 fact that they must be finite and ordered monotonically).</p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.7.0.</span></p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function
+can be invoked with two additional optional keyword arguments:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
+represents the maximum timestep size in absolute value;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">callback</span></code>: this is a callable with signature</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>which will be invoked at the end of each timestep, with the integrator
+object as argument.</p>
+</li>
+</ul>
 </div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
@@ -732,10 +769,9 @@ fact that they must be finite and ordered monotonically).</p>
 
       </div>
     </div>
-    
+  
   <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
 
-
-    
+  None
   </body>
 </html>

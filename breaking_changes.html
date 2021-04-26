@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Advanced tutorials &#8212; heyoka 0.8.0 documentation</title>
+    <title>Breaking changes &#8212; heyoka 0.8.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -34,8 +34,8 @@
     <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Batch mode" href="tut_batch_mode.html" />
-    <link rel="prev" title="Event detection" href="tut_events.html" />
+    <link rel="next" title="Bibliography" href="bibliography.html" />
+    <link rel="prev" title="Changelog" href="changelog.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
     
@@ -123,11 +123,11 @@
    </li>
   </ul>
  </li>
- <li class="toctree-l1 current active has-children">
-  <a class="current reference internal" href="#">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="advanced_tutorials.html">
    Advanced tutorials
   </a>
-  <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
   <label for="toctree-checkbox-2">
    <i class="fas fa-chevron-down">
    </i>
@@ -150,8 +150,8 @@
    Changelog
   </a>
  </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="breaking_changes.html">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
    Breaking changes
   </a>
  </li>
@@ -201,7 +201,7 @@
         <!-- ipynb file if we had a myst markdown file -->
         
         <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/advanced_tutorials.rst.txt"><button type="button"
+        <a class="dropdown-buttons" href="_sources/breaking_changes.rst.txt"><button type="button"
                 class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
                 data-placement="left">.rst</button></a>
         <!-- Download PDF via print -->
@@ -221,7 +221,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fadvanced_tutorials.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbreaking_changes.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -242,6 +242,19 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#bchanges-0-8-0">
+   0.8.0
+  </a>
+ </li>
+</ul>
+
+            </nav>
         </div>
     </div>
 </div>
@@ -250,27 +263,20 @@
         
               <div>
                 
-  <div class="section" id="advanced-tutorials">
-<span id="id1"></span><h1>Advanced tutorials<a class="headerlink" href="#advanced-tutorials" title="Permalink to this headline">¶</a></h1>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>More <a class="reference external" href="https://bluescarni.github.io/heyoka.py/tutorials.html#tutorials" title="(in heyoka.py)"><span class="xref std std-ref">tutorials</span></a> and <a class="reference external" href="https://bluescarni.github.io/heyoka.py/examples.html#examples" title="(in heyoka.py)"><span class="xref std std-ref">examples</span></a> are available in the documentation
-of heyoka’s <a class="reference external" href="https://bluescarni.github.io/heyoka.py">Python bindings</a>.</p>
-</div>
-<p>In this section we will show some of heyoka’s more advanced functionalities,
-including multiprecision computations and vectorisation via batch mode.</p>
-<p>Because in batch mode indexing over the state vector as a flat 1D array
-can quickly become complicated and confusing, in these tutorials we will
-make extensive use of <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor</a>,
-a C++ library which, among many other features, provides an API very similar
-to <a class="reference external" href="https://numpy.org/">NumPy</a> for working with multidimensional arrays.
-It is outside the scope of this document to give a full overview on xtensor’s
-API and capabilities. Here, however, we will use only some of xtensor’s most basic
-features, and, for a reader familiar with NumPy and its multidimensional array API,
-the tutorials should not be too hard to follow.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="tut_batch_mode.html">Batch mode</a></li>
+  <div class="section" id="breaking-changes">
+<span id="id1"></span><h1>Breaking changes<a class="headerlink" href="#breaking-changes" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="bchanges-0-8-0">
+<span id="id2"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>The direction of a non-terminal event is now specified
+with the (optional) keyword argument <code class="docutils literal notranslate"><span class="pre">direction</span></code> for
+the event’s constructor (whereas before the direction
+could be specified via an unnamed argument).</p></li>
+<li><p>An <code class="docutils literal notranslate"><span class="pre">int</span></code> argument has been appended to the signature of
+the events’ callbacks. This new argument represents the sign
+of the derivative of the event equation at the event trigger
+time, and its value will be -1 for negative derivative,
+1 for positive derivative and 0 for zero derivative.</p></li>
 </ul>
 </div>
 </div>
@@ -281,8 +287,8 @@ the tutorials should not be too hard to follow.</p>
         
         <div class='prev-next-bottom'>
             
-    <a class='left-prev' id="prev-link" href="tut_events.html" title="previous page">Event detection</a>
-    <a class='right-next' id="next-link" href="tut_batch_mode.html" title="next page">Batch mode</a>
+    <a class='left-prev' id="prev-link" href="changelog.html" title="previous page">Changelog</a>
+    <a class='right-next' id="next-link" href="bibliography.html" title="next page">Bibliography</a>
 
         </div>
         

@@ -1,6 +1,32 @@
 Changelog
 =========
 
+0.8.0 (unreleased)
+------------------
+
+New
+~~~
+
+- The ``propagate_for/until()`` functions now support writing
+  the Taylor coefficients at the end of each timestep
+  (`#131 <https://github.com/bluescarni/heyoka/pull/131>`__).
+
+Changes
+~~~~~~~
+
+- **BREAKING**: various :ref:`breaking changes <bchanges_0_8_0>`
+  in the event detection API
+  (`#131 <https://github.com/bluescarni/heyoka/pull/131>`__).
+- Improvements to the stream operator of ``taylor_outcome``
+  (`#131 <https://github.com/bluescarni/heyoka/pull/131>`__).
+
+Fix
+~~~
+
+- Don't set the multiroot ``mr`` flag to ``true`` if
+  a terminal event has a cooldown of zero
+  (`#131 <https://github.com/bluescarni/heyoka/pull/131>`__).
+
 0.7.0 (2021-04-21)
 ------------------
 
