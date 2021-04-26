@@ -6173,9 +6173,14 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
         default:
-            if (oc > taylor_outcome::success) {
-                os << "taylor_outcome::terminal_event_{}"_format(static_cast<std::int64_t>(oc));
+            if (oc >= taylor_outcome{0}) {
+                // Continuing terminal event.
+                os << "taylor_outcome::terminal_event_{} (continuing)"_format(static_cast<std::int64_t>(oc));
+            } else if (oc > taylor_outcome::success) {
+                // Stopping terminal event.
+                os << "taylor_outcome::terminal_event_{} (stopping)"_format(-static_cast<std::int64_t>(oc) - 1);
             } else {
+                // Unknown value.
                 os << "taylor_outcome::??";
             }
     }
@@ -6190,6 +6195,7 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::positive);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(event_direction::negative);
         default:
+            // Unknown value.
             os << "event_direction::??";
     }
 

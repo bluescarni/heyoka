@@ -367,7 +367,7 @@ the outcome of the integration will contain the index of the event that triggere
 
 .. code-block:: console
 
-   Integration outcome: taylor_outcome::terminal_event_0
+   Integration outcome: taylor_outcome::terminal_event_0 (continuing)
    Event index        : 0
 
 The screen output confirms that the first (and only) event triggered. For stopping terminal events,
