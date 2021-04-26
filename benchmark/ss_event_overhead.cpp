@@ -100,7 +100,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
     // the radius of jupiter to keep thing simple.
     const auto jradius = T(0.000477895);
     std::vector<nt_event<T>> evs;
-    auto cb = [](taylor_adaptive<T> &, T, event_direction) { throw; };
+    auto cb = [](taylor_adaptive<T> &, T, int) { throw; };
     for (auto i = 0; i < 6; ++i) {
         auto xi = expression("x_{}"_format(i));
         auto yi = expression("y_{}"_format(i));

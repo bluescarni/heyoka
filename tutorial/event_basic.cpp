@@ -27,7 +27,7 @@ int main()
         // The left-hand side of the event equation
         v,
         // The callback.
-        [&zero_vel_times](taylor_adaptive<double> &ta, double time, event_direction) {
+        [&zero_vel_times](taylor_adaptive<double> &ta, double time, int) {
             // Compute the state of the system when the
             // event triggered and print the value of x.
             ta.update_d_output(time);
@@ -63,8 +63,7 @@ int main()
     // Redefine ev to detect only events
     // in the positive direction.
     ev = nt_event<double>(
-        v,
-        [&zero_vel_times](taylor_adaptive<double> &, double time, event_direction) { zero_vel_times.push_back(time); },
+        v, [&zero_vel_times](taylor_adaptive<double> &, double time, int) { zero_vel_times.push_back(time); },
         // Specify the direction.
         kw::direction = event_direction::positive);
 
@@ -81,10 +80,10 @@ int main()
     }
 
     // Define two close non-terminal events.
-    nt_event<double> ev0(v, [](taylor_adaptive<double> &, double time, event_direction) {
+    nt_event<double> ev0(v, [](taylor_adaptive<double> &, double time, int) {
         std::cout << "Event 0 triggering at t=" << time << '\n';
     });
-    nt_event<double> ev1(v * v - 1e-12, [](taylor_adaptive<double> &, double time, event_direction) {
+    nt_event<double> ev1(v * v - 1e-12, [](taylor_adaptive<double> &, double time, int) {
         std::cout << "Event 1 triggering at t=" << time << '\n';
     });
 
@@ -100,7 +99,7 @@ int main()
         // The event equation.
         v,
         // The callback.
-        kw::callback = [](taylor_adaptive<double> &ta, [[maybe_unused]] bool mr, event_direction) {
+        kw::callback = [](taylor_adaptive<double> &ta, [[maybe_unused]] bool mr, int) {
             // NOTE: the value of the drag coefficient
             // is stored as the first (and only) runtime parameter
             // of the integrator.

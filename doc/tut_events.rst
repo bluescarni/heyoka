@@ -92,10 +92,12 @@ callback is a callable object with the following signature:
 
 .. code-block:: c++
 
-   void (taylor_adaptive<double> &, double);
+   void (taylor_adaptive<double> &, double, int);
 
-The first function argument is a mutable reference to the integrator object, while the second argument is the absolute time
-at which the event was detected.
+The first argument is a mutable reference to the integrator object, the second argument is the absolute time
+at which the event was detected (i.e., the trigger time), and the last argument is the sign of the derivative
+of the event equation at the trigger time (-1 for negative derivative, 1 for positive derivative and 0 for
+null derivative).
 
 Because non-terminal event detection is performed at the end of an integration step,
 when the callback is invoked the state and time of the integrator object are those *at the end* of the integration
@@ -230,7 +232,7 @@ Let's begin by defining the two events:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 82-87
+    :lines: 82-88
 
 This time the events' callbacks just print the event time to screen, without
 modifying the ``zero_vel_times`` list.
@@ -239,7 +241,7 @@ We can then reset the integrator, propagate for a few time units and check the s
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 89-93
+    :lines: 90-94
 
 .. code-block:: console
 
@@ -312,7 +314,7 @@ Let us begin with the definition of the terminal event:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 95-113
+    :lines: 96-114
 
 Like in the case of non-terminal events, we specified as first construction argument
 the event equation. As second argument we passed a callback function that will be invoked
@@ -340,6 +342,9 @@ We thus refer to terminal events without a callback or whose callback returns ``
 as *stopping* terminal events, because their occurrence will prevent the integrator from continuing
 without user intervention.
 
+Like for non-terminal events, the last callback argument is the sign of the time derivative
+of the event equation at the event trigger time.
+
 In this example, within the callback code we alter the value of the drag coefficient :math:`\alpha`
 (which is stored within the :ref:`runtime parameters <tut_param>` of the integrator): if :math:`\alpha`
 is currently 0, we set it to 1, otherwise we set it to 0.
@@ -348,7 +353,7 @@ Let us proceed to the construction of the integrator:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 115-123
+    :lines: 116-124
 
 Similarly to the non-terminal events case, the list of terminal events
 is specified when constructing an integrator via the ``kw::t_events`` keyword argument.
@@ -358,7 +363,7 @@ the outcome of the integration will contain the index of the event that triggere
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 125-133
+    :lines: 126-134
 
 .. code-block:: console
 
@@ -375,7 +380,7 @@ execution of the callback:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
     :language: c++
-    :lines: 135-144
+    :lines: 136-145
 
 .. code-block:: console
 
