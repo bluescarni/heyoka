@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -1080,5 +1081,125 @@ TEST_CASE("propagate grid")
     for (auto i = 0u; i < 3u; ++i) {
         REQUIRE(out[2u * i] == approximately(out_copy[2u * i], 1000.));
         REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
+    }
+}
+
+// Test the stream operator of the outcome enum.
+TEST_CASE("outcome stream")
+{
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::success;
+
+        REQUIRE(oss.str() == "taylor_outcome::success");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::step_limit;
+
+        REQUIRE(oss.str() == "taylor_outcome::step_limit");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::time_limit;
+
+        REQUIRE(oss.str() == "taylor_outcome::time_limit");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome::err_nf_state;
+
+        REQUIRE(oss.str() == "taylor_outcome::err_nf_state");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{0};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_0 (continuing)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{42};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_42 (continuing)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{-1};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_0 (stopping)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{-43};
+
+        REQUIRE(oss.str() == "taylor_outcome::terminal_event_42 (stopping)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << taylor_outcome{static_cast<std::int64_t>(taylor_outcome::err_nf_state) - 1};
+
+        REQUIRE(oss.str() == "taylor_outcome::??");
+    }
+}
+
+// Test the stream operator of the event direction enum.
+TEST_CASE("event direction stream")
+{
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{-1};
+
+        REQUIRE(oss.str() == "event_direction::negative");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{0};
+
+        REQUIRE(oss.str() == "event_direction::any");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{1};
+
+        REQUIRE(oss.str() == "event_direction::positive");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{-2};
+
+        REQUIRE(oss.str() == "event_direction::??");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << event_direction{2};
+
+        REQUIRE(oss.str() == "event_direction::??");
     }
 }
