@@ -110,7 +110,7 @@ function to compute the dense output at any time within the last timestep that w
     non-const functions on it (such as ``update_d_output()``). Do not try to assign a new integrator object
     from within the callback, as that will result in undefined behaviour.
 
-In this specific case, we perform two actions in the callback:
+In this example, we perform two actions in the callback:
 
 - first, we compute the dense output at the event trigger time and print
   the value of the ``x`` coordinate,
@@ -172,7 +172,7 @@ Event direction
 
 By default, heyoka will detect all zeroes of the event equations regardless
 of the *direction* of the zero crossing (i.e., the value of the time derivative
-of the event equation at the zero). However, it is sometimes useful to tigger the detection
+of the event equation at the zero). However, it is sometimes useful to trigger the detection
 of an event only if its direction is positive or negative. Event direction is represented
 in heyoka by the ``event_direction`` enum, whose values can be
 
@@ -187,7 +187,7 @@ Event direction can be specified upon construction via the ``kw::direction`` key
     :lines: 63-72
 
 In this specific case, constraining the event direction to be positive is equivalent
-to detect :math:`v = 0` only when the pendulum reaches the maximum amplitude on the left.
+to detecting :math:`v = 0` only when the pendulum reaches the maximum amplitude on the left.
 Let us take a look at the event times:
 
 .. literalinclude:: ../tutorial/event_basic.cpp
@@ -365,7 +365,8 @@ the outcome of the integration will contain the index of the event that triggere
    Integration outcome: taylor_outcome::terminal_event_0
    Event index        : 0
 
-The screen output confirms that the first (and only) event triggered.
+The screen output confirms that the first (and only) event triggered. For stopping terminal events,
+the numerical value of the outcome is the opposite of the event index minus one.
 
 Because here we used the single step
 function, even if the event's callback returned ``true`` the integration was stopped in correpondence of the
@@ -424,6 +425,9 @@ all terminal events.
 Limitations and caveats
 -----------------------
 
+Badly-conditioned event equations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Because heyoka's event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
 not a problem in practice, unless the event equations are written in such a way to always generate polynomials
@@ -443,7 +447,15 @@ This, at best, will result in reduced performance and, at worst, in missing even
 As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.
 
-Note that missed events due to ill-conditioned polynomials will be flagged by heyoka's logging system.
+Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka's logging system.
+
+Event equations and timestepping
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+As explained earlier, the differential equations of the events are added to the ODE system and
+integrated together with the original equations. Because of this, event equations influence the
+selection of the adaptive timestep, even if no event is ever detected throughout the integration.
+
 
 Full code listing
 -----------------
