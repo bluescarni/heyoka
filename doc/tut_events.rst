@@ -97,7 +97,7 @@ callback is a callable object with the following signature:
 The first argument is a mutable reference to the integrator object, the second argument is the absolute time
 at which the event was detected (i.e., the trigger time), and the last argument is the sign of the derivative
 of the event equation at the trigger time (-1 for negative derivative, 1 for positive derivative and 0 for
-null derivative).
+zero derivative).
 
 Because non-terminal event detection is performed at the end of an integration step,
 when the callback is invoked the state and time of the integrator object are those *at the end* of the integration
