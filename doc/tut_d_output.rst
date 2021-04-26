@@ -17,6 +17,9 @@ cost. Additionally, because the dense output is computed via the
 Taylor series of the solution of the ODE system, its accuracy
 is guaranteed to respect the error tolerance set in the integrator.
 
+Dense output for the ``step()`` functions
+-----------------------------------------
+
 In order to illustrate how to use dense output in heyoka,
 we will keep things simple and go back to the simple pendulum:
 
@@ -117,6 +120,24 @@ use of dense output.
    guaranteed accuracy range - it is the user's responsibility to be aware
    that doing so will produce results whose accuracy does not match the integrator's
    error tolerance.
+
+Dense output for the ``propagate_*()`` functions
+------------------------------------------------
+
+.. versionadded:: 0.8.0
+
+Dense output can be enabled also for the time-limited propagation functions
+``propagate_for()`` and ``propagate_until()`` via the boolean keyword argument
+``write_tc``.
+
+When ``write_tc`` is set to ``true``, the ``propagate_*()`` functions
+will internally invoke the ``step()`` function with the optional boolean
+flag set to ``true``, so that at the end of each timestep the Taylor coefficients
+will be available. The Taylor coefficients can be used, e.g., inside the
+optional callback that can be passed to the ``propagate_*()`` functions.
+
+Note that ``propagate_grid()`` always unconditionally writes the Taylor coefficients
+at the end of each timestep.
 
 Full code listing
 -----------------

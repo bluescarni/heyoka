@@ -447,6 +447,37 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
 }
 
+TEST_CASE("propagate for_until write_tc")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2};
+
+    ta.propagate_until(
+        {10., 11.}, kw::callback = [](auto &t) {
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta.propagate_until(
+        {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2};
+
+    ta.propagate_for(
+        {10., 11.}, kw::callback = [](auto &t) {
+            REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+
+    ta.propagate_for(
+        {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
+            REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+        });
+}
+
 TEST_CASE("propagate grid 2")
 {
     using Catch::Matchers::Message;

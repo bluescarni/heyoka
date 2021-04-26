@@ -4,6 +4,13 @@ Changelog
 0.8.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- The ``propagate_for/until()`` functions now support writing
+  the Taylor coefficients at the end of each timestep
+  (`#131 <https://github.com/bluescarni/heyoka/pull/131>`__).
+
 Changes
 ~~~~~~~
 

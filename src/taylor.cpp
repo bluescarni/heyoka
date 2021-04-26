@@ -3920,7 +3920,7 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              std::function<void(taylor_adaptive_impl &)> cb)
+                                              std::function<void(taylor_adaptive_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -3980,7 +3980,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [res, h] = step_impl(static_cast<T>(dt_limit), false);
+        const auto [res, h] = step_impl(static_cast<T>(dt_limit), wtc);
 
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
@@ -4133,7 +4133,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // know that the grid is strictly monotonic, we know that we
     // will take at least 1 TC-writing timestep before starting
     // to use the dense output.
-    // NOTE: use the same max_steps for the initial propagation.
+    // NOTE: use the same max_steps for the initial propagation,
+    // and don't pass the callback.
     const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
 
     if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
@@ -4851,7 +4852,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
                                                        const std::vector<T> &max_delta_ts,
-                                                       std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                       std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -4865,13 +4866,13 @@ void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &del
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb));
+    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
 }
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloat<T>> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -4951,7 +4952,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
         // Run the integration timestep.
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        step_impl(m_cur_max_delta_ts, false);
+        step_impl(m_cur_max_delta_ts, wtc);
 
         // Check if the integration timestep produced an error condition or we reached
         // a stopping terminal event.
@@ -5055,7 +5056,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -5071,7 +5072,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb));
+    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
 }
 
 template <typename T>
@@ -5190,7 +5191,8 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
-    // NOTE: use the same max_steps for the initial propagation.
+    // NOTE: use the same max_steps for the initial propagation,
+    // and don't pass the callback.
     propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
 
     // Check the result of the integration.
