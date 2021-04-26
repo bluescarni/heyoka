@@ -32,10 +32,13 @@ release = '@heyoka_VERSION@'
 # ones.
 extensions = [
     'sphinx.ext.mathjax',
-    'sphinxcontrib.bibtex'
+    'sphinxcontrib.bibtex',
+    'sphinx.ext.intersphinx'
 ]
 
 bibtex_bibfiles = ['biblio.bib']
+
+intersphinx_mapping = {'hypy': ('https://bluescarni.github.io/heyoka.py', None)}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
