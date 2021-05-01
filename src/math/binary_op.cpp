@@ -48,6 +48,7 @@
 #include <heyoka/math/binary_op.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
