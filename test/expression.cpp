@@ -204,6 +204,8 @@ TEST_CASE("operator == and !=")
     }
 }
 
+#if 0
+
 TEST_CASE("compute connections")
 {
     // We test the result on a simple polynomial x^2*y + 2
@@ -333,6 +335,8 @@ TEST_CASE("update_node_values_dbl")
         REQUIRE_THROWS(compute_node_values_dbl(ex, in, connections));
     }
 }
+
+#endif
 
 TEST_CASE("compute_grad_dbl")
 {

@@ -184,6 +184,7 @@ endif()
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/binary_operator.cpp"

@@ -39,6 +39,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
@@ -254,8 +255,7 @@ expression operator+(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::add, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return add(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
@@ -746,14 +746,14 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
 }
 
 long double eval_ldbl(const expression &e, const std::unordered_map<std::string, long double> &map,
-                const std::vector<long double> &pars)
+                      const std::vector<long double> &pars)
 {
     return std::visit([&](const auto &arg) { return eval_ldbl(arg, map, pars); }, e.value());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 mppp::real128 eval_f128(const expression &e, const std::unordered_map<std::string, mppp::real128> &map,
-                const std::vector<mppp::real128> &pars)
+                        const std::vector<mppp::real128> &pars)
 {
     return std::visit([&](const auto &arg) { return eval_f128(arg, map, pars); }, e.value());
 }

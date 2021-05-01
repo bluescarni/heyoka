@@ -20,9 +20,9 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -86,10 +86,8 @@ TEST_CASE("multimangle")
 
     llvm_state s{kw::opt_level = 0u};
 
-    taylor_add_jet<double>(s, "jet0", {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 1,
-                           1, false, true);
-    taylor_add_jet<double>(s, "jet1", {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 1,
-                           1, false, true);
+    taylor_add_jet<double>(s, "jet0", {add(2_dbl, 3_dbl), x + y}, 1, 1, false, true);
+    taylor_add_jet<double>(s, "jet1", {sub(2_dbl, 3_dbl), x + y}, 1, 1, false, true);
 
     s.compile();
 
@@ -127,9 +125,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -149,9 +145,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, par[0], 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(par[0], 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -173,9 +167,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -199,9 +191,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, par[1]}}, x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -227,9 +217,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 2, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -251,9 +239,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 2, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -281,9 +267,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y}, 3, 3,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -323,9 +307,7 @@ TEST_CASE("taylor sub")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::sub, par[0], par[1]}}, x + y}, 3, 3,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sub(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -365,8 +347,7 @@ TEST_CASE("taylor sub")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::sub, 2_dbl, 3_dbl}}, x + y},
-                                   opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({sub(2_dbl, 3_dbl), x + y}, opt_level, high_accuracy, compact_mode);
 
         // Variable-number tests.
         {
@@ -1038,9 +1019,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1060,9 +1039,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, par[0], 3_dbl}}, x + y}, 1, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(par[0], 3_dbl), x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1084,9 +1061,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, 3_dbl), x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1110,9 +1085,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, par[1]}}, x + y}, 1, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1138,9 +1111,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 2, 1,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, 3_dbl), x + y}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1162,9 +1133,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 2, 2,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, 3_dbl), x + y}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1192,9 +1161,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y}, 3, 3,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(2_dbl, 3_dbl), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1234,9 +1201,7 @@ TEST_CASE("taylor add")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet",
-                                 {expression{binary_operator{binary_operator::type::add, par[0], par[1]}}, x + y}, 3, 3,
-                                 high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {add(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -1276,8 +1241,7 @@ TEST_CASE("taylor add")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({expression{binary_operator{binary_operator::type::add, 2_dbl, 3_dbl}}, x + y},
-                                   opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({add(2_dbl, 3_dbl), x + y}, opt_level, high_accuracy, compact_mode);
 
         // Variable-number tests.
         {
