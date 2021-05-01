@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -72,6 +73,20 @@ binary_op::binary_op(type t, expression a, expression b)
     : func_base("binary_op", std::vector{std::move(a), std::move(b)}), m_type(t)
 {
     assert(m_type >= type::add && m_type <= type::div);
+}
+
+bool binary_op::extra_equal_to(const func &f) const
+{
+    // NOTE: this should be ensured by the
+    // implementation of func's equality operator.
+    assert(f.extract<binary_op>() == f.get_ptr());
+
+    return static_cast<const binary_op *>(f.get_ptr())->m_type == m_type;
+}
+
+std::size_t binary_op::extra_hash() const
+{
+    return std::hash<type>{}(m_type);
 }
 
 void binary_op::to_stream(std::ostream &os) const

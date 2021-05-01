@@ -569,7 +569,7 @@ std::ostream &operator<<(std::ostream &os, const func &f)
 
 std::size_t hash(const func &f)
 {
-    // NOTE: the hash value is computed by combining the hash values of:
+    // NOTE: the initial hash value is computed by combining the hash values of:
     // - the function name,
     // - the function inner type index,
     // - the arguments' hashes.
@@ -581,12 +581,25 @@ std::size_t hash(const func &f)
         boost::hash_combine(seed, hash(arg));
     }
 
+    // Combine with the extra hash value too.
+    boost::hash_combine(seed, f.ptr()->extra_hash());
+
     return seed;
 }
 
 bool operator==(const func &a, const func &b)
 {
-    return a.get_name() == b.get_name() && a.get_type_index() == b.get_type_index() && a.args() == b.args();
+    // NOTE: the initial comparison considers:
+    // - the function name,
+    // - the function inner type index,
+    // - the arguments.
+    // If they are all equal, the extra equality comparison logic
+    // is also run.
+    if (a.get_name() == b.get_name() && a.get_type_index() == b.get_type_index() && a.args() == b.args()) {
+        return a.ptr()->extra_equal_to(b);
+    } else {
+        return false;
+    }
 }
 
 bool operator!=(const func &a, const func &b)
@@ -637,13 +650,15 @@ double eval_dbl(const func &f, const std::unordered_map<std::string, double> &ma
     return f.eval_dbl(map, pars);
 }
 
-long double eval_ldbl(const func &f, const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars)
+long double eval_ldbl(const func &f, const std::unordered_map<std::string, long double> &map,
+                      const std::vector<long double> &pars)
 {
     return f.eval_ldbl(map, pars);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars)
+mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map,
+                        const std::vector<mppp::real128> &pars)
 {
     return f.eval_f128(map, pars);
 }

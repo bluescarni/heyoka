@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <ostream>
 #include <string>
@@ -47,6 +48,10 @@ public:
     explicit binary_op(type, expression, expression);
 
     void to_stream(std::ostream &) const;
+
+    bool extra_equal_to(const func &) const;
+
+    std::size_t extra_hash() const;
 
     type op() const;
     const expression &lhs() const;
