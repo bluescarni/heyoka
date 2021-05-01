@@ -298,8 +298,7 @@ expression operator-(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::sub, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return sub(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
@@ -351,8 +350,7 @@ expression operator*(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::mul, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return mul(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     // Simplify x*x -> square(x).
@@ -405,8 +403,7 @@ expression operator/(expression e1, expression e2)
             // NOTE: fall through to the standard case.
         }
         // The standard case.
-        return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return div(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
