@@ -18,7 +18,6 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC expression;
 class HEYOKA_DLL_PUBLIC variable;
 class HEYOKA_DLL_PUBLIC number;
-class HEYOKA_DLL_PUBLIC binary_operator;
 class HEYOKA_DLL_PUBLIC func;
 class HEYOKA_DLL_PUBLIC param;
 

@@ -105,8 +105,6 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 } // namespace
 
 // Default implementation of Taylor decomposition for a function.
-// NOTE: this is a generalisation of the implementation
-// for the binary operators.
 void func_default_td_impl(func_base &fb, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {

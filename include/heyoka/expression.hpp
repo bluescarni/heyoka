@@ -30,7 +30,6 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -47,7 +46,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC expression
 {
 public:
-    using value_type = std::variant<number, variable, binary_operator, func, param>;
+    using value_type = std::variant<number, variable, func, param>;
 
 private:
     value_type m_value;
@@ -64,7 +63,6 @@ public:
 
     explicit expression(number);
     explicit expression(variable);
-    explicit expression(binary_operator);
     explicit expression(func);
     explicit expression(param);
 

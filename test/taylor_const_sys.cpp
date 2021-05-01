@@ -20,7 +20,6 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
@@ -406,7 +405,7 @@ TEST_CASE("taylor end novars")
 
     llvm_state s;
 
-    auto no_vars = expression{binary_operator{binary_operator::type::mul, 2_dbl, 3_dbl}};
+    auto no_vars = expression{mul(2_dbl, 3_dbl)};
     auto dc = taylor_add_jet<double>(
         s, "jet", {sin(y) + cos(x) + sin(x) + cos(y) + no_vars, sin(y) + cos(x) + sin(x) + cos(y) + no_vars}, 2, 1,
         false, false);

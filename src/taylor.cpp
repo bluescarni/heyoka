@@ -59,7 +59,6 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
@@ -784,7 +783,7 @@ void verify_taylor_dec(const std::vector<expression> &orig,
     }
 
     // From n_eq to dc.size() - n_eq, the expressions
-    // must be binary operators or functions whose arguments
+    // must be functions whose arguments
     // are either variables in the u_n form,
     // where n < i, or numbers/params.
     // The hidden dependencies must contain indices
@@ -794,7 +793,7 @@ void verify_taylor_dec(const std::vector<expression> &orig,
             [i](const auto &v) {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
+                if constexpr (std::is_same_v<type, func>) {
                     auto check_arg = [i](const auto &arg) {
                         if (auto p_var = std::get_if<variable>(&arg.value())) {
                             assert(p_var->name().rfind("u_", 0) == 0);
@@ -1755,7 +1754,7 @@ taylor_segment_dc(const std::vector<std::pair<expression, std::vector<std::uint3
             [](const auto &v) -> std::vector<std::uint32_t> {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
+                if constexpr (std::is_same_v<type, func>) {
                     std::vector<std::uint32_t> retval;
 
                     for (const auto &arg : v.args()) {
@@ -1777,7 +1776,7 @@ taylor_segment_dc(const std::vector<std::pair<expression, std::vector<std::uint3
                     return retval;
                 } else {
                     throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                                "expression is not a function or a binary operator");
+                                                "expression is not a function");
                 }
             },
             ex.value());
@@ -2045,7 +2044,7 @@ auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32
         [&deps](const auto &v) -> std::vector<std::variant<std::uint32_t, number>> {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
+            if constexpr (std::is_same_v<type, func>) {
                 std::vector<std::variant<std::uint32_t, number>> retval;
 
                 for (const auto &arg : v.args()) {
@@ -2076,7 +2075,7 @@ auto taylor_udef_to_variants(const expression &ex, const std::vector<std::uint32
                 return retval;
             } else {
                 throw std::invalid_argument("Invalid expression encountered in a Taylor decomposition: the "
-                                            "expression is not a function or a binary operator");
+                                            "expression is not a function");
             }
         },
         ex.value());

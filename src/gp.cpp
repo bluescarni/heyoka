@@ -17,7 +17,6 @@
 #include <variant>
 #include <vector>
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -52,14 +51,7 @@ void fetch_from_node_id_impl(expression &ex, std::size_t node_id, std::size_t &n
         std::visit(
             [node_id, &node_counter, &ret](auto &node) {
                 using type = detail::uncvref_t<decltype(node)>;
-                if constexpr (std::is_same_v<type, binary_operator>) {
-                    for (auto &arg : node.args()) {
-                        fetch_from_node_id_impl(arg, node_id, node_counter, ret);
-                        if (ret) {
-                            return;
-                        }
-                    }
-                } else if constexpr (std::is_same_v<type, func>) {
+                if constexpr (std::is_same_v<type, func>) {
                     for (auto [b, e] = node.get_mutable_args_it(); b != e; ++b) {
                         fetch_from_node_id_impl(*b, node_id, node_counter, ret);
                         if (ret) {
@@ -78,7 +70,7 @@ void count_nodes_impl(const expression &e, std::size_t &node_counter)
     std::visit(
         [&node_counter](auto &node) {
             using type = detail::uncvref_t<decltype(node)>;
-            if constexpr (std::is_same_v<type, func> || std::is_same_v<type, binary_operator>) {
+            if constexpr (std::is_same_v<type, func>) {
                 for (auto &arg : node.args()) {
                     count_nodes_impl(arg, node_counter);
                 }
@@ -95,10 +87,8 @@ expression_generator::expression_generator(const std::vector<std::string> &vars,
     : m_vars(vars), m_b_funcs(), m_e(engine)
 {
     // These are the default blocks for a random expression.
-    m_bos = {binary_operator::type::add, binary_operator::type::sub, binary_operator::type::mul,
-             binary_operator::type::div};
     m_u_funcs = {heyoka::sin, heyoka::cos};
-    m_b_funcs = {};
+    m_b_funcs = {heyoka::add, heyoka::sub, heyoka::mul, heyoka::div};
     m_range_dbl = 10;
     // Default weights for the probability of selecting a bo, unary, binary, a variable, a number.
     m_weights = {8., 2., 1., 4., 1.};
@@ -113,10 +103,9 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
     node_type type;
     if (depth < min_depth) {
         // If the node depth is below the minimum desired, we force leaves (num or var) to be not selected
-        double n_bos = static_cast<double>(m_bos.size());
         double n_u_fun = static_cast<double>(m_u_funcs.size());
         double n_b_fun = static_cast<double>(m_b_funcs.size());
-        std::discrete_distribution<> dis({n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2]});
+        std::discrete_distribution<> dis({0, n_u_fun * m_weights[1], n_b_fun * m_weights[2]});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -142,12 +131,11 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
         }
     } else {
         // else we can get anything
-        double n_bos = static_cast<double>(m_bos.size());
         double n_u_fun = static_cast<double>(m_u_funcs.size());
         double n_b_fun = static_cast<double>(m_b_funcs.size());
         double n_var = static_cast<double>(m_vars.size());
         std::discrete_distribution<> dis(
-            {n_bos * m_weights[0], n_u_fun * m_weights[1], n_b_fun * m_weights[2], n_var * m_weights[3], m_weights[4]});
+            {0, n_u_fun * m_weights[1], n_b_fun * m_weights[2], n_var * m_weights[3], m_weights[4]});
         switch (dis(m_e)) {
             case 0:
                 type = node_type::bo;
@@ -180,13 +168,6 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
             return expression{variable{symbol}};
             break;
         }
-        case node_type::bo: {
-            // We return one of the binary oprators in m_bos with randomly constructed arguments
-            auto bo_type = *detail::random_element(m_bos.begin(), m_bos.end(), m_e);
-            return expression{binary_operator(bo_type, this->operator()(min_depth, max_depth, depth + 1),
-                                              this->operator()(min_depth, max_depth, depth + 1))};
-            break;
-        }
         case node_type::u_fun: {
             // We return one of the unary functions in m_u_funcs with randomly constructed argument
             auto u_f = *detail::random_element(m_u_funcs.begin(), m_u_funcs.end(), m_e);
@@ -205,10 +186,6 @@ expression expression_generator::operator()(unsigned min_depth, unsigned max_dep
     }
 };
 
-const std::vector<binary_operator::type> &expression_generator::get_bos() const
-{
-    return m_bos;
-}
 const std::vector<expression (*)(expression)> &expression_generator::get_u_funcs() const
 {
     return m_u_funcs;
@@ -230,10 +207,6 @@ const std::vector<double> &expression_generator::get_weights() const
     return m_weights;
 }
 
-void expression_generator::set_bos(const std::vector<binary_operator::type> &bos)
-{
-    m_bos = bos;
-}
 void expression_generator::set_u_funcs(const std::vector<expression (*)(expression)> &u_funcs)
 {
     m_u_funcs = u_funcs;
@@ -269,24 +242,6 @@ std::ostream &operator<<(std::ostream &os, const expression_generator &eg)
     os << "\nVariables: ";
     for (const auto &var : vars) {
         os << var << " ";
-    }
-    os << "\nBinary Operators: ";
-    auto bos = eg.get_bos();
-    for (const auto &bo : bos) {
-        switch (bo) {
-            case binary_operator::type::add:
-                os << "+ ";
-                break;
-            case binary_operator::type::sub:
-                os << "- ";
-                break;
-            case binary_operator::type::mul:
-                os << "* ";
-                break;
-            case binary_operator::type::div:
-                os << "/ ";
-                break;
-        }
     }
     auto u_funcs = eg.get_u_funcs();
     if (u_funcs.size()) {
@@ -324,11 +279,7 @@ void mutate(expression &e, const expression_generator &generator, const double m
     } else {
         std::visit(
             [&generator, &mut_p, &min_depth, &max_depth, &depth, &engine](auto &node) {
-                if constexpr (std::is_same_v<decltype(node), binary_operator &>) {
-                    for (auto &branch : node.args()) {
-                        mutate(branch, generator, mut_p, engine, min_depth, max_depth, depth + 1);
-                    }
-                } else if constexpr (std::is_same_v<decltype(node), func &>) {
+                if constexpr (std::is_same_v<decltype(node), func &>) {
                     for (auto [b, e] = node.get_mutable_args_it(); b != e; ++b) {
                         mutate(*b, generator, mut_p, engine, min_depth, max_depth, depth + 1);
                     }

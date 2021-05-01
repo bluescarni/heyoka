@@ -33,7 +33,6 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
@@ -67,8 +66,6 @@ expression::expression(std::string s) : expression(variable{std::move(s)}) {}
 expression::expression(number n) : m_value(std::move(n)) {}
 
 expression::expression(variable var) : m_value(std::move(var)) {}
-
-expression::expression(binary_operator bo) : m_value(std::move(bo)) {}
 
 expression::expression(func f) : m_value(std::move(f)) {}
 
@@ -848,11 +845,10 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
         [&](const auto &v) -> llvm::Value * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 return taylor_diff<T>(s, v, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
             } else {
-                throw std::invalid_argument(
-                    "Taylor derivatives can be computed only for binary operators or functions");
+                throw std::invalid_argument("Taylor derivatives can be computed only for functions");
             }
         },
         ex.value());
@@ -903,11 +899,10 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
         [&](const auto &v) -> llvm::Function * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 return taylor_c_diff_func<T>(s, v, n_uvars, batch_size);
             } else {
-                throw std::invalid_argument(
-                    "Taylor derivatives in compact mode can be computed only for binary operators or functions");
+                throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
             }
         },
         ex.value());
@@ -1023,7 +1018,7 @@ std::uint32_t get_param_size(const expression &ex)
                 }
 
                 retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
-            } else if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            } else if constexpr (std::is_same_v<type, func>) {
                 for (const auto &a : v.args()) {
                     retval = std::max(get_param_size(a), retval);
                 }
@@ -1051,7 +1046,7 @@ bool has_time(const expression &ex)
         [](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 for (const auto &a : v.args()) {
                     if (has_time(a)) {
                         return true;

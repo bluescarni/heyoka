@@ -10,7 +10,6 @@
 #include <limits>
 #include <stdexcept>
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
