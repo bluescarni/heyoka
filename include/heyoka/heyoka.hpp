@@ -9,7 +9,6 @@
 #ifndef HEYOKA_HEYOKA_HPP
 #define HEYOKA_HEYOKA_HPP
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>

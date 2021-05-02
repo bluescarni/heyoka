@@ -6,12 +6,14 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_POW_HPP
-#define HEYOKA_MATH_POW_HPP
+#ifndef HEYOKA_MATH_BINARY_OP_HPP
+#define HEYOKA_MATH_BINARY_OP_HPP
 
 #include <heyoka/config.hpp>
 
+#include <cstddef>
 #include <cstdint>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -33,20 +35,29 @@ namespace heyoka
 namespace detail
 {
 
-// NOTE: when we implement serialization, we will
-// want to make sure that the deserialized exponent
-// is never 0.
-class HEYOKA_DLL_PUBLIC pow_impl : public func_base
+class HEYOKA_DLL_PUBLIC binary_op : public func_base
 {
 public:
-    pow_impl();
-    explicit pow_impl(expression, expression);
+    enum class type { add, sub, mul, div };
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
+private:
+    type m_type;
+
+public:
+    binary_op();
+    explicit binary_op(type, expression, expression);
+
+    void to_stream(std::ostream &) const;
+
+    bool extra_equal_to(const func &) const;
+
+    std::size_t extra_hash() const;
+
+    type op() const;
+    const expression &lhs() const;
+    const expression &rhs() const;
+    expression &lhs();
+    expression &rhs();
 
     expression diff(const std::string &) const;
 
@@ -59,8 +70,6 @@ public:
 
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
                         const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
@@ -83,17 +92,13 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression pow(expression, expression);
-HEYOKA_DLL_PUBLIC expression pow(expression, double);
-HEYOKA_DLL_PUBLIC expression pow(expression, long double);
+HEYOKA_DLL_PUBLIC expression add(expression, expression);
 
-#if defined(HEYOKA_HAVE_REAL128)
+HEYOKA_DLL_PUBLIC expression sub(expression, expression);
 
-HEYOKA_DLL_PUBLIC expression pow(expression, mppp::real128);
+HEYOKA_DLL_PUBLIC expression mul(expression, expression);
 
-#endif
-
-HEYOKA_DLL_PUBLIC expression powi(expression, std::uint32_t);
+HEYOKA_DLL_PUBLIC expression div(expression, expression);
 
 } // namespace heyoka
 

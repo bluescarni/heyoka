@@ -33,12 +33,12 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
@@ -66,8 +66,6 @@ expression::expression(std::string s) : expression(variable{std::move(s)}) {}
 expression::expression(number n) : m_value(std::move(n)) {}
 
 expression::expression(variable var) : m_value(std::move(var)) {}
-
-expression::expression(binary_operator bo) : m_value(std::move(bo)) {}
 
 expression::expression(func f) : m_value(std::move(f)) {}
 
@@ -254,8 +252,7 @@ expression operator+(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::add, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return add(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
@@ -298,8 +295,7 @@ expression operator-(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::sub, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return sub(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
@@ -351,8 +347,7 @@ expression operator*(expression e1, expression e2)
         }
 
         // The standard case.
-        return expression{binary_operator{binary_operator::type::mul, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return mul(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     // Simplify x*x -> square(x).
@@ -405,8 +400,7 @@ expression operator/(expression e1, expression e2)
             // NOTE: fall through to the standard case.
         }
         // The standard case.
-        return expression{binary_operator{binary_operator::type::div, expression{std::forward<decltype(v1)>(v1)},
-                                          expression{std::forward<decltype(v2)>(v2)}}};
+        return div(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
@@ -746,14 +740,14 @@ double eval_dbl(const expression &e, const std::unordered_map<std::string, doubl
 }
 
 long double eval_ldbl(const expression &e, const std::unordered_map<std::string, long double> &map,
-                const std::vector<long double> &pars)
+                      const std::vector<long double> &pars)
 {
     return std::visit([&](const auto &arg) { return eval_ldbl(arg, map, pars); }, e.value());
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 mppp::real128 eval_f128(const expression &e, const std::unordered_map<std::string, mppp::real128> &map,
-                const std::vector<mppp::real128> &pars)
+                        const std::vector<mppp::real128> &pars)
 {
     return std::visit([&](const auto &arg) { return eval_f128(arg, map, pars); }, e.value());
 }
@@ -851,11 +845,10 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
         [&](const auto &v) -> llvm::Value * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 return taylor_diff<T>(s, v, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
             } else {
-                throw std::invalid_argument(
-                    "Taylor derivatives can be computed only for binary operators or functions");
+                throw std::invalid_argument("Taylor derivatives can be computed only for functions");
             }
         },
         ex.value());
@@ -906,11 +899,10 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
         [&](const auto &v) -> llvm::Function * {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 return taylor_c_diff_func<T>(s, v, n_uvars, batch_size);
             } else {
-                throw std::invalid_argument(
-                    "Taylor derivatives in compact mode can be computed only for binary operators or functions");
+                throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
             }
         },
         ex.value());
@@ -1026,7 +1018,7 @@ std::uint32_t get_param_size(const expression &ex)
                 }
 
                 retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
-            } else if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            } else if constexpr (std::is_same_v<type, func>) {
                 for (const auto &a : v.args()) {
                     retval = std::max(get_param_size(a), retval);
                 }
@@ -1054,7 +1046,7 @@ bool has_time(const expression &ex)
         [](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
-            if constexpr (std::is_same_v<type, binary_operator> || std::is_same_v<type, func>) {
+            if constexpr (std::is_same_v<type, func>) {
                 for (const auto &a : v.args()) {
                     if (has_time(a)) {
                         return true;

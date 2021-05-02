@@ -28,7 +28,10 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -170,7 +173,8 @@ double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::pow(heyoka::eval_dbl(args()[0], map, pars), heyoka::eval_dbl(args()[1], map, pars));
 }
 
-long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
 {
     assert(args().size() == 2u);
 
@@ -178,7 +182,8 @@ long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 2u);
 

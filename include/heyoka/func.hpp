@@ -71,7 +71,12 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual void *get_ptr() = 0;
 
     virtual const std::string &get_name() const = 0;
+
     virtual void to_stream(std::ostream &) const = 0;
+
+    virtual bool extra_equal_to(const func &) const = 0;
+
+    virtual std::size_t extra_hash() const = 0;
 
     virtual const std::vector<expression> &args() const = 0;
     virtual std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> get_mutable_args_it() = 0;
@@ -125,6 +130,19 @@ template <typename T>
 inline constexpr bool func_has_to_stream_v = std::is_same_v<detected_t<func_to_stream_t, T>, void>;
 
 template <typename T>
+using func_extra_equal_to_t
+    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_equal_to(std::declval<const func &>()));
+
+template <typename T>
+inline constexpr bool func_has_extra_equal_to_v = std::is_same_v<detected_t<func_extra_equal_to_t, T>, bool>;
+
+template <typename T>
+using func_extra_hash_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().extra_hash());
+
+template <typename T>
+inline constexpr bool func_has_extra_hash_v = std::is_same_v<detected_t<func_extra_hash_t, T>, std::size_t>;
+
+template <typename T>
 using func_codegen_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().codegen_dbl(
     std::declval<llvm_state &>(), std::declval<const std::vector<llvm::Value *> &>()));
 
@@ -165,7 +183,8 @@ inline constexpr bool func_has_eval_dbl_v = std::is_same_v<detected_t<func_eval_
 
 template <typename T>
 using func_eval_ldbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_ldbl(
-    std::declval<const std::unordered_map<std::string, long double> &>(), std::declval<const std::vector<long double> &>()));
+    std::declval<const std::unordered_map<std::string, long double> &>(),
+    std::declval<const std::vector<long double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval_ldbl_t, T>, long double>;
@@ -173,7 +192,8 @@ inline constexpr bool func_has_eval_ldbl_v = std::is_same_v<detected_t<func_eval
 #if defined(HEYOKA_HAVE_REAL128)
 template <typename T>
 using func_eval_f128_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_f128(
-    std::declval<const std::unordered_map<std::string, mppp::real128> &>(), std::declval<const std::vector<mppp::real128> &>()));
+    std::declval<const std::unordered_map<std::string, mppp::real128> &>(),
+    std::declval<const std::vector<mppp::real128> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_f128_v = std::is_same_v<detected_t<func_eval_f128_t, T>, mppp::real128>;
@@ -188,8 +208,8 @@ template <typename T>
 inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
 
 template <typename T>
-using func_eval_num_dbl_t = decltype(
-    std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(std::declval<const std::vector<double> &>()));
+using func_eval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(
+    std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
@@ -325,12 +345,31 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         // in the derived class).
         return static_cast<const func_base *>(&m_value)->get_name();
     }
+
     void to_stream(std::ostream &os) const final
     {
         if constexpr (func_has_to_stream_v<T>) {
             m_value.to_stream(os);
         } else {
             func_default_to_stream_impl(os, static_cast<const func_base &>(m_value));
+        }
+    }
+
+    bool extra_equal_to(const func &f) const final
+    {
+        if constexpr (func_has_extra_equal_to_v<T>) {
+            return m_value.extra_equal_to(f);
+        } else {
+            return true;
+        }
+    }
+
+    std::size_t extra_hash() const final
+    {
+        if constexpr (func_has_extra_hash_v<T>) {
+            return m_value.extra_hash();
+        } else {
+            return 0;
         }
     }
 
@@ -383,7 +422,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
             throw not_implemented_error("double eval is not implemented for the function '" + get_name() + "'");
         }
     }
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &m, const std::vector<long double> &pars) const final
+    long double eval_ldbl(const std::unordered_map<std::string, long double> &m,
+                          const std::vector<long double> &pars) const final
     {
         if constexpr (func_has_eval_ldbl_v<T>) {
             return m_value.eval_ldbl(m, pars);
@@ -392,7 +432,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m, const std::vector< mppp::real128> &pars) const final
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &m,
+                            const std::vector<mppp::real128> &pars) const final
     {
         if constexpr (func_has_eval_f128_v<T>) {
             return m_value.eval_f128(m, pars);
@@ -516,10 +557,17 @@ HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
 
+HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
+
+HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
+HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
+
 class HEYOKA_DLL_PUBLIC func
 {
     friend HEYOKA_DLL_PUBLIC void swap(func &, func &) noexcept;
     friend HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const func &);
+    friend HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
+    friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 
     // Pointer to the inner base.
     std::unique_ptr<detail::func_inner_base> m_ptr;
@@ -590,7 +638,8 @@ public:
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &, const std::vector<mppp::real128> &) const;
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                            const std::vector<mppp::real128> &) const;
 #endif
 
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
@@ -618,11 +667,6 @@ public:
 #endif
 };
 
-HEYOKA_DLL_PUBLIC std::size_t hash(const func &);
-
-HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
-HEYOKA_DLL_PUBLIC bool operator!=(const func &, const func &);
-
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const func &);
 HEYOKA_DLL_PUBLIC void rename_variables(func &, const std::unordered_map<std::string, std::string> &);
 
@@ -633,10 +677,10 @@ HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const func &, const std::unordered_map<std::string, long double> &,
-                                  const std::vector<long double> &);
+                                        const std::vector<long double> &);
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const func &, const std::unordered_map<std::string, mppp::real128> &,
-                                  const std::vector<mppp::real128> &);
+                                          const std::vector<mppp::real128> &);
 #endif
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const func &,
