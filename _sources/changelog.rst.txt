@@ -1,6 +1,18 @@
 Changelog
 =========
 
+0.9.0 (unreleased)
+------------------
+
+Changes
+~~~~~~~
+
+- Remove the ``binary_operator`` node type in the expression
+  system and implement binary arithmetic using the ``func`` node
+  type instead
+  (`#132 <https://github.com/bluescarni/heyoka/pull/132>`__). This
+  is an internal change that does not affect the integrators' API.
+
 0.8.0 (2021-04-28)
 ------------------
 
