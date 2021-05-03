@@ -19,6 +19,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -36,6 +37,7 @@
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
@@ -671,6 +673,117 @@ llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string 
 
     // Build a vector with the results.
     return scalars_to_vector(builder, retvals);
+}
+
+namespace
+{
+
+// Small helper to temporarily reset the fast math flags
+// in the builder of an llvm_state. Upon destruction, the original
+// flags will be restored.
+struct fm_disabler {
+    llvm_state &m_s;
+    llvm::FastMathFlags m_orig_fm;
+
+    explicit fm_disabler(llvm_state &s)
+        : m_s(s),
+          // Store the original flags.
+          m_orig_fm(s.builder().getFastMathFlags())
+    {
+        // Clear the flags.
+        m_s.builder().clearFastMathFlags();
+    }
+
+    fm_disabler(const fm_disabler &) = delete;
+    fm_disabler(fm_disabler &&) noexcept = delete;
+    fm_disabler &operator=(const fm_disabler &) = delete;
+    fm_disabler &operator=(fm_disabler &&) noexcept = delete;
+
+    ~fm_disabler()
+    {
+        // Restore the original flags.
+        m_s.builder().setFastMathFlags(m_orig_fm);
+    }
+};
+
+} // namespace
+
+// EFT of the sum of two floating-point numbers.
+std::pair<llvm::Value *, llvm::Value *> eft_two_sum(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // Disable the fast math flags.
+    fm_disabler fmd(s);
+
+    auto &builder = s.builder();
+
+    // x = a + b.
+    auto x = builder.CreateFAdd(a, b);
+    // z = x - a.
+    auto z = builder.CreateFSub(x, a);
+    // y = (a - (x - z)) + (b -z).
+    auto y = builder.CreateFAdd(builder.CreateFSub(a, builder.CreateFSub(x, z)), builder.CreateFSub(b, z));
+
+    return {x, y};
+}
+
+namespace
+{
+
+// Helper to invoke the FMA primitive.
+// NOTE: this assumes the fast math flags have already been disabled.
+llvm::Value *llvm_fma(llvm_state &s, llvm::Value *a, llvm::Value *b, llvm::Value *c)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *a_t = a->getType()->getScalarType();
+
+    if (a_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto a_scalars = vector_to_scalars(builder, a), b_scalars = vector_to_scalars(builder, b),
+             c_scalars = vector_to_scalars(builder, c);
+
+        // Execute the heyoka_fma128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(a_scalars.size()) i = 0; i < a_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_fma128", a_t, {a_scalars[i], b_scalars[i], c_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fma", {a->getType()}, {a, b, c});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+} // namespace
+
+std::pair<llvm::Value *, llvm::Value *> eft_two_product(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // Disable the fast math flags.
+    fm_disabler fmd(s);
+
+    auto &builder = s.builder();
+
+    // x = a * b.
+    auto x = builder.CreateFMul(a, b);
+    // y = fma(a, b, -x).
+    auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
+
+    return {x, y};
 }
 
 } // namespace heyoka::detail

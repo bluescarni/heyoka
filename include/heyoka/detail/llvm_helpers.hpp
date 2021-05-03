@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <string>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -84,6 +85,11 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, const std::string &);
+
+// Functions for the implementation of the compensated
+// Horner scheme.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> eft_two_sum(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> eft_two_product(llvm_state &, llvm::Value *, llvm::Value *);
 
 } // namespace heyoka::detail
 

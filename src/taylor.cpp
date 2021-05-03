@@ -3123,6 +3123,8 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
                  std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool,
                  bool compact_mode)
 {
+    assert(order >= 2u);
+
     auto &builder = s.builder();
 
     if (compact_mode) {
@@ -3185,6 +3187,40 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         // Non-compact mode.
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
 
+        // Init the return values with the last-order monomials.
+        std::vector<llvm::Value *> res_arr, hsum_arr;
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            res_arr.push_back(diff_arr[order * n_eq + i]);
+        }
+
+        // Do the first step manually.
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            auto [p_i, pi_i] = eft_two_product(s, res_arr[i], h);
+            auto [s_i, sigma_i] = eft_two_sum(s, p_i, diff_arr[(order - 1u) * n_eq + i]);
+
+            hsum_arr.push_back(builder.CreateFAdd(pi_i, sigma_i));
+
+            res_arr[i] = s_i;
+        }
+
+        // The remaining iterations.
+        for (std::uint32_t o = 2; o <= order; ++o) {
+            for (std::uint32_t i = 0; i < n_eq; ++i) {
+                auto [p_i, pi_i] = eft_two_product(s, res_arr[i], h);
+                auto [s_i, sigma_i] = eft_two_sum(s, p_i, diff_arr[(order - o) * n_eq + i]);
+
+                hsum_arr[i] = builder.CreateFAdd(builder.CreateFMul(hsum_arr[i], h), builder.CreateFAdd(pi_i, sigma_i));
+
+                res_arr[i] = s_i;
+            }
+        }
+
+        // Evaluate the result.
+        for (std::uint32_t i = 0; i < n_eq; ++i) {
+            res_arr[i] = builder.CreateFAdd(res_arr[i], hsum_arr[i]);
+        }
+
+#if 0
         // Init the return values with the order-0 monomials, and the running
         // compensations with zero.
         std::vector<llvm::Value *> res_arr, comp_arr;
@@ -3212,6 +3248,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
             // Update the power of h.
             cur_h = builder.CreateFMul(cur_h, h);
         }
+#endif
 
         return res_arr;
     }
