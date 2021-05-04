@@ -274,6 +274,27 @@ tens of billions of timesteps,</p></li>
 on automatic differentiation techniques and aggressive just-in-time
 compilation via <a class="reference external" href="https://llvm.org/">LLVM</a>.</p></li>
 </ul>
+<p>If you prefer using Python rather than C++, heyoka can be used from Python via
+<a class="reference external" href="https://github.com/bluescarni/heyoka.py">heyoka.py</a>, its Python bindings.</p>
+<p>If you are using heyoka as part of your research, teaching, or other activities, we would be grateful if you could star
+the repository and/or cite our work. For citation purposes, you can use the following BibTex entry, which refers
+to the heyoka paper (<a class="reference external" href="https://arxiv.org/abs/2105.00800">arXiv preprint</a>):</p>
+<div class="highlight-bibtex notranslate"><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">10.1093/mnras/stab1032</span><span class="p">,</span>
+    <span class="na">author</span> <span class="p">=</span> <span class="s">{Biscani, Francesco and Izzo, Dario}</span><span class="p">,</span>
+    <span class="na">title</span> <span class="p">=</span> <span class="s">&quot;{Revisiting high-order Taylor methods for astrodynamics and celestial mechanics}&quot;</span><span class="p">,</span>
+    <span class="na">journal</span> <span class="p">=</span> <span class="s">{Monthly Notices of the Royal Astronomical Society}</span><span class="p">,</span>
+    <span class="na">volume</span> <span class="p">=</span> <span class="s">{504}</span><span class="p">,</span>
+    <span class="na">number</span> <span class="p">=</span> <span class="s">{2}</span><span class="p">,</span>
+    <span class="na">pages</span> <span class="p">=</span> <span class="s">{2614-2628}</span><span class="p">,</span>
+    <span class="na">year</span> <span class="p">=</span> <span class="s">{2021}</span><span class="p">,</span>
+    <span class="na">month</span> <span class="p">=</span> <span class="s">{04}</span><span class="p">,</span>
+    <span class="na">issn</span> <span class="p">=</span> <span class="s">{0035-8711}</span><span class="p">,</span>
+    <span class="na">doi</span> <span class="p">=</span> <span class="s">{10.1093/mnras/stab1032}</span><span class="p">,</span>
+    <span class="na">url</span> <span class="p">=</span> <span class="s">{https://doi.org/10.1093/mnras/stab1032}</span><span class="p">,</span>
+    <span class="na">eprint</span> <span class="p">=</span> <span class="s">{https://academic.oup.com/mnras/article-pdf/504/2/2614/37750349/stab1032.pdf}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
 <p>As a simple example, consider the ODE system
 corresponding to the <a class="reference external" href="https://en.wikipedia.org/wiki/Pendulum_(mathematics)">pendulum</a>,</p>
 <div class="math notranslate nohighlight">
@@ -322,8 +343,6 @@ in heyoka:</p>
 <p>heyoka is released under the <a class="reference external" href="https://www.mozilla.org/en-US/MPL/2.0/FAQ/">MPL-2.0</a>
 license. The authors are Francesco Biscani (Max Planck Institute for Astronomy) and
 Dario Izzo (European Space Agency).</p>
-<p>If you prefer using Python rather than C++, heyoka can be used from Python via
-<a class="reference external" href="https://github.com/bluescarni/heyoka.py">heyoka.py</a>, its Python bindings.</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
