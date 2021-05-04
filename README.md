@@ -52,6 +52,27 @@ heyoka is a C++ library for the integration of ordinary differential equations
 If you prefer using Python rather than C++, heyoka can be used from Python via
 [heyoka.py](https://github.com/bluescarni/heyoka.py), its Python bindings.
 
+If you are using heyoka as part of your research, teaching, or other activities, we would be grateful if you could star
+the repository and/or cite our work. For citation purposes, you can use the following BibTex entry, which refers
+to the [heyoka paper](https://doi.org/10.1093/mnras/stab1032) ([arXiv preprint](https://arxiv.org/abs/2105.00800)):
+
+```bibtex
+@article{10.1093/mnras/stab1032,
+    author = {Biscani, Francesco and Izzo, Dario},
+    title = "{Revisiting high-order Taylor methods for astrodynamics and celestial mechanics}",
+    journal = {Monthly Notices of the Royal Astronomical Society},
+    volume = {504},
+    number = {2},
+    pages = {2614-2628},
+    year = {2021},
+    month = {04},
+    issn = {0035-8711},
+    doi = {10.1093/mnras/stab1032},
+    url = {https://doi.org/10.1093/mnras/stab1032},
+    eprint = {https://academic.oup.com/mnras/article-pdf/504/2/2614/37750349/stab1032.pdf}
+}
+```
+
 Quick example
 -------------
 
