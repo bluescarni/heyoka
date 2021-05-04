@@ -32,8 +32,7 @@ If you prefer using Python rather than C++, heyoka can be used from Python via
 
 If you are using heyoka as part of your research, teaching, or other activities, we would be grateful if you could star
 the repository and/or cite our work. For citation purposes, you can use the following BibTex entry, which refers
-to the `heyoka paper <https://doi.org/10.1093/mnras/stab1032>`__
-(`arXiv preprint <https://arxiv.org/abs/2105.00800>`__):
+to the heyoka paper (`arXiv preprint <https://arxiv.org/abs/2105.00800>`__):
 
 .. code-block:: bibtex
 
