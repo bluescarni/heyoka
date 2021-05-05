@@ -65,6 +65,11 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_fma128(__float128 x, __float128 y
     return mppp::fma(mppp::real128{x}, mppp::real128{y}, mppp::real128{z}).m_value;
 }
 
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_max128(__float128 x, __float128 y)
+{
+    return mppp::fmax(mppp::real128{x}, mppp::real128{y}).m_value;
+}
+
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128 x, __float128 y)
 {
     return mppp::fmax(mppp::real128{x}, mppp::abs(mppp::real128{y})).m_value;

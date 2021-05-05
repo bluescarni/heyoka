@@ -1276,6 +1276,45 @@ std::uint32_t taylor_order_from_tol(T tol)
     return static_cast<std::uint32_t>(order_f);
 }
 
+// Helper to compute max(x_v, y_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_max128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Return max(a, b).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
@@ -1619,22 +1658,27 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         const auto n_sv_funcs = static_cast<std::uint32_t>(sv_funcs_dc.size());
 
         // Compute the norm infinity of the state vector and the norm infinity of the derivatives
-        // at orders order and order - 1.
-        max_abs_state = taylor_step_abs(s, diff_arr[0]);
-        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
-        // state variables and sv funcs (not all u vars), hence the indexing is
-        // order * (n_eq + n_sv_funcs).
-        max_abs_diff_o = taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs)]);
-        max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs)]);
+        // at orders order and order - 1. We first create vectors of absolute values and then
+        // compute their maxima.
+        std::vector<llvm::Value *> v_max_abs_state, v_max_abs_diff_o, v_max_abs_diff_om1;
+
         // NOTE: iterate up to n_eq + n_sv_funcs in order to
         // consider also the functions of state variables for
         // the computation of the timestep.
-        for (std::uint32_t i = 1; i < n_eq + n_sv_funcs; ++i) {
-            max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
-            max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * (n_eq + n_sv_funcs) + i]);
-            max_abs_diff_om1
-                = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]);
+        for (std::uint32_t i = 0; i < n_eq + n_sv_funcs; ++i) {
+            v_max_abs_state.push_back(taylor_step_abs(s, diff_arr[i]));
+            // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+            // state variables and sv funcs (not all u vars), hence the indexing is
+            // order * (n_eq + n_sv_funcs).
+            v_max_abs_diff_o.push_back(taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs) + i]));
+            v_max_abs_diff_om1.push_back(taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]));
         }
+
+        // Find the maxima via pairwise reduction.
+        auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return taylor_step_max(s, a, b); };
+        max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
+        max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
+        max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
