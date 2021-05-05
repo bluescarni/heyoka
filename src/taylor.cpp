@@ -1854,13 +1854,13 @@ std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
 }
 
 // Helper to construct the global arrays needed for the computation of the
-// derivatives of the state variables. The return value is a set
+// derivatives of the state variables in compact mode. The return value is a set
 // of 6 arrays:
-// - the indices of the state variables whose derivative is a u variable, paired to
+// - the indices of the state variables whose time derivative is a u variable, paired to
 // - the indices of the u variables appearing in the derivatives, and
-// - the indices of the state variables whose derivative is a constant, paired to
+// - the indices of the state variables whose time derivative is a constant, paired to
 // - the values of said constants, and
-// - the indices of the state variables whose derivative is a param, paired to
+// - the indices of the state variables whose time derivative is a param, paired to
 // - the indices of the params.
 template <typename T>
 auto taylor_c_make_sv_diff_globals(llvm_state &s,
