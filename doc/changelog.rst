@@ -7,6 +7,8 @@ Changelog
 Changes
 ~~~~~~~
 
+- Small performance optimisations
+  (`#133 <https://github.com/bluescarni/heyoka/pull/133>`__).
 - Remove the ``binary_operator`` node type in the expression
   system and implement binary arithmetic using the ``func`` node
   type instead
