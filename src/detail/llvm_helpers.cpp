@@ -270,34 +270,43 @@ llvm::Value *scalars_to_vector(ir_builder &builder, const std::vector<llvm::Valu
     return vec;
 }
 
+// Pairwise reduction of a vector of LLVM values.
+llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &vals,
+                             const std::function<llvm::Value *(llvm::Value *, llvm::Value *)> &f)
+{
+    assert(!vals.empty());
+    assert(f);
+
+    if (vals.size() == std::numeric_limits<decltype(vals.size())>::max()) {
+        throw std::overflow_error("Overflow detected in pairwise_reduce()");
+    }
+
+    while (vals.size() != 1u) {
+        std::vector<llvm::Value *> new_vals;
+
+        for (decltype(vals.size()) i = 0; i < vals.size(); i += 2u) {
+            if (i + 1u == vals.size()) {
+                // We are at the last element of the vector
+                // and the size of the vector is odd. Just append
+                // the existing value.
+                new_vals.push_back(vals[i]);
+            } else {
+                new_vals.push_back(f(vals[i], vals[i + 1u]));
+            }
+        }
+
+        new_vals.swap(vals);
+    }
+
+    return vals[0];
+}
+
 // Pairwise summation of a vector of LLVM values.
 // https://en.wikipedia.org/wiki/Pairwise_summation
 llvm::Value *pairwise_sum(ir_builder &builder, std::vector<llvm::Value *> &sum)
 {
-    assert(!sum.empty());
-
-    if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
-        throw std::overflow_error("Overflow detected in pairwise_sum()");
-    }
-
-    while (sum.size() != 1u) {
-        std::vector<llvm::Value *> new_sum;
-
-        for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
-            if (i + 1u == sum.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing value.
-                new_sum.push_back(sum[i]);
-            } else {
-                new_sum.push_back(builder.CreateFAdd(sum[i], sum[i + 1u]));
-            }
-        }
-
-        new_sum.swap(sum);
-    }
-
-    return sum[0];
+    return pairwise_reduce(
+        sum, [&builder](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return builder.CreateFAdd(a, b); });
 }
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
