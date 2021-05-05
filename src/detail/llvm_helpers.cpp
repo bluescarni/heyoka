@@ -52,6 +52,18 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka::detail
 {
 
@@ -113,8 +125,6 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
     const auto it = type_map.find(tp);
 
     if (it == type_map.end()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("Unable to associate the C++ type '{}' to an LLVM type"_format(tp.name()));
     } else {
         return it->second(c);
@@ -277,9 +287,11 @@ llvm::Value *pairwise_reduce(std::vector<llvm::Value *> &vals,
     assert(!vals.empty());
     assert(f);
 
+    // LCOV_EXCL_START
     if (vals.size() == std::numeric_limits<decltype(vals.size())>::max()) {
         throw std::overflow_error("Overflow detected in pairwise_reduce()");
     }
+    // LCOV_EXCL_STOP
 
     while (vals.size() != 1u) {
         std::vector<llvm::Value *> new_vals;
@@ -317,7 +329,7 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     // Fetch the intrinsic ID from the name.
     const auto intrinsic_ID = llvm::Function::lookupIntrinsicID(name);
     if (intrinsic_ID == 0) {
-        throw std::invalid_argument("Cannot fetch the ID of the intrinsic '" + name + "'");
+        throw std::invalid_argument("Cannot fetch the ID of the intrinsic '{}'"_format(name));
     }
 
     // Fetch the declaration.
@@ -327,18 +339,18 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     // And the docs of the getDeclaration() function.
     auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, types);
     if (callee_f == nullptr) {
-        throw std::invalid_argument("Error getting the declaration of the intrinsic '" + name + "'");
+        throw std::invalid_argument("Error getting the declaration of the intrinsic '{}'"_format(name));
     }
     if (!callee_f->isDeclaration()) {
         // It does not make sense to have a definition of a builtin.
-        throw std::invalid_argument("The intrinsic '" + name + "' must be only declared, not defined");
+        throw std::invalid_argument("The intrinsic '{}' must be only declared, not defined"_format(name));
     }
 
     // Check the number of arguments.
     if (callee_f->arg_size() != args.size()) {
-        throw std::invalid_argument("Incorrect # of arguments passed while calling the intrinsic '" + name
-                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
-                                    + std::to_string(args.size()) + " were provided instead");
+        throw std::invalid_argument(
+            "Incorrect # of arguments passed while calling the intrinsic '{}': {} are "
+            "expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
     }
 
     // Create the function call.
@@ -364,7 +376,7 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
         auto *ft = llvm::FunctionType::get(ret_type, arg_types, false);
         callee_f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
         if (callee_f == nullptr) {
-            throw std::invalid_argument("Unable to create the prototype for the external function '" + name + "'");
+            throw std::invalid_argument("Unable to create the prototype for the external function '{}'"_format(name));
         }
 
         // Add the function attributes.
@@ -376,15 +388,14 @@ llvm::Value *llvm_invoke_external(llvm_state &s, const std::string &name, llvm::
         // The function declaration exists already. Check that it is only a
         // declaration and not a definition.
         if (!callee_f->isDeclaration()) {
-            throw std::invalid_argument(
-                "Cannot call the function '" + name
-                + "' as an external function, because it is defined as an internal module function");
+            throw std::invalid_argument("Cannot call the function '{}' as an external function, because "
+                                        "it is defined as an internal module function"_format(name));
         }
         // Check the number of arguments.
         if (callee_f->arg_size() != args.size()) {
-            throw std::invalid_argument("Incorrect # of arguments passed while calling the external function '" + name
-                                        + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
-                                        + std::to_string(args.size()) + " were provided instead");
+            throw std::invalid_argument(
+                "Incorrect # of arguments passed while calling the external function '{}': {} "
+                "are expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
         }
         // NOTE: perhaps in the future we should consider adding more checks here
         // (e.g., argument types, return type).
@@ -408,19 +419,19 @@ llvm::Value *llvm_invoke_internal(llvm_state &s, const std::string &name, const 
     auto callee_f = s.module().getFunction(name);
 
     if (callee_f == nullptr) {
-        throw std::invalid_argument("Unknown internal function: '" + name + "'");
+        throw std::invalid_argument("Unknown internal function: '{}'"_format(name));
     }
 
     if (callee_f->isDeclaration()) {
-        throw std::invalid_argument("The internal function '" + name
-                                    + "' cannot be just a declaration, a definition is needed");
+        throw std::invalid_argument("The internal function '{}' cannot be just a "
+                                    "declaration, a definition is needed"_format(name));
     }
 
     // Check the number of arguments.
     if (callee_f->arg_size() != args.size()) {
-        throw std::invalid_argument("Incorrect # of arguments passed while calling the internal function '" + name
-                                    + "': " + std::to_string(callee_f->arg_size()) + " are expected, but "
-                                    + std::to_string(args.size()) + " were provided instead");
+        throw std::invalid_argument(
+            "Incorrect # of arguments passed while calling the internal function '{}': {} are "
+            "expected, but {} were provided instead"_format(name, callee_f->arg_size(), args.size()));
     }
     // NOTE: perhaps in the future we should consider adding more checks here
     // (e.g., argument types).
