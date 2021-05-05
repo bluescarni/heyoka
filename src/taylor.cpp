@@ -1276,6 +1276,45 @@ std::uint32_t taylor_order_from_tol(T tol)
     return static_cast<std::uint32_t>(order_f);
 }
 
+// Helper to compute max(x_v, y_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_max128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Return max(a, b).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
@@ -1548,7 +1587,6 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
-
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
 
         // These will end up containing the norm infinity of the state vector + sv_funcs and the
@@ -1615,28 +1653,32 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         max_abs_diff_om1 = builder.CreateLoad(max_abs_diff_om1);
     } else {
         // Non-compact mode.
-
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
         const auto n_sv_funcs = static_cast<std::uint32_t>(sv_funcs_dc.size());
 
         // Compute the norm infinity of the state vector and the norm infinity of the derivatives
-        // at orders order and order - 1.
-        max_abs_state = taylor_step_abs(s, diff_arr[0]);
-        // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
-        // state variables and sv funcs (not all u vars), hence the indexing is
-        // order * (n_eq + n_sv_funcs).
-        max_abs_diff_o = taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs)]);
-        max_abs_diff_om1 = taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs)]);
+        // at orders order and order - 1. We first create vectors of absolute values and then
+        // compute their maxima.
+        std::vector<llvm::Value *> v_max_abs_state, v_max_abs_diff_o, v_max_abs_diff_om1;
+
         // NOTE: iterate up to n_eq + n_sv_funcs in order to
         // consider also the functions of state variables for
         // the computation of the timestep.
-        for (std::uint32_t i = 1; i < n_eq + n_sv_funcs; ++i) {
-            max_abs_state = taylor_step_maxabs(s, max_abs_state, diff_arr[i]);
-            max_abs_diff_o = taylor_step_maxabs(s, max_abs_diff_o, diff_arr[order * (n_eq + n_sv_funcs) + i]);
-            max_abs_diff_om1
-                = taylor_step_maxabs(s, max_abs_diff_om1, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]);
+        for (std::uint32_t i = 0; i < n_eq + n_sv_funcs; ++i) {
+            v_max_abs_state.push_back(taylor_step_abs(s, diff_arr[i]));
+            // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
+            // state variables and sv funcs (not all u vars), hence the indexing is
+            // order * (n_eq + n_sv_funcs).
+            v_max_abs_diff_o.push_back(taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs) + i]));
+            v_max_abs_diff_om1.push_back(taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]));
         }
+
+        // Find the maxima via pairwise reduction.
+        auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return taylor_step_max(s, a, b); };
+        max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
+        max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
+        max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -1854,14 +1896,16 @@ std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
 }
 
 // Helper to construct the global arrays needed for the computation of the
-// derivatives of the state variables. The return value is a set
-// of 6 arrays:
-// - the indices of the state variables whose derivative is a u variable, paired to
+// derivatives of the state variables in compact mode. The first part of the
+// return value is a set of 6 arrays:
+// - the indices of the state variables whose time derivative is a u variable, paired to
 // - the indices of the u variables appearing in the derivatives, and
-// - the indices of the state variables whose derivative is a constant, paired to
+// - the indices of the state variables whose time derivative is a constant, paired to
 // - the values of said constants, and
-// - the indices of the state variables whose derivative is a param, paired to
+// - the indices of the state variables whose time derivative is a param, paired to
 // - the indices of the params.
+// The second part of the return value is a boolean flag that will be true if
+// the time derivatives of all state variables are u variables, false otherwise.
 template <typename T>
 auto taylor_c_make_sv_diff_globals(llvm_state &s,
                                    const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc,
@@ -1874,6 +1918,10 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s,
     // Build iteratively the output values as vectors of constants.
     std::vector<llvm::Constant *> var_indices, vars, num_indices, nums, par_indices, pars;
 
+    // Keep track of how many time derivatives
+    // of the state variables are u variables.
+    std::uint32_t n_der_vars = 0;
+
     // NOTE: the derivatives of the state variables are at the end of the decomposition.
     for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
         std::visit(
@@ -1881,6 +1929,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s,
                 using type = uncvref_t<decltype(v)>;
 
                 if constexpr (std::is_same_v<type, variable>) {
+                    ++n_der_vars;
                     // NOTE: remove from i the n_uvars offset to get the
                     // true index of the state variable.
                     var_indices.push_back(builder.getInt32(i - n_uvars));
@@ -1897,6 +1946,10 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s,
             },
             dc[i].first.value());
     }
+
+    // Flag to signal that the time derivatives of all state variables are u variables.
+    assert(dc.size() >= n_uvars);
+    const auto all_der_vars = (n_der_vars == (dc.size() - n_uvars));
 
     assert(var_indices.size() == vars.size());
     assert(num_indices.size() == nums.size());
@@ -1942,18 +1995,22 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s,
     auto *g_pars
         = new llvm::GlobalVariable(module, pars_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, pars_arr);
 
-    return std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars};
+    return std::pair{std::array{g_var_indices, g_vars, g_num_indices, g_nums, g_par_indices, g_pars}, all_der_vars};
 }
 
 // Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
-// sv_diff_gl is the set of arrays produced by taylor_c_make_sv_diff_globals(), which contain
+// svd_gl is the return value of taylor_c_make_sv_diff_globals(), which contains
 // the indices/constants necessary for the computation.
-template <typename T>
-void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVariable *, 6> &sv_diff_gl,
-                               llvm::Value *diff_arr, llvm::Value *par_ptr, std::uint32_t n_uvars, llvm::Value *order,
-                               std::uint32_t batch_size)
+template <typename T, typename U>
+void taylor_c_compute_sv_diffs(llvm_state &s, const U &svd_gl, llvm::Value *diff_arr, llvm::Value *par_ptr,
+                               std::uint32_t n_uvars, llvm::Value *order, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
+
+    // Fetch the global arrays and
+    // the all_der_vars flag.
+    const auto &sv_diff_gl = svd_gl.first;
+    const auto all_der_vars = svd_gl.second;
 
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1967,7 +2024,13 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::array<llvm::GlobalVaria
     // Handle the u variables definitions.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_vars), [&](llvm::Value *cur_idx) {
         // Fetch the index of the state variable.
-        auto *sv_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[0], {builder.getInt32(0), cur_idx}));
+        // NOTE: if the time derivatives of all state variables are u variables, there's
+        // no need to lookup the index in the global array (which will just contain
+        // the values in the [0, n_vars] range).
+        auto *sv_idx
+            = all_der_vars
+                  ? cur_idx
+                  : builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[0], {builder.getInt32(0), cur_idx}));
 
         // Fetch the index of the u variable.
         auto *u_idx = builder.CreateLoad(builder.CreateInBoundsGEP(sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
@@ -2384,7 +2447,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     // Generate the global arrays for the computation of the derivatives
     // of the state variables.
-    const auto sv_diff_gl = taylor_c_make_sv_diff_globals<T>(s, dc, n_uvars);
+    const auto svd_gl = taylor_c_make_sv_diff_globals<T>(s, dc, n_uvars);
 
     // Determine the maximum u variable index appearing in sv_funcs_dc, or zero
     // if sv_funcs_dc is empty.
@@ -2483,14 +2546,14 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute all derivatives up to order 'order - 1'.
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
         // State variables first.
-        taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
+        taylor_c_compute_sv_diffs<T>(s, svd_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
 
         // The other u variables.
         compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
-    taylor_c_compute_sv_diffs<T>(s, sv_diff_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
+    taylor_c_compute_sv_diffs<T>(s, svd_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
 
     // Compute the last-order derivatives for the sv_funcs, if any. Because the sv funcs
     // correspond to u variables in the decomposition, we will have to compute the
