@@ -1548,7 +1548,6 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
-
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
 
         // These will end up containing the norm infinity of the state vector + sv_funcs and the
@@ -1615,7 +1614,6 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         max_abs_diff_om1 = builder.CreateLoad(max_abs_diff_om1);
     } else {
         // Non-compact mode.
-
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
         const auto n_sv_funcs = static_cast<std::uint32_t>(sv_funcs_dc.size());
