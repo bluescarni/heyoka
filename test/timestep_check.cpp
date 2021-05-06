@@ -62,7 +62,7 @@ TEST_CASE("scalar")
 
             const auto order = ta.get_order();
 
-            for (auto i = 0; i < 10; ++i) {
+            for (auto _ = 0; _ < 10; ++_) {
                 // Take a step forward writing the Taylor coefficients.
                 ta.step(true);
 
