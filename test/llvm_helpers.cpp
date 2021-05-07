@@ -33,6 +33,7 @@ TEST_CASE("while_loop")
         REQUIRE(f_ptr(4) == 4u);
     }
 
+#if 0
     // Error handling.
     {
         llvm_state s;
@@ -45,4 +46,5 @@ TEST_CASE("while_loop")
 
         REQUIRE_THROWS_AS(detail::llvm_while_loop_test2(s), std::runtime_error);
     }
+#endif
 }
