@@ -74,6 +74,9 @@ HEYOKA_DLL_PUBLIC void llvm_loop_u32(llvm_state &, llvm::Value *, llvm::Value *,
                                      const std::function<void(llvm::Value *)> &,
                                      const std::function<llvm::Value *(llvm::Value *)> & = {});
 
+HEYOKA_DLL_PUBLIC void llvm_while_loop(llvm_state &, const std::function<llvm::Value *()> &,
+                                       const std::function<void()> &);
+
 HEYOKA_DLL_PUBLIC void llvm_if_then_else(llvm_state &, llvm::Value *, const std::function<void()> &,
                                          const std::function<void()> &);
 
