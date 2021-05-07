@@ -74,7 +74,11 @@ TEST_CASE("while_loop")
         REQUIRE(f_ptr(2) == 2u);
         REQUIRE(f_ptr(3) == 3u);
         REQUIRE(f_ptr(4) == 4u);
+
+        std::cout << "Finished opt " << opt_level << '\n';
     }
+
+    std::cout << "Finished normal\n";
 
     // Error handling.
     {
@@ -98,6 +102,8 @@ TEST_CASE("while_loop")
         REQUIRE_THROWS_AS(llvm_while_loop(
                               s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {}),
                           std::runtime_error);
+
+        std::cout << "Finished throw1\n";
     }
 
     {
@@ -125,5 +131,7 @@ TEST_CASE("while_loop")
                 s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
                 [&]() { throw std::runtime_error{"aa"}; }),
             std::runtime_error);
+
+        std::cout << "Finished throw2\n";
     }
 }
