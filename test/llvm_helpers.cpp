@@ -40,11 +40,9 @@ TEST_CASE("while_loop")
         REQUIRE_THROWS_AS(detail::llvm_while_loop_test1(s), std::runtime_error);
     }
 
-#if 0
     {
         llvm_state s;
 
         REQUIRE_THROWS_AS(detail::llvm_while_loop_test2(s), std::runtime_error);
     }
-#endif
 }

@@ -858,9 +858,15 @@ void llvm_while_loop_test2(llvm_state &s)
     auto retval = builder.CreateAlloca(val_t);
     builder.CreateStore(builder.getInt32(0), retval);
 
-    llvm_while_loop(
-        s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
-        [&]() { throw std::runtime_error{"aa"}; });
+    try {
+        llvm_while_loop(
+            s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
+            [&]() { throw std::runtime_error{"aa"}; });
+    } catch (...) {
+        f->eraseFromParent();
+
+        throw;
+    }
 }
 
 } // namespace heyoka::detail
