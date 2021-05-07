@@ -829,8 +829,14 @@ void llvm_while_loop_test1(llvm_state &s)
     auto retval = builder.CreateAlloca(val_t);
     builder.CreateStore(builder.getInt32(0), retval);
 
-    llvm_while_loop(
-        s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {});
+    try {
+        llvm_while_loop(
+            s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {});
+    } catch (...) {
+        f->eraseFromParent();
+
+        throw;
+    }
 }
 
 void llvm_while_loop_test2(llvm_state &s)
