@@ -90,6 +90,11 @@ HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::Arra
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, const std::string &);
 
+// Test functions.
+HEYOKA_DLL_PUBLIC void llvm_while_loop_test0(llvm_state &);
+HEYOKA_DLL_PUBLIC void llvm_while_loop_test1(llvm_state &);
+HEYOKA_DLL_PUBLIC void llvm_while_loop_test2(llvm_state &);
+
 } // namespace heyoka::detail
 
 #endif

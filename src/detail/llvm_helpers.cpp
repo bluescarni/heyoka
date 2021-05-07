@@ -775,4 +775,86 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     cur->addIncoming(cmp, loop_end_bb);
 }
 
+// Test functions.
+void llvm_while_loop_test0(llvm_state &s)
+{
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    auto val_t = builder.getInt32Ty();
+
+    std::vector<llvm::Type *> fargs{val_t};
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "count_n", &md);
+
+    auto final_n = f->args().begin();
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    auto retval = builder.CreateAlloca(val_t);
+    builder.CreateStore(builder.getInt32(0), retval);
+
+    llvm_while_loop(
+        s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
+        [&]() { builder.CreateStore(builder.CreateAdd(builder.CreateLoad(retval), builder.getInt32(1)), retval); });
+
+    // Return the result.
+    builder.CreateRet(builder.CreateLoad(retval));
+
+    // Verify.
+    s.verify_function(f);
+
+    // Run the optimisation pass.
+    s.optimise();
+
+    // Compile.
+    s.compile();
+}
+
+void llvm_while_loop_test1(llvm_state &s)
+{
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    auto val_t = builder.getInt32Ty();
+
+    std::vector<llvm::Type *> fargs{val_t};
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "count_n", &md);
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    auto retval = builder.CreateAlloca(val_t);
+    builder.CreateStore(builder.getInt32(0), retval);
+
+    llvm_while_loop(
+        s, [&]() -> llvm::Value * { throw std::runtime_error{"aa"}; }, [&]() {});
+}
+
+void llvm_while_loop_test2(llvm_state &s)
+{
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    auto val_t = builder.getInt32Ty();
+
+    std::vector<llvm::Type *> fargs{val_t};
+    auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "count_n", &md);
+
+    auto final_n = f->args().begin();
+
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    auto retval = builder.CreateAlloca(val_t);
+    builder.CreateStore(builder.getInt32(0), retval);
+
+    llvm_while_loop(
+        s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
+        [&]() { throw std::runtime_error{"aa"}; });
+}
+
 } // namespace heyoka::detail
