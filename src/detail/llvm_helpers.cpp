@@ -35,6 +35,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -598,6 +599,8 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
 {
     auto &context = s.context();
     auto &builder = s.builder();
+
+    assert(cond->getType() == builder.getInt1Ty());
 
     // Fetch the current function.
     assert(builder.GetInsertBlock() != nullptr);
