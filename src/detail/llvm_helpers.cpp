@@ -35,6 +35,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -599,6 +600,8 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     auto &context = s.context();
     auto &builder = s.builder();
 
+    assert(cond->getType() == builder.getInt1Ty());
+
     // Fetch the current function.
     assert(builder.GetInsertBlock() != nullptr);
     auto f = builder.GetInsertBlock()->getParent();
@@ -691,6 +694,85 @@ llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string 
 
     // Build a vector with the results.
     return scalars_to_vector(builder, retvals);
+}
+
+// Create an LLVM for loop in the form:
+//
+// while (cond()) {
+//   body();
+// }
+void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, const std::function<void()> &body)
+{
+    assert(body);
+    assert(cond);
+
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    // Fetch the current function.
+    assert(builder.GetInsertBlock() != nullptr);
+    auto f = builder.GetInsertBlock()->getParent();
+    assert(f != nullptr);
+
+    // Do a first evaluation of cond.
+    // NOTE: if this throws, we have not created any block
+    // yet, no need for manual cleanup.
+    auto cmp = cond();
+    assert(cmp != nullptr);
+    assert(cmp->getType() == builder.getInt1Ty());
+
+    // Pre-create loop and afterloop blocks. Note that these have just
+    // been created, they have not been inserted yet in the IR.
+    auto *loop_bb = llvm::BasicBlock::Create(context);
+    auto *after_bb = llvm::BasicBlock::Create(context);
+
+    // NOTE: we need a special case if the body of the loop is
+    // never to be executed (that is, cond returns false).
+    // In such a case, we will jump directly to after_bb.
+    builder.CreateCondBr(builder.CreateNot(cmp), after_bb, loop_bb);
+
+    // Get a reference to the current block for
+    // later usage in the phi node.
+    auto preheader_bb = builder.GetInsertBlock();
+
+    // Add the loop block and start insertion into it.
+    f->getBasicBlockList().push_back(loop_bb);
+    builder.SetInsertPoint(loop_bb);
+
+    // Create the phi node and add the first pair of arguments.
+    auto cur = builder.CreatePHI(builder.getInt1Ty(), 2);
+    cur->addIncoming(cmp, preheader_bb);
+
+    // Execute the loop body and the post-body code.
+    try {
+        body();
+
+        // Compute the end condition.
+        cmp = cond();
+        assert(cmp != nullptr);
+        assert(cmp->getType() == builder.getInt1Ty());
+    } catch (...) {
+        // NOTE: at this point after_bb has not been
+        // inserted into any parent, and thus it will not
+        // be cleaned up automatically. Do it manually.
+        after_bb->deleteValue();
+
+        throw;
+    }
+
+    // Get a reference to the current block for later use,
+    // and insert the "after loop" block.
+    auto loop_end_bb = builder.GetInsertBlock();
+    f->getBasicBlockList().push_back(after_bb);
+
+    // Insert the conditional branch into the end of loop_end_bb.
+    builder.CreateCondBr(cmp, loop_bb, after_bb);
+
+    // Any new code will be inserted in after_bb.
+    builder.SetInsertPoint(after_bb);
+
+    // Add a new entry to the PHI node for the backedge.
+    cur->addIncoming(cmp, loop_end_bb);
 }
 
 } // namespace heyoka::detail
