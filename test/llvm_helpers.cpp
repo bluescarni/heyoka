@@ -95,6 +95,11 @@ TEST_CASE("while_loop")
         auto retval = builder.CreateAlloca(val_t);
         builder.CreateStore(builder.getInt32(0), retval);
 
+        // NOTE: if we don't do the cleanup of f before re-throwing,
+        // on the OSX CI the test will hang on shutdown (i.e., all the tests
+        // run correctly but the test program hangs on exit). Not sure what is
+        // going on with that, perhaps another bad interaction between LLVM and
+        // exceptions?
         auto thrower = [&]() {
             try {
                 llvm_while_loop(
