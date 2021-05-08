@@ -4,6 +4,12 @@ Changelog
 0.9.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- Add an LLVM ``while`` loop function
+  (`#135 <https://github.com/bluescarni/heyoka/pull/135>`__).
+
 Changes
 ~~~~~~~
 
