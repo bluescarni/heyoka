@@ -19,6 +19,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -51,6 +52,7 @@
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/sleef.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -133,18 +135,10 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
 }
 
 // Implementation of the function to create a pair struct.
-llvm::Type *to_llvm_pair_type_impl(llvm::LLVMContext &c, const std::type_info &tp, std::uint32_t batch_size)
+llvm::Type *to_llvm_pair_type(llvm::LLVMContext &c, llvm::Type *tp)
 {
-    assert(batch_size > 0u);
-
-    // Try fetching the floating-point type first.
-    auto fp_t = to_llvm_type_impl(c, tp);
-
-    // Turn it into a vector type.
-    auto vec_t = make_vector_type(fp_t, batch_size);
-
     // Create the return value.
-    auto ret = llvm::StructType::get(c, {vec_t, vec_t});
+    auto ret = llvm::StructType::get(c, {tp, tp});
 
     assert(ret);
 
@@ -792,6 +786,87 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 
     // Add a new entry to the PHI node for the backedge.
     cur->addIncoming(cmp, loop_end_bb);
+}
+
+std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
+{
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        // NOTE: for __float128 we cannot use the intrinsics, we need
+        // to call an external function.
+
+        // Convert the vector argument to scalars.
+        auto x_scalars = vector_to_scalars(builder, x);
+
+        // Define the scalar pair return type.
+        auto ret_t = to_llvm_pair_type(context, to_llvm_type<mppp::real128>(context));
+
+        // Execute the heyoka_sincos128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_sin, res_cos;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            auto p = llvm_invoke_external(
+                s, "heyoka_sincos128", ret_t, {x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+
+            res_sin.emplace_back(builder.CreateExtractElement(p, std::uint64_t(0)));
+            res_cos.emplace_back(builder.CreateExtractElement(p, std::uint64_t(1)));
+        }
+
+        // Reconstruct the return value as a vector.
+        return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
+    } else {
+#endif
+
+#if 0
+        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x->getType())) {
+            if (const auto sfn = sleef_function_name(context, "sincos", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                // Define the scalar pair return type.
+                auto ret_t = to_llvm_pair_type<mppp::real128>(context, 1);
+
+                return llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+
+            if (const auto sfn = sleef_function_name(s.context(), "sin", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, args,
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+#endif
+
+        // Compute sin and cos via intrinsics.
+        auto *sin_x = llvm_invoke_intrinsic(s, "llvm.sin", {x->getType()}, {x});
+        auto *cos_x = llvm_invoke_intrinsic(s, "llvm.cos", {x->getType()}, {x});
+
+        return {sin_x, cos_x};
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
 }
 
 } // namespace heyoka::detail

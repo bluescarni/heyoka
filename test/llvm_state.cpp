@@ -18,6 +18,13 @@
 
 using namespace heyoka;
 
+TEST_CASE("empty state")
+{
+    llvm_state s;
+    std::cout << s << '\n';
+    std::cout << s.get_ir() << '\n';
+}
+
 TEST_CASE("copy semantics")
 {
     auto [x, y] = make_vars("x", "y");

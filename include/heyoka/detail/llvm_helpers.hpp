@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <string>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -44,14 +45,8 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
 }
 
 // Helper to create an unnamed pair-like struct {x, y}. Both members
-// are the same floating-point (vector) type.
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_pair_type_impl(llvm::LLVMContext &, const std::type_info &, std::uint32_t);
-
-template <typename T>
-inline llvm::Type *to_llvm_pair_type(llvm::LLVMContext &c, std::uint32_t batch_size)
-{
-    return to_llvm_pair_type_impl(c, typeid(T), batch_size);
-}
+// are of the same type.
+HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_pair_type(llvm::LLVMContext &, llvm::Type *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
@@ -99,6 +94,9 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, const std::string &);
+
+// Math helpers.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
 
 } // namespace heyoka::detail
 

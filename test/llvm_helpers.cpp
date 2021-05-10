@@ -30,7 +30,7 @@ using namespace heyoka;
 TEST_CASE("fp_pair")
 {
     using detail::to_llvm_pair_type;
-    using detail::to_llvm_vector_type;
+    using detail::to_llvm_type;
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         llvm_state s{kw::opt_level = opt_level};
@@ -39,8 +39,8 @@ TEST_CASE("fp_pair")
         auto &builder = s.builder();
         auto &context = s.context();
 
-        auto fp_t = to_llvm_vector_type<double>(context, 1);
-        auto fpp_t = to_llvm_pair_type<double>(context, 1);
+        auto fp_t = to_llvm_type<double>(context);
+        auto fpp_t = to_llvm_pair_type(context, fp_t);
 
         std::vector<llvm::Type *> fargs{fp_t, fp_t};
         auto *ft = llvm::FunctionType::get(fpp_t, fargs, false);
