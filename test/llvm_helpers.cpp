@@ -27,6 +27,11 @@
 
 using namespace heyoka;
 
+struct p_double {
+    double x;
+    double y;
+};
+
 TEST_CASE("fp_pair")
 {
     using detail::to_llvm_pair_type;
@@ -71,10 +76,6 @@ TEST_CASE("fp_pair")
         s.compile();
 
         // Fetch the function pointer.
-        using p_double = struct {
-            double x;
-            double y;
-        };
         auto f_ptr = reinterpret_cast<p_double (*)(double, double)>(s.jit_lookup("pair_test"));
 
         p_double res{0, 0};
