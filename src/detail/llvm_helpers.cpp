@@ -132,6 +132,25 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
     }
 }
 
+// Implementation of the function to create a pair struct.
+llvm::Type *to_llvm_pair_type_impl(llvm::LLVMContext &c, const std::type_info &tp, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    // Try fetching the floating-point type first.
+    auto fp_t = to_llvm_type_impl(c, tp);
+
+    // Turn it into a vector type.
+    auto vec_t = make_vector_type(fp_t, batch_size);
+
+    // Create the return value.
+    auto ret = llvm::StructType::get(c, {vec_t, vec_t});
+
+    assert(ret);
+
+    return ret;
+}
+
 // Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
 // 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
