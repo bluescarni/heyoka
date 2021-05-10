@@ -59,6 +59,8 @@ TEST_CASE("fp_pair")
 
         builder.CreateRet(rv);
 
+        std::cout << s.get_ir() << '\n';
+
         // Verify.
         s.verify_function(f);
 
