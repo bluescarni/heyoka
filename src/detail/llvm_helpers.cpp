@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -52,8 +53,11 @@
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -131,6 +135,21 @@ llvm::Type *to_llvm_type_impl(llvm::LLVMContext &c, const std::type_info &tp)
         throw std::invalid_argument("Unable to associate the C++ type '{}' to an LLVM type"_format(tp.name()));
     } else {
         return it->second(c);
+    }
+}
+
+// Helper to produce a unique string for the type t.
+std::string llvm_mangle_type(llvm::Type *t)
+{
+    assert(t != nullptr);
+
+    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
+        // If the type is a vector, get the name of the element type
+        // and append the vector size.
+        return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
+    } else {
+        // Otherwise just return the type name.
+        return llvm_type_name(t);
     }
 }
 
@@ -858,4 +877,273 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 #endif
 }
 
+// Helper to compute abs(x_v).
+llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector argument.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the fabsq() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        res_scalars.reserve(x_scalars.size());
+        for (auto *x_scal : x_scalars) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "fabsq", x_t, {x_scal},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to reduce x modulo y, that is, to compute:
+// x - y * floor(x / y).
+llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
+{
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        // NOTE: for __float128 we cannot use the intrinsics, we need
+        // to call an external function.
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x), y_scalars = vector_to_scalars(builder, y);
+
+        // Compute the modulus on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            auto quo = builder.CreateFDiv(x_scalars[i], y_scalars[i]);
+            auto fl_quo = llvm_invoke_external(
+                s, "floorq", x_t, {quo},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+
+            res_scalars.push_back(builder.CreateFSub(x_scalars[i], builder.CreateFMul(y_scalars[i], fl_quo)));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        auto quo = builder.CreateFDiv(x, y);
+        auto fl_quo = llvm_invoke_intrinsic(s, "llvm.floor", {quo->getType()}, {quo});
+
+        return builder.CreateFSub(x, builder.CreateFMul(y, fl_quo));
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+namespace
+{
+
+// Variable template for the constant pi at different levels of precision.
+template <typename T>
+const auto inv_kep_pi = boost::math::constants::pi<T>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+const mppp::real128 inv_kep_pi<mppp::real128> = mppp::pi_128;
+
+#endif
+
+// Implementation of the inverse Kepler equation.
+template <typename T>
+llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto tp = to_llvm_vector_type<T>(context, batch_size);
+
+    // Fetch the function name.
+    const auto fname = "heyoka_inv_kep_{}"_format(llvm_mangle_type(tp));
+
+    // The function arguments:
+    // - eccentricity,
+    // - mean anomaly.
+    std::vector<llvm::Type *> fargs{tp, tp};
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is tp.
+        auto *ft = llvm::FunctionType::get(tp, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto ecc = f->args().begin();
+        auto M_arg = f->args().begin() + 1;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Reduce M modulo 2*pi.
+        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_pi<T>}), batch_size));
+
+        // Create the return value.
+        auto retval = builder.CreateAlloca(tp);
+
+        // Initial guess: M if e < 0.8, pi otherwise.
+        auto ig = builder.CreateSelect(
+            builder.CreateFCmpOLT(ecc, vector_splat(builder, codegen<T>(s, number{T(8) / T(10)}), batch_size)), M,
+            vector_splat(builder, codegen<T>(s, number{inv_kep_pi<T>}), batch_size));
+        builder.CreateStore(ig, retval);
+
+        // Create the counter.
+        auto *counter = builder.CreateAlloca(builder.getInt32Ty());
+        builder.CreateStore(builder.getInt32(0), counter);
+
+        // Variables to store sin(E) and cos(E).
+        auto sin_E = builder.CreateAlloca(tp);
+        auto cos_E = builder.CreateAlloca(tp);
+
+        // Write the initial values for sin_E and cos_E.
+        auto sin_cos_E = llvm_sincos(s, builder.CreateLoad(retval));
+        builder.CreateStore(sin_cos_E.first, sin_E);
+        builder.CreateStore(sin_cos_E.second, cos_E);
+
+        // Variable to hold the value of f(E) = E - e*sin(E) - M.
+        auto fE = builder.CreateAlloca(tp);
+        // Helper to compute f(E).
+        auto fE_compute = [&]() {
+            auto ret = builder.CreateFMul(ecc, builder.CreateLoad(sin_E));
+            ret = builder.CreateFSub(builder.CreateLoad(retval), ret);
+            return builder.CreateFSub(ret, M);
+        };
+        // Compute and store the initial value of f(E).
+        builder.CreateStore(fE_compute(), fE);
+
+        // Define the stopping condition functor.
+        // NOTE: hard-code to 250 max iterations.
+        auto max_iter = builder.getInt32(250);
+        auto loop_cond = [&,
+                          // NOTE: tolerance is 4 * eps.
+                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
+                                             batch_size)]() -> llvm::Value * {
+            auto c_cond = builder.CreateICmpULT(builder.CreateLoad(counter), max_iter);
+
+            // Keep on iterating as long as abs(f(E)) > tol.
+            // NOTE: need reduction only in batch mode.
+            auto tol_check = builder.CreateFCmpOGT(llvm_abs(s, builder.CreateLoad(fE)), tol);
+            auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
+
+            // NOTE: this is a way of creating a logical AND.
+            return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::getNullValue(tol_cond->getType()));
+        };
+
+        // Run the loop.
+        llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
+            // Compute the new value.
+            auto new_val = builder.CreateFDiv(
+                builder.CreateLoad(fE), builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(cos_E))));
+            new_val = builder.CreateFSub(builder.CreateLoad(retval), new_val);
+            builder.CreateStore(new_val, retval);
+
+            // Update sin_E/cos_E.
+            sin_cos_E = llvm_sincos(s, builder.CreateLoad(retval));
+            builder.CreateStore(sin_cos_E.first, sin_E);
+            builder.CreateStore(sin_cos_E.second, cos_E);
+
+            // Update f(E).
+            builder.CreateStore(fE_compute(), fE);
+
+            // Update the counter.
+            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(counter), builder.getInt32(1)), counter);
+        });
+
+        // Check the counter.
+        llvm_if_then_else(
+            s, builder.CreateICmpEQ(builder.CreateLoad(counter), max_iter),
+            [&]() { llvm_invoke_external(s, "heyoka_inv_kep_max_iter", builder.getVoidTy(), {}); }, []() {});
+
+        // Return the result.
+        builder.CreateRet(builder.CreateLoad(retval));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        if (!compare_function_signature(f, tp, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the inverse Kepler equation detected");
+        }
+    }
+
+    return f;
+}
+
+} // namespace
+
+llvm::Function *llvm_add_inv_kep_dbl(llvm_state &s, std::uint32_t batch_size)
+{
+    return llvm_add_inv_kep_impl<double>(s, batch_size);
+}
+
+llvm::Function *llvm_add_inv_kep_ldbl(llvm_state &s, std::uint32_t batch_size)
+{
+    return llvm_add_inv_kep_impl<long double>(s, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_inv_kep_f128(llvm_state &s, std::uint32_t batch_size)
+{
+    return llvm_add_inv_kep_impl<mppp::real128>(s, batch_size);
+}
+
+#endif
+
 } // namespace heyoka::detail
+
+// NOTE: this function will be called by the LLVM implementation
+// of the inverse Kepler function when the maximum number of iterations
+// is exceeded.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_max_iter()
+{
+    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the inverse Kepler equation");
+}
