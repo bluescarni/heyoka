@@ -118,7 +118,7 @@ TEST_CASE("sincos batch")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        for (auto batch_size : {1u, 2u, 4u, 23u}) {
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
             for (auto opt_level : {0u, 1u, 2u, 3u}) {
                 llvm_state s{kw::opt_level = opt_level};
 
@@ -161,6 +161,7 @@ TEST_CASE("sincos batch")
                 // Fetch the function pointer.
                 auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *)>(s.jit_lookup("sc"));
 
+                // Setup the argument and the output values.
                 std::vector<fp_t> x_vec(batch_size), s_vec(x_vec), c_vec(x_vec);
                 for (auto i = 0u; i < batch_size; ++i) {
                     x_vec[i] = i + 1u;

@@ -818,7 +818,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
             // at the same time, we cannot use it directly because it returns a pair
             // of SIMD vectors rather than a single one and that does not play
             // well with the calling conventions. In theory we could write a wrapper
-            // for these sincos functions but compiling such a wrapper requires correctly
+            // for these sincos functions using pointers for output values,
+            // but compiling such a wrapper requires correctly
             // setting up the SIMD compilation flags. Perhaps we can consider this in the
             // future to improve performance.
             const auto sfn_sin = sleef_function_name(context, "sin", vec_t->getElementType(),
