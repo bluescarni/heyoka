@@ -920,12 +920,13 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
 // x - y * floor(x / y).
 llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
 {
-    auto &context = s.context();
     auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
     auto *x_t = x->getType()->getScalarType();
+
+    auto &context = s.context();
 
     if (x_t == llvm::Type::getFP128Ty(context)) {
         // NOTE: for __float128 we cannot use the intrinsics, we need
