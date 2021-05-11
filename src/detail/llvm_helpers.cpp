@@ -1058,8 +1058,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         builder.CreateStore(fE_compute(), fE);
 
         // Define the stopping condition functor.
-        // NOTE: hard-code to 250 max iterations.
-        auto max_iter = builder.getInt32(250);
+        // NOTE: hard-code this for the time being.
+        auto max_iter = builder.getInt32(50);
         auto loop_cond = [&,
                           // NOTE: tolerance is 4 * eps.
                           tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
