@@ -115,7 +115,7 @@ llvm::Value *sinh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_sinh128");
+    return call_extern_vec(s, args[0], "sinhq");
 }
 
 #endif

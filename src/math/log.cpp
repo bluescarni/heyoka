@@ -107,7 +107,7 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     std::vector<llvm::Value *> retvals;
     for (auto scal : scalars) {
         retvals.push_back(llvm_invoke_external(
-            s, "heyoka_log128", scal->getType(), {scal},
+            s, "logq", scal->getType(), {scal},
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
@@ -128,7 +128,8 @@ double log_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::log(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-long double log_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double log_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -136,7 +137,8 @@ long double log_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 log_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 log_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 1u);
 

@@ -117,7 +117,7 @@ llvm::Value *acos_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_acos128");
+    return call_extern_vec(s, args[0], "acosq");
 }
 
 #endif
@@ -129,7 +129,8 @@ double acos_impl::eval_dbl(const std::unordered_map<std::string, double> &map, c
     return std::acos(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-long double acos_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double acos_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                 const std::vector<long double> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -137,7 +138,8 @@ long double acos_impl::eval_ldbl(const std::unordered_map<std::string, long doub
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 acos_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 acos_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                   const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 1u);
 

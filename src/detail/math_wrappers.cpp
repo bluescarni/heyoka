@@ -30,41 +30,6 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // related to incompatibilities between GCC
 // and LLVM in the implementation of __float128,
 // and needs to be investigated more.
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_pow128(__float128 x, __float128 y)
-{
-    return mppp::pow(mppp::real128{x}, mppp::real128{y}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128 x)
-{
-    return mppp::log(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_exp128(__float128 x)
-{
-    return mppp::exp(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128 x)
-{
-    return mppp::sin(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cos128(__float128 x)
-{
-    return mppp::cos(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sqrt128(__float128 x)
-{
-    return mppp::sqrt(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_fma128(__float128 x, __float128 y, __float128 z)
-{
-    return mppp::fma(mppp::real128{x}, mppp::real128{y}, mppp::real128{z}).m_value;
-}
-
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_max128(__float128 x, __float128 y)
 {
     return mppp::fmax(mppp::real128{x}, mppp::real128{y}).m_value;
@@ -83,66 +48,6 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128 x, __float12
 extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minnum128(__float128 x, __float128 y)
 {
     return mppp::fmin(mppp::real128{x}, mppp::real128{y}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_abs128(__float128 x)
-{
-    return mppp::abs(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tan128(__float128 x)
-{
-    return mppp::tan(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asin128(__float128 x)
-{
-    return mppp::asin(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acos128(__float128 x)
-{
-    return mppp::acos(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atan128(__float128 x)
-{
-    return mppp::atan(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cosh128(__float128 x)
-{
-    return mppp::cosh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sinh128(__float128 x)
-{
-    return mppp::sinh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tanh128(__float128 x)
-{
-    return mppp::tanh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asinh128(__float128 x)
-{
-    return mppp::asinh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acosh128(__float128 x)
-{
-    return mppp::acosh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atanh128(__float128 x)
-{
-    return mppp::atanh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_erf128(__float128 x)
-{
-    return mppp::erf(mppp::real128{x}).m_value;
 }
 
 #endif
