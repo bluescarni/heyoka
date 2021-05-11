@@ -9,15 +9,20 @@
 #ifndef HEYOKA_DETAIL_LLVM_HELPERS_HPP
 #define HEYOKA_DETAIL_LLVM_HELPERS_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka::detail
@@ -42,6 +47,8 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
 {
     return make_vector_type(to_llvm_type<T>(c), batch_size);
 }
+
+HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
@@ -89,6 +96,36 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, const std::string &);
+
+// Math helpers.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return llvm_add_inv_kep_E_dbl(s, batch_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return llvm_add_inv_kep_E_ldbl(s, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return llvm_add_inv_kep_E_f128(s, batch_size);
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+}
 
 } // namespace heyoka::detail
 

@@ -97,16 +97,7 @@ namespace detail
 // to avoid potential clashing in function names.
 std::string taylor_mangle_suffix(llvm::Type *t)
 {
-    assert(t != nullptr);
-
-    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
-        // If the type is a vector, get the name of the element type
-        // and append the vector size.
-        return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
-    } else {
-        // Otherwise just return the type name.
-        return llvm_type_name(t);
-    }
+    return llvm_mangle_type(t);
 }
 
 namespace
@@ -1455,7 +1446,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
         std::vector<llvm::Value *> res_scalars;
         for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
             res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_pow128", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
+                s, "powq", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
                 // NOTE: in theory we may add ReadNone here as well,
                 // but for some reason, at least up to LLVM 10,
                 // this causes strange codegen issues. Revisit
@@ -1486,45 +1477,6 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
         }
 
         return llvm_invoke_intrinsic(s, "llvm.pow", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute abs(x_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_abs(llvm_state &s, llvm::Value *x_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector argument.
-    auto *x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v);
-
-        // Execute the heyoka_abs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        res_scalars.reserve(x_scalars.size());
-        for (auto *x_scal : x_scalars) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_abs128", x_t, {x_scal},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1598,14 +1550,14 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
 
         // Initialise with the abs(derivatives) of the first state variable at orders 0, 'order' and 'order - 1'.
         builder.CreateStore(
-            taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), builder.getInt32(0))),
+            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), builder.getInt32(0))),
             max_abs_state);
         builder.CreateStore(
-            taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), builder.getInt32(0))),
+            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), builder.getInt32(0))),
             max_abs_diff_o);
-        builder.CreateStore(taylor_step_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u),
-                                                                  builder.getInt32(0))),
-                            max_abs_diff_om1);
+        builder.CreateStore(
+            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u), builder.getInt32(0))),
+            max_abs_diff_om1);
 
         // Iterate over the variables to compute the norm infinities.
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
@@ -1666,12 +1618,12 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         // consider also the functions of state variables for
         // the computation of the timestep.
         for (std::uint32_t i = 0; i < n_eq + n_sv_funcs; ++i) {
-            v_max_abs_state.push_back(taylor_step_abs(s, diff_arr[i]));
+            v_max_abs_state.push_back(llvm_abs(s, diff_arr[i]));
             // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
             // state variables and sv funcs (not all u vars), hence the indexing is
             // order * (n_eq + n_sv_funcs).
-            v_max_abs_diff_o.push_back(taylor_step_abs(s, diff_arr[order * (n_eq + n_sv_funcs) + i]));
-            v_max_abs_diff_om1.push_back(taylor_step_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]));
+            v_max_abs_diff_o.push_back(llvm_abs(s, diff_arr[order * (n_eq + n_sv_funcs) + i]));
+            v_max_abs_diff_om1.push_back(llvm_abs(s, diff_arr[(order - 1u) * (n_eq + n_sv_funcs) + i]));
         }
 
         // Find the maxima via pairwise reduction.

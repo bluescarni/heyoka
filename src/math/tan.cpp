@@ -110,7 +110,7 @@ llvm::Value *tan_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_tan128");
+    return call_extern_vec(s, args[0], "tanq");
 }
 
 #endif
@@ -122,7 +122,8 @@ double tan_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::tan(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -130,7 +131,8 @@ long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 tan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 tan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 1u);
 

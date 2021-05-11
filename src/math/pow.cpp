@@ -152,7 +152,7 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     std::vector<llvm::Value *> retvals;
     for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
         retvals.push_back(llvm_invoke_external(
-            s, "heyoka_pow128", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
+            s, "powq", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
