@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add an LLVM-based vectorised solver for Kepler's equation
+  (`#136 <https://github.com/bluescarni/heyoka/pull/136>`__).
 - Add an LLVM ``while`` loop function
   (`#135 <https://github.com/bluescarni/heyoka/pull/135>`__).
 
