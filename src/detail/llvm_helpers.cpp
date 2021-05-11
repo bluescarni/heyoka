@@ -779,7 +779,6 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
-    auto &builder = s.builder();
     auto &context = s.context();
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -789,6 +788,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
     if (x_t == llvm::Type::getFP128Ty(context)) {
         // NOTE: for __float128 we cannot use the intrinsics, we need
         // to call an external function.
+        auto &builder = s.builder();
 
         // Convert the vector argument to scalars.
         auto x_scalars = vector_to_scalars(builder, x);
