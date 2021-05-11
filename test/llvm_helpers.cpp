@@ -316,9 +316,9 @@ TEST_CASE("modulus batch")
     tuple_for_each(fp_types, tester);
 }
 
-TEST_CASE("inv_kep_scalar")
+TEST_CASE("inv_kep_E_scalar")
 {
-    using detail::llvm_add_inv_kep;
+    using detail::llvm_add_inv_kep_E;
     using detail::to_llvm_type;
     namespace bmt = boost::math::tools;
     using std::cos;
@@ -330,7 +330,7 @@ TEST_CASE("inv_kep_scalar")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            auto fkep = llvm_add_inv_kep<fp_t>(s, 1);
+            auto fkep = llvm_add_inv_kep_E<fp_t>(s, 1);
 
             auto &md = s.module();
             auto &builder = s.builder();
@@ -363,7 +363,7 @@ TEST_CASE("inv_kep_scalar")
             // Fetch the function pointer.
             auto f_ptr = reinterpret_cast<fp_t (*)(fp_t, fp_t)>(s.jit_lookup("hey_kep"));
 
-            auto bmt_inv_kep = [](fp_t ecc, fp_t M) {
+            auto bmt_inv_kep_E = [](fp_t ecc, fp_t M) {
                 // Initial guess.
                 auto ig = ecc < 0.8 ? M : boost::math::constants::pi<double>();
 
@@ -380,14 +380,14 @@ TEST_CASE("inv_kep_scalar")
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
                 const auto M = M_dist(rng);
-                REQUIRE(f_ptr(0, M) == approximately(bmt_inv_kep(0, M)));
+                REQUIRE(f_ptr(0, M) == approximately(bmt_inv_kep_E(0, M)));
             }
 
             // Non-zero eccentricities.
             for (auto i = 0; i < ntrials * 10; ++i) {
                 const auto M = M_dist(rng);
                 const auto e = e_dist(rng);
-                REQUIRE(f_ptr(e, M) == approximately(bmt_inv_kep(e, M), fp_t(10000)));
+                REQUIRE(f_ptr(e, M) == approximately(bmt_inv_kep_E(e, M), fp_t(10000)));
             }
         }
     };
@@ -395,9 +395,9 @@ TEST_CASE("inv_kep_scalar")
     tuple_for_each(fp_types, tester);
 }
 
-TEST_CASE("inv_kep_batch")
+TEST_CASE("inv_kep_E_batch")
 {
-    using detail::llvm_add_inv_kep;
+    using detail::llvm_add_inv_kep_E;
     using detail::to_llvm_type;
     namespace bmt = boost::math::tools;
     using std::cos;
@@ -410,7 +410,7 @@ TEST_CASE("inv_kep_batch")
             for (auto opt_level : {0u, 1u, 2u, 3u}) {
                 llvm_state s{kw::opt_level = opt_level};
 
-                auto fkep = llvm_add_inv_kep<fp_t>(s, batch_size);
+                auto fkep = llvm_add_inv_kep_E<fp_t>(s, batch_size);
 
                 auto &md = s.module();
                 auto &builder = s.builder();
@@ -449,7 +449,7 @@ TEST_CASE("inv_kep_batch")
                 // Fetch the function pointer.
                 auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_kep"));
 
-                auto bmt_inv_kep = [](fp_t ecc, fp_t M) {
+                auto bmt_inv_kep_E = [](fp_t ecc, fp_t M) {
                     // Initial guess.
                     auto ig = ecc < 0.8 ? M : boost::math::constants::pi<double>();
 
@@ -475,7 +475,7 @@ TEST_CASE("inv_kep_batch")
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
                     for (auto j = 0u; j < batch_size; ++j) {
-                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep(0, M_vec[j])));
+                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep_E(0, M_vec[j])));
                     }
                 }
 
@@ -488,7 +488,7 @@ TEST_CASE("inv_kep_batch")
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
                     for (auto j = 0u; j < batch_size; ++j) {
-                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep(e_vec[j], M_vec[j]), fp_t(10000)));
+                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep_E(e_vec[j], M_vec[j]), fp_t(10000)));
                     }
                 }
             }

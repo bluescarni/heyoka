@@ -102,25 +102,25 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_dbl(llvm_state &, std::uint32_t);
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_ldbl(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_f128(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &, std::uint32_t);
 
 #endif
 
 template <typename T>
-inline llvm::Function *llvm_add_inv_kep(llvm_state &s, std::uint32_t batch_size)
+inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_size)
 {
     if constexpr (std::is_same_v<T, double>) {
-        return llvm_add_inv_kep_dbl(s, batch_size);
+        return llvm_add_inv_kep_E_dbl(s, batch_size);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return llvm_add_inv_kep_ldbl(s, batch_size);
+        return llvm_add_inv_kep_E_ldbl(s, batch_size);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return llvm_add_inv_kep_f128(s, batch_size);
+        return llvm_add_inv_kep_E_f128(s, batch_size);
 #endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");

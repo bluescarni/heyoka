@@ -969,18 +969,18 @@ namespace
 
 // Variable template for the constant pi at different levels of precision.
 template <typename T>
-const auto inv_kep_pi = boost::math::constants::pi<T>();
+const auto inv_kep_E_pi = boost::math::constants::pi<T>();
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-const mppp::real128 inv_kep_pi<mppp::real128> = mppp::pi_128;
+const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
 
 #endif
 
 // Implementation of the inverse Kepler equation.
 template <typename T>
-llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
+llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -992,7 +992,7 @@ llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
     auto tp = to_llvm_vector_type<T>(context, batch_size);
 
     // Fetch the function name.
-    const auto fname = "heyoka_inv_kep_{}"_format(llvm_mangle_type(tp));
+    const auto fname = "heyoka_inv_kep_E_{}"_format(llvm_mangle_type(tp));
 
     // The function arguments:
     // - eccentricity,
@@ -1022,7 +1022,7 @@ llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Reduce M modulo 2*pi.
-        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_pi<T>}), batch_size));
+        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
 
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
@@ -1030,7 +1030,7 @@ llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
         // Initial guess: M if e < 0.8, pi otherwise.
         auto ig = builder.CreateSelect(
             builder.CreateFCmpOLT(ecc, vector_splat(builder, codegen<T>(s, number{T(8) / T(10)}), batch_size)), M,
-            vector_splat(builder, codegen<T>(s, number{inv_kep_pi<T>}), batch_size));
+            vector_splat(builder, codegen<T>(s, number{inv_kep_E_pi<T>}), batch_size));
         builder.CreateStore(ig, retval);
 
         // Create the counter.
@@ -1098,7 +1098,7 @@ llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
         // Check the counter.
         llvm_if_then_else(
             s, builder.CreateICmpEQ(builder.CreateLoad(counter), max_iter),
-            [&]() { llvm_invoke_external(s, "heyoka_inv_kep_max_iter", builder.getVoidTy(), {}); }, []() {});
+            [&]() { llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {}); }, []() {});
 
         // Return the result.
         builder.CreateRet(builder.CreateLoad(retval));
@@ -1120,21 +1120,21 @@ llvm::Function *llvm_add_inv_kep_impl(llvm_state &s, std::uint32_t batch_size)
 
 } // namespace
 
-llvm::Function *llvm_add_inv_kep_dbl(llvm_state &s, std::uint32_t batch_size)
+llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &s, std::uint32_t batch_size)
 {
-    return llvm_add_inv_kep_impl<double>(s, batch_size);
+    return llvm_add_inv_kep_E_impl<double>(s, batch_size);
 }
 
-llvm::Function *llvm_add_inv_kep_ldbl(llvm_state &s, std::uint32_t batch_size)
+llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &s, std::uint32_t batch_size)
 {
-    return llvm_add_inv_kep_impl<long double>(s, batch_size);
+    return llvm_add_inv_kep_E_impl<long double>(s, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *llvm_add_inv_kep_f128(llvm_state &s, std::uint32_t batch_size)
+llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 {
-    return llvm_add_inv_kep_impl<mppp::real128>(s, batch_size);
+    return llvm_add_inv_kep_E_impl<mppp::real128>(s, batch_size);
 }
 
 #endif
@@ -1144,7 +1144,7 @@ llvm::Function *llvm_add_inv_kep_f128(llvm_state &s, std::uint32_t batch_size)
 // NOTE: this function will be called by the LLVM implementation
 // of the inverse Kepler function when the maximum number of iterations
 // is exceeded.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_max_iter()
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter()
 {
-    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the inverse Kepler equation");
+    heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
