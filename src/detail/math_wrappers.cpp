@@ -145,23 +145,6 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_erf128(__float128 x)
     return mppp::erf(mppp::real128{x}).m_value;
 }
 
-extern "C" {
-
-using heyoka_f128_pair = struct {
-    __float128 x;
-    __float128 y;
-};
-
-HEYOKA_DLL_PUBLIC heyoka_f128_pair heyoka_sincos128(__float128 x)
-{
-    mppp::real128 s, c;
-
-    mppp::sincos(mppp::real128{x}, &s, &c);
-
-    return heyoka_f128_pair{s.m_value, c.m_value};
-}
-}
-
 #endif
 
 #if defined(_MSC_VER)

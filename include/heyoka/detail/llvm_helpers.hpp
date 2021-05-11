@@ -44,10 +44,6 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
     return make_vector_type(to_llvm_type<T>(c), batch_size);
 }
 
-// Helper to create an unnamed pair-like struct {x, y}. Both members
-// are of the same type.
-HEYOKA_DLL_PUBLIC llvm::Type *to_llvm_pair_type(llvm::LLVMContext &, llvm::Type *);
-
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 

@@ -6,13 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -20,70 +23,160 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/llvm_state.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
-struct p_double {
-    double x;
-    double y;
-};
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
-TEST_CASE("fp_pair")
+TEST_CASE("sincos scalar")
 {
-    using detail::to_llvm_pair_type;
+    using detail::llvm_sincos;
     using detail::to_llvm_type;
+    using std::cos;
+    using std::sin;
 
-    for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        llvm_state s{kw::opt_level = opt_level};
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
-        auto &md = s.module();
-        auto &builder = s.builder();
-        auto &context = s.context();
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
 
-        auto fp_t = to_llvm_type<double>(context);
-        auto fpp_t = to_llvm_pair_type(context, fp_t);
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
 
-        std::vector<llvm::Type *> fargs{fp_t, fp_t};
-        auto *ft = llvm::FunctionType::get(fpp_t, fargs, false);
-        REQUIRE(ft != nullptr);
-        auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "pair_test", &md);
-        REQUIRE(f != nullptr);
+            auto val_t = to_llvm_type<fp_t>(context);
 
-        auto x = f->args().begin();
-        auto y = f->args().begin() + 1;
+            std::vector<llvm::Type *> fargs{val_t, llvm::PointerType::getUnqual(val_t),
+                                            llvm::PointerType::getUnqual(val_t)};
+            auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
 
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+            auto x = f->args().begin();
+            auto sptr = f->args().begin() + 1;
+            auto cptr = f->args().begin() + 2;
 
-        llvm::Value *rv = llvm::UndefValue::get(fpp_t);
-        rv = builder.CreateInsertValue(rv, builder.CreateFAdd(x, y), {0});
-        rv = builder.CreateInsertValue(rv, builder.CreateFSub(x, y), {1});
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        builder.CreateRet(rv);
+            auto ret = llvm_sincos(s, x);
+            builder.CreateStore(ret.first, sptr);
+            builder.CreateStore(ret.second, cptr);
 
-        std::cout << s.get_ir() << '\n';
+            // Create the return value.
+            builder.CreateRetVoid();
 
-        // Verify.
-        s.verify_function(f);
+            // Verify.
+            s.verify_function(f);
 
-        // Run the optimisation pass.
-        s.optimise();
+            // Run the optimisation pass.
+            s.optimise();
 
-        // Compile.
-        s.compile();
+            // Compile.
+            s.compile();
 
-        // Fetch the function pointer.
-        auto f_ptr = reinterpret_cast<p_double (*)(double, double)>(s.jit_lookup("pair_test"));
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<void (*)(fp_t, fp_t *, fp_t *)>(s.jit_lookup("sc"));
 
-        p_double res{0, 0};
-        res = f_ptr(42, -1);
+            fp_t sn, cs;
+            f_ptr(fp_t(2), &sn, &cs);
+            REQUIRE(sn == approximately(sin(fp_t(2))));
+            REQUIRE(cs == approximately(cos(fp_t(2))));
 
-        REQUIRE(res.x == 41);
-        REQUIRE(res.y == 43);
-    }
+            f_ptr(fp_t(-123.45), &sn, &cs);
+            REQUIRE(sn == approximately(sin(fp_t(-123.45))));
+            REQUIRE(cs == approximately(cos(fp_t(-123.45))));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("sincos batch")
+{
+    using detail::llvm_sincos;
+    using detail::to_llvm_type;
+    using std::cos;
+    using std::sin;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 23u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
+                                                llvm::PointerType::getUnqual(val_t),
+                                                llvm::PointerType::getUnqual(val_t)};
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sc", &md);
+
+                auto xptr = f->args().begin();
+                auto sptr = f->args().begin() + 1;
+                auto cptr = f->args().begin() + 2;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto x = detail::load_vector_from_memory(builder, xptr, batch_size);
+
+                auto ret = llvm_sincos(s, x);
+                detail::store_vector_to_memory(builder, sptr, ret.first);
+                detail::store_vector_to_memory(builder, cptr, ret.second);
+
+                // Create the return value.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *)>(s.jit_lookup("sc"));
+
+                std::vector<fp_t> x_vec(batch_size), s_vec(x_vec), c_vec(x_vec);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    x_vec[i] = i + 1u;
+                }
+
+                f_ptr(x_vec.data(), s_vec.data(), c_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(s_vec[i] == approximately(sin(x_vec[i])));
+                    REQUIRE(c_vec[i] == approximately(cos(x_vec[i])));
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }
 
 TEST_CASE("while_loop")
