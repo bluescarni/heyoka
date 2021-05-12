@@ -383,14 +383,18 @@ TEST_CASE("inv_kep_E_scalar")
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
                 const auto M = M_dist(rng);
-                REQUIRE(f_ptr(0, M) == approximately(bmt_inv_kep_E(0, M)));
+                const auto E = f_ptr(0, M);
+                REQUIRE(E == approximately(bmt_inv_kep_E(0, M)));
+                REQUIRE(fp_t(M) == approximately(E));
             }
 
             // Non-zero eccentricities.
             for (auto i = 0; i < ntrials * 10; ++i) {
                 const auto M = M_dist(rng);
                 const auto e = e_dist(rng);
-                REQUIRE(f_ptr(e, M) == approximately(bmt_inv_kep_E(e, M), fp_t(10000)));
+                const auto E = f_ptr(e, M);
+                REQUIRE(E == approximately(bmt_inv_kep_E(e, M), fp_t(10000)));
+                REQUIRE(fp_t(M) == approximately(E - e * sin(E), fp_t(10000)));
             }
         }
     };
