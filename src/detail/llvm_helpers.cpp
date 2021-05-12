@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -796,6 +797,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     cur->addIncoming(cmp, loop_end_bb);
 }
 
+// Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
     auto &context = s.context();
@@ -964,6 +966,83 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
 #endif
 }
 
+// Minimum value.
+llvm::Value *llvm_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minnum128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Maximum value.
+llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_max128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Return max(a, b).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 namespace
 {
 
@@ -982,6 +1061,8 @@ const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
 template <typename T>
 llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 {
+    using std::nextafter;
+
     assert(batch_size > 0u);
 
     auto &md = s.module();
@@ -1021,16 +1102,28 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Reduce M modulo 2*pi.
-        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
-
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
 
-        // Initial guess: M if e < 0.8, pi otherwise.
-        auto ig = builder.CreateSelect(
-            builder.CreateFCmpOLT(ecc, vector_splat(builder, codegen<T>(s, number{T(8) / T(10)}), batch_size)), M,
-            vector_splat(builder, codegen<T>(s, number{inv_kep_E_pi<T>}), batch_size));
+        // Reduce M modulo 2*pi.
+        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
+
+        // Make extra sure M is in the [0, 2*pi) range.
+        auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
+        M = llvm_max(s, M, lb);
+        M = llvm_min(s, M, ub);
+
+        // Compute the initial guess from the usual elliptic expansion
+        // to the second order in eccentricities:
+        // E = M + e*sin(M) + e**2/2 * sin(2M) + ...
+        auto [sin_M, cos_M] = llvm_sincos(s, M);
+        // e*sin(M).
+        auto ig1 = builder.CreateFMul(ecc, sin_M);
+        // e**2/2 * sin(2M) = e**2*sin(M)*cos(M).
+        auto ig2 = builder.CreateFMul(builder.CreateFMul(builder.CreateFMul(ecc, ecc), sin_M), cos_M);
+        // Put it together.
+        auto ig = builder.CreateFAdd(builder.CreateFAdd(M, ig1), ig2);
         builder.CreateStore(ig, retval);
 
         // Create the counter.
@@ -1078,13 +1171,33 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Run the loop.
         llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
             // Compute the new value.
+            auto old_val = builder.CreateLoad(retval);
             auto new_val = builder.CreateFDiv(
                 builder.CreateLoad(fE), builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(cos_E))));
-            new_val = builder.CreateFSub(builder.CreateLoad(retval), new_val);
+            new_val = builder.CreateFSub(old_val, new_val);
+
+            // Bisect if new_val > ub.
+            // NOTE: '>' is fine here, ub is the maximum allowed value.
+            auto bcheck = builder.CreateFCmpOGT(new_val, ub);
+            new_val = builder.CreateSelect(
+                bcheck,
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                                   builder.CreateFAdd(old_val, ub)),
+                new_val);
+
+            // Bisect if new_val < lb.
+            bcheck = builder.CreateFCmpOLT(new_val, lb);
+            new_val = builder.CreateSelect(
+                bcheck,
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                                   builder.CreateFAdd(old_val, lb)),
+                new_val);
+
+            // Store the new value.
             builder.CreateStore(new_val, retval);
 
             // Update sin_E/cos_E.
-            sin_cos_E = llvm_sincos(s, builder.CreateLoad(retval));
+            sin_cos_E = llvm_sincos(s, new_val);
             builder.CreateStore(sin_cos_E.first, sin_E);
             builder.CreateStore(sin_cos_E.second, cos_E);
 

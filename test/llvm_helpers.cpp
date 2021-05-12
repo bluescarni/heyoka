@@ -11,15 +11,12 @@
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <random>
 #include <stdexcept>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/tools/roots.hpp>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -363,16 +360,6 @@ TEST_CASE("inv_kep_E_scalar")
             // Fetch the function pointer.
             auto f_ptr = reinterpret_cast<fp_t (*)(fp_t, fp_t)>(s.jit_lookup("hey_kep"));
 
-            auto bmt_inv_kep_E = [](fp_t ecc, fp_t M) {
-                // Initial guess.
-                auto ig = ecc < 0.8 ? M : boost::math::constants::pi<double>();
-
-                auto func = [ecc, M](fp_t E) { return std::make_pair(E - ecc * sin(E) - M, 1 - ecc * cos(E)); };
-
-                return bmt::newton_raphson_iterate(func, ig, fp_t(0), fp_t(2 * boost::math::constants::pi<double>()),
-                                                   std::numeric_limits<fp_t>::digits - 2);
-            };
-
             std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
 
             const auto ntrials = 100;
@@ -380,14 +367,16 @@ TEST_CASE("inv_kep_E_scalar")
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
                 const auto M = M_dist(rng);
-                REQUIRE(f_ptr(0, M) == approximately(bmt_inv_kep_E(0, M)));
+                const auto E = f_ptr(0, M);
+                REQUIRE(fp_t(M) == approximately(E));
             }
 
             // Non-zero eccentricities.
             for (auto i = 0; i < ntrials * 10; ++i) {
                 const auto M = M_dist(rng);
                 const auto e = e_dist(rng);
-                REQUIRE(f_ptr(e, M) == approximately(bmt_inv_kep_E(e, M), fp_t(10000)));
+                const auto E = f_ptr(e, M);
+                REQUIRE(fp_t(M) == approximately(E - e * sin(E), fp_t(10000)));
             }
         }
     };
@@ -449,17 +438,6 @@ TEST_CASE("inv_kep_E_batch")
                 // Fetch the function pointer.
                 auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_kep"));
 
-                auto bmt_inv_kep_E = [](fp_t ecc, fp_t M) {
-                    // Initial guess.
-                    auto ig = ecc < 0.8 ? M : boost::math::constants::pi<double>();
-
-                    auto func = [ecc, M](fp_t E) { return std::make_pair(E - ecc * sin(E) - M, 1 - ecc * cos(E)); };
-
-                    return bmt::newton_raphson_iterate(func, ig, fp_t(0),
-                                                       fp_t(2 * boost::math::constants::pi<double>()),
-                                                       std::numeric_limits<fp_t>::digits - 2);
-                };
-
                 std::uniform_real_distribution<double> e_dist(0., 1.),
                     M_dist(0., 2 * boost::math::constants::pi<double>());
 
@@ -475,7 +453,7 @@ TEST_CASE("inv_kep_E_batch")
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
                     for (auto j = 0u; j < batch_size; ++j) {
-                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep_E(0, M_vec[j])));
+                        REQUIRE(M_vec[j] == approximately(ret_vec[j]));
                     }
                 }
 
@@ -488,7 +466,7 @@ TEST_CASE("inv_kep_E_batch")
                     f_ptr(ret_vec.data(), e_vec.data(), M_vec.data());
 
                     for (auto j = 0u; j < batch_size; ++j) {
-                        REQUIRE(ret_vec[j] == approximately(bmt_inv_kep_E(e_vec[j], M_vec[j]), fp_t(10000)));
+                        REQUIRE(M_vec[j] == approximately(ret_vec[j] - e_vec[j] * sin(ret_vec[j]), fp_t(10000)));
                     }
                 }
             }
