@@ -1114,10 +1114,16 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         M = llvm_max(s, M, lb);
         M = llvm_min(s, M, ub);
 
-        // Initial guess: M if e < 0.8, pi otherwise.
-        auto ig = builder.CreateSelect(
-            builder.CreateFCmpOLT(ecc, vector_splat(builder, codegen<T>(s, number{T(8) / T(10)}), batch_size)), M,
-            vector_splat(builder, codegen<T>(s, number{inv_kep_E_pi<T>}), batch_size));
+        // Compute the initial guess from the usual elliptic expansion
+        // to the second order in eccentricities:
+        // E = M + e*sin(M) + e**2/2 * sin(2M) + ...
+        auto [sin_M, cos_M] = llvm_sincos(s, M);
+        // e*sin(M).
+        auto ig1 = builder.CreateFMul(ecc, sin_M);
+        // e**2/2 * sin(2M) = e**2*sin(M)*cos(M).
+        auto ig2 = builder.CreateFMul(builder.CreateFMul(builder.CreateFMul(ecc, ecc), sin_M), cos_M);
+        // Put it together.
+        auto ig = builder.CreateFAdd(builder.CreateFAdd(M, ig1), ig2);
         builder.CreateStore(ig, retval);
 
         // Create the counter.
@@ -1165,13 +1171,33 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Run the loop.
         llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
             // Compute the new value.
+            auto old_val = builder.CreateLoad(retval);
             auto new_val = builder.CreateFDiv(
                 builder.CreateLoad(fE), builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(cos_E))));
-            new_val = builder.CreateFSub(builder.CreateLoad(retval), new_val);
+            new_val = builder.CreateFSub(old_val, new_val);
+
+            // Bisect if new_val > ub.
+            // NOTE: '>' is fine here, ub is the maximum allowed value.
+            auto bcheck = builder.CreateFCmpOGT(new_val, ub);
+            new_val = builder.CreateSelect(
+                bcheck,
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                                   builder.CreateFAdd(old_val, ub)),
+                new_val);
+
+            // Bisect if new_val < lb.
+            bcheck = builder.CreateFCmpOLT(new_val, lb);
+            new_val = builder.CreateSelect(
+                bcheck,
+                builder.CreateFMul(vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size),
+                                   builder.CreateFAdd(old_val, lb)),
+                new_val);
+
+            // Store the new value.
             builder.CreateStore(new_val, retval);
 
             // Update sin_E/cos_E.
-            sin_cos_E = llvm_sincos(s, builder.CreateLoad(retval));
+            sin_cos_E = llvm_sincos(s, new_val);
             builder.CreateStore(sin_cos_E.first, sin_E);
             builder.CreateStore(sin_cos_E.second, cos_E);
 
