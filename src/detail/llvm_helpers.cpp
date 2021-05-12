@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -1060,6 +1061,8 @@ const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
 template <typename T>
 llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 {
+    using std::nextafter;
+
     assert(batch_size > 0u);
 
     auto &md = s.module();
@@ -1099,11 +1102,17 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
+        // Create the return value.
+        auto retval = builder.CreateAlloca(tp);
+
         // Reduce M modulo 2*pi.
         auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
 
-        // Create the return value.
-        auto retval = builder.CreateAlloca(tp);
+        // Make extra sure M is in the [0, 2*pi) range.
+        auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
+        M = llvm_max(s, M, lb);
+        M = llvm_min(s, M, ub);
 
         // Initial guess: M if e < 0.8, pi otherwise.
         auto ig = builder.CreateSelect(
