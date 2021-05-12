@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/cstdint.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/tools/roots.hpp>
 
@@ -369,8 +370,10 @@ TEST_CASE("inv_kep_E_scalar")
 
                 auto func = [ecc, M](fp_t E) { return std::make_pair(E - ecc * sin(E) - M, 1 - ecc * cos(E)); };
 
+                boost::uintmax_t max_iter = 50;
+
                 return bmt::newton_raphson_iterate(func, ig, fp_t(0), fp_t(2 * boost::math::constants::pi<double>()),
-                                                   std::numeric_limits<fp_t>::digits - 2);
+                                                   std::numeric_limits<fp_t>::digits - 2, max_iter);
             };
 
             std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
@@ -455,9 +458,11 @@ TEST_CASE("inv_kep_E_batch")
 
                     auto func = [ecc, M](fp_t E) { return std::make_pair(E - ecc * sin(E) - M, 1 - ecc * cos(E)); };
 
+                    boost::uintmax_t max_iter = 50;
+
                     return bmt::newton_raphson_iterate(func, ig, fp_t(0),
                                                        fp_t(2 * boost::math::constants::pi<double>()),
-                                                       std::numeric_limits<fp_t>::digits - 2);
+                                                       std::numeric_limits<fp_t>::digits - 2, max_iter);
                 };
 
                 std::uniform_real_distribution<double> e_dist(0., 1.),

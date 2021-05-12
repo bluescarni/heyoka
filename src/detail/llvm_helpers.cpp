@@ -796,6 +796,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
     cur->addIncoming(cmp, loop_end_bb);
 }
 
+// Helper to compute sin and cos simultaneously.
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
     auto &context = s.context();
