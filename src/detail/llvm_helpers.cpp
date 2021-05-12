@@ -965,6 +965,83 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
 #endif
 }
 
+// Minimum value.
+llvm::Value *llvm_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_minnum128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Maximum value.
+llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
+
+        // Execute the heyoka_max128() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // Return max(a, b).
+        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 namespace
 {
 

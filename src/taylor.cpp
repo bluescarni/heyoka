@@ -1267,45 +1267,6 @@ std::uint32_t taylor_order_from_tol(T tol)
     return static_cast<std::uint32_t>(order_f);
 }
 
-// Helper to compute max(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_max128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        // Return max(a, b).
-        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
@@ -1383,44 +1344,6 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
         auto *abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
         // Return min(a, abs(b)).
         return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
-}
-
-// Helper to compute min(x_v, y_v) in the Taylor stepper implementation.
-llvm::Value *taylor_step_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
-{
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minnum128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1627,7 +1550,7 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         }
 
         // Find the maxima via pairwise reduction.
-        auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return taylor_step_max(s, a, b); };
+        auto reducer = [&s](llvm::Value *a, llvm::Value *b) -> llvm::Value * { return llvm_max(s, a, b); };
         max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
         max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
@@ -1646,7 +1569,7 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
                                    vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
-    auto rho_m = taylor_step_min(s, rho_o, rho_om1);
+    auto rho_m = llvm_min(s, rho_o, rho_om1);
 
     // Compute the scaling + safety factor.
     const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
