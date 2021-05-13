@@ -566,7 +566,17 @@ Given :math:`a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \
 .. math::
    :label:
 
-   a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right).
+   a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right),
+
+where the partial derivatives are
+
+.. math::
+   :label:
+
+   \begin{cases}
+   \frac{\partial E}{\partial e} = \frac{\sin E}{1-e\cos E}, \\
+   \frac{\partial E}{\partial M} = \frac{1}{1-e\cos E}. \\
+   \end{cases}
 
 Expanding the partial derivatives yields
 
