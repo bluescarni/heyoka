@@ -57,6 +57,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -207,8 +219,6 @@ void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
 double pow_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 2u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
             "exponentiation over doubles (2 arguments were expected, but {} arguments were provided"_format(a.size()));
@@ -326,8 +336,6 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector
     assert(f.args().size() == 2u);
 
     if (!deps.empty()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
                                     "derivative of the exponentiation, but a vector of size {} was passed "
                                     "instead"_format(deps.size()));
@@ -379,8 +387,6 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -477,8 +483,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &, const U &n,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -487,8 +491,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(
-        taylor_c_diff_numparam_mangle(n), taylor_mangle_suffix(val_t), li_to_string(n_uvars));
+    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
+                                                                            taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,
