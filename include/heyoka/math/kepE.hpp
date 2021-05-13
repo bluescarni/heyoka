@@ -11,7 +11,9 @@
 
 #include <heyoka/config.hpp>
 
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -32,6 +34,9 @@ public:
     explicit kepE_impl(expression, expression);
 
     expression diff(const std::string &) const;
+
+    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;

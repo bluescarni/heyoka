@@ -17,6 +17,8 @@
 
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <fmt/format.h>
+
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -36,6 +38,19 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -57,6 +72,50 @@ expression kepE_impl::diff(const std::string &s) const
     expression E{func{*this}};
 
     return (heyoka::diff(e, s) * sin(E) + heyoka::diff(M, s)) / (1_dbl - e * cos(E));
+}
+
+std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
+kepE_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+{
+    assert(args().size() == 2u);
+
+    // Decompose the arguments.
+    auto &e = *get_mutable_args_it().first;
+    if (const auto dres = taylor_decompose_in_place(std::move(e), u_vars_defs)) {
+        e = expression{variable{"u_{}"_format(dres)}};
+    }
+
+    auto &M = *(get_mutable_args_it().first + 1);
+    if (const auto dres = taylor_decompose_in_place(std::move(M), u_vars_defs)) {
+        M = expression{variable{"u_{}"_format(dres)}};
+    }
+
+    // Make a copy of e.
+    auto e_copy = e;
+
+    // Append the kepE decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+
+    // Append the sin(a)/cos(a) decompositions.
+    u_vars_defs.emplace_back(sin(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
+                             std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(cos(expression{variable{"u_{}"_format(u_vars_defs.size() - 2u)}}),
+                             std::vector<std::uint32_t>{});
+
+    // Append the e*cos(a) decomposition.
+    u_vars_defs.emplace_back(std::move(e_copy) * expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}},
+                             std::vector<std::uint32_t>{});
+
+    // Add the hidden deps.
+    // NOTE: hidden deps on sin(a) and e*cos(a).
+    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
+    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+
+    // sin/cos hidden deps.
+    (u_vars_defs.end() - 3)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
+
+    return u_vars_defs.size() - 4u;
 }
 
 namespace
