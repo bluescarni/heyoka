@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -32,7 +33,9 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
+#include <heyoka/math/sin.hpp>
 
 namespace heyoka
 {
@@ -43,6 +46,18 @@ namespace detail
 kepE_impl::kepE_impl() : kepE_impl(0_dbl, 0_dbl) {}
 
 kepE_impl::kepE_impl(expression e, expression M) : func_base("kepE", std::vector{std::move(e), std::move(M)}) {}
+
+expression kepE_impl::diff(const std::string &s) const
+{
+    assert(args().size() == 2u);
+
+    const auto &e = args()[0];
+    const auto &M = args()[1];
+
+    expression E{func{*this}};
+
+    return (heyoka::diff(e, s) * sin(E) + heyoka::diff(M, s)) / (1_dbl - e * cos(E));
+}
 
 namespace
 {
@@ -91,5 +106,10 @@ llvm::Value *kepE_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 #endif
 
 } // namespace detail
+
+expression kepE(expression e, expression M)
+{
+    return expression{func{detail::kepE_impl{std::move(e), std::move(M)}}};
+}
 
 } // namespace heyoka
