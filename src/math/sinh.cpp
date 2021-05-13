@@ -52,6 +52,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -128,28 +140,22 @@ sinh_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::u
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
     if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        using namespace fmt::literals;
         arg = expression{"u_{}"_format(dres)};
     }
 
-    // Save a copy of the decomposed argument.
-    auto f_arg = arg;
+    // Append the cosh decomposition.
+    u_vars_defs.emplace_back(cosh(arg), std::vector<std::uint32_t>{});
 
     // Append the sinh decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
-
-    // Compute the return value (pointing to the
-    // decomposed sinh).
-    const auto retval = u_vars_defs.size() - 1u;
-
-    // Append the cosh decomposition.
-    u_vars_defs.emplace_back(cosh(std::move(f_arg)), std::vector<std::uint32_t>{});
 
     // Add the hidden deps.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
     (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
-    return retval;
+    // Compute the return value (pointing to the
+    // decomposed sinh).
+    return u_vars_defs.size() - 1u;
 }
 
 namespace
@@ -225,8 +231,6 @@ llvm::Value *taylor_diff_sinh(llvm_state &s, const sinh_impl &f, const std::vect
     assert(f.args().size() == 1u);
 
     if (deps.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
             "derivative of the hyperbolic sine, but a vector of size {} was passed instead"_format(deps.size()));
@@ -277,8 +281,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn, const U &num, std::uint32_t,
                                              std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_sinh_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -299,7 +301,6 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn,
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    using namespace fmt::literals;
     const auto fname = "heyoka_taylor_diff_sinh_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
