@@ -54,6 +54,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -163,8 +175,6 @@ void sin_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
 double sin_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
             "sine over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
@@ -191,27 +201,22 @@ sin_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
     if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_" + li_to_string(dres)}};
+        arg = expression{variable{"u_{}"_format(dres)}};
     }
 
-    // Save a copy of the decomposed argument.
-    auto f_arg = arg;
+    // Append the cosine decomposition.
+    u_vars_defs.emplace_back(cos(arg), std::vector<std::uint32_t>{});
 
     // Append the sine decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
-    // Compute the return value (pointing to the
-    // decomposed sine).
-    const auto retval = u_vars_defs.size() - 1u;
-
-    // Append the cosine decomposition.
-    u_vars_defs.emplace_back(cos(std::move(f_arg)), std::vector<std::uint32_t>{});
-
-    // Add the hidden deps.
+    // Setup the hidden deps.
     (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
     (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
-    return retval;
+    // Compute the return value (pointing to the
+    // decomposed sine).
+    return u_vars_defs.size() - 1u;
 }
 
 namespace
@@ -287,8 +292,6 @@ llvm::Value *taylor_diff_sin(llvm_state &s, const sin_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     if (deps.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
             "derivative of the sine, but a vector of size {} was passed instead"_format(deps.size()));
@@ -339,8 +342,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const sin_impl &fn, const U &num, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_sin_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -361,8 +362,7 @@ llvm::Function *taylor_c_diff_func_sin_impl(llvm_state &s, const sin_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_sin_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_sin_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

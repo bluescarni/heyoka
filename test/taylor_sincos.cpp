@@ -355,7 +355,7 @@ TEST_CASE("taylor sincos")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -368,14 +368,14 @@ TEST_CASE("taylor sincos")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(sin(jet[1])));
-            REQUIRE(jet[3] == approximately(cos(jet[0])));
+            REQUIRE(jet[2] == approximately(sin(jet[1] + 1)));
+            REQUIRE(jet[3] == approximately(cos(jet[0] + 1)));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -392,17 +392,17 @@ TEST_CASE("taylor sincos")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -4);
 
-            REQUIRE(jet[4] == approximately(sin(jet[2])));
-            REQUIRE(jet[5] == approximately(sin(jet[3])));
+            REQUIRE(jet[4] == approximately(sin(jet[2] + 1)));
+            REQUIRE(jet[5] == approximately(sin(jet[3] + 1)));
 
-            REQUIRE(jet[6] == approximately(cos(jet[0])));
-            REQUIRE(jet[7] == approximately(cos(jet[1])));
+            REQUIRE(jet[6] == approximately(cos(jet[0] + 1)));
+            REQUIRE(jet[7] == approximately(cos(jet[1] + 1)));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {sin(y), cos(x)}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {sin(y + 1_dbl), cos(x + 1_dbl)}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -415,10 +415,10 @@ TEST_CASE("taylor sincos")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == approximately(sin(jet[1])));
-            REQUIRE(jet[3] == approximately(cos(jet[0])));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] * cos(jet[1])));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * -jet[2] * sin(jet[0])));
+            REQUIRE(jet[2] == approximately(sin(jet[1] + 1)));
+            REQUIRE(jet[3] == approximately(cos(jet[0] + 1)));
+            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] * cos(jet[1] + 1)));
+            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * -jet[2] * sin(jet[0] + 1)));
         }
 
         {

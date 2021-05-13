@@ -57,6 +57,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -148,19 +160,14 @@ erf_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
 {
     assert(args().size() == 1u);
 
-    using namespace fmt::literals;
-
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
     if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
         arg = expression{"u_{}"_format(dres)};
     }
 
-    // Append the erf decomposition.
-    u_vars_defs.emplace_back(erf(arg), std::vector<std::uint32_t>{});
-
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(std::move(arg)), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(arg), std::vector<std::uint32_t>{});
 
     // Append - arg * arg.
     u_vars_defs.emplace_back(-expression{"u_{}"_format(u_vars_defs.size() - 1u)}, std::vector<std::uint32_t>{});
@@ -168,10 +175,15 @@ erf_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::ui
     // Append exp( - arg * arg).
     u_vars_defs.emplace_back(exp(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
 
-    // Add the hidden dep.
-    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    // Append the erf decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
-    return u_vars_defs.size() - 4u;
+    // Add the hidden dep.
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+
+    // Compute the return value (pointing to the
+    // decomposed erf).
+    return u_vars_defs.size() - 1u;
 }
 
 namespace
@@ -261,8 +273,6 @@ llvm::Value *taylor_diff_erf(llvm_state &s, const erf_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     if (deps.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
             "derivative of the error function, but a vector of size {} was passed instead"_format(deps.size()));
@@ -313,8 +323,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, const U &num, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_erf_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -335,7 +343,6 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    using namespace fmt::literals;
     const auto fname = "heyoka_taylor_diff_erf_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
