@@ -8,7 +8,7 @@ needs to be able to represent the right-hand side of an ODE system in symbolic
 form in order to be able to compute its high-order derivatives via automatic
 differentiation. heyoka represents generic mathematical expressions
 via a simple `abstract syntax tree (AST) <https://en.wikipedia.org/wiki/Abstract_syntax_tree>`__
-in which the internal nodes are either mathematical operators or n-ary functions,
+in which the internal nodes are n-ary functions,
 and the leaf nodes can be:
 
 * symbolic variables,

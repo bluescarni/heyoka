@@ -559,9 +559,9 @@ trascendental equation
 .. math::
    :label:
 
-   M = E - e \sin E.
+   M = E - e \sin E,
 
-Given :math:`a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \right)`, we have
+with :math:`e \in \left[ 0, 1 \right)`. Given :math:`a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \right)`, we have
 
 .. math::
    :label:
