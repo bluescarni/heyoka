@@ -68,7 +68,7 @@ TEST_CASE("kepE decompose")
         REQUIRE(dec.size() == 6u);
 
         REQUIRE(dec[2].first == kepE(u0, u1));
-        REQUIRE(dec[2].second == std::vector<std::uint32_t>{3, 5});
+        REQUIRE(dec[2].second == std::vector<std::uint32_t>{5, 3});
 
         REQUIRE(dec[3].first == sin("u_2"_var));
         REQUIRE(dec[3].second == std::vector<std::uint32_t>{4});
@@ -97,7 +97,7 @@ TEST_CASE("kepE decompose")
         REQUIRE(dec[3].second.empty());
 
         REQUIRE(dec[4].first == kepE("u_2"_var, "u_3"_var));
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{5, 7});
+        REQUIRE(dec[4].second == std::vector<std::uint32_t>{7, 5});
 
         REQUIRE(dec[5].first == sin("u_4"_var));
         REQUIRE(dec[5].second == std::vector<std::uint32_t>{6});
