@@ -35,6 +35,15 @@ using fmt::literals::operator""_format;
 
 using namespace heyoka;
 
+TEST_CASE("kepE def ctor")
+{
+    detail::kepE_impl k;
+
+    REQUIRE(k.args().size() == 2u);
+    REQUIRE(k.args()[0] == 0_dbl);
+    REQUIRE(k.args()[1] == 0_dbl);
+}
+
 TEST_CASE("kepE diff")
 {
     auto [x, y] = make_vars("x", "y");
