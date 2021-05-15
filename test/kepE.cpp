@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <sstream>
 #include <utility>
@@ -28,11 +29,14 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
+#include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -47,6 +51,7 @@ using fmt::literals::operator""_format;
 #endif
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("kepE def ctor")
 {
@@ -163,4 +168,51 @@ TEST_CASE("kepE cse")
     auto dc = taylor_add_jet<double>(s, "jet", {cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), x}, 1, 1, false, false);
 
     REQUIRE(dc.size() == 10u);
+}
+
+// NOTE: this test checks a numerical integration of the Stark problem using kepE vs
+// the implementation in the Python notebook, which does not use kepE. This test is useful
+// to check both the symbolic and automatic derivatives of kepE.
+TEST_CASE("kepE stark")
+{
+    using std::cos;
+    using std::sin;
+    using std::sqrt;
+
+    auto [L, G, H, l, g, h] = make_vars("L", "G", "H", "l", "g", "h");
+
+    const auto eps = 1e-3;
+
+    auto E = kepE(sqrt(1. - G * G / (L * L)), l);
+
+    auto Ham = -0.5 * pow(L, -2.)
+               - eps * L * sqrt(1. - H * H / (G * G))
+                     * (L * (cos(E) - sqrt(1. - G * G / (L * L))) * sin(g) + G * sin(E) * cos(g));
+
+    auto ta = taylor_adaptive<double>{{prime(L) = -diff(Ham, l), prime(G) = -diff(Ham, g), prime(H) = -diff(Ham, h),
+                                       prime(l) = diff(Ham, L), prime(g) = diff(Ham, G), prime(h) = diff(Ham, H)},
+                                      std::vector{1.0045488165591647, 0.9731906288081488, -0.9683287292736491,
+                                                  2.8485929090946436, 4.314274521695855, 3.3415926535897924}};
+    auto ic_L = ta.get_state()[0];
+    auto ic_G = ta.get_state()[1];
+    auto ic_E = ta.get_state()[3];
+    ta.get_state_data()[3] = ic_E - sqrt(1 - ic_G * ic_G / (ic_L * ic_L)) * sin(ic_E);
+
+    auto [oc, _1, _2, _3] = ta.propagate_until(250.);
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+
+    REQUIRE(ta.get_state()[0] == approximately(1.0046255890340732));
+    REQUIRE(ta.get_state()[1] == approximately(0.9802027040286941));
+    REQUIRE(ta.get_state()[2] == approximately(-0.9683287292736491));
+    REQUIRE(ta.get_state()[4] == approximately(3.8714912951286484));
+    REQUIRE(ta.get_state()[5] == approximately(2.745578227312136));
+
+    auto f_L = ta.get_state()[0];
+    auto f_G = ta.get_state()[1];
+    auto f_E = -2.2193101195959493;
+
+    // NOTE: slightly less precise because we don't reduce the angle via callback here.
+    REQUIRE(sin(ta.get_state()[3]) == approximately(sin(f_E - sqrt(1 - f_G * f_G / (f_L * f_L)) * sin(f_E)), 10000.));
+    REQUIRE(cos(ta.get_state()[3]) == approximately(cos(f_E - sqrt(1 - f_G * f_G / (f_L * f_L)) * sin(f_E)), 10000.));
 }
