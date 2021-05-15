@@ -817,6 +817,206 @@ TEST_CASE("taylor kepE")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, opt_level,
                                    high_accuracy, compact_mode);
+
+        // Variable-variable tests.
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 1, 1, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            jet.resize(4);
+
+            jptr(jet.data(), nullptr, nullptr);
+
+            REQUIRE(jet[0] == fp_t{.2});
+            REQUIRE(jet[1] == fp_t{.3});
+            REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[0], jet[1])));
+            REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[1], jet[0])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 1, 2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            jet.resize(8);
+
+            jptr(jet.data(), nullptr, nullptr);
+
+            REQUIRE(jet[0] == .2);
+            REQUIRE(jet[1] == .5);
+
+            REQUIRE(jet[2] == .3);
+            REQUIRE(jet[3] == .4);
+
+            REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[0], jet[2])));
+            REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[1], jet[3])));
+
+            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(jet[2], jet[0])));
+            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(jet[3], jet[1])));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 1, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.2}, fp_t{.3}};
+            jet.resize(6);
+
+            jptr(jet.data(), nullptr, nullptr);
+
+            REQUIRE(jet[0] == .2);
+            REQUIRE(jet[1] == .3);
+            REQUIRE(jet[2] == approximately(bmt_inv_kep_E(jet[0], jet[1])));
+            REQUIRE(jet[3] == approximately(bmt_inv_kep_E(jet[1], jet[0])));
+            REQUIRE(jet[4]
+                    == approximately(fp_t{1} / 2 * (jet[2] * sin(jet[2]) + jet[3]) / (1 - jet[0] * cos(jet[2]))));
+            REQUIRE(jet[5]
+                    == approximately(fp_t{1} / 2 * (jet[3] * sin(jet[3]) + jet[2]) / (1 - jet[1] * cos(jet[3]))));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 2, 2, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.3}, fp_t{.4}};
+            jet.resize(12);
+
+            jptr(jet.data(), nullptr, nullptr);
+
+            REQUIRE(jet[0] == .2);
+            REQUIRE(jet[1] == .5);
+
+            REQUIRE(jet[2] == .3);
+            REQUIRE(jet[3] == .4);
+
+            REQUIRE(jet[4] == approximately(bmt_inv_kep_E(jet[0], jet[2])));
+            REQUIRE(jet[5] == approximately(bmt_inv_kep_E(jet[1], jet[3])));
+
+            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(jet[2], jet[0])));
+            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(jet[3], jet[1])));
+
+            REQUIRE(jet[8]
+                    == approximately(fp_t{1} / 2 * (jet[4] * sin(jet[4]) + jet[6]) / (1 - jet[0] * cos(jet[4]))));
+            REQUIRE(jet[9]
+                    == approximately(fp_t{1} / 2 * (jet[5] * sin(jet[5]) + jet[7]) / (1 - jet[1] * cos(jet[5]))));
+
+            REQUIRE(jet[10]
+                    == approximately(fp_t{1} / 2 * (jet[6] * sin(jet[6]) + jet[4]) / (1 - jet[2] * cos(jet[6]))));
+            REQUIRE(jet[11]
+                    == approximately(fp_t{1} / 2 * (jet[7] * sin(jet[7]) + jet[5]) / (1 - jet[3] * cos(jet[7]))));
+        }
+
+        {
+            llvm_state s{kw::opt_level = opt_level};
+
+            taylor_add_jet<fp_t>(s, "jet", {kepE(x, y), kepE(y, x)}, 3, 3, high_accuracy, compact_mode);
+
+            s.compile();
+
+            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+            std::vector<fp_t> jet{fp_t{.2}, fp_t{.5}, fp_t{.1}, fp_t{.3}, fp_t{.4}, fp_t{.6}};
+            jet.resize(24);
+
+            jptr(jet.data(), nullptr, nullptr);
+
+            REQUIRE(jet[0] == .2);
+            REQUIRE(jet[1] == .5);
+            REQUIRE(jet[2] == .1);
+
+            REQUIRE(jet[3] == .3);
+            REQUIRE(jet[4] == .4);
+            REQUIRE(jet[5] == .6);
+
+            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(jet[0], jet[3])));
+            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(jet[1], jet[4])));
+            REQUIRE(jet[8] == approximately(bmt_inv_kep_E(jet[2], jet[5])));
+
+            REQUIRE(jet[9] == approximately(bmt_inv_kep_E(jet[3], jet[0])));
+            REQUIRE(jet[10] == approximately(bmt_inv_kep_E(jet[4], jet[1])));
+            REQUIRE(jet[11] == approximately(bmt_inv_kep_E(jet[5], jet[2])));
+
+            REQUIRE(jet[12]
+                    == approximately(fp_t{1} / 2 * (jet[6] * sin(jet[6]) + jet[9]) / (1 - jet[0] * cos(jet[6]))));
+            REQUIRE(jet[13]
+                    == approximately(fp_t{1} / 2 * (jet[7] * sin(jet[7]) + jet[10]) / (1 - jet[1] * cos(jet[7]))));
+            REQUIRE(jet[14]
+                    == approximately(fp_t{1} / 2 * (jet[8] * sin(jet[8]) + jet[11]) / (1 - jet[2] * cos(jet[8]))));
+
+            REQUIRE(jet[15]
+                    == approximately(fp_t{1} / 2 * (jet[9] * sin(jet[9]) + jet[6]) / (1 - jet[3] * cos(jet[9]))));
+            REQUIRE(jet[16]
+                    == approximately(fp_t{1} / 2 * (jet[10] * sin(jet[10]) + jet[7]) / (1 - jet[4] * cos(jet[10]))));
+            REQUIRE(jet[17]
+                    == approximately(fp_t{1} / 2 * (jet[11] * sin(jet[11]) + jet[8]) / (1 - jet[5] * cos(jet[11]))));
+
+            REQUIRE(jet[18]
+                    == approximately(fp_t{1} / 6
+                                     * ((2 * jet[12] * sin(jet[6]) + jet[6] * 2 * jet[12] * cos(jet[6]) + 2 * jet[15])
+                                            * (1 - jet[0] * cos(jet[6]))
+                                        - (jet[6] * sin(jet[6]) + jet[9])
+                                              * (jet[0] * 2 * jet[12] * sin(jet[6]) - jet[6] * cos(jet[6])))
+                                     / ((1 - jet[0] * cos(jet[6])) * (1 - jet[0] * cos(jet[6])))));
+            REQUIRE(jet[19]
+                    == approximately(fp_t{1} / 6
+                                     * ((2 * jet[13] * sin(jet[7]) + jet[7] * 2 * jet[13] * cos(jet[7]) + 2 * jet[16])
+                                            * (1 - jet[1] * cos(jet[7]))
+                                        - (jet[7] * sin(jet[7]) + jet[10])
+                                              * (jet[1] * 2 * jet[13] * sin(jet[7]) - jet[7] * cos(jet[7])))
+                                     / ((1 - jet[1] * cos(jet[7])) * (1 - jet[1] * cos(jet[7])))));
+            REQUIRE(jet[20]
+                    == approximately(fp_t{1} / 6
+                                     * ((2 * jet[14] * sin(jet[8]) + jet[8] * 2 * jet[14] * cos(jet[8]) + 2 * jet[17])
+                                            * (1 - jet[2] * cos(jet[8]))
+                                        - (jet[8] * sin(jet[8]) + jet[11])
+                                              * (jet[2] * 2 * jet[14] * sin(jet[8]) - jet[8] * cos(jet[8])))
+                                     / ((1 - jet[2] * cos(jet[8])) * (1 - jet[2] * cos(jet[8])))));
+
+            REQUIRE(jet[21]
+                    == approximately(fp_t{1} / 6
+                                     * ((2 * jet[15] * sin(jet[9]) + jet[9] * 2 * jet[15] * cos(jet[9]) + 2 * jet[12])
+                                            * (1 - jet[3] * cos(jet[9]))
+                                        - (jet[9] * sin(jet[9]) + jet[6])
+                                              * (jet[3] * 2 * jet[15] * sin(jet[9]) - jet[9] * cos(jet[9])))
+                                     / ((1 - jet[3] * cos(jet[9])) * (1 - jet[3] * cos(jet[9])))));
+            REQUIRE(
+                jet[22]
+                == approximately(fp_t{1} / 6
+                                 * ((2 * jet[16] * sin(jet[10]) + jet[10] * 2 * jet[16] * cos(jet[10]) + 2 * jet[13])
+                                        * (1 - jet[4] * cos(jet[10]))
+                                    - (jet[10] * sin(jet[10]) + jet[7])
+                                          * (jet[4] * 2 * jet[16] * sin(jet[10]) - jet[10] * cos(jet[10])))
+                                 / ((1 - jet[4] * cos(jet[10])) * (1 - jet[4] * cos(jet[10])))));
+            REQUIRE(
+                jet[23]
+                == approximately(fp_t{1} / 6
+                                 * ((2 * jet[17] * sin(jet[11]) + jet[11] * 2 * jet[17] * cos(jet[11]) + 2 * jet[14])
+                                        * (1 - jet[5] * cos(jet[11]))
+                                    - (jet[11] * sin(jet[11]) + jet[8])
+                                          * (jet[5] * 2 * jet[17] * sin(jet[11]) - jet[11] * cos(jet[11])))
+                                 / ((1 - jet[5] * cos(jet[11])) * (1 - jet[5] * cos(jet[11])))));
+        }
     };
 
     // TODO fix.
