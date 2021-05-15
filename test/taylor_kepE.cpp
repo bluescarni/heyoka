@@ -1019,8 +1019,7 @@ TEST_CASE("taylor kepE")
         }
     };
 
-    // TODO fix.
-    for (auto cm : {false, false}) {
+    for (auto cm : {true, false}) {
         for (auto f : {false, true}) {
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 0, f, cm); });
             tuple_for_each(fp_types, [&tester, f, cm](auto x) { tester(x, 1, f, cm); });
