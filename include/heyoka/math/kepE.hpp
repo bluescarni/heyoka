@@ -16,6 +16,12 @@
 #include <utility>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -60,6 +66,24 @@ public:
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
+
+HEYOKA_DLL_PUBLIC expression kepE(expression, double);
+HEYOKA_DLL_PUBLIC expression kepE(expression, long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression kepE(expression, mppp::real128);
+
+#endif
+
+HEYOKA_DLL_PUBLIC expression kepE(double, expression);
+HEYOKA_DLL_PUBLIC expression kepE(long double, expression);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression kepE(mppp::real128, expression);
+
+#endif
 
 } // namespace heyoka
 

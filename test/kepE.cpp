@@ -6,18 +6,29 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <sstream>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/number.hpp>
 
 #include "catch.hpp"
 
@@ -108,4 +119,35 @@ TEST_CASE("kepE decompose")
         REQUIRE(dec[7].first == "u_2"_var * "u_6"_var);
         REQUIRE(dec[7].second.empty());
     }
+}
+
+TEST_CASE("kepE overloads")
+{
+    auto k = kepE("x"_var, 1.1);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
+
+    k = kepE("x"_var, 1.1l);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = kepE("x"_var, mppp::real128{"1.1"});
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+    k = kepE(1.1, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1});
+
+    k = kepE(1.1l, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = kepE(mppp::real128{"1.1"}, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
+#endif
 }
