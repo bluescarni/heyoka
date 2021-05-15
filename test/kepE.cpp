@@ -25,10 +25,12 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 
@@ -150,4 +152,15 @@ TEST_CASE("kepE overloads")
     REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
     REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
 #endif
+}
+
+TEST_CASE("kepE cse")
+{
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s;
+
+    auto dc = taylor_add_jet<double>(s, "jet", {cos(kepE(x, y)) + sin(kepE(x, y)) + kepE(x, y), x}, 1, 1, false, false);
+
+    REQUIRE(dc.size() == 10u);
 }
