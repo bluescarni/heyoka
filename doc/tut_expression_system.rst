@@ -52,7 +52,8 @@ also supports the following elementary functions (with more to come in the near 
 * the basic trigonometric and hyperbolic functions, and their inverse counterparts,
 * the natural logarithm and exponential,
 * the standard logistic function (sigmoid),
-* the error function.
+* the error function,
+* the inverse of Kepler's elliptic equation.
 
 heyoka also provides an API for implementing new functions without
 modifying the library's code.

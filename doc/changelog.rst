@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add the inverse of Kepler's elliptic equation to the expression
+  system
+  (`#138 <https://github.com/bluescarni/heyoka/pull/138>`__).
 - Add an LLVM-based vectorised solver for Kepler's equation
   (`#136 <https://github.com/bluescarni/heyoka/pull/136>`__).
 - Add an LLVM ``while`` loop function
