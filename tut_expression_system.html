@@ -271,7 +271,7 @@ needs to be able to represent the right-hand side of an ODE system in symbolic
 form in order to be able to compute its high-order derivatives via automatic
 differentiation. heyoka represents generic mathematical expressions
 via a simple <a class="reference external" href="https://en.wikipedia.org/wiki/Abstract_syntax_tree">abstract syntax tree (AST)</a>
-in which the internal nodes are either mathematical operators or n-ary functions,
+in which the internal nodes are n-ary functions,
 and the leaf nodes can be:</p>
 <ul class="simple">
 <li><p>symbolic variables,</p></li>
@@ -321,7 +321,8 @@ also supports the following elementary functions (with more to come in the near 
 <li><p>the basic trigonometric and hyperbolic functions, and their inverse counterparts,</p></li>
 <li><p>the natural logarithm and exponential,</p></li>
 <li><p>the standard logistic function (sigmoid),</p></li>
-<li><p>the error function.</p></li>
+<li><p>the error function,</p></li>
+<li><p>the inverse of Kepler’s elliptic equation.</p></li>
 </ul>
 <p>heyoka also provides an API for implementing new functions without
 modifying the library’s code.</p>

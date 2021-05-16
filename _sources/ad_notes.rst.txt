@@ -511,7 +511,7 @@ the final result, for :math:`n > 0`, is:
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[1 - c^{\left[ 0 \right]}\left( t \right) \right]}\left[ n b^{\left[ n \right]}\left( t \right) + \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
 
 Special functions
------------------------
+-----------------
 
 .. _ad_erf:
 
@@ -539,10 +539,86 @@ becomes
 
    a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).
 
-After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`,
-:eq:`eq_leibniz_00` and :eq:`eq_ad_addsub_00` to obtain, for :math:`n > 0`:
+After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`
+and :eq:`eq_leibniz_00` to obtain, for :math:`n > 0`:
 
 .. math::
    :label:
 
    a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).
+
+Celestial mechanics
+-------------------
+
+Inverse of Kepler's elliptic equation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The inverse of Kepler's elliptic equation is the bivariate function :math:`E = E\left( e, M \right)` implicitly defined by the
+trascendental equation
+
+.. math::
+   :label:
+
+   M = E - e \sin E,
+
+with :math:`e \in \left[ 0, 1 \right)`. Given :math:`a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \right)`, we have
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right),
+
+where the partial derivatives are
+
+.. math::
+   :label:
+
+   \begin{cases}
+   \frac{\partial E}{\partial e} = \frac{\sin E}{1-e\cos E}, \\
+   \frac{\partial E}{\partial M} = \frac{1}{1-e\cos E}. \\
+   \end{cases}
+
+Expanding the partial derivatives yields
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) = \frac{e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right)}{1-e\left( t \right)\cos a\left(t \right)},
+
+or, equivalently,
+
+.. math::
+   :label: eq_ad_kepE_00
+
+   a^\prime\left( t \right) -  a^\prime\left( t \right) e \left( t \right) \cos a\left(t \right) = e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right).
+
+We can now introduce the auxiliary functions
+
+.. math::
+   :label:
+
+   \begin{cases}
+   c\left( t \right) = e\left( t \right) \cos a\left(t \right), \\
+   d\left( t \right) = \sin a\left(t \right), \\
+   \end{cases}
+
+so that :eq:`eq_ad_kepE_00` can be rewritten as
+
+.. math::
+   :label:
+
+   a^\prime\left( t \right) -  a^\prime\left( t \right) c\left( t \right) = e^\prime \left( t \right)d\left(t \right) + M^\prime\left( t \right).
+
+After applying the normalised derivative of order :math:`n-1` to both sides, we can use :eq:`eq_norm_der_00`
+and :eq:`eq_leibniz_00` and re-arrange to obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right)\right)}
+   \left[
+   n\left( e^{\left[ n \right]}\left( t \right) d^{\left[ 0 \right]}\left( t \right) + M^{\left[ n \right]}\left( t \right)\right) +
+   \sum_{j=1}^{n-1}j\left( c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right)+
+   d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
+   \right)
+   \right].

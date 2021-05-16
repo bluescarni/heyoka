@@ -409,6 +409,18 @@
    </li>
   </ul>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#celestial-mechanics">
+   Celestial mechanics
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inverse-of-kepler-s-elliptic-equation">
+     Inverse of Kepler’s elliptic equation
+    </a>
+   </li>
+  </ul>
+ </li>
 </ul>
 
             </nav>
@@ -712,10 +724,54 @@ identical to the <a class="reference internal" href="#ad-atan"><span class="std 
 <p>becomes</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-49">
 <span class="eqno">(57)<a class="headerlink" href="#equation-ad-notes-49" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac 2{\sqrt\pi}c\left( t \right) b^\prime\left( t \right).\]</div>
-<p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>,
-<a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and <a class="reference internal" href="#equation-eq-ad-addsub-00">(3)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>
+and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
 <div class="math notranslate nohighlight" id="equation-ad-notes-50">
 <span class="eqno">(58)<a class="headerlink" href="#equation-ad-notes-50" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac 1n \frac 2{\sqrt\pi}\sum_{j=1}^{n} j c^{\left[ n - j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right).\]</div>
+</div>
+</div>
+<div class="section" id="celestial-mechanics">
+<h2>Celestial mechanics<a class="headerlink" href="#celestial-mechanics" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="inverse-of-kepler-s-elliptic-equation">
+<h3>Inverse of Kepler’s elliptic equation<a class="headerlink" href="#inverse-of-kepler-s-elliptic-equation" title="Permalink to this headline">¶</a></h3>
+<p>The inverse of Kepler’s elliptic equation is the bivariate function <span class="math notranslate nohighlight">\(E = E\left( e, M \right)\)</span> implicitly defined by the
+trascendental equation</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-51">
+<span class="eqno">(59)<a class="headerlink" href="#equation-ad-notes-51" title="Permalink to this equation">¶</a></span>\[M = E - e \sin E,\]</div>
+<p>with <span class="math notranslate nohighlight">\(e \in \left[ 0, 1 \right)\)</span>. Given <span class="math notranslate nohighlight">\(a\left( t \right) = E\left( e\left( t \right), M \left( t \right) \right)\)</span>, we have</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-52">
+<span class="eqno">(60)<a class="headerlink" href="#equation-ad-notes-52" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{\partial E}{\partial e}e^\prime\left( t \right) + \frac{\partial E}{\partial M}M^\prime\left( t \right),\]</div>
+<p>where the partial derivatives are</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-53">
+<span class="eqno">(61)<a class="headerlink" href="#equation-ad-notes-53" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{cases}
+\frac{\partial E}{\partial e} = \frac{\sin E}{1-e\cos E}, \\
+\frac{\partial E}{\partial M} = \frac{1}{1-e\cos E}. \\
+\end{cases}\end{split}\]</div>
+<p>Expanding the partial derivatives yields</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-54">
+<span class="eqno">(62)<a class="headerlink" href="#equation-ad-notes-54" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) = \frac{e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right)}{1-e\left( t \right)\cos a\left(t \right)},\]</div>
+<p>or, equivalently,</p>
+<div class="math notranslate nohighlight" id="equation-eq-ad-kepe-00">
+<span class="eqno">(63)<a class="headerlink" href="#equation-eq-ad-kepe-00" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) e \left( t \right) \cos a\left(t \right) = e^\prime \left( t \right)\sin a\left(t \right) + M^\prime\left( t \right).\]</div>
+<p>We can now introduce the auxiliary functions</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-55">
+<span class="eqno">(64)<a class="headerlink" href="#equation-ad-notes-55" title="Permalink to this equation">¶</a></span>\[\begin{split}\begin{cases}
+c\left( t \right) = e\left( t \right) \cos a\left(t \right), \\
+d\left( t \right) = \sin a\left(t \right), \\
+\end{cases}\end{split}\]</div>
+<p>so that <a class="reference internal" href="#equation-eq-ad-kepe-00">(63)</a> can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-56">
+<span class="eqno">(65)<a class="headerlink" href="#equation-ad-notes-56" title="Permalink to this equation">¶</a></span>\[a^\prime\left( t \right) -  a^\prime\left( t \right) c\left( t \right) = e^\prime \left( t \right)d\left(t \right) + M^\prime\left( t \right).\]</div>
+<p>After applying the normalised derivative of order <span class="math notranslate nohighlight">\(n-1\)</span> to both sides, we can use <a class="reference internal" href="#equation-eq-norm-der-00">(1)</a>
+and <a class="reference internal" href="#equation-eq-leibniz-00">(2)</a> and re-arrange to obtain, for <span class="math notranslate nohighlight">\(n &gt; 0\)</span>:</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-57">
+<span class="eqno">(66)<a class="headerlink" href="#equation-ad-notes-57" title="Permalink to this equation">¶</a></span>\[a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left(1 - c^{\left[ 0 \right]}\left( t \right)\right)}
+\left[
+n\left( e^{\left[ n \right]}\left( t \right) d^{\left[ 0 \right]}\left( t \right) + M^{\left[ n \right]}\left( t \right)\right) +
+\sum_{j=1}^{n-1}j\left( c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right)+
+d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
+\right)
+\right].\]</div>
 </div>
 </div>
 </div>
