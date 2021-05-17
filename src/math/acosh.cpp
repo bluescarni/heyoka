@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -170,19 +171,19 @@ taylor_dc_t::size_type acosh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     }
 
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(arg), std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(taylor_dc_item_t{square(arg), {}, {}, {}});
 
     // Append arg * arg - 1.
-    u_vars_defs.emplace_back(expression{"u_{}"_format(u_vars_defs.size() - 1u)} - 1_dbl, std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(taylor_dc_item_t{expression{"u_{}"_format(u_vars_defs.size() - 1u)} - 1_dbl, {}, {}, {}});
 
     // Append sqrt(arg * arg - 1).
-    u_vars_defs.emplace_back(sqrt(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(taylor_dc_item_t{sqrt(expression{"u_{}"_format(u_vars_defs.size() - 1u)}), {}, {}, {}});
 
     // Append the acosh decomposition.
-    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(taylor_dc_item_t{expression{func{std::move(*this)}}, {}, {}, {}});
 
     // Add the hidden dep.
-    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+    std::get<1>(*(u_vars_defs.end() - 1)).push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
     // Compute the return value (pointing to the
     // decomposed acosh).

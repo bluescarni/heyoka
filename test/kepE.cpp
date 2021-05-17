@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <sstream>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -78,52 +79,52 @@ TEST_CASE("kepE decompose")
         auto [u0, u1] = make_vars("u_0", "u_1");
 
         taylor_dc_t dec;
-        dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
+        dec.push_back(taylor_dc_item_t{"e"_var, {}, {}, {}});
+        dec.push_back(taylor_dc_item_t{"M"_var, {}, {}, {}});
         taylor_decompose_in_place(kepE(u0, u1), dec);
 
         REQUIRE(dec.size() == 6u);
 
-        REQUIRE(dec[2].first == kepE(u0, u1));
-        REQUIRE(dec[2].second == std::vector<std::uint32_t>{5, 3});
+        REQUIRE(std::get<0>(dec[2]) == kepE(u0, u1));
+        REQUIRE(std::get<1>(dec[2]) == std::vector<std::uint32_t>{5, 3});
 
-        REQUIRE(dec[3].first == sin("u_2"_var));
-        REQUIRE(dec[3].second == std::vector<std::uint32_t>{4});
+        REQUIRE(std::get<0>(dec[3]) == sin("u_2"_var));
+        REQUIRE(std::get<1>(dec[3]) == std::vector<std::uint32_t>{4});
 
-        REQUIRE(dec[4].first == cos("u_2"_var));
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{3});
+        REQUIRE(std::get<0>(dec[4]) == cos("u_2"_var));
+        REQUIRE(std::get<1>(dec[4]) == std::vector<std::uint32_t>{3});
 
-        REQUIRE(dec[5].first == "u_0"_var * "u_4"_var);
-        REQUIRE(dec[5].second.empty());
+        REQUIRE(std::get<0>(dec[5]) == "u_0"_var * "u_4"_var);
+        REQUIRE(std::get<1>(dec[5]).empty());
     }
 
     {
         auto [u0, u1] = make_vars("u_0", "u_1");
 
         taylor_dc_t dec;
-        dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
-        dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
+        dec.push_back(taylor_dc_item_t{"e"_var, {}, {}, {}});
+        dec.push_back(taylor_dc_item_t{"M"_var, {}, {}, {}});
         taylor_decompose_in_place(kepE(u0 + u1, u1 - u0), dec);
 
         REQUIRE(dec.size() == 8u);
 
-        REQUIRE(dec[2].first == "u_0"_var + "u_1"_var);
-        REQUIRE(dec[2].second.empty());
+        REQUIRE(std::get<0>(dec[2]) == "u_0"_var + "u_1"_var);
+        REQUIRE(std::get<1>(dec[2]).empty());
 
-        REQUIRE(dec[3].first == "u_1"_var - "u_0"_var);
-        REQUIRE(dec[3].second.empty());
+        REQUIRE(std::get<0>(dec[3]) == "u_1"_var - "u_0"_var);
+        REQUIRE(std::get<1>(dec[3]).empty());
 
-        REQUIRE(dec[4].first == kepE("u_2"_var, "u_3"_var));
-        REQUIRE(dec[4].second == std::vector<std::uint32_t>{7, 5});
+        REQUIRE(std::get<0>(dec[4]) == kepE("u_2"_var, "u_3"_var));
+        REQUIRE(std::get<1>(dec[4]) == std::vector<std::uint32_t>{7, 5});
 
-        REQUIRE(dec[5].first == sin("u_4"_var));
-        REQUIRE(dec[5].second == std::vector<std::uint32_t>{6});
+        REQUIRE(std::get<0>(dec[5]) == sin("u_4"_var));
+        REQUIRE(std::get<1>(dec[5]) == std::vector<std::uint32_t>{6});
 
-        REQUIRE(dec[6].first == cos("u_4"_var));
-        REQUIRE(dec[6].second == std::vector<std::uint32_t>{5});
+        REQUIRE(std::get<0>(dec[6]) == cos("u_4"_var));
+        REQUIRE(std::get<1>(dec[6]) == std::vector<std::uint32_t>{5});
 
-        REQUIRE(dec[7].first == "u_2"_var * "u_6"_var);
-        REQUIRE(dec[7].second.empty());
+        REQUIRE(std::get<0>(dec[7]) == "u_2"_var * "u_6"_var);
+        REQUIRE(std::get<1>(dec[7]).empty());
     }
 }
 

@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -103,26 +104,26 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     auto e_copy = e;
 
     // Append the kepE decomposition.
-    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(taylor_dc_item_t{expression{func{std::move(*this)}}, {}, {}, {}});
 
     // Append the sin(a)/cos(a) decompositions.
-    u_vars_defs.emplace_back(sin(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
-                             std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(cos(expression{variable{"u_{}"_format(u_vars_defs.size() - 2u)}}),
-                             std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(
+        taylor_dc_item_t{sin(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}), {}, {}, {}});
+    u_vars_defs.push_back(
+        taylor_dc_item_t{cos(expression{variable{"u_{}"_format(u_vars_defs.size() - 2u)}}), {}, {}, {}});
 
     // Append the e*cos(a) decomposition.
-    u_vars_defs.emplace_back(std::move(e_copy) * expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}},
-                             std::vector<std::uint32_t>{});
+    u_vars_defs.push_back(
+        {std::move(e_copy) * expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}, {}, {}, {}});
 
     // Add the hidden deps.
     // NOTE: hidden deps on e*cos(a) and sin(a) (in this order).
-    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
-    (u_vars_defs.end() - 4)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
+    std::get<1>(*(u_vars_defs.end() - 4)).push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    std::get<1>(*(u_vars_defs.end() - 4)).push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
 
     // sin/cos hidden deps.
-    (u_vars_defs.end() - 3)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
-    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
+    std::get<1>(*(u_vars_defs.end() - 3)).push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
+    std::get<1>(*(u_vars_defs.end() - 2)).push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 3u));
 
     return u_vars_defs.size() - 4u;
 }
