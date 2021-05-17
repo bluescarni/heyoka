@@ -159,8 +159,7 @@ mppp::real128 asinh_impl::eval_f128(const std::unordered_map<std::string, mppp::
 }
 #endif
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-asinh_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type asinh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 

@@ -127,7 +127,7 @@ long double eval_ldbl(const param &p, const std::unordered_map<std::string, long
 
 #if defined(HEYOKA_HAVE_REAL128)
 mppp::real128 eval_f128(const param &p, const std::unordered_map<std::string, mppp::real128> &,
-                       const std::vector<mppp::real128> &pars)
+                        const std::vector<mppp::real128> &pars)
 {
     if (p.idx() >= pars.size()) {
         using namespace fmt::literals;
@@ -175,8 +175,7 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
     throw not_implemented_error("update_grad_dbl() not implemented for param");
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(param &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
+taylor_dc_t::size_type taylor_decompose_in_place(param &&, taylor_dc_t &)
 {
     // NOTE: params do not require decomposition.
     return 0;

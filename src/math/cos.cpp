@@ -194,8 +194,7 @@ double cos_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return -std::sin(a[0]);
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-cos_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type cos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 

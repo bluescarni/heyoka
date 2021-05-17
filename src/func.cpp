@@ -105,7 +105,7 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 } // namespace
 
 // Default implementation of Taylor decomposition for a function.
-void func_default_td_impl(func_base &fb, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
+void func_default_td_impl(func_base &fb, taylor_dc_t &u_vars_defs)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
@@ -338,8 +338,7 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-func::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type func::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
 
@@ -725,8 +724,7 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
     };
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(func &&f, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &dc)
+taylor_dc_t::size_type taylor_decompose_in_place(func &&f, taylor_dc_t &dc)
 {
     return std::move(f).taylor_decompose(dc);
 }

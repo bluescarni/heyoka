@@ -13,7 +13,6 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -41,8 +40,7 @@ public:
 
     expression diff(const std::string &) const;
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,

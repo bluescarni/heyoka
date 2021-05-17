@@ -117,30 +117,27 @@ HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
-    taylor_decompose(std::vector<expression>, std::vector<expression>);
-HEYOKA_DLL_PUBLIC std::pair<std::vector<std::pair<expression, std::vector<std::uint32_t>>>, std::vector<std::uint32_t>>
+HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<expression>,
+                                                                                      std::vector<expression>);
+HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
     taylor_decompose(std::vector<std::pair<expression, expression>>, std::vector<expression>);
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t, bool, bool,
-                   std::vector<expression>);
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_ldbl(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t, bool,
-                    bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<expression>,
+                                                 std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &, std::vector<expression>,
+                                                  std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<expression>, std::uint32_t, std::uint32_t, bool,
-                    bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<expression>,
+                                                  std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
 
 #endif
 
 template <typename T>
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-               std::uint32_t batch_size, bool high_accuracy, bool compact_mode, std::vector<expression> sv_funcs = {})
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
+                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           std::vector<expression> sv_funcs = {})
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
@@ -158,26 +155,25 @@ taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> s
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, std::uint32_t,
-                   std::uint32_t, bool, bool, std::vector<expression>);
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_ldbl(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, std::uint32_t,
-                    std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &,
+                                                 std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                 std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &,
+                                                  std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                  std::uint32_t, bool, bool, std::vector<expression>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<std::pair<expression, expression>>, std::uint32_t,
-                    std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &,
+                                                  std::vector<std::pair<expression, expression>>, std::uint32_t,
+                                                  std::uint32_t, bool, bool, std::vector<expression>);
 
 #endif
 
 template <typename T>
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>
-taylor_add_jet(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-               std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-               std::vector<expression> sv_funcs = {})
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
+                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           std::vector<expression> sv_funcs = {})
 {
     if constexpr (std::is_same_v<T, double>) {
         return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
@@ -490,7 +486,7 @@ private:
     // Dimension of the system.
     std::uint32_t m_dim;
     // Taylor decomposition.
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> m_dc;
+    taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
     // The steppers.
@@ -609,7 +605,7 @@ public:
 
     const llvm_state &get_llvm_state() const;
 
-    const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &get_decomposition() const;
+    const taylor_dc_t &get_decomposition() const;
 
     std::uint32_t get_order() const;
     std::uint32_t get_dim() const;
@@ -796,7 +792,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Dimension of the system.
     std::uint32_t m_dim;
     // Taylor decomposition.
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> m_dc;
+    taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
     // The stepper.
@@ -893,7 +889,7 @@ public:
 
     const llvm_state &get_llvm_state() const;
 
-    const std::vector<std::pair<expression, std::vector<std::uint32_t>>> &get_decomposition() const;
+    const taylor_dc_t &get_decomposition() const;
 
     std::uint32_t get_batch_size() const;
     std::uint32_t get_order() const;

@@ -12,12 +12,10 @@
 #include <heyoka/config.hpp>
 
 #include <cstddef>
-#include <cstdint>
 #include <ostream>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -139,8 +137,7 @@ inline llvm::Value *codegen(llvm_state &s, const number &n)
     }
 }
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(number &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &);
 
 } // namespace heyoka
 
