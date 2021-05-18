@@ -163,9 +163,11 @@ llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Va
     auto &builder = s.builder();
 
     // Determine the index into the parameter array.
+    // LCOV_EXCL_START
     if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
         throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
     }
+    // LCOV_EXCL_STOP
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
@@ -1254,10 +1256,12 @@ std::uint32_t taylor_order_from_tol(T tol)
 
     // NOTE: cast to double as that ensures that the
     // max of std::uint32_t is exactly representable.
+    // LCOV_EXCL_START
     if (order_f > static_cast<double>(std::numeric_limits<std::uint32_t>::max())) {
         throw std::overflow_error("The computation of the Taylor order in an adaptive Taylor stepper resulted "
                                   "in an overflow condition");
     }
+    // LCOV_EXCL_STOP
     return static_cast<std::uint32_t>(order_f);
 }
 
@@ -2522,6 +2526,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
     // unsigned integer. This is the maximum total number of derivatives we will have to compute
     // and store, with the +1 taking into account the extra slots that might be needed by sv_funcs_dc.
     // If sv_funcs_dc is empty, we need only n_uvars * order + n_eq derivatives.
+    // LCOV_EXCL_START
     if (order == std::numeric_limits<std::uint32_t>::max()
         || n_uvars > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
         throw std::overflow_error(
@@ -2533,6 +2538,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         throw std::overflow_error(
             "An overflow condition was detected in the computation of a jet of Taylor derivatives");
     }
+    // LCOV_EXCL_STOP
 
     if (compact_mode) {
         // In compact mode, let's ensure that we can index into par_ptr using std::uint32_t.
@@ -2543,10 +2549,12 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         for (auto i = n_eq; i < dc.size(); ++i) {
             param_size = std::max(param_size, get_param_size(dc[i].first));
         }
+        // LCOV_EXCL_START
         if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error(
                 "An overflow condition was detected in the computation of a jet of Taylor derivatives in compact mode");
         }
+        // LCOV_EXCL_STOP
 
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
                                                   batch_size);
@@ -2653,6 +2661,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
     // Overflow checking: ensure we can index into
     // tc_ptr using std::uint32_t.
     // NOTE: this is the same check done in taylor_add_jet_impl().
+    // LCOV_EXCL_START
     if (order == std::numeric_limits<std::uint32_t>::max()
         || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
         || n_eq > std::numeric_limits<std::uint32_t>::max() - n_sv_funcs
@@ -2660,6 +2669,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
         throw std::overflow_error("An overflow condition was detected while generating the code for writing the Taylor "
                                   "polynomials of an ODE system into the output array");
     }
+    // LCOV_EXCL_STOP
 
     if (diff_variant.index() == 0u) {
         // Compact mode.
@@ -4318,17 +4328,21 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Fix m_pars' size, if necessary.
     const auto npars = n_pars_in_sys(sys);
+    // LCOV_EXCL_START
     if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
         throw std::overflow_error(
             "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
     }
+    // LCOV_EXCL_STOP
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
+        // LCOV_EXCL_START
         throw std::invalid_argument(
             "Excessive number of parameter values passed to the constructor of an adaptive "
             "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
             "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
+        // LCOV_EXCL_STOP
     }
 
     // Store the dimension of the system.
@@ -5364,12 +5378,14 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // NOTE: overflow checking. We need to be able to index into the jet array
     // (size (n_eq + n_sv_funcs) * (order + 1) * batch_size)
     // using uint32_t.
+    // LCOV_EXCL_START
     if (order == std::numeric_limits<std::uint32_t>::max()
         || (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
         || n_eq > std::numeric_limits<std::uint32_t>::max() - n_sv_funcs
         || n_eq + n_sv_funcs > std::numeric_limits<std::uint32_t>::max() / ((order + 1u) * batch_size)) {
         throw std::overflow_error("An overflow condition was detected while adding a Taylor jet");
     }
+    // LCOV_EXCL_STOP
 
     if (compact_mode) {
         auto diff_arr = std::get<llvm::Value *>(diff_variant);
