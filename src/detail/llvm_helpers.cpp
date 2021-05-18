@@ -1108,22 +1108,44 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Reduce M modulo 2*pi.
         auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
 
-        // Make extra sure M is in the [0, 2*pi) range.
-        auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
-        M = llvm_max(s, M, lb);
-        M = llvm_min(s, M, ub);
-
         // Compute the initial guess from the usual elliptic expansion
-        // to the second order in eccentricities:
-        // E = M + e*sin(M) + e**2/2 * sin(2M) + ...
+        // to the third order in eccentricities:
+        // E = M + e*sin(M) + e**2*sin(M)*cos(M) + e**3*sin(M)*(3/2*cos(M)**2 - 1/2) + ...
         auto [sin_M, cos_M] = llvm_sincos(s, M);
         // e*sin(M).
-        auto ig1 = builder.CreateFMul(ecc, sin_M);
-        // e**2/2 * sin(2M) = e**2*sin(M)*cos(M).
-        auto ig2 = builder.CreateFMul(builder.CreateFMul(builder.CreateFMul(ecc, ecc), sin_M), cos_M);
+        auto e_sin_M = builder.CreateFMul(ecc, sin_M);
+        // e*cos(M).
+        auto e_cos_M = builder.CreateFMul(ecc, cos_M);
+        // e**2.
+        auto e2 = builder.CreateFMul(ecc, ecc);
+        // cos(M)**2.
+        auto cos_M_2 = builder.CreateFMul(cos_M, cos_M);
+
+        // 3/2 and 1/2 constants.
+        auto c_3_2 = vector_splat(builder, codegen<T>(s, number{T(3) / 2}), batch_size);
+        auto c_1_2 = vector_splat(builder, codegen<T>(s, number{T(1) / 2}), batch_size);
+
+        // M + e*sin(M).
+        auto tmp1 = builder.CreateFAdd(M, e_sin_M);
+        // e**2*sin(M)*cos(M).
+        auto tmp2 = builder.CreateFMul(e_sin_M, e_cos_M);
+        // e**3*sin(M).
+        auto tmp3 = builder.CreateFMul(e2, e_sin_M);
+        // 3/2*cos(M)**2 - 1/2.
+        auto tmp4 = builder.CreateFSub(builder.CreateFMul(c_3_2, cos_M_2), c_1_2);
+
         // Put it together.
-        auto ig = builder.CreateFAdd(builder.CreateFAdd(M, ig1), ig2);
+        auto ig1 = builder.CreateFAdd(tmp1, tmp2);
+        auto ig2 = builder.CreateFMul(tmp3, tmp4);
+        auto ig = builder.CreateFAdd(ig1, ig2);
+
+        // Make extra sure the initial guess is in the [0, 2*pi) range.
+        auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
+        ig = llvm_max(s, ig, lb);
+        ig = llvm_min(s, ig, ub);
+
+        // Store it.
         builder.CreateStore(ig, retval);
 
         // Create the counter.
