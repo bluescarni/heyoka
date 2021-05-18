@@ -7,7 +7,6 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cstddef>
-#include <cstdint>
 #include <initializer_list>
 #include <iostream>
 #include <sstream>
@@ -192,7 +191,7 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
-    taylor_dc_t dec{{"x"_var, {}, {}, {}}};
+    taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
     std::move(f).taylor_decompose(dec);
 }
@@ -381,7 +380,7 @@ struct func_10 : func_base {
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
-        u_vars_defs.push_back(taylor_dc_item_t{"foo"_var, {}, {}, {}});
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
         return u_vars_defs.size() - 1u;
     }
@@ -393,7 +392,7 @@ struct func_10a : func_base {
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
-        u_vars_defs.push_back(taylor_dc_item_t{"foo"_var, {}, {}, {}});
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
         return u_vars_defs.size();
     }
@@ -405,7 +404,7 @@ struct func_10b : func_base {
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
-        u_vars_defs.push_back(taylor_dc_item_t{"foo"_var, {}, {}, {}});
+        u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
         return 0;
     }
@@ -417,9 +416,9 @@ TEST_CASE("func taylor_decompose")
 
     auto f = func(func_10{{"x"_var}});
 
-    taylor_dc_t u_vars_defs{{"x"_var, {}, {}, {}}};
+    taylor_dc_t u_vars_defs{{"x"_var, {}}};
     REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 1u);
-    REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}, {}, {}}, {"foo"_var, {}, {}, {}}});
+    REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
     f = func(func_10a{{"x"_var}});
 

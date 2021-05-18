@@ -125,7 +125,7 @@ inline taylor_dc_t::size_type func_inner<T>::taylor_decompose(taylor_dc_t &u_var
     } else {
         func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
 
-        u_vars_defs.push_back(taylor_dc_item_t{expression{func{std::move(m_value)}}, {}, {}, {}});
+        u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
 
         return u_vars_defs.size() - 1u;
     }

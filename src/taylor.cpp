@@ -476,9 +476,9 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // The first n_eq definitions are just renaming
     // of the state variables into u variables.
     for (idx_t i = 0; i < n_eq; ++i) {
-        assert(std::holds_alternative<variable>(std::get<0>(v_ex[i]).value()));
+        assert(std::holds_alternative<variable>(v_ex[i].first.value()));
         // NOTE: no hidden deps allowed here.
-        assert(std::get<1>(v_ex[i]).empty());
+        assert(v_ex[i].second.empty());
         retval.push_back(std::move(v_ex[i]));
 
         // NOTE: the u vars that correspond to state
@@ -490,7 +490,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 
     // Handle the u variables which do not correspond to state variables.
     for (auto i = n_eq; i < v_ex.size() - n_eq; ++i) {
-        auto &[ex, deps, _1, _2] = v_ex[i];
+        auto &[ex, deps] = v_ex[i];
 
         // Rename the u variables in ex.
         rename_variables(ex, uvars_rename);
@@ -498,7 +498,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         if (auto it = ex_map.find(ex); it == ex_map.end()) {
             // This is the first occurrence of ex in the
             // decomposition. Add it to retval.
-            retval.push_back(taylor_dc_item_t{ex, std::move(deps), {}, {}});
+            retval.emplace_back(ex, std::move(deps));
 
             // Add ex to ex_map, mapping it to
             // the index it corresponds to in retval
@@ -526,7 +526,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     // the u variables in their definitions are renamed with
     // the new indices.
     for (auto i = v_ex.size() - n_eq; i < v_ex.size(); ++i) {
-        auto &[ex, deps, _1, _2] = v_ex[i];
+        auto &[ex, deps] = v_ex[i];
 
         // NOTE: here we expect only vars, numbers or params,
         // and no hidden dependencies.
@@ -536,12 +536,12 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 
         rename_variables(ex, uvars_rename);
 
-        retval.push_back(taylor_dc_item_t{std::move(ex), std::move(deps), {}, {}});
+        retval.emplace_back(std::move(ex), std::move(deps));
     }
 
     // Re-adjust all indices in the hidden dependencies in order to account
     // for the renaming of the uvars.
-    for (auto &[_, deps, _1, _2] : retval) {
+    for (auto &[_, deps] : retval) {
         for (auto &idx : deps) {
             auto it = uvars_rename.find("u_{}"_format(idx));
             assert(it != uvars_rename.end());
@@ -609,7 +609,7 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         auto v = boost::add_vertex(g);
 
         // Fetch the list of variables in the current expression.
-        const auto vars = get_variables(std::get<0>(dc[i]));
+        const auto vars = get_variables(dc[i].first);
 
         if (vars.empty()) {
             // The current expression does not contain
@@ -722,10 +722,10 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // derivatives and the hidden deps.
     for (auto *it = dc.data() + n_eq; it != dc.data() + dc.size(); ++it) {
         // Remap the expression.
-        rename_variables(std::get<0>(*it), remap);
+        rename_variables(it->first, remap);
 
         // Remap the hidden dependencies.
-        for (auto &idx : std::get<1>(*it)) {
+        for (auto &idx : it->second) {
             auto it_remap = remap.find("u_{}"_format(idx));
             assert(it_remap != remap.end());
             idx = uname_to_index(it_remap->second);
@@ -764,8 +764,8 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     // must be just variables. No hidden dependencies
     // are allowed.
     for (idx_t i = 0; i < n_eq; ++i) {
-        assert(std::holds_alternative<variable>(std::get<0>(dc[i]).value()));
-        assert(std::get<1>(dc[i]).empty());
+        assert(std::holds_alternative<variable>(dc[i].first.value()));
+        assert(dc[i].second.empty());
     }
 
     // From n_eq to dc.size() - n_eq, the expressions
@@ -797,9 +797,9 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                     assert(false);
                 }
             },
-            std::get<0>(dc[i]).value());
+            dc[i].first.value());
 
-        for (auto idx : std::get<1>(dc[i])) {
+        for (auto idx : dc[i].second) {
             assert(idx >= n_eq);
             assert(idx < dc.size() - n_eq);
 
@@ -823,10 +823,10 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
                     assert(false);
                 }
             },
-            std::get<0>(dc[i]).value());
+            dc[i].first.value());
 
         // No hidden dependencies.
-        assert(std::get<1>(dc[i]).empty());
+        assert(dc[i].second.empty());
     }
 
     std::unordered_map<std::string, expression> subs_map;
@@ -835,13 +835,13 @@ void verify_taylor_dec(const std::vector<expression> &orig, const taylor_dc_t &d
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (idx_t i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_{}"_format(i), subs(std::get<0>(dc[i]), subs_map));
+        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the right-hand sides of the system
     // and compare them to the original ones.
     for (auto i = dc.size() - n_eq; i < dc.size(); ++i) {
-        assert(subs(std::get<0>(dc[i]), subs_map) == orig[i - (dc.size() - n_eq)]);
+        assert(subs(dc[i].first, subs_map) == orig[i - (dc.size() - n_eq)]);
     }
 }
 
@@ -857,7 +857,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
     // in terms of state variables or other u variables,
     // and store it in subs_map.
     for (decltype(dc.size()) i = 0; i < dc.size() - n_eq; ++i) {
-        subs_map.emplace("u_{}"_format(i), subs(std::get<0>(dc[i]), subs_map));
+        subs_map.emplace("u_{}"_format(i), subs(dc[i].first, subs_map));
     }
 
     // Reconstruct the sv functions and compare them to the
@@ -865,7 +865,7 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
     for (decltype(sv_funcs.size()) i = 0; i < sv_funcs.size(); ++i) {
         assert(sv_funcs_dc[i] < dc.size());
 
-        auto sv_func = subs(std::get<0>(dc[sv_funcs_dc[i]]), subs_map);
+        auto sv_func = subs(dc[sv_funcs_dc[i]].first, subs_map);
         assert(sv_func == sv_funcs[i]);
     }
 }
@@ -955,7 +955,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     taylor_dc_t u_vars_defs;
     u_vars_defs.reserve(vars.size());
     for (const auto &var : vars) {
-        u_vars_defs.push_back(taylor_dc_item_t{expression{var}, {}, {}, {}});
+        u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
     // Create a copy of the original equations in terms of u variables.
@@ -1003,7 +1003,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
     for (auto &ex : v_ex_copy) {
-        u_vars_defs.push_back(taylor_dc_item_t{std::move(ex), {}, {}, {}});
+        u_vars_defs.emplace_back(std::move(ex), std::vector<std::uint32_t>{});
     }
 
 #if !defined(NDEBUG)
@@ -1150,7 +1150,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     taylor_dc_t u_vars_defs;
     u_vars_defs.reserve(lhs_vars.size());
     for (const auto &var : lhs_vars) {
-        u_vars_defs.emplace_back(taylor_dc_item_t{expression{var}, {}, {}, {}});
+        u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
     // Create a copy of the original equations in terms of u variables.
@@ -1198,7 +1198,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
     for (auto &[_, rhs] : sys_copy) {
-        u_vars_defs.emplace_back(taylor_dc_item_t{std::move(rhs), {}, {}, {}});
+        u_vars_defs.emplace_back(std::move(rhs), std::vector<std::uint32_t>{});
     }
 
 #if !defined(NDEBUG)
@@ -1708,7 +1708,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
             assert(!s_dc.empty());
         }
 
-        const auto &[ex, deps, _1, _2] = dc[i];
+        const auto &[ex, deps] = dc[i];
 
         // Determine the u indices on which ex depends.
         const auto u_indices = udef_args_indices(ex);
@@ -1723,7 +1723,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
         }
 
         // Append ex to the current block.
-        s_dc.back().push_back(taylor_dc_item_t{ex, deps, {}, {}});
+        s_dc.back().emplace_back(ex, deps);
     }
 
 #if !defined(NDEBUG)
@@ -1734,7 +1734,7 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
         // No segment can be empty.
         assert(!s.empty());
 
-        for (const auto &[ex, _, _1, _2] : s) {
+        for (const auto &[ex, _] : s) {
             // All the indices in the definitions of the
             // u variables in the current block must be
             // less than counter + n_eq (which is the starting
@@ -1810,7 +1810,7 @@ auto taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::ui
                     assert(false);
                 }
             },
-            std::get<0>(dc[i]).value());
+            dc[i].first.value());
     }
 
     // Flag to signal that the time derivatives of all state variables are u variables.
@@ -2197,7 +2197,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, std::get<0>(ex), n_uvars, batch_size);
+            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2206,7 +2206,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
-            const auto cdiff_args = taylor_udef_to_variants(std::get<0>(ex), std::get<1>(ex));
+            const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
             if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument(
@@ -2541,7 +2541,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // Deduce the size of the param array from the expressions in the decomposition.
         std::uint32_t param_size = 0;
         for (auto i = n_eq; i < dc.size(); ++i) {
-            param_size = std::max(param_size, get_param_size(std::get<0>(dc[i])));
+            param_size = std::max(param_size, get_param_size(dc[i].first));
         }
         if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error(
@@ -2556,8 +2556,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            diff_arr.push_back(taylor_diff<T>(s, std::get<0>(dc[i]), std::get<1>(dc[i]), diff_arr, par_ptr, time_ptr,
-                                              n_uvars, 0, i, batch_size));
+            diff_arr.push_back(
+                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i, batch_size));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -2568,21 +2568,21 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
             // NOTE: the derivatives of the state variables
             // are at the end of the decomposition vector.
             for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
-                diff_arr.push_back(taylor_compute_sv_diff<T>(s, std::get<0>(dc[i]), diff_arr, par_ptr, n_uvars,
-                                                             cur_order, batch_size));
+                diff_arr.push_back(
+                    taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, cur_order, batch_size));
             }
 
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
-                diff_arr.push_back(taylor_diff<T>(s, std::get<0>(dc[i]), std::get<1>(dc[i]), diff_arr, par_ptr,
-                                                  time_ptr, n_uvars, cur_order, i, batch_size));
+                diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
+                                                  cur_order, i, batch_size));
             }
         }
 
         // Compute the last-order derivatives for the state variables.
         for (auto i = n_uvars; i < boost::numeric_cast<std::uint32_t>(dc.size()); ++i) {
             diff_arr.push_back(
-                taylor_compute_sv_diff<T>(s, std::get<0>(dc[i]), diff_arr, par_ptr, n_uvars, order, batch_size));
+                taylor_compute_sv_diff<T>(s, dc[i].first, diff_arr, par_ptr, n_uvars, order, batch_size));
         }
 
         // If there are sv funcs, we need to compute their last-order derivatives too:
@@ -2595,8 +2595,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // above, thus we never enter the loop.
         // NOTE: <= because max_svf_idx is an index, not a size.
         for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
-            diff_arr.push_back(taylor_diff<T>(s, std::get<0>(dc[i]), std::get<1>(dc[i]), diff_arr, par_ptr, time_ptr,
-                                              n_uvars, order, i, batch_size));
+            diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, order,
+                                              i, batch_size));
         }
 
 #if !defined(NDEBUG)
