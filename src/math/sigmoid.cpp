@@ -69,19 +69,19 @@ using fmt::literals::operator""_format;
 // The sigmoid is not in the standard library and thus needs wrappers
 // for its double, long double and 128 versions.
 
-extern "C" HEYOKA_DLL_PUBLIC double heyoka_sigmoid(double x)
+extern "C" HEYOKA_DLL_PUBLIC double heyoka_sigmoid(double x) noexcept
 {
     return 1. / (1. + std::exp(-x));
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sigmoidl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sigmoidl(long double x) noexcept
 {
     return 1. / (1. + std::exp(-x));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sigmoid128(__float128 x)
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sigmoid128(__float128 x) noexcept
 {
     return (1. / (1. + mppp::exp(-mppp::real128{x}))).m_value;
 }
