@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -49,6 +50,131 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 std::mt19937 rng;
+
+TEST_CASE("sgn scalar")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {val_t}, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            // Create the return value.
+            builder.CreateRet(llvm_sgn(s, x));
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<std::int32_t (*)(fp_t)>(s.jit_lookup("sgn"));
+
+            REQUIRE(f_ptr(0) == 0);
+            REQUIRE(f_ptr(-42) == -1);
+            REQUIRE(f_ptr(123) == 1);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+// Generic branchless sign function.
+template <typename T>
+int sgn(T val)
+{
+    return (T(0) < val) - (val < T(0));
+}
+
+TEST_CASE("sgn batch")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                auto *ft = llvm::FunctionType::get(
+                    builder.getVoidTy(),
+                    {llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(val_t)}, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+                auto out = f->args().begin();
+                auto x = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                // Load the vector from memory.
+                auto v = detail::load_vector_from_memory(builder, x, batch_size);
+
+                // Create and store the return value.
+                detail::store_vector_to_memory(builder, out, llvm_sgn(s, v));
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(std::int32_t *, const fp_t *)>(s.jit_lookup("sgn"));
+
+                std::uniform_real_distribution<double> rdist(-10., 10.);
+                std::vector<fp_t> values(batch_size);
+                std::generate(values.begin(), values.end(), [&rdist]() { return rdist(rng); });
+                std::vector<std::int32_t> signs(batch_size);
+
+                f_ptr(signs.data(), values.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(signs[i] == sgn(values[i]));
+                }
+
+                values[0] = 0;
+
+                f_ptr(signs.data(), values.data());
+                REQUIRE(signs[0] == 0);
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
 
 TEST_CASE("sincos scalar")
 {

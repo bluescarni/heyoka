@@ -1043,6 +1043,36 @@ llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
+// Branchless sign function.
+// NOTE: requires FP value.
+llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
+{
+    assert(val != nullptr);
+    assert(val->getType()->getScalarType()->isFloatingPointTy());
+
+    auto &builder = s.builder();
+
+    // Build zero constant.
+    auto zero = llvm::Constant::getNullValue(val->getType());
+
+    // Run the comparisons.
+    auto cmp0 = builder.CreateFCmpOLT(zero, val);
+    auto cmp1 = builder.CreateFCmpOLT(val, zero);
+
+    // Convert to int.
+    llvm::Type *int_type;
+    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(cmp0->getType())) {
+        int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
+    } else {
+        int_type = builder.getInt32Ty();
+    }
+    auto icmp0 = builder.CreateZExt(cmp0, int_type);
+    auto icmp1 = builder.CreateZExt(cmp1, int_type);
+
+    // Compute and return the result.
+    return builder.CreateSub(icmp0, icmp1);
+}
+
 namespace
 {
 
