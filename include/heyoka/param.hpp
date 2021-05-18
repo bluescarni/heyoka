@@ -14,7 +14,6 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <heyoka/detail/fwd_decl.hpp>
@@ -66,7 +65,7 @@ HEYOKA_DLL_PUBLIC long double eval_ldbl(const param &, const std::unordered_map<
 
 #if defined(HEYOKA_HAVE_REAL128)
 HEYOKA_DLL_PUBLIC mppp::real128 eval_f128(const param &, const std::unordered_map<std::string, mppp::real128> &,
-                                  const std::vector<mppp::real128> &);
+                                          const std::vector<mppp::real128> &);
 #endif
 
 HEYOKA_DLL_PUBLIC void eval_batch_dbl(std::vector<double> &, const param &,
@@ -84,8 +83,7 @@ HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> 
                                                     const std::vector<std::vector<std::size_t>> &, std::size_t &,
                                                     double);
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(param &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(param &&, taylor_dc_t &);
 
 } // namespace heyoka
 

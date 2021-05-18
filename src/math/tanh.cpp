@@ -132,8 +132,7 @@ llvm::Value *tanh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 
 #endif
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-tanh_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 

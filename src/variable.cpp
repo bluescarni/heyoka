@@ -10,7 +10,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <ostream>
 #include <stdexcept>
@@ -31,13 +30,13 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
-#include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -196,8 +195,7 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
     node_counter++;
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(variable &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
+taylor_dc_t::size_type taylor_decompose_in_place(variable &&, taylor_dc_t &)
 {
     // NOTE: variables do not require decomposition.
     return 0;

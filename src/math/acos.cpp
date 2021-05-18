@@ -159,8 +159,7 @@ mppp::real128 acos_impl::eval_f128(const std::unordered_map<std::string, mppp::r
 }
 #endif
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-acos_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type acos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 

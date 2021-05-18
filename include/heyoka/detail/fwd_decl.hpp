@@ -9,6 +9,10 @@
 #ifndef HEYOKA_DETAIL_FWD_DECL_HPP
 #define HEYOKA_DETAIL_FWD_DECL_HPP
 
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 #include <heyoka/detail/visibility.hpp>
 
 namespace heyoka
@@ -44,6 +48,9 @@ class HEYOKA_DLL_PUBLIC t_event_impl;
 // NOTE: put it here because this is currently shared between
 // taylor.hpp and event_detection.hpp.
 enum class event_direction { negative = -1, any = 0, positive = 1 };
+
+// Type representing a Taylor decomposition.
+using taylor_dc_t = std::vector<std::pair<expression, std::vector<std::uint32_t>>>;
 
 } // namespace heyoka
 

@@ -84,8 +84,7 @@ expression kepE_impl::diff(const std::string &s) const
     return (heyoka::diff(e, s) * sin(E) + heyoka::diff(M, s)) / (1_dbl - e * cos(E));
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-kepE_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
