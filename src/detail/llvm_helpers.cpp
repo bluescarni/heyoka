@@ -1233,7 +1233,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Check the counter.
         llvm_if_then_else(
             s, builder.CreateICmpEQ(builder.CreateLoad(counter), max_iter),
-            [&]() { llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {}); }, []() {});
+            [&]() {
+                llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
+                                     {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+            },
+            []() {});
 
         // Return the result.
         builder.CreateRet(builder.CreateLoad(retval));
@@ -1279,7 +1283,7 @@ llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 // NOTE: this function will be called by the LLVM implementation
 // of the inverse Kepler function when the maximum number of iterations
 // is exceeded.
-extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter()
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 {
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
