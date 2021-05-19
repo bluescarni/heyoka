@@ -1082,7 +1082,6 @@ namespace
 template <typename T>
 llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    assert(n > 0u);
     assert(batch_size > 0u);
 
     // Overflow check: we need to be able to index
@@ -1144,77 +1143,88 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
-        // Load the order-0 coefficient(s).
-        auto cf0
-            = load_vector_from_memory(builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32(0)}), batch_size);
+        // Fetch the type for storing the last_nz_idx variable.
+        auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
 
-        // Check if the coefficients are all nonzero.
-        auto cf0_all_nz = builder.CreateFCmpONE(cf0, llvm::Constant::getNullValue(cf0->getType()));
-        if (batch_size > 1u) {
-            // Need to run a reduction in vector mode.
-            cf0_all_nz = builder.CreateAndReduce(cf0_all_nz);
+        // The initial last nz idx is zero for all batch elements.
+        auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
+        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
+
+        // NOTE: last_nz_idx is an index into the poly coefficient vector. Thus, in batch
+        // mode, when loading from a vector of indices, we will have to apply an offset.
+        // For instance, for batch_size = 4 and last_nz_idx = [0, 1, 1, 2], the actual
+        // memory indices to load the scalar coefficients from are:
+        // - 0 * 4 + 0 = 0
+        // - 1 * 4 + 1 = 5
+        // - 1 * 4 + 2 = 6
+        // - 2 * 4 + 3 = 11.
+        // That is, last_nz_idx * batch_size + offset, where offset is [0, 1, 2, 3].
+        llvm::Value *offset;
+        if (batch_size == 1u) {
+            // In scalar mode the offset is simply zero.
+            offset = builder.getInt32(0);
+        } else {
+            offset = llvm::UndefValue::get(make_vector_type(builder.getInt32Ty(), batch_size));
+            for (std::uint32_t i = 0; i < batch_size; ++i) {
+                offset = builder.CreateInsertElement(offset, builder.getInt32(i), i);
+            }
         }
 
-        // Branch on the happy path (constant coefficients are all nonzero).
-        llvm_if_then_else(
-            s, cf0_all_nz,
-            [&]() {
-                // Fetch the type for storing the last_nz_idx variable.
-                auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
+        // Init the vector of coefficient pointers with the base pointer value.
+        auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
 
-                // The initial last nz idx is zero for all batch elements.
-                auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
-                builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
+        // Init the return value with zero.
+        auto retval = builder.CreateAlloca(last_nz_idx_t);
+        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
 
-                // Init the vector of coefficient pointers with the base pointer value.
-                auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
+        // The iteration range is [1, n].
+        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
+            // Load the current poly coefficient(s).
+            auto cur_cf = load_vector_from_memory(
+                builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(cur_n, builder.getInt32(batch_size))}),
+                batch_size);
 
-                // Init the return value with zero.
-                auto retval = builder.CreateAlloca(last_nz_idx_t);
-                builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
+            // Load the last nonzero coefficient(s).
+            auto last_nz_ptr_idx = builder.CreateAdd(
+                offset, builder.CreateMul(builder.CreateLoad(last_nz_idx),
+                                          vector_splat(builder, builder.getInt32(batch_size), batch_size)));
+            auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
+            auto last_nz_cf
+                = batch_size > 1u
+                      ? static_cast<llvm::Value *>(builder.CreateMaskedGather(last_nz_ptr, llvm::Align(alignof(T))))
+                      : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
 
-                // Iterate from 1 to n + 1.
-                llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
-                    // Load the current coefficient(s).
-                    auto cur_cf = load_vector_from_memory(
-                        builder,
-                        builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(cur_n, builder.getInt32(batch_size))}),
-                        batch_size);
+            // Compute the sign of the current coefficient(s).
+            auto cur_sgn = llvm_sgn(s, cur_cf);
 
-                    // Load the last nonzero coefficient(s).
-                    auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, builder.CreateLoad(last_nz_idx));
-                    auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(
-                                          builder.CreateMaskedGather(last_nz_ptr, llvm::Align(alignof(T))))
-                                                      : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+            // Compute the sign of the last nonzero coefficient(s).
+            auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
 
-                    // Compute the sign of the current coefficient(s).
-                    auto cur_sgn = llvm_sgn(s, cur_cf);
+            // Add them and check if the result is zero (this indicates a sign change).
+            auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
+                                            llvm::Constant::getNullValue(cur_sgn->getType()));
 
-                    // Compute the sign of the last nonzero coefficient(s).
-                    auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
+            // We also need to check if last_nz_sgn is zero. If that is the case, it means
+            // we haven't found any nonzero coefficient yet for the polynomial and we must
+            // not modify retval yet.
+            auto zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
+            cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
 
-                    // Add them and check if the result is zero (this indicates a sign change).
-                    auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
-                                                    llvm::Constant::getNullValue(cur_sgn->getType()));
+            // Update retval.
+            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(retval), builder.CreateZExt(cmp, last_nz_idx_t)),
+                                retval);
 
-                    // Update retval.
-                    builder.CreateStore(
-                        builder.CreateAdd(builder.CreateLoad(retval), builder.CreateZExt(cmp, last_nz_idx_t)), retval);
+            // Update last_nz_idx.
+            builder.CreateStore(
+                builder.CreateSelect(builder.CreateICmpEQ(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
+                                     builder.CreateLoad(last_nz_idx), vector_splat(builder, cur_n, batch_size)),
+                last_nz_idx);
+        });
 
-                    // Update last_nz_idx.
-                    builder.CreateStore(
-                        builder.CreateSelect(
-                            builder.CreateICmpNE(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
-                            vector_splat(builder, cur_n, batch_size), builder.CreateLoad(last_nz_idx)),
-                        last_nz_idx);
-                });
+        // Store the result.
+        store_vector_to_memory(builder, out_ptr, builder.CreateLoad(retval));
 
-                // Store the result.
-                store_vector_to_memory(builder, out_ptr, builder.CreateLoad(retval));
-            },
-            [&]() {});
-
-        // Return the result.
+        // Return.
         builder.CreateRetVoid();
 
         // Verify.

@@ -65,6 +65,8 @@ const auto fp_types = std::tuple<double, long double
 
 std::mt19937 rng;
 
+constexpr auto ntrials = 100;
+
 TEST_CASE("sgn scalar")
 {
     using detail::llvm_sgn;
@@ -502,8 +504,6 @@ TEST_CASE("inv_kep_E_scalar")
 
             std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
 
-            const auto ntrials = 100;
-
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
                 const auto M = M_dist(rng);
@@ -580,8 +580,6 @@ TEST_CASE("inv_kep_E_batch")
 
                 std::uniform_real_distribution<double> e_dist(0., 1.),
                     M_dist(0., 2 * boost::math::constants::pi<double>());
-
-                const auto ntrials = 100;
 
                 std::vector<fp_t> ret_vec(batch_size), e_vec(ret_vec), M_vec(ret_vec);
 
@@ -763,46 +761,51 @@ TEST_CASE("csc_scalar")
             auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
                 "heyoka_csc_degree_{}_{}"_format(degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
 
-            // Happy path tests.
+            // Random testing.
+            std::uniform_real_distribution<double> rdist(-10., 10.);
+            std::uniform_int_distribution<int> idist(0, 9);
             std::uint32_t out = 0;
-            std::vector<fp_t> cfs(degree + 1u);
+            std::vector<fp_t> cfs(degree + 1u), nz_values;
 
-            // {1, 0, 0, 0, 0}.
-            cfs[0] = 1;
+            for (auto i = 0; i < ntrials * 10; ++i) {
+                nz_values.clear();
+
+                // Generate random coefficients, putting
+                // in a zero every once in a while.
+                std::generate(cfs.begin(), cfs.end(), [&idist, &rdist, &nz_values]() {
+                    auto ret = idist(rng) == 0 ? fp_t(0) : fp_t(rdist(rng));
+                    if (ret != 0) {
+                        nz_values.push_back(ret);
+                    }
+
+                    return ret;
+                });
+
+                // Determine the number of sign changes.
+                auto n_sc = 0u;
+                for (decltype(nz_values.size()) j = 1; j < nz_values.size(); ++j) {
+                    n_sc += sgn(nz_values[j]) != sgn(nz_values[j - 1u]);
+                }
+
+                // Check it.
+                f_ptr(&out, cfs.data());
+                REQUIRE(out == n_sc);
+            }
+
+            // A full zero test.
+            std::fill(cfs.begin(), cfs.end(), fp_t(0));
             f_ptr(&out, cfs.data());
             REQUIRE(out == 0u);
 
-            // {1, 1, 0, 0, 0}.
-            cfs[1] = 1;
+            // Full 1.
+            std::fill(cfs.begin(), cfs.end(), fp_t(1));
             f_ptr(&out, cfs.data());
             REQUIRE(out == 0u);
 
-            // {1, 0, 1, 0, 0}.
-            cfs[1] = 0;
-            cfs[2] = 1;
+            // Full -1.
+            std::fill(cfs.begin(), cfs.end(), fp_t(-1));
             f_ptr(&out, cfs.data());
             REQUIRE(out == 0u);
-
-            // {1, 0, 0, 0, 1}.
-            cfs[2] = 0;
-            cfs[4] = 1;
-            f_ptr(&out, cfs.data());
-            REQUIRE(out == 0u);
-
-            // {1, 0, 0, 0, -1}.
-            cfs[4] = -1;
-            f_ptr(&out, cfs.data());
-            REQUIRE(out == 1u);
-
-            // {1, 0, 1, 0, -1}.
-            cfs[2] = 1;
-            f_ptr(&out, cfs.data());
-            REQUIRE(out == 1u);
-
-            // {1, 0, -1, 0, -1}.
-            cfs[2] = -1;
-            f_ptr(&out, cfs.data());
-            REQUIRE(out == 1u);
         }
     };
 
@@ -834,6 +837,54 @@ TEST_CASE("csc_batch")
                 auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(
                     s.jit_lookup("heyoka_csc_degree_{}_{}"_format(
                         degree, llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
+
+                // Random testing.
+                std::uniform_real_distribution<double> rdist(-10., 10.);
+                std::uniform_int_distribution<int> idist(0, 9);
+                std::vector<std::uint32_t> out(batch_size), n_sc(batch_size);
+                std::vector<fp_t> cfs((degree + 1u) * batch_size), nz_values;
+
+                for (auto i = 0; i < ntrials * 10; ++i) {
+                    // Generate random coefficients, putting
+                    // in a zero every once in a while.
+                    std::generate(cfs.begin(), cfs.end(),
+                                  [&idist, &rdist]() { return idist(rng) == 0 ? fp_t(0) : fp_t(rdist(rng)); });
+
+                    // Determine the number of sign changes for each batch element.
+                    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+                        nz_values.clear();
+
+                        for (auto j = 0u; j <= degree; ++j) {
+                            if (cfs[batch_size * j + batch_idx] != 0) {
+                                nz_values.push_back(cfs[batch_size * j + batch_idx]);
+                            }
+                        }
+
+                        n_sc[batch_idx] = 0;
+                        for (decltype(nz_values.size()) j = 1; j < nz_values.size(); ++j) {
+                            n_sc[batch_idx] += sgn(nz_values[j]) != sgn(nz_values[j - 1u]);
+                        }
+                    }
+
+                    // Check the result.
+                    f_ptr(out.data(), cfs.data());
+                    REQUIRE(std::equal(out.begin(), out.end(), n_sc.begin()));
+                }
+
+                // A full zero test.
+                std::fill(cfs.begin(), cfs.end(), fp_t(0));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+
+                // Full 1.
+                std::fill(cfs.begin(), cfs.end(), fp_t(1));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+
+                // Full -1.
+                std::fill(cfs.begin(), cfs.end(), fp_t(-1));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
             }
         }
     };
