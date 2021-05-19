@@ -578,8 +578,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // LCOV_EXCL_STOP
                 }
 
-                // Check if detect multiple roots in the cooldown
-                // period for the detected event.
+                // Check if multiple roots are detected in the cooldown
+                // period for a terminal event. For non-terminal events,
+                // this will be unused.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
                     if constexpr (is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
