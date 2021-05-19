@@ -19,6 +19,8 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <fmt/format.h>
+
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -38,6 +40,18 @@
 
 #include "catch.hpp"
 #include "test_utils.hpp"
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -724,4 +738,105 @@ TEST_CASE("while_loop")
 
         REQUIRE_THROWS_AS(thrower(), std::runtime_error);
     }
+}
+
+TEST_CASE("csc_scalar")
+{
+    using detail::llvm_add_csc;
+    using detail::llvm_mangle_type;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            const auto degree = 4u;
+
+            llvm_add_csc<fp_t>(s, degree, 1);
+
+            s.optimise();
+
+            s.compile();
+
+            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
+                "heyoka_csc_degree_{}_{}"_format(degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
+
+            // Happy path tests.
+            std::uint32_t out = 0;
+            std::vector<fp_t> cfs(degree + 1u);
+
+            // {1, 0, 0, 0, 0}.
+            cfs[0] = 1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // {1, 1, 0, 0, 0}.
+            cfs[1] = 1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // {1, 0, 1, 0, 0}.
+            cfs[1] = 0;
+            cfs[2] = 1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // {1, 0, 0, 0, 1}.
+            cfs[2] = 0;
+            cfs[4] = 1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // {1, 0, 0, 0, -1}.
+            cfs[4] = -1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 1u);
+
+            // {1, 0, 1, 0, -1}.
+            cfs[2] = 1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 1u);
+
+            // {1, 0, -1, 0, -1}.
+            cfs[2] = -1;
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 1u);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("csc_batch")
+{
+    using detail::llvm_add_csc;
+    using detail::llvm_mangle_type;
+    using detail::make_vector_type;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                const auto degree = 4u;
+
+                llvm_add_csc<fp_t>(s, degree, batch_size);
+
+                s.optimise();
+
+                s.compile();
+
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(
+                    s.jit_lookup("heyoka_csc_degree_{}_{}"_format(
+                        degree, llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }

@@ -1076,6 +1076,187 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 namespace
 {
 
+// Add a function to count the number of sign changes in the coefficients
+// of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
+// and scalar type T.
+template <typename T>
+llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    assert(n > 0u);
+    assert(batch_size > 0u);
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a sign changes counter function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto tp = to_llvm_vector_type<T>(context, batch_size);
+
+    // Fetch the function name.
+    const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
+
+    // The function arguments:
+    // - pointer to the return value,
+    // - pointer to the array of coefficients.
+    // NOTE: both pointers are to the scalar counterparts
+    // of the vector types, so that we can call this from regular
+    // C++ code.
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is void.
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto out_ptr = f->args().begin();
+        out_ptr->setName("out_ptr");
+        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        out_ptr->addAttr(llvm::Attribute::NoAlias);
+        out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+        auto cf_ptr = f->args().begin() + 1;
+        cf_ptr->setName("cf_ptr");
+        cf_ptr->addAttr(llvm::Attribute::NoCapture);
+        cf_ptr->addAttr(llvm::Attribute::NoAlias);
+        cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Load the order-0 coefficient(s).
+        auto cf0
+            = load_vector_from_memory(builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32(0)}), batch_size);
+
+        // Check if the coefficients are all nonzero.
+        auto cf0_all_nz = builder.CreateFCmpONE(cf0, llvm::Constant::getNullValue(cf0->getType()));
+        if (batch_size > 1u) {
+            // Need to run a reduction in vector mode.
+            cf0_all_nz = builder.CreateAndReduce(cf0_all_nz);
+        }
+
+        // Branch on the happy path (constant coefficients are all nonzero).
+        llvm_if_then_else(
+            s, cf0_all_nz,
+            [&]() {
+                // Fetch the type for storing the last_nz_idx variable.
+                auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
+
+                // The initial last nz idx is zero for all batch elements.
+                auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
+                builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
+
+                // Init the vector of coefficient pointers with the base pointer value.
+                auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
+
+                // Init the return value with zero.
+                auto retval = builder.CreateAlloca(last_nz_idx_t);
+                builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
+
+                // Iterate from 1 to n + 1.
+                llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
+                    // Load the current coefficient(s).
+                    auto cur_cf = load_vector_from_memory(
+                        builder,
+                        builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(cur_n, builder.getInt32(batch_size))}),
+                        batch_size);
+
+                    // Load the last nonzero coefficient(s).
+                    auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, builder.CreateLoad(last_nz_idx));
+                    auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(
+                                          builder.CreateMaskedGather(last_nz_ptr, llvm::Align(alignof(T))))
+                                                      : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+
+                    // Compute the sign of the current coefficient(s).
+                    auto cur_sgn = llvm_sgn(s, cur_cf);
+
+                    // Compute the sign of the last nonzero coefficient(s).
+                    auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
+
+                    // Add them and check if the result is zero (this indicates a sign change).
+                    auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
+                                                    llvm::Constant::getNullValue(cur_sgn->getType()));
+
+                    // Update retval.
+                    builder.CreateStore(
+                        builder.CreateAdd(builder.CreateLoad(retval), builder.CreateZExt(cmp, last_nz_idx_t)), retval);
+
+                    // Update last_nz_idx.
+                    builder.CreateStore(
+                        builder.CreateSelect(
+                            builder.CreateICmpNE(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
+                            vector_splat(builder, cur_n, batch_size), builder.CreateLoad(last_nz_idx)),
+                        last_nz_idx);
+                });
+
+                // Store the result.
+                store_vector_to_memory(builder, out_ptr, builder.CreateLoad(retval));
+            },
+            [&]() {});
+
+        // Return the result.
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        if (!compare_function_signature(f, builder.getVoidTy(), fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signature for the sign changes counter function detected");
+        }
+    }
+
+    return f;
+}
+
+} // namespace
+
+llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<mppp::real128>(s, n, batch_size);
+}
+
+#endif
+
+namespace
+{
+
 // Variable template for the constant pi at different levels of precision.
 template <typename T>
 const auto inv_kep_E_pi = boost::math::constants::pi<T>();
