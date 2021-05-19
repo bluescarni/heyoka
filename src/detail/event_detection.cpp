@@ -37,6 +37,7 @@
 
 #endif
 
+#include <fmt/format.h>
 #include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
@@ -57,6 +58,18 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka::detail
 {
@@ -498,39 +511,49 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     // Verify the function.
     s.verify_function(f);
 
-    // Run the optimisation pass.
-    s.optimise();
+    // NOTE: the optimisation pass will be run outside.
 }
 
-// Fetch a polynomial translation function
-// from the thread-local cache.
+// Fetch the JITted functions used in the event detection implementation.
 template <typename T>
-auto get_poly_translator_1(std::uint32_t order)
+auto get_ed_jit_functions(std::uint32_t order)
 {
-    using func_t = void (*)(T *, const T *);
+    // Polynomial translation function type.
+    using pt_t = void (*)(T *, const T *);
+    // Sign changes counting function type.
+    using csc_t = void (*)(std::uint32_t *, const T *);
 
-    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, func_t>> tf_map;
+    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::pair<pt_t, csc_t>>> tf_map;
 
     auto it = tf_map.find(order);
 
     if (it == tf_map.end()) {
         // Cache miss, we need to create
-        // a new LLVM state and function.
+        // a new LLVM state and functions.
         llvm_state s;
 
         // Add the polynomial translation function.
         add_poly_translator_1<T>(s, order, 1);
 
+        // Add the sign changes counting function.
+        llvm_add_csc<T>(s, order, 1);
+
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
         s.compile();
 
-        // Fetch the function.
-        auto f = reinterpret_cast<func_t>(s.jit_lookup("poly_translate_1"));
+        // Fetch the functions.
+        auto pt = reinterpret_cast<pt_t>(s.jit_lookup("poly_translate_1"));
+        auto csc = reinterpret_cast<csc_t>(s.jit_lookup(
+            "heyoka_csc_degree_{}_{}"_format(order, llvm_mangle_type(to_llvm_vector_type<T>(s.context(), 1)))));
 
-        // Insert state and function into the cache.
-        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), f});
+        // Insert state and functions into the cache.
+        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, csc}});
         assert(ret.second);
 
-        return f;
+        return std::pair{pt, csc};
     } else {
         // Cache hit, return the function.
         return it->second.second;
@@ -583,8 +606,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Fetch a reference to the wlist.
     auto &wl = get_wlist<T>();
 
-    // Fetch the polynomial translation function.
-    auto pt1 = get_poly_translator_1<T>(order);
+    // Fetch the JITted functions.
+    auto [pt, csc] = get_ed_jit_functions<T>(order);
 
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
@@ -800,10 +823,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 std::copy(tmp.v.rbegin(), tmp.v.rend(), tmp1.v.data());
 
                 // Translate it.
-                pt1(tmp2.v.data(), tmp1.v.data());
+                pt(tmp2.v.data(), tmp1.v.data());
 
                 // Count the sign changes.
-                const auto n_sc = count_sign_changes(tmp2.v.data(), order);
+                std::uint32_t n_sc;
+                csc(&n_sc, tmp2.v.data());
 
                 if (n_sc == 1u) {
                     // Found isolating interval, add it to isol.
@@ -815,7 +839,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // into tmp1.
                     poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                    pt1(tmp2.v.data(), tmp1.v.data());
+                    pt(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
                     const auto mid = (lb + ub) / 2;
