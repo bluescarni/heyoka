@@ -537,7 +537,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     auto &wl = get_wlist<T>();
 
     // Fetch the JITted functions.
-    auto [pt, csc] = get_ed_jit_functions<T>(order);
+    auto j_funcs = get_ed_jit_functions<T>(order);
+    auto pt = j_funcs.first;
+    auto csc = j_funcs.second;
 
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
