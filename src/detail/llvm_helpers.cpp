@@ -1052,14 +1052,14 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
     auto &builder = s.builder();
 
-    // Build zero constant.
+    // Build the zero constant.
     auto zero = llvm::Constant::getNullValue(val->getType());
 
     // Run the comparisons.
     auto cmp0 = builder.CreateFCmpOLT(zero, val);
     auto cmp1 = builder.CreateFCmpOLT(val, zero);
 
-    // Convert to int.
+    // Convert to int32.
     llvm::Type *int_type;
     if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(cmp0->getType())) {
         int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
