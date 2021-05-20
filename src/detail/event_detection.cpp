@@ -381,8 +381,8 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     // Overflow check: we need to be able to index
     // into the array of coefficients.
     // LCOV_EXCL_START
-    if (n == std::numeric_limits<std::uint32_t>::max()
-        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
         throw std::overflow_error("Overflow detected while adding a polynomial translation function");
     }
     // LCOV_EXCL_STOP
