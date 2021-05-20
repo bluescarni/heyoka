@@ -378,6 +378,15 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 {
     assert(order > 0u);
 
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a polynomial translation function");
+    }
+    // LCOV_EXCL_STOP
+
     auto &builder = s.builder();
     auto &context = s.context();
 
@@ -472,7 +481,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     // LCOV_EXCL_START
     if (n == std::numeric_limits<std::uint32_t>::max()
         || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
-        throw std::overflow_error("Overflow detected while adding a sign changes counter function");
+        throw std::overflow_error("Overflow detected while adding an rtscc function");
     }
     // LCOV_EXCL_STOP
 
@@ -480,7 +489,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Add the translator and the sign changes counting functions.
+    // Add the translator and the sign changes counting function.
     auto pt = add_poly_translator_1<T>(s, n, batch_size);
     auto scc = llvm_add_csc<T>(s, n, batch_size);
 
@@ -502,7 +511,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
     // LCOV_EXCL_START
     if (f == nullptr) {
-        throw std::invalid_argument("Unable to create a function for polynomial rtscc");
+        throw std::invalid_argument("Unable to create an rtscc function");
     }
     // LCOV_EXCL_STOP
 
