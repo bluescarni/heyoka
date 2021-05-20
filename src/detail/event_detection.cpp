@@ -27,7 +27,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/math/policies/policy.hpp>
-#include <boost/math/special_functions/binomial.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -355,24 +354,8 @@ struct is_terminal_event<t_event<T>> : std::true_type {
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
-// Helper to compute binomial coefficients
-// using Boost.Math.
-template <typename T>
-auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
-{
-    const auto n = boost::numeric_cast<unsigned>(n_);
-    const auto k = boost::numeric_cast<unsigned>(k_);
-
-    return boost::math::binomial_coefficient<T>(n, k);
-}
-
 // Helper to add a polynomial translation function
 // to the state 's'.
-// NOTE: once we add the time polynomial functions we will have to solve
-// the issue of generating tables of binomial coefficients. Once we do that,
-// perhaps we can convert the manually-unrolled loops in this function
-// into regular for loops. Note that if we do that, we will be using out_ptr
-// as temporary storage space, so we need to remove the writeonly attributes.
 template <typename T>
 llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -390,11 +373,23 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Helper to fetch the (i, j) binomial coefficient from
+    // a precomputed global array. The returned value is already
+    // splatted.
+    auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, order)](llvm::Value *i, llvm::Value *j) {
+        auto idx = builder.CreateMul(i, builder.getInt32(order + 1u));
+        idx = builder.CreateAdd(idx, j);
+
+        auto val = builder.CreateLoad(builder.CreateInBoundsGEP(bc_ptr, {idx}));
+
+        return vector_splat(builder, val, batch_size);
+    };
+
     // Fetch the current insertion block.
     auto orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
-    // - the output pointer (write-only),
+    // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
     // No overlap is allowed.
     std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
@@ -414,7 +409,6 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
@@ -428,29 +422,25 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     builder.SetInsertPoint(bb);
 
     // Init the return values as zeroes.
-    std::vector<llvm::Value *> ret_cfs;
-    for (std::uint32_t i = 0; i <= order; ++i) {
-        ret_cfs.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-    }
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
+        auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))});
+        store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+    });
 
     // Do the translation.
-    for (std::uint32_t i = 0; i <= order; ++i) {
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         auto ai = load_vector_from_memory(
-            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32(i * batch_size)}), batch_size);
+            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))}),
+            batch_size);
 
-        for (std::uint32_t k = 0; k <= i; ++k) {
-            auto tmp = builder.CreateFMul(
-                ai, vector_splat(builder, codegen<T>(s, number{boost_math_bc<T>(i, k)}), batch_size));
+        llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
+            auto tmp = builder.CreateFMul(ai, get_bc(i, k));
 
-            ret_cfs[k] = builder.CreateFAdd(ret_cfs[k], tmp);
-        }
-    }
-
-    // Write out the return value.
-    for (std::uint32_t i = 0; i <= order; ++i) {
-        auto ret_ptr = builder.CreateInBoundsGEP(out_ptr, {builder.getInt32(i * batch_size)});
-        store_vector_to_memory(builder, ret_ptr, ret_cfs[i]);
-    }
+            auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(k, builder.getInt32(batch_size))});
+            auto new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
+            store_vector_to_memory(builder, ptr, new_val);
+        });
+    });
 
     // Create the return value.
     builder.CreateRetVoid();

@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/special_functions/binomial.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -35,6 +36,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
@@ -1499,6 +1501,74 @@ llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &s, std::uint32_t batch_size)
 llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 {
     return llvm_add_inv_kep_E_impl<mppp::real128>(s, batch_size);
+}
+
+#endif
+
+namespace
+{
+
+// Helper to create a global const array variable containing
+// all binomial coefficients up to (n, n). The coefficients are stored
+// as scalars and the return value is a pointer to the first coefficient.
+template <typename T>
+llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
+{
+    // Overflow check.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || (n + 1u) > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding an array of binomial coefficients");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the array type.
+    auto *arr_type
+        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
+
+    // Generate the binomials as constants.
+    std::vector<llvm::Constant *> bc_const;
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        for (std::uint32_t j = 0; j <= n; ++j) {
+            // NOTE: the Boost implementation requires j <= i. We don't care about
+            // j > i anyway.
+            const auto val = (j <= i) ? boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i),
+                                                                             boost::numeric_cast<unsigned>(j))
+                                      : T(0);
+            bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
+        }
+    }
+
+    // Create the global array.
+    auto *bc_const_arr = llvm::ConstantArray::get(arr_type, bc_const);
+    auto *g_bc_const_arr = new llvm::GlobalVariable(md, bc_const_arr->getType(), true,
+                                                    llvm::GlobalVariable::InternalLinkage, bc_const_arr);
+
+    // Get out a pointer to the beginning of the array.
+    return builder.CreateInBoundsGEP(g_bc_const_arr, {builder.getInt32(0), builder.getInt32(0)});
+}
+
+} // namespace
+
+llvm::Value *llvm_add_bc_array_dbl(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<double>(s, n);
+}
+
+llvm::Value *llvm_add_bc_array_ldbl(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<long double>(s, n);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<mppp::real128>(s, n);
 }
 
 #endif
