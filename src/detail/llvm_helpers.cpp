@@ -1508,9 +1508,10 @@ llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 namespace
 {
 
-// Helper to create a global const array variable containing
+// Helper to create a global const array containing
 // all binomial coefficients up to (n, n). The coefficients are stored
 // as scalars and the return value is a pointer to the first coefficient.
+// The array has shape (n + 1, n + 1) and it is stored in row-major format.
 template <typename T>
 llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
 {

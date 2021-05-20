@@ -18,6 +18,10 @@ New
 Changes
 ~~~~~~~
 
+- Several functions used for event detection are now
+  compiled just-in-time, rather than being implemented
+  in C++
+  (`#142 <https://github.com/bluescarni/heyoka/pull/142>`__).
 - Cleanup unused and undocumented functions
   (`#134 <https://github.com/bluescarni/heyoka/pull/134>`__).
 - Small performance optimisations
