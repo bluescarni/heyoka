@@ -368,6 +368,11 @@ auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
 
 // Helper to add a polynomial translation function
 // to the state 's'.
+// NOTE: once we add the time polynomial functions we will have to solve
+// the issue of generating tables of binomial coefficients. Once we do that,
+// perhaps we can convert the manually-unrolled loops in this function
+// into regular for loops. Note that if we do that, we will be using out_ptr
+// as temporary storage space, so we need to remove the writeonly attributes.
 template <typename T>
 llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -536,12 +541,13 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     builder.SetInsertPoint(bb);
 
     // Do the reversion into out_ptr1.
-    for (std::uint32_t i = 0; i <= n; ++i) {
-        auto cur_cf = load_vector_from_memory(
-            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32((n - i) * batch_size)}), batch_size);
-        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr1, {builder.getInt32(i * batch_size)}),
-                               cur_cf);
-    }
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        auto load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
+        auto store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
+
+        auto cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(cf_ptr, {load_idx}), batch_size);
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr1, {store_idx}), cur_cf);
+    });
 
     // Translate out_ptr1 into out_ptr2.
     builder.CreateCall(pt, {out_ptr2, out_ptr1});
