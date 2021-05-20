@@ -369,12 +369,15 @@ auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
 // Helper to add a polynomial translation function
 // to the state 's'.
 template <typename T>
-void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
+llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order > 0u);
 
     auto &builder = s.builder();
     auto &context = s.context();
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
 
     // The function arguments:
     // - the output pointer (write-only),
@@ -441,7 +444,122 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     // Verify the function.
     s.verify_function(f);
 
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
     // NOTE: the optimisation pass will be run outside.
+    return f;
+}
+
+// Add a function that, given an input polynomial of order n represented
+// as an array of coefficients:
+// - reverses it,
+// - translates it by 1,
+// - counts the sign changes in the coefficients
+//   of the resulting polynomial.
+template <typename T>
+llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a sign changes counter function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Add the translator and the sign changes counting functions.
+    auto pt = add_poly_translator_1<T>(s, n, batch_size);
+    auto scc = llvm_add_csc<T>(s, n, batch_size);
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
+    // The function arguments:
+    // - two poly coefficients output pointers,
+    // - the output pointer to the number of sign changes (write-only),
+    // - the input pointer to the original poly coefficients (read-only).
+    // No overlap is allowed.
+    std::vector<llvm::Type *> fargs{
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+        llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create a function for polynomial rtscc");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    // NOTE: out_ptr1/2 are used both in read and write mode,
+    // even though this function never actually reads from them
+    // (they are just forwarded to other functions reading from them).
+    // Because I am not 100% sure about the writeonly attribute
+    // in this case, let's err on the side of caution and do not
+    // mark them as writeonly.
+    auto out_ptr1 = f->args().begin();
+    out_ptr1->setName("out_ptr1");
+    out_ptr1->addAttr(llvm::Attribute::NoCapture);
+    out_ptr1->addAttr(llvm::Attribute::NoAlias);
+
+    auto out_ptr2 = f->args().begin() + 1;
+    out_ptr2->setName("out_ptr2");
+    out_ptr2->addAttr(llvm::Attribute::NoCapture);
+    out_ptr2->addAttr(llvm::Attribute::NoAlias);
+
+    auto n_sc_ptr = f->args().begin() + 2;
+    n_sc_ptr->setName("n_sc_ptr");
+    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
+    n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
+    n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto cf_ptr = f->args().begin() + 3;
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Do the reversion into out_ptr1.
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        auto cur_cf = load_vector_from_memory(
+            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32((n - i) * batch_size)}), batch_size);
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr1, {builder.getInt32(i * batch_size)}),
+                               cur_cf);
+    }
+
+    // Translate out_ptr1 into out_ptr2.
+    builder.CreateCall(pt, {out_ptr2, out_ptr1});
+
+    // Count the sign changes in out_ptr2.
+    builder.CreateCall(scc, {n_sc_ptr, out_ptr2});
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
 }
 
 // Fetch the JITted functions used in the event detection implementation.
@@ -450,10 +568,10 @@ auto get_ed_jit_functions(std::uint32_t order)
 {
     // Polynomial translation function type.
     using pt_t = void (*)(T *, const T *);
-    // Sign changes counting function type.
-    using csc_t = void (*)(std::uint32_t *, const T *);
+    // rtscc function type.
+    using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
 
-    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::pair<pt_t, csc_t>>> tf_map;
+    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::pair<pt_t, rtscc_t>>> tf_map;
 
     auto it = tf_map.find(order);
 
@@ -462,11 +580,9 @@ auto get_ed_jit_functions(std::uint32_t order)
         // a new LLVM state and functions.
         llvm_state s;
 
-        // Add the polynomial translation function.
-        add_poly_translator_1<T>(s, order, 1);
-
-        // Add the sign changes counting function.
-        llvm_add_csc<T>(s, order, 1);
+        // Add the rtscc function. This will also indirectly
+        // add the translator function.
+        add_poly_rtscc<T>(s, order, 1);
 
         // Run the optimisation pass.
         s.optimise();
@@ -476,14 +592,13 @@ auto get_ed_jit_functions(std::uint32_t order)
 
         // Fetch the functions.
         auto pt = reinterpret_cast<pt_t>(s.jit_lookup("poly_translate_1"));
-        auto csc = reinterpret_cast<csc_t>(s.jit_lookup(
-            "heyoka_csc_degree_{}_{}"_format(order, llvm_mangle_type(to_llvm_vector_type<T>(s.context(), 1)))));
+        auto rtscc = reinterpret_cast<rtscc_t>(s.jit_lookup("poly_rtscc"));
 
         // Insert state and functions into the cache.
-        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, csc}});
+        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, rtscc}});
         assert(ret.second);
 
-        return std::pair{pt, csc};
+        return std::pair{pt, rtscc};
     } else {
         // Cache hit, return the function.
         return it->second.second;
@@ -539,7 +654,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Fetch the JITted functions.
     auto j_funcs = get_ed_jit_functions<T>(order);
     auto pt = j_funcs.first;
-    auto csc = j_funcs.second;
+    auto rtscc = j_funcs.second;
 
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
@@ -752,15 +867,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     }
                 }
 
-                // Reverse it.
-                std::copy(tmp.v.rbegin(), tmp.v.rend(), tmp1.v.data());
-
-                // Translate it.
-                pt(tmp2.v.data(), tmp1.v.data());
-
-                // Count the sign changes.
+                // Reverse tmp into tmp1, translate tmp1 by 1 with output
+                // in tmp2, and count the sign changes in tmp2.
                 std::uint32_t n_sc;
-                csc(&n_sc, tmp2.v.data());
+                rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
                 if (n_sc == 1u) {
                     // Found isolating interval, add it to isol.
