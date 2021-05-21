@@ -138,7 +138,6 @@ TEST_CASE("taylor time")
 
         auto x = "x"_var, y = "y"_var;
 
-        // Number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
