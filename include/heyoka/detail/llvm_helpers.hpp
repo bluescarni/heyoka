@@ -103,6 +103,32 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_modulus(llvm_state &, llvm::Value *, llvm::V
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
+
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_dbl(llvm_state &, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_ldbl(llvm_state &, std::uint32_t, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_f128(llvm_state &, std::uint32_t, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Function *llvm_add_csc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return llvm_add_csc_dbl(s, n, batch_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return llvm_add_csc_ldbl(s, n, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return llvm_add_csc_f128(s, n, batch_size);
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+}
 
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &, std::uint32_t);
@@ -123,6 +149,31 @@ inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_siz
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
         return llvm_add_inv_kep_E_f128(s, batch_size);
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+}
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_ldbl(llvm_state &, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_f128(llvm_state &, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return llvm_add_bc_array_dbl(s, n);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return llvm_add_bc_array_ldbl(s, n);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return llvm_add_bc_array_f128(s, n);
 #endif
     } else {
         static_assert(always_false_v<T>, "Unhandled type.");

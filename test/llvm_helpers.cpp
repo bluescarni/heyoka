@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -17,6 +18,8 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+
+#include <fmt/format.h>
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -38,6 +41,18 @@
 #include "catch.hpp"
 #include "test_utils.hpp"
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 using namespace heyoka;
 using namespace heyoka_test;
 
@@ -49,6 +64,133 @@ const auto fp_types = std::tuple<double, long double
                                  >{};
 
 std::mt19937 rng;
+
+constexpr auto ntrials = 100;
+
+TEST_CASE("sgn scalar")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            auto *ft = llvm::FunctionType::get(builder.getInt32Ty(), {val_t}, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            // Create the return value.
+            builder.CreateRet(llvm_sgn(s, x));
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<std::int32_t (*)(fp_t)>(s.jit_lookup("sgn"));
+
+            REQUIRE(f_ptr(0) == 0);
+            REQUIRE(f_ptr(-42) == -1);
+            REQUIRE(f_ptr(123) == 1);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+// Generic branchless sign function.
+template <typename T>
+int sgn(T val)
+{
+    return (T(0) < val) - (val < T(0));
+}
+
+TEST_CASE("sgn batch")
+{
+    using detail::llvm_sgn;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                auto *ft = llvm::FunctionType::get(
+                    builder.getVoidTy(),
+                    {llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(val_t)}, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "sgn", &md);
+
+                auto out = f->args().begin();
+                auto x = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                // Load the vector from memory.
+                auto v = detail::load_vector_from_memory(builder, x, batch_size);
+
+                // Create and store the return value.
+                detail::store_vector_to_memory(builder, out, llvm_sgn(s, v));
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(std::int32_t *, const fp_t *)>(s.jit_lookup("sgn"));
+
+                std::uniform_real_distribution<double> rdist(-10., 10.);
+                std::vector<fp_t> values(batch_size);
+                std::generate(values.begin(), values.end(), [&rdist]() { return rdist(rng); });
+                std::vector<std::int32_t> signs(batch_size);
+
+                f_ptr(signs.data(), values.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(signs[i] == sgn(values[i]));
+                }
+
+                values[0] = 0;
+
+                f_ptr(signs.data(), values.data());
+                REQUIRE(signs[0] == 0);
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
 
 TEST_CASE("sincos scalar")
 {
@@ -362,8 +504,6 @@ TEST_CASE("inv_kep_E_scalar")
 
             std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
 
-            const auto ntrials = 100;
-
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
                 const auto M = M_dist(rng);
@@ -440,8 +580,6 @@ TEST_CASE("inv_kep_E_batch")
 
                 std::uniform_real_distribution<double> e_dist(0., 1.),
                     M_dist(0., 2 * boost::math::constants::pi<double>());
-
-                const auto ntrials = 100;
 
                 std::vector<fp_t> ret_vec(batch_size), e_vec(ret_vec), M_vec(ret_vec);
 
@@ -598,4 +736,158 @@ TEST_CASE("while_loop")
 
         REQUIRE_THROWS_AS(thrower(), std::runtime_error);
     }
+}
+
+TEST_CASE("csc_scalar")
+{
+    using detail::llvm_add_csc;
+    using detail::llvm_mangle_type;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            const auto degree = 4u;
+
+            llvm_add_csc<fp_t>(s, degree, 1);
+
+            s.optimise();
+
+            s.compile();
+
+            auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(s.jit_lookup(
+                "heyoka_csc_degree_{}_{}"_format(degree, llvm_mangle_type(to_llvm_type<fp_t>(s.context())))));
+
+            // Random testing.
+            std::uniform_real_distribution<double> rdist(-10., 10.);
+            std::uniform_int_distribution<int> idist(0, 9);
+            std::uint32_t out = 0;
+            std::vector<fp_t> cfs(degree + 1u), nz_values;
+
+            for (auto i = 0; i < ntrials * 10; ++i) {
+                nz_values.clear();
+
+                // Generate random coefficients, putting
+                // in a zero every once in a while.
+                std::generate(cfs.begin(), cfs.end(), [&idist, &rdist, &nz_values]() {
+                    auto ret = idist(rng) == 0 ? fp_t(0) : fp_t(rdist(rng));
+                    if (ret != 0) {
+                        nz_values.push_back(ret);
+                    }
+
+                    return ret;
+                });
+
+                // Determine the number of sign changes.
+                auto n_sc = 0u;
+                for (decltype(nz_values.size()) j = 1; j < nz_values.size(); ++j) {
+                    n_sc += sgn(nz_values[j]) != sgn(nz_values[j - 1u]);
+                }
+
+                // Check it.
+                f_ptr(&out, cfs.data());
+                REQUIRE(out == n_sc);
+            }
+
+            // A full zero test.
+            std::fill(cfs.begin(), cfs.end(), fp_t(0));
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // Full 1.
+            std::fill(cfs.begin(), cfs.end(), fp_t(1));
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+
+            // Full -1.
+            std::fill(cfs.begin(), cfs.end(), fp_t(-1));
+            f_ptr(&out, cfs.data());
+            REQUIRE(out == 0u);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("csc_batch")
+{
+    using detail::llvm_add_csc;
+    using detail::llvm_mangle_type;
+    using detail::make_vector_type;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                const auto degree = 4u;
+
+                llvm_add_csc<fp_t>(s, degree, batch_size);
+
+                s.optimise();
+
+                s.compile();
+
+                auto f_ptr = reinterpret_cast<void (*)(std::uint32_t *, const fp_t *)>(
+                    s.jit_lookup("heyoka_csc_degree_{}_{}"_format(
+                        degree, llvm_mangle_type(make_vector_type(to_llvm_type<fp_t>(s.context()), batch_size)))));
+
+                // Random testing.
+                std::uniform_real_distribution<double> rdist(-10., 10.);
+                std::uniform_int_distribution<int> idist(0, 9);
+                std::vector<std::uint32_t> out(batch_size), n_sc(batch_size);
+                std::vector<fp_t> cfs((degree + 1u) * batch_size), nz_values;
+
+                for (auto i = 0; i < ntrials * 10; ++i) {
+                    // Generate random coefficients, putting
+                    // in a zero every once in a while.
+                    std::generate(cfs.begin(), cfs.end(),
+                                  [&idist, &rdist]() { return idist(rng) == 0 ? fp_t(0) : fp_t(rdist(rng)); });
+
+                    // Determine the number of sign changes for each batch element.
+                    for (auto batch_idx = 0u; batch_idx < batch_size; ++batch_idx) {
+                        nz_values.clear();
+
+                        for (auto j = 0u; j <= degree; ++j) {
+                            if (cfs[batch_size * j + batch_idx] != 0) {
+                                nz_values.push_back(cfs[batch_size * j + batch_idx]);
+                            }
+                        }
+
+                        n_sc[batch_idx] = 0;
+                        for (decltype(nz_values.size()) j = 1; j < nz_values.size(); ++j) {
+                            n_sc[batch_idx] += sgn(nz_values[j]) != sgn(nz_values[j - 1u]);
+                        }
+                    }
+
+                    // Check the result.
+                    f_ptr(out.data(), cfs.data());
+                    REQUIRE(std::equal(out.begin(), out.end(), n_sc.begin()));
+                }
+
+                // A full zero test.
+                std::fill(cfs.begin(), cfs.end(), fp_t(0));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+
+                // Full 1.
+                std::fill(cfs.begin(), cfs.end(), fp_t(1));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+
+                // Full -1.
+                std::fill(cfs.begin(), cfs.end(), fp_t(-1));
+                f_ptr(out.data(), cfs.data());
+                REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }

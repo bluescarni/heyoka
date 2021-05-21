@@ -24,6 +24,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/special_functions/binomial.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -35,6 +36,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
@@ -1043,6 +1045,233 @@ llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
+// Branchless sign function.
+// NOTE: requires FP value.
+llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
+{
+    assert(val != nullptr);
+    assert(val->getType()->getScalarType()->isFloatingPointTy());
+
+    auto &builder = s.builder();
+
+    // Build the zero constant.
+    auto zero = llvm::Constant::getNullValue(val->getType());
+
+    // Run the comparisons.
+    auto cmp0 = builder.CreateFCmpOLT(zero, val);
+    auto cmp1 = builder.CreateFCmpOLT(val, zero);
+
+    // Convert to int32.
+    llvm::Type *int_type;
+    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(cmp0->getType())) {
+        int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
+    } else {
+        int_type = builder.getInt32Ty();
+    }
+    auto icmp0 = builder.CreateZExt(cmp0, int_type);
+    auto icmp1 = builder.CreateZExt(cmp1, int_type);
+
+    // Compute and return the result.
+    return builder.CreateSub(icmp0, icmp1);
+}
+
+namespace
+{
+
+// Add a function to count the number of sign changes in the coefficients
+// of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
+// and scalar type T.
+template <typename T>
+llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a sign changes counter function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto tp = to_llvm_vector_type<T>(context, batch_size);
+
+    // Fetch the function name.
+    const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
+
+    // The function arguments:
+    // - pointer to the return value,
+    // - pointer to the array of coefficients.
+    // NOTE: both pointers are to the scalar counterparts
+    // of the vector types, so that we can call this from regular
+    // C++ code.
+    std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is void.
+        auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, fname, &md);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto out_ptr = f->args().begin();
+        out_ptr->setName("out_ptr");
+        out_ptr->addAttr(llvm::Attribute::NoCapture);
+        out_ptr->addAttr(llvm::Attribute::NoAlias);
+        out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+        auto cf_ptr = f->args().begin() + 1;
+        cf_ptr->setName("cf_ptr");
+        cf_ptr->addAttr(llvm::Attribute::NoCapture);
+        cf_ptr->addAttr(llvm::Attribute::NoAlias);
+        cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Fetch the type for storing the last_nz_idx variable.
+        auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
+
+        // The initial last nz idx is zero for all batch elements.
+        auto last_nz_idx = builder.CreateAlloca(last_nz_idx_t);
+        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), last_nz_idx);
+
+        // NOTE: last_nz_idx is an index into the poly coefficient vector. Thus, in batch
+        // mode, when loading from a vector of indices, we will have to apply an offset.
+        // For instance, for batch_size = 4 and last_nz_idx = [0, 1, 1, 2], the actual
+        // memory indices to load the scalar coefficients from are:
+        // - 0 * 4 + 0 = 0
+        // - 1 * 4 + 1 = 5
+        // - 1 * 4 + 2 = 6
+        // - 2 * 4 + 3 = 11.
+        // That is, last_nz_idx * batch_size + offset, where offset is [0, 1, 2, 3].
+        llvm::Value *offset;
+        if (batch_size == 1u) {
+            // In scalar mode the offset is simply zero.
+            offset = builder.getInt32(0);
+        } else {
+            offset = llvm::UndefValue::get(make_vector_type(builder.getInt32Ty(), batch_size));
+            for (std::uint32_t i = 0; i < batch_size; ++i) {
+                offset = builder.CreateInsertElement(offset, builder.getInt32(i), i);
+            }
+        }
+
+        // Init the vector of coefficient pointers with the base pointer value.
+        auto cf_ptr_v = vector_splat(builder, cf_ptr, batch_size);
+
+        // Init the return value with zero.
+        auto retval = builder.CreateAlloca(last_nz_idx_t);
+        builder.CreateStore(llvm::Constant::getNullValue(last_nz_idx_t), retval);
+
+        // The iteration range is [1, n].
+        llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
+            // Load the current poly coefficient(s).
+            auto cur_cf = load_vector_from_memory(
+                builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(cur_n, builder.getInt32(batch_size))}),
+                batch_size);
+
+            // Load the last nonzero coefficient(s).
+            auto last_nz_ptr_idx = builder.CreateAdd(
+                offset, builder.CreateMul(builder.CreateLoad(last_nz_idx),
+                                          vector_splat(builder, builder.getInt32(batch_size), batch_size)));
+            auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
+            auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(builder.CreateMaskedGather(last_nz_ptr,
+#if LLVM_VERSION_MAJOR == 10
+                                                                                                      alignof(T)
+#else
+                                                                                                      llvm::Align(alignof(T))
+#endif
+                                                                                                          ))
+                                              : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+
+            // Compute the sign of the current coefficient(s).
+            auto cur_sgn = llvm_sgn(s, cur_cf);
+
+            // Compute the sign of the last nonzero coefficient(s).
+            auto last_nz_sgn = llvm_sgn(s, last_nz_cf);
+
+            // Add them and check if the result is zero (this indicates a sign change).
+            auto cmp = builder.CreateICmpEQ(builder.CreateAdd(cur_sgn, last_nz_sgn),
+                                            llvm::Constant::getNullValue(cur_sgn->getType()));
+
+            // We also need to check if last_nz_sgn is zero. If that is the case, it means
+            // we haven't found any nonzero coefficient yet for the polynomial and we must
+            // not modify retval yet.
+            auto zero_cmp = builder.CreateICmpEQ(last_nz_sgn, llvm::Constant::getNullValue(last_nz_sgn->getType()));
+            cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
+
+            // Update retval.
+            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(retval), builder.CreateZExt(cmp, last_nz_idx_t)),
+                                retval);
+
+            // Update last_nz_idx.
+            builder.CreateStore(
+                builder.CreateSelect(builder.CreateICmpEQ(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
+                                     builder.CreateLoad(last_nz_idx), vector_splat(builder, cur_n, batch_size)),
+                last_nz_idx);
+        });
+
+        // Store the result.
+        store_vector_to_memory(builder, out_ptr, builder.CreateLoad(retval));
+
+        // Return.
+        builder.CreateRetVoid();
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // LCOV_EXCL_START
+        // The function was created before. Check if the signatures match.
+        if (!compare_function_signature(f, builder.getVoidTy(), fargs)) {
+            throw std::invalid_argument(
+                "Inconsistent function signature for the sign changes counter function detected");
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    return f;
+}
+
+} // namespace
+
+llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_csc_impl<mppp::real128>(s, n, batch_size);
+}
+
+#endif
+
 namespace
 {
 
@@ -1274,6 +1503,75 @@ llvm::Function *llvm_add_inv_kep_E_ldbl(llvm_state &s, std::uint32_t batch_size)
 llvm::Function *llvm_add_inv_kep_E_f128(llvm_state &s, std::uint32_t batch_size)
 {
     return llvm_add_inv_kep_E_impl<mppp::real128>(s, batch_size);
+}
+
+#endif
+
+namespace
+{
+
+// Helper to create a global const array containing
+// all binomial coefficients up to (n, n). The coefficients are stored
+// as scalars and the return value is a pointer to the first coefficient.
+// The array has shape (n + 1, n + 1) and it is stored in row-major format.
+template <typename T>
+llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
+{
+    // Overflow check.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || (n + 1u) > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding an array of binomial coefficients");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the array type.
+    auto *arr_type
+        = llvm::ArrayType::get(to_llvm_type<T>(context), boost::numeric_cast<std::uint64_t>((n + 1u) * (n + 1u)));
+
+    // Generate the binomials as constants.
+    std::vector<llvm::Constant *> bc_const;
+    for (std::uint32_t i = 0; i <= n; ++i) {
+        for (std::uint32_t j = 0; j <= n; ++j) {
+            // NOTE: the Boost implementation requires j <= i. We don't care about
+            // j > i anyway.
+            const auto val = (j <= i) ? boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i),
+                                                                             boost::numeric_cast<unsigned>(j))
+                                      : T(0);
+            bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
+        }
+    }
+
+    // Create the global array.
+    auto *bc_const_arr = llvm::ConstantArray::get(arr_type, bc_const);
+    auto *g_bc_const_arr = new llvm::GlobalVariable(md, bc_const_arr->getType(), true,
+                                                    llvm::GlobalVariable::InternalLinkage, bc_const_arr);
+
+    // Get out a pointer to the beginning of the array.
+    return builder.CreateInBoundsGEP(g_bc_const_arr, {builder.getInt32(0), builder.getInt32(0)});
+}
+
+} // namespace
+
+llvm::Value *llvm_add_bc_array_dbl(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<double>(s, n);
+}
+
+llvm::Value *llvm_add_bc_array_ldbl(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<long double>(s, n);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
+{
+    return llvm_add_bc_array_impl<mppp::real128>(s, n);
 }
 
 #endif
