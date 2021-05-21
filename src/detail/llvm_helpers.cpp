@@ -1239,11 +1239,13 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     } else {
+        // LCOV_EXCL_START
         // The function was created before. Check if the signatures match.
         if (!compare_function_signature(f, builder.getVoidTy(), fargs)) {
             throw std::invalid_argument(
                 "Inconsistent function signature for the sign changes counter function detected");
         }
+        // LCOV_EXCL_STOP
     }
 
     return f;
