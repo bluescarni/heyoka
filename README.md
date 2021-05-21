@@ -24,6 +24,8 @@ heyoka
     <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Report bug</a>
     ·
     <a href="https://github.com/bluescarni/heyoka/issues/new/choose">Request feature</a>
+    ·
+    <a href="https://github.com/bluescarni/heyoka/discussions">Discuss</a>
   </p>
 </p>
 
