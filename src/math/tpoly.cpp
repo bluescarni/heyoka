@@ -355,6 +355,18 @@ llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t
 
 #endif
 
+// Small helper to detect if an expression
+// is a tpoly function.
+bool is_tpoly(const expression &ex)
+{
+    if (auto func_ptr = std::get_if<func>(&ex.value());
+        func_ptr != nullptr && func_ptr->extract<tpoly_impl>() != nullptr) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 } // namespace detail
 
 expression tpoly(expression b, expression e)

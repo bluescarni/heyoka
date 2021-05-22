@@ -100,19 +100,18 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-// TODO restore.
-#if 0
-
-
-TEST_CASE("is_time")
+TEST_CASE("has_time")
 {
-    REQUIRE(!detail::is_time(1_dbl));
-    REQUIRE(!detail::is_time("x"_var));
-    REQUIRE(!detail::is_time(1_dbl + hy::time));
-    REQUIRE(detail::is_time(hy::time));
-}
+    REQUIRE(!has_time(1_dbl));
+    REQUIRE(has_time(hy::time));
+    REQUIRE(has_time(1. + tpoly(par[0], par[1])));
+    REQUIRE(has_time(hy::time + tpoly(par[0], par[1])));
 
-#endif
+    REQUIRE(!detail::is_tpoly(1_dbl));
+    REQUIRE(!detail::is_tpoly(hy::time));
+    REQUIRE(!detail::is_tpoly(1. + tpoly(par[0], par[1])));
+    REQUIRE(detail::is_tpoly(tpoly(par[0], par[1])));
+}
 
 TEST_CASE("ode test")
 {

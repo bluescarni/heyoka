@@ -57,6 +57,8 @@ public:
 #endif
 };
 
+HEYOKA_DLL_PUBLIC bool is_tpoly(const expression &);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression tpoly(expression, expression);
