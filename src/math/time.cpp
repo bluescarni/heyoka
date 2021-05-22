@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include <fmt/format.h>
@@ -38,6 +39,18 @@
 #include <heyoka/math/time.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -121,7 +134,6 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Compose the function name.
-    using namespace fmt::literals;
     const auto fname = "heyoka_taylor_diff_time_{}"_format(taylor_mangle_suffix(val_t));
 
     // The function arguments:
@@ -191,6 +203,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     } else {
+        // LCOV_EXCL_START
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
         // and then optimised - optimisation might remove arguments which are compile-time
@@ -199,6 +212,7 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
             throw std::invalid_argument(
                 "Inconsistent function signature for the Taylor derivative of time() in compact mode detected");
         }
+        // LCOV_EXCL_STOP
     }
 
     return f;

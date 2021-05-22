@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add time polynomials to the expression system
+  (`#144 <https://github.com/bluescarni/heyoka/pull/144>`__).
 - Add the inverse of Kepler's elliptic equation to the expression
   system
   (`#138 <https://github.com/bluescarni/heyoka/pull/138>`__).
