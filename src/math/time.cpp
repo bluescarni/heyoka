@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include <fmt/format.h>
