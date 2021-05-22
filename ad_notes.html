@@ -421,6 +421,18 @@
    </li>
   </ul>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#time-functions">
+   Time functions
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#time-polynomials">
+     Time polynomials
+    </a>
+   </li>
+  </ul>
+ </li>
 </ul>
 
             </nav>
@@ -772,6 +784,25 @@ n\left( e^{\left[ n \right]}\left( t \right) d^{\left[ 0 \right]}\left( t \right
 d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
 \right)
 \right].\]</div>
+</div>
+</div>
+<div class="section" id="time-functions">
+<h2>Time functions<a class="headerlink" href="#time-functions" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="time-polynomials">
+<h3>Time polynomials<a class="headerlink" href="#time-polynomials" title="Permalink to this headline">¶</a></h3>
+<p>Given the time polynomial of order <span class="math notranslate nohighlight">\(n\)</span></p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-58">
+<span class="eqno">(67)<a class="headerlink" href="#equation-ad-notes-58" title="Permalink to this equation">¶</a></span>\[p_n\left( t \right) = \sum_{i=0}^n a_i t^i,\]</div>
+<p>its derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-59">
+<span class="eqno">(68)<a class="headerlink" href="#equation-ad-notes-59" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\left( i \right)_j\)</span> is the <a class="reference external" href="https://en.wikipedia.org/wiki/Falling_and_rising_factorials">falling factorial</a>.
+The normalised derivative of order <span class="math notranslate nohighlight">\(j\)</span> is</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-60">
+<span class="eqno">(69)<a class="headerlink" href="#equation-ad-notes-60" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},\]</div>
+<p>which, with the help of elementary relations involving factorials and after re-arranging the indices, can be rewritten as</p>
+<div class="math notranslate nohighlight" id="equation-ad-notes-61">
+<span class="eqno">(70)<a class="headerlink" href="#equation-ad-notes-61" title="Permalink to this equation">¶</a></span>\[\left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.\]</div>
 </div>
 </div>
 </div>
