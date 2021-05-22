@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <iostream>
 #include <random>
 #include <sstream>
 #include <tuple>
@@ -22,7 +23,11 @@
 
 #endif
 
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/cos.hpp>
+#include <heyoka/math/sin.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/math/tpoly.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -98,38 +103,6 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 // TODO restore.
 #if 0
 
-TEST_CASE("ode test")
-{
-    using std::cos;
-    using std::sin;
-
-    for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto ha : {false, true}) {
-                auto [x] = make_vars("x");
-
-                taylor_adaptive<double> ta({prime(x) = cos(hy::time)}, {.5}, kw::high_accuracy = ha,
-                                           kw::compact_mode = cm, kw::opt_level = opt_level);
-
-                ta.propagate_until(100.);
-
-                REQUIRE(ta.get_state()[0] == approximately(sin(100.) + .5, 10000.));
-
-                ta.propagate_until(0.);
-
-                REQUIRE(ta.get_state()[0] == approximately(.5, 1000.));
-            }
-        }
-    }
-}
-
-TEST_CASE("stream output")
-{
-    std::ostringstream oss;
-    oss << "x"_var + hy::time;
-
-    REQUIRE(oss.str() == "(x + t)");
-}
 
 TEST_CASE("is_time")
 {
@@ -140,6 +113,44 @@ TEST_CASE("is_time")
 }
 
 #endif
+
+TEST_CASE("ode test")
+{
+    auto x = "x"_var;
+
+    auto eq = 6. * hy::time * cos(tpoly(par[0], par[3]))
+              - tpoly(par[3], par[6]) * sin(tpoly(par[0], par[3])) * tpoly(par[6], par[8]);
+
+    auto pars = std::vector<double>{-1, 2, 1, 1, 0, 3, 2, 2};
+
+    taylor_adaptive<double> ta({prime(x) = eq}, {std::cos(-1.)}, kw::pars = std::move(pars));
+
+    const auto tf = 10.;
+    auto oc = std::get<0>(ta.propagate_until(tf));
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(ta.get_state()[0] == approximately((1 + 3 * tf * tf) * std::cos(-1 + 2 * tf + tf * tf), 1000.));
+}
+
+TEST_CASE("mangle test")
+{
+    llvm_state s{kw::opt_level = 3};
+
+    auto x = "x"_var, y = "y"_var;
+
+    taylor_add_jet<double>(s, "jet", {tpoly(par[0], par[1]), x + y + tpoly(par[0], par[3]) + tpoly(par[3], par[6])}, 10,
+                           1, false, true);
+
+    std::cout << s.get_ir() << '\n';
+}
+
+TEST_CASE("stream output")
+{
+    std::ostringstream oss;
+    oss << tpoly(par[3], par[6]);
+
+    REQUIRE(oss.str() == "tpoly(3, 6)");
+}
 
 TEST_CASE("taylor tpoly")
 {

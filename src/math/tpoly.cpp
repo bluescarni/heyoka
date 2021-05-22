@@ -88,7 +88,7 @@ tpoly_impl::tpoly_impl(expression b, expression e)
 
 void tpoly_impl::to_stream(std::ostream &os) const
 {
-    os << "t_poly({}, {})"_format(m_b_idx, m_e_idx);
+    os << "tpoly({}, {})"_format(m_b_idx, m_e_idx);
 }
 
 namespace
