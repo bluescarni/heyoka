@@ -134,7 +134,7 @@ TEST_CASE("ode test")
 
 TEST_CASE("mangle test")
 {
-    llvm_state s{kw::opt_level = 3};
+    llvm_state s{kw::opt_level = 3u};
 
     auto x = "x"_var, y = "y"_var;
 
