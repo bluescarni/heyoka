@@ -622,3 +622,38 @@ and :eq:`eq_leibniz_00` and re-arrange to obtain, for :math:`n > 0`:
    d^{\left[ n - j \right]}\left( t \right)e^{\left[ j \right]}\left( t \right)
    \right)
    \right].
+
+Time functions
+--------------
+
+Time polynomials
+^^^^^^^^^^^^^^^^
+
+Given the time polynomial of order :math:`n`
+
+.. math::
+   :label:
+
+   p_n\left( t \right) = \sum_{i=0}^n a_i t^i,
+
+its derivative of order :math:`j` is
+
+.. math::
+   :label:
+
+   \left(p_n\left( t \right)\right)^{\left( j \right)} = \sum_{i=j}^n \left( i \right)_j a_i t^{i - j},
+
+where :math:`\left( i \right)_j` is the `falling factorial <https://en.wikipedia.org/wiki/Falling_and_rising_factorials>`__.
+The normalised derivative of order :math:`j` is
+
+.. math::
+   :label:
+
+   \left(p_n\left( t \right)\right)^{\left[ j \right]} = \frac{1}{j!}\sum_{i=j}^n \left( i \right)_j a_i t^{i - j},
+
+which, with the help of elementary relations involving factorials and after re-arranging the indices, can be rewritten as
+
+.. math::
+   :label:
+
+   \left(p_n\left( t \right)\right)^{\left[ j \right]} = \sum_{i=0}^{n-j} {i+j \choose j} a_{i+j} t^i.
