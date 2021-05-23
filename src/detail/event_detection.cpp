@@ -821,8 +821,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // wrapping degree around. I.e., degree will
             // always be at least 0, even if the order 0
             // coefficient is zero.
-            for (std::uint32_t i = 0; i < order; ++i) {
-                if (tmp.v[order - i] != 0) {
+            for (std::uint32_t o = 0; o < order; ++o) {
+                if (tmp.v[order - o] != 0) {
                     break;
                 }
                 --degree;
