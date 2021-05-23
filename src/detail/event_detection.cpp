@@ -803,8 +803,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // LCOV_EXCL_STOP
             }
 
-            // Rescale it so that the range [0, h)
-            // becomes [0, 1).
+            // Rescale the event polynomial so that the range [0, h)
+            // becomes [0, 1), and write the resulting polynomial into tmp.
             // NOTE: at the first iteration (i.e., for the first event),
             // tmp has been constructed correctly outside this function.
             // Below, tmp will first be moved into wl (thus rendering
@@ -814,6 +814,66 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             assert(!tmp.v.empty());
             assert(tmp.v.size() - 1u == order);
             poly_rescale(tmp.v.data(), ptr, h, order);
+
+            // Determine the polynomial degree.
+            auto degree = order;
+            // NOTE: use < rather than <= in order to avoid
+            // wrapping degree around. I.e., degree will
+            // always be at least 0, even if the order 0
+            // coefficient is zero.
+            for (std::uint32_t i = 0; i < order; ++i) {
+                if (tmp.v[order - i] != 0) {
+                    break;
+                }
+                --degree;
+            }
+
+            // Optimise the cases in which the event polynomial
+            // is linear or quadratic.
+            switch (degree) {
+                case 1u: {
+                    // Linear case.
+                    const auto root = -tmp.v[0] / tmp.v[1];
+
+                    // Add the root only if it falls outside
+                    // the cooldown range and within the [0, 1)
+                    // range.
+                    if (root >= lb_offset && root < 1) {
+                        add_d_event(root * h);
+                    }
+
+                    continue;
+                }
+                case 2u: {
+                    // Quadratic case.
+                    using std::sqrt;
+
+                    const auto a = tmp.v[2], b = tmp.v[1], c = tmp.v[0];
+                    const auto delta = b * b - 4 * a * c;
+
+                    if (delta < 0) {
+                        // Negative discriminant, no real zeroes.
+                        // Move to the next event.
+                        continue;
+                    }
+
+                    const auto sqrt_delta = sqrt(delta);
+                    const auto root1 = (-b - sqrt_delta) / (2 * a);
+                    const auto root2 = (-b + sqrt_delta) / (2 * a);
+
+                    // Add the roots only if they fall outside
+                    // the cooldown range and within the [0, 1)
+                    // range.
+                    if (root1 >= lb_offset && root1 < 1) {
+                        add_d_event(root1 * h);
+                    }
+                    if (root2 >= lb_offset && root2 < 1) {
+                        add_d_event(root2 * h);
+                    }
+
+                    continue;
+                }
+            }
 
             // Place the first element in the working list.
             wl.emplace_back(0, 1, std::move(tmp));
