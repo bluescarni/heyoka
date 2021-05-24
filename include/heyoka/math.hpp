@@ -20,6 +20,7 @@
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
+#include <heyoka/math/kepE.hpp>
 #include <heyoka/math/log.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/pow.hpp>
@@ -31,5 +32,6 @@
 #include <heyoka/math/tan.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/math/tpoly.hpp>
 
 #endif

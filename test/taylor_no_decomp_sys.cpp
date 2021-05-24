@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <initializer_list>
 #include <random>
 #include <tuple>

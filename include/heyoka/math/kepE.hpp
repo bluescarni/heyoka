@@ -6,15 +6,21 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_TAN_HPP
-#define HEYOKA_MATH_TAN_HPP
+#ifndef HEYOKA_MATH_KEPE_HPP
+#define HEYOKA_MATH_KEPE_HPP
+
+#include <heyoka/config.hpp>
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
-#include <heyoka/config.hpp>
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -26,33 +32,16 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC tan_impl : public func_base
+class HEYOKA_DLL_PUBLIC kepE_impl : public func_base
 {
 public:
-    tan_impl();
-    explicit tan_impl(expression);
+    kepE_impl();
+    explicit kepE_impl(expression, expression);
 
     expression diff(const std::string &) const;
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
-
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
@@ -64,6 +53,7 @@ public:
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                   std::uint32_t) const;
 #endif
+
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -73,7 +63,25 @@ public:
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression tan(expression);
+HEYOKA_DLL_PUBLIC expression kepE(expression, expression);
+
+HEYOKA_DLL_PUBLIC expression kepE(expression, double);
+HEYOKA_DLL_PUBLIC expression kepE(expression, long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression kepE(expression, mppp::real128);
+
+#endif
+
+HEYOKA_DLL_PUBLIC expression kepE(double, expression);
+HEYOKA_DLL_PUBLIC expression kepE(long double, expression);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression kepE(mppp::real128, expression);
+
+#endif
 
 } // namespace heyoka
 

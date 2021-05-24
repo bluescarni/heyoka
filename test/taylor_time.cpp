@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 #include <random>
@@ -21,6 +22,7 @@
 
 #endif
 
+#include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/time.hpp>
@@ -137,7 +139,6 @@ TEST_CASE("taylor time")
 
         auto x = "x"_var, y = "y"_var;
 
-        // Number tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 

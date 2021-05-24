@@ -52,6 +52,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -115,7 +127,7 @@ llvm::Value *atan_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_atan128");
+    return call_extern_vec(s, args[0], "atanq");
 }
 
 #endif
@@ -127,7 +139,8 @@ double atan_impl::eval_dbl(const std::unordered_map<std::string, double> &map, c
     return std::atan(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-long double atan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double atan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                 const std::vector<long double> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -135,7 +148,8 @@ long double atan_impl::eval_ldbl(const std::unordered_map<std::string, long doub
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 atan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 atan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                   const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -143,12 +157,9 @@ mppp::real128 atan_impl::eval_f128(const std::unordered_map<std::string, mppp::r
 }
 #endif
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-atan_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type atan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
-
-    using namespace fmt::literals;
 
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
@@ -156,16 +167,18 @@ atan_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::u
         arg = expression{"u_{}"_format(dres)};
     }
 
-    // Append the atan decomposition.
-    u_vars_defs.emplace_back(atan(arg), std::vector<std::uint32_t>{});
-
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(std::move(arg)), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(arg), std::vector<std::uint32_t>{});
+
+    // Append the atan decomposition.
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
-    (u_vars_defs.end() - 2)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 1u));
+    (u_vars_defs.end() - 1)->second.push_back(boost::numeric_cast<std::uint32_t>(u_vars_defs.size() - 2u));
 
-    return u_vars_defs.size() - 2u;
+    // Compute the return value (pointing to the
+    // decomposed atan).
+    return u_vars_defs.size() - 1u;
 }
 
 namespace
@@ -259,8 +272,6 @@ llvm::Value *taylor_diff_atan(llvm_state &s, const atan_impl &f, const std::vect
     assert(f.args().size() == 1u);
 
     if (deps.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
             "derivative of the inverse tangent, but a vector of size {} was passed instead"_format(deps.size()));
@@ -311,8 +322,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn, const U &num, std::uint32_t,
                                              std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_atan_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -333,8 +342,7 @@ llvm::Function *taylor_c_diff_func_atan_impl(llvm_state &s, const atan_impl &fn,
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_atan_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_atan_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

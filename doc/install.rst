@@ -16,7 +16,7 @@ a comprehensive continuous integration pipeline, which includes:
 
 heyoka has the following **mandatory** dependencies:
 
-* the `LLVM <https://llvm.org/>`__ compiler infrastructure library, version 10 or 11,
+* the `LLVM <https://llvm.org/>`__ compiler infrastructure library (version >= 10),
 * the `Boost <https://www.boost.org/>`__ C++ libraries (version >= 1.60),
 * the `{fmt} <https://fmt.dev/latest/index.html>`__ library,
 * the `spdlog <https://github.com/gabime/spdlog>`__ library.
@@ -66,7 +66,7 @@ Packages
 Conda
 `````
 
-heyoka is available via the `conda <https://conda.io/docs/>`__ package manager for Linux, OSX and Windows
+heyoka is available via the `conda <https://conda.io/en/latest/>`__ package manager for Linux, OSX and Windows
 thanks to the infrastructure provided by `conda-forge <https://conda-forge.org/>`__.
 
 In order to install heyoka via conda, you just need to add ``conda-forge``
@@ -81,7 +81,7 @@ to the channels, and then we can immediately install heyoka:
 The conda package for heyoka is maintained by the core development team,
 and it is regularly updated when new heyoka versions are released.
 
-Please refer to the `conda documentation <https://conda.io/docs/>`__ for instructions
+Please refer to the `conda documentation <https://conda.io/en/latest/>`__ for instructions
 on how to setup and manage
 your conda installation.
 

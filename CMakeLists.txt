@@ -196,6 +196,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/log.cpp"
@@ -217,6 +218,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atanh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/erf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
@@ -275,21 +277,23 @@ endif()
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
 
+# Define an interface target for linking to the LLVM bits.
+add_library(heyoka_llvm_internal INTERFACE)
 # Add the definitions required by LLVM.
-target_compile_definitions(heyoka PRIVATE ${LLVM_DEFINITIONS})
+target_compile_definitions(heyoka_llvm_internal INTERFACE ${LLVM_DEFINITIONS})
+# On MSVC, silence std::iterator warnings coming from the LLVM headers.
 if(MSVC)
-    # On MSVC, silence std::iterator warnings coming from the LLVM headers.
-    target_compile_definitions(heyoka PRIVATE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+    target_compile_definitions(heyoka_llvm_internal INTERFACE _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
 # Add the LLVM include dirs.
-target_include_directories(heyoka SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(heyoka_llvm_internal SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
 
 if(TARGET LLVM)
     # On some platforms, LLVM is built as a single library,
     # which is exported by LLVM's CMake config-file package as
     # a target called LLVM.
-    target_link_libraries(heyoka PRIVATE LLVM)
+    target_link_libraries(heyoka_llvm_internal INTERFACE LLVM)
 else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
@@ -307,7 +311,7 @@ else()
     message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
     get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
     message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
-    target_link_directories(heyoka PRIVATE "${_HEYOKA_ZLIB_LOCATION_DIR}")
+    target_link_directories(heyoka_llvm_internal INTERFACE "${_HEYOKA_ZLIB_LOCATION_DIR}")
 
     unset(_HEYOKA_ZLIB_LOCATION)
     unset(_HEYOKA_ZLIB_LOCATION_DIR)
@@ -317,12 +321,15 @@ else()
     # NOTE: not sure what these two do, I copied from symengine's CMakeLists.txt.
     llvm_map_components_to_libnames(_HEYOKA_LLVM_LIBS_DIRECT ${_HEYOKA_LLVM_COMPONENTS})
     llvm_expand_dependencies(_HEYOKA_LLVM_LIBS ${_HEYOKA_LLVM_LIBS_DIRECT})
-    target_link_libraries(heyoka PRIVATE ${_HEYOKA_LLVM_LIBS})
+    target_link_libraries(heyoka_llvm_internal INTERFACE ${_HEYOKA_LLVM_LIBS})
 
     unset(_HEYOKA_LLVM_COMPONENTS)
     unset(_HEYOKA_LLVM_LIBS_DIRECT)
     unset(_HEYOKA_LLVM_LIBS)
 endif()
+
+# Link to LLVM privately.
+target_link_libraries(heyoka PRIVATE heyoka_llvm_internal)
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED CONFIG)

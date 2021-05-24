@@ -10,7 +10,6 @@
 
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <initializer_list>
 #include <limits>
@@ -34,6 +33,7 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
@@ -324,8 +324,7 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
 
 #endif
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(number &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &)
+taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &)
 {
     // NOTE: numbers do not require decomposition.
     return 0;

@@ -30,114 +30,24 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // related to incompatibilities between GCC
 // and LLVM in the implementation of __float128,
 // and needs to be investigated more.
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_pow128(__float128 x, __float128 y)
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_max128(__float128 x, __float128 y) noexcept
 {
-    return mppp::pow(mppp::real128{x}, mppp::real128{y}).m_value;
+    return mppp::fmax(mppp::real128{x}, mppp::real128{y}).m_value;
 }
 
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_log128(__float128 x)
-{
-    return mppp::log(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_exp128(__float128 x)
-{
-    return mppp::exp(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sin128(__float128 x)
-{
-    return mppp::sin(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cos128(__float128 x)
-{
-    return mppp::cos(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sqrt128(__float128 x)
-{
-    return mppp::sqrt(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_fma128(__float128 x, __float128 y, __float128 z)
-{
-    return mppp::fma(mppp::real128{x}, mppp::real128{y}, mppp::real128{z}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128 x, __float128 y)
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128 x, __float128 y) noexcept
 {
     return mppp::fmax(mppp::real128{x}, mppp::abs(mppp::real128{y})).m_value;
 }
 
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128 x, __float128 y)
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128 x, __float128 y) noexcept
 {
     return mppp::fmin(mppp::real128{x}, mppp::abs(mppp::real128{y})).m_value;
 }
 
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minnum128(__float128 x, __float128 y)
+extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minnum128(__float128 x, __float128 y) noexcept
 {
     return mppp::fmin(mppp::real128{x}, mppp::real128{y}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_abs128(__float128 x)
-{
-    return mppp::abs(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tan128(__float128 x)
-{
-    return mppp::tan(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asin128(__float128 x)
-{
-    return mppp::asin(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acos128(__float128 x)
-{
-    return mppp::acos(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atan128(__float128 x)
-{
-    return mppp::atan(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_cosh128(__float128 x)
-{
-    return mppp::cosh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sinh128(__float128 x)
-{
-    return mppp::sinh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_tanh128(__float128 x)
-{
-    return mppp::tanh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_asinh128(__float128 x)
-{
-    return mppp::asinh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_acosh128(__float128 x)
-{
-    return mppp::acosh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_atanh128(__float128 x)
-{
-    return mppp::atanh(mppp::real128{x}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_erf128(__float128 x)
-{
-    return mppp::erf(mppp::real128{x}).m_value;
 }
 
 #endif
@@ -149,57 +59,57 @@ extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_erf128(__float128 x)
 // NOTE: there seems to be issues when trying to invoke long double
 // math functions on MSVC (LLVM complaining about missing symbols).
 // Let's create ad-hoc wrappers.
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanl(long double x) noexcept
 {
     return std::tan(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinl(long double x) noexcept
 {
     return std::asin(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acosl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acosl(long double x) noexcept
 {
     return std::acos(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanl(long double x) noexcept
 {
     return std::atan(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_coshl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_coshl(long double x) noexcept
 {
     return std::cosh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sinhl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sinhl(long double x) noexcept
 {
     return std::sinh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanhl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_tanhl(long double x) noexcept
 {
     return std::tanh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinhl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_asinhl(long double x) noexcept
 {
     return std::asinh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acoshl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_acoshl(long double x) noexcept
 {
     return std::acosh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanhl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanhl(long double x) noexcept
 {
     return std::atanh(x);
 }
 
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_erfl(long double x)
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_erfl(long double x) noexcept
 {
     return std::erf(x);
 }

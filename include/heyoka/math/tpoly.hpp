@@ -6,12 +6,11 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_TAN_HPP
-#define HEYOKA_MATH_TAN_HPP
+#ifndef HEYOKA_MATH_TPOLY_HPP
+#define HEYOKA_MATH_TPOLY_HPP
 
 #include <cstdint>
-#include <string>
-#include <unordered_map>
+#include <ostream>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -26,33 +25,18 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC tan_impl : public func_base
+class HEYOKA_DLL_PUBLIC tpoly_impl : public func_base
 {
 public:
-    tan_impl();
-    explicit tan_impl(expression);
+    // NOTE: we will cache the begin/end indices
+    // for convenience.
+    std::uint32_t m_b_idx, m_e_idx;
 
-    expression diff(const std::string &) const;
+    tpoly_impl();
+    explicit tpoly_impl(expression, expression);
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
+    void to_stream(std::ostream &) const;
 
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
-#endif
-
-    void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
-                        const std::vector<double> &) const;
-    double eval_num_dbl(const std::vector<double> &) const;
-    double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
-
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
@@ -64,6 +48,7 @@ public:
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                   std::uint32_t) const;
 #endif
+
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -71,9 +56,11 @@ public:
 #endif
 };
 
+HEYOKA_DLL_PUBLIC bool is_tpoly(const expression &);
+
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression tan(expression);
+HEYOKA_DLL_PUBLIC expression tpoly(expression, expression);
 
 } // namespace heyoka
 

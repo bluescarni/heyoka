@@ -42,6 +42,7 @@
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/math/tpoly.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -822,8 +823,7 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 // which corresponds to the decomposed version of ex.
 // If the return value is zero, ex was not decomposed.
 // NOTE: this will render ex unusable.
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(expression &&ex, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
+taylor_dc_t::size_type taylor_decompose_in_place(expression &&ex, taylor_dc_t &u_vars_defs)
 {
     return std::visit(
         [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
@@ -1029,18 +1029,18 @@ std::uint32_t get_param_size(const expression &ex)
     return retval;
 }
 
-// Determine if an expression contains the time function.
+// Determine if an expression is time-dependent.
 bool has_time(const expression &ex)
 {
-    // If the expression itself is a time function,
+    // If the expression itself is a time function or a tpoly,
     // return true.
-    if (detail::is_time(ex)) {
+    if (detail::is_time(ex) || detail::is_tpoly(ex)) {
         return true;
     }
 
     // Otherwise:
     // - if ex is a function, check if any of its arguments
-    //   contains the time function,
+    //   is time-dependent,
     // - otherwise, return false.
     return std::visit(
         [](const auto &v) {

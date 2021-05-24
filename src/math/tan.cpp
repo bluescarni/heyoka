@@ -54,6 +54,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -110,7 +122,7 @@ llvm::Value *tan_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "heyoka_tan128");
+    return call_extern_vec(s, args[0], "tanq");
 }
 
 #endif
@@ -122,7 +134,8 @@ double tan_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::tan(heyoka::eval_dbl(args()[0], map, pars));
 }
 
-long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -130,7 +143,8 @@ long double tan_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 tan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 tan_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 1u);
 
@@ -152,8 +166,6 @@ void tan_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
 double tan_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
             "tangent over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
@@ -172,22 +184,21 @@ double tan_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
     return std::tan(a[0]);
 }
 
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-tan_impl::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+taylor_dc_t::size_type tan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
     // Decompose the argument.
     auto &arg = *get_mutable_args_it().first;
     if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_" + detail::li_to_string(dres)}};
+        arg = expression{variable{"u_{}"_format(dres)}};
     }
 
     // Append the tan decomposition.
-    u_vars_defs.emplace_back(tan(std::move(arg)), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 
     // Append the auxiliary function tan(arg) * tan(arg).
-    u_vars_defs.emplace_back(square(expression{variable{"u_" + detail::li_to_string(u_vars_defs.size() - 1u)}}),
+    u_vars_defs.emplace_back(square(expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
 
     // Add the hidden dep.
@@ -269,8 +280,6 @@ llvm::Value *taylor_diff_tan(llvm_state &s, const tan_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     if (deps.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "A hidden dependency vector of size 1 is expected in order to compute the Taylor "
             "derivative of the tangent, but a vector of size {} was passed instead"_format(deps.size()));
@@ -321,8 +330,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &fn, const U &num, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_tan_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -343,8 +350,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_tan_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_tan_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

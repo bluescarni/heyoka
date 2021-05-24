@@ -4,9 +4,33 @@ Changelog
 0.9.0 (unreleased)
 ------------------
 
+New
+~~~
+
+- Add time polynomials to the expression system
+  (`#144 <https://github.com/bluescarni/heyoka/pull/144>`__).
+- Add the inverse of Kepler's elliptic equation to the expression
+  system
+  (`#138 <https://github.com/bluescarni/heyoka/pull/138>`__).
+- Add an LLVM-based vectorised solver for Kepler's equation
+  (`#136 <https://github.com/bluescarni/heyoka/pull/136>`__).
+- Add an LLVM ``while`` loop function
+  (`#135 <https://github.com/bluescarni/heyoka/pull/135>`__).
+
 Changes
 ~~~~~~~
 
+- Performance improvements for event detection in the linear
+  and quadratic cases
+  (`#145 <https://github.com/bluescarni/heyoka/pull/145>`__).
+- Several functions used for event detection are now
+  compiled just-in-time, rather than being implemented
+  in C++
+  (`#142 <https://github.com/bluescarni/heyoka/pull/142>`__).
+- Cleanup unused and undocumented functions
+  (`#134 <https://github.com/bluescarni/heyoka/pull/134>`__).
+- Small performance optimisations
+  (`#133 <https://github.com/bluescarni/heyoka/pull/133>`__).
 - Remove the ``binary_operator`` node type in the expression
   system and implement binary arithmetic using the ``func`` node
   type instead

@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_COSH_HPP
 
 #include <cstdint>
-#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -39,8 +38,7 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
