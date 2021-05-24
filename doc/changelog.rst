@@ -20,6 +20,9 @@ New
 Changes
 ~~~~~~~
 
+- Performance improvements for event detection in the linear
+  and quadratic cases
+  (`#145 <https://github.com/bluescarni/heyoka/pull/145>`__).
 - Several functions used for event detection are now
   compiled just-in-time, rather than being implemented
   in C++
