@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
     auto ta_ev = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                          {-0.25, 0.},
-                                         kw::nt_events = {ev_t(v, [](taylor_adaptive<double> &, double) {})}};
+                                         kw::nt_events = {ev_t(v, [](taylor_adaptive<double> &, double, int) {})}};
 
     for (auto i = 0; i < 10; ++i) {
         ta_ev.propagate_for(final_time);

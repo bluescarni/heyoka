@@ -12,7 +12,6 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -53,8 +52,7 @@ public:
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &) &&;
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;

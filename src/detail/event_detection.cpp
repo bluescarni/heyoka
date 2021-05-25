@@ -27,7 +27,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/math/policies/policy.hpp>
-#include <boost/math/special_functions/binomial.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -37,6 +36,7 @@
 
 #endif
 
+#include <fmt/format.h>
 #include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
@@ -50,12 +50,25 @@
 #include <llvm/IR/Value.h>
 
 #include <heyoka/detail/event_detection.hpp>
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka::detail
 {
@@ -169,76 +182,6 @@ template <typename T>
 int sgn(T val)
 {
     return (T(0) < val) - (val < T(0));
-}
-
-// Count the number of sign changes in the coefficients of polynomial a.
-// Zero coefficients are skipped. Requires random-access iterator.
-// NOTE: in case of NaN values in a, the return value of this
-// function will be meaningless, and we rely on checks elsewhere
-// (e.g., in the root finding function) to bail out.
-template <typename InputIt>
-std::uint32_t count_sign_changes(InputIt a, std::uint32_t n)
-{
-    assert(n > 0u);
-
-    using std::isnan;
-
-    std::uint32_t retval = 0;
-
-    // Start from index 0 and move forward
-    // until we either find a nonzero coefficient,
-    // or we reach the last coefficient in the polynomial.
-    // In the latter case, the next loop will be skipped
-    // and the return value will remain 0.
-    std::uint32_t last_nz_idx = 0;
-    while (a[last_nz_idx] == 0 && last_nz_idx != n) {
-        ++last_nz_idx;
-    }
-
-    // Start iterating 1 past the first nonzero coefficient.
-    for (auto idx = last_nz_idx + 1u; idx <= n; ++idx) {
-        // Determine if a sign change occurred wrt
-        // the last nonzero coefficient found.
-        const auto cur_sign = sgn(a[idx]);
-        // NOTE: don't run the assertion check if
-        // we are dealing with nans.
-        assert(isnan(a[last_nz_idx]) || sgn(a[last_nz_idx]));
-        retval += (cur_sign + sgn(a[last_nz_idx])) == 0;
-
-        // Update last_nz_idx if necessary.
-        last_nz_idx = cur_sign ? idx : last_nz_idx;
-    }
-
-#if !defined(NDEBUG)
-    // In debug mode, run a sanity check with a simpler algorithm.
-    thread_local std::vector<typename std::iterator_traits<InputIt>::value_type> nz_cfs;
-    nz_cfs.clear();
-
-    // NOTE: check if we have nans in the polynomials,
-    // we don't want to run the check in that case.
-    bool has_nan = false;
-
-    for (std::uint32_t i = 0; i <= n; ++i) {
-        if (isnan(a[i])) {
-            has_nan = true;
-        }
-
-        if (a[i] != 0) {
-            nz_cfs.push_back(a[i]);
-        }
-    }
-
-    std::uint32_t r_check = 0;
-    for (std::uint32_t i = 1; i < nz_cfs.size(); ++i) {
-        if ((nz_cfs[i] > 0) != (nz_cfs[i - 1u] > 0)) {
-            ++r_check;
-        }
-    }
-
-    assert(has_nan || r_check == retval);
-#endif
-
-    return retval;
 }
 
 // Evaluate the first derivative of a polynomial.
@@ -411,29 +354,42 @@ struct is_terminal_event<t_event<T>> : std::true_type {
 template <typename T>
 constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
-// Helper to compute binomial coefficients
-// using Boost.Math.
-template <typename T>
-auto boost_math_bc(std::uint32_t n_, std::uint32_t k_)
-{
-    const auto n = boost::numeric_cast<unsigned>(n_);
-    const auto k = boost::numeric_cast<unsigned>(k_);
-
-    return boost::math::binomial_coefficient<T>(n, k);
-}
-
 // Helper to add a polynomial translation function
 // to the state 's'.
 template <typename T>
-void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
+llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
     assert(order > 0u);
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (order == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (order + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a polynomial translation function");
+    }
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // Helper to fetch the (i, j) binomial coefficient from
+    // a precomputed global array. The returned value is already
+    // splatted.
+    auto get_bc = [&, bc_ptr = llvm_add_bc_array<T>(s, order)](llvm::Value *i, llvm::Value *j) {
+        auto idx = builder.CreateMul(i, builder.getInt32(order + 1u));
+        idx = builder.CreateAdd(idx, j);
+
+        auto val = builder.CreateLoad(builder.CreateInBoundsGEP(bc_ptr, {idx}));
+
+        return vector_splat(builder, val, batch_size);
+    };
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
     // The function arguments:
-    // - the output pointer (write-only),
+    // - the output pointer,
     // - the pointer to the poly coefficients (read-only).
     // No overlap is allowed.
     std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
@@ -453,7 +409,6 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     out_ptr->setName("out_ptr");
     out_ptr->addAttr(llvm::Attribute::NoCapture);
     out_ptr->addAttr(llvm::Attribute::NoAlias);
-    out_ptr->addAttr(llvm::Attribute::WriteOnly);
 
     auto cf_ptr = f->args().begin() + 1;
     cf_ptr->setName("cf_ptr");
@@ -467,29 +422,25 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     builder.SetInsertPoint(bb);
 
     // Init the return values as zeroes.
-    std::vector<llvm::Value *> ret_cfs;
-    for (std::uint32_t i = 0; i <= order; ++i) {
-        ret_cfs.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-    }
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
+        auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))});
+        store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+    });
 
     // Do the translation.
-    for (std::uint32_t i = 0; i <= order; ++i) {
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
         auto ai = load_vector_from_memory(
-            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.getInt32(i * batch_size)}), batch_size);
+            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))}),
+            batch_size);
 
-        for (std::uint32_t k = 0; k <= i; ++k) {
-            auto tmp = builder.CreateFMul(
-                ai, vector_splat(builder, codegen<T>(s, number{boost_math_bc<T>(i, k)}), batch_size));
+        llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
+            auto tmp = builder.CreateFMul(ai, get_bc(i, k));
 
-            ret_cfs[k] = builder.CreateFAdd(ret_cfs[k], tmp);
-        }
-    }
-
-    // Write out the return value.
-    for (std::uint32_t i = 0; i <= order; ++i) {
-        auto ret_ptr = builder.CreateInBoundsGEP(out_ptr, {builder.getInt32(i * batch_size)});
-        store_vector_to_memory(builder, ret_ptr, ret_cfs[i]);
-    }
+            auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(k, builder.getInt32(batch_size))});
+            auto new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
+            store_vector_to_memory(builder, ptr, new_val);
+        });
+    });
 
     // Create the return value.
     builder.CreateRetVoid();
@@ -497,39 +448,162 @@ void add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t bat
     // Verify the function.
     s.verify_function(f);
 
-    // Run the optimisation pass.
-    s.optimise();
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
 }
 
-// Fetch a polynomial translation function
-// from the thread-local cache.
+// Add a function that, given an input polynomial of order n represented
+// as an array of coefficients:
+// - reverses it,
+// - translates it by 1,
+// - counts the sign changes in the coefficients
+//   of the resulting polynomial.
 template <typename T>
-auto get_poly_translator_1(std::uint32_t order)
+llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    using func_t = void (*)(T *, const T *);
+    assert(batch_size > 0u);
 
-    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, func_t>> tf_map;
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding an rtscc function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Add the translator and the sign changes counting function.
+    auto pt = add_poly_translator_1<T>(s, n, batch_size);
+    auto scc = llvm_add_csc<T>(s, n, batch_size);
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
+    // The function arguments:
+    // - two poly coefficients output pointers,
+    // - the output pointer to the number of sign changes (write-only),
+    // - the input pointer to the original poly coefficients (read-only).
+    // No overlap is allowed.
+    std::vector<llvm::Type *> fargs{
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+        llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr);
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create an rtscc function");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    // NOTE: out_ptr1/2 are used both in read and write mode,
+    // even though this function never actually reads from them
+    // (they are just forwarded to other functions reading from them).
+    // Because I am not 100% sure about the writeonly attribute
+    // in this case, let's err on the side of caution and do not
+    // mark them as writeonly.
+    auto out_ptr1 = f->args().begin();
+    out_ptr1->setName("out_ptr1");
+    out_ptr1->addAttr(llvm::Attribute::NoCapture);
+    out_ptr1->addAttr(llvm::Attribute::NoAlias);
+
+    auto out_ptr2 = f->args().begin() + 1;
+    out_ptr2->setName("out_ptr2");
+    out_ptr2->addAttr(llvm::Attribute::NoCapture);
+    out_ptr2->addAttr(llvm::Attribute::NoAlias);
+
+    auto n_sc_ptr = f->args().begin() + 2;
+    n_sc_ptr->setName("n_sc_ptr");
+    n_sc_ptr->addAttr(llvm::Attribute::NoCapture);
+    n_sc_ptr->addAttr(llvm::Attribute::NoAlias);
+    n_sc_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto cf_ptr = f->args().begin() + 3;
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr);
+    builder.SetInsertPoint(bb);
+
+    // Do the reversion into out_ptr1.
+    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        auto load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
+        auto store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
+
+        auto cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(cf_ptr, {load_idx}), batch_size);
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr1, {store_idx}), cur_cf);
+    });
+
+    // Translate out_ptr1 into out_ptr2.
+    builder.CreateCall(pt, {out_ptr2, out_ptr1});
+
+    // Count the sign changes in out_ptr2.
+    builder.CreateCall(scc, {n_sc_ptr, out_ptr2});
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
+}
+
+// Fetch the JITted functions used in the event detection implementation.
+template <typename T>
+auto get_ed_jit_functions(std::uint32_t order)
+{
+    // Polynomial translation function type.
+    using pt_t = void (*)(T *, const T *);
+    // rtscc function type.
+    using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+
+    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::pair<pt_t, rtscc_t>>> tf_map;
 
     auto it = tf_map.find(order);
 
     if (it == tf_map.end()) {
         // Cache miss, we need to create
-        // a new LLVM state and function.
+        // a new LLVM state and functions.
         llvm_state s;
 
-        // Add the polynomial translation function.
-        add_poly_translator_1<T>(s, order, 1);
+        // Add the rtscc function. This will also indirectly
+        // add the translator function.
+        add_poly_rtscc<T>(s, order, 1);
 
+        // Run the optimisation pass.
+        s.optimise();
+
+        // Compile.
         s.compile();
 
-        // Fetch the function.
-        auto f = reinterpret_cast<func_t>(s.jit_lookup("poly_translate_1"));
+        // Fetch the functions.
+        auto pt = reinterpret_cast<pt_t>(s.jit_lookup("poly_translate_1"));
+        auto rtscc = reinterpret_cast<rtscc_t>(s.jit_lookup("poly_rtscc"));
 
-        // Insert state and function into the cache.
-        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), f});
+        // Insert state and functions into the cache.
+        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, rtscc}});
         assert(ret.second);
 
-        return f;
+        return std::pair{pt, rtscc};
     } else {
         // Cache hit, return the function.
         return it->second.second;
@@ -538,9 +612,9 @@ auto get_poly_translator_1(std::uint32_t order)
 
 // Implementation of event detection.
 template <typename T>
-void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &d_tes,
-                               std::vector<std::tuple<std::uint32_t, T>> &d_ntes, const std::vector<t_event<T>> &tes,
-                               const std::vector<nt_event<T>> &ntes,
+void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int>> &d_tes,
+                               std::vector<std::tuple<std::uint32_t, T, int>> &d_ntes,
+                               const std::vector<t_event<T>> &tes, const std::vector<nt_event<T>> &ntes,
                                const std::vector<std::optional<std::pair<T, T>>> &cooldowns, T h,
                                const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
 {
@@ -582,8 +656,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
     // Fetch a reference to the wlist.
     auto &wl = get_wlist<T>();
 
-    // Fetch the polynomial translation function.
-    auto pt1 = get_poly_translator_1<T>(order);
+    // Fetch the JITted functions.
+    auto j_funcs = get_ed_jit_functions<T>(order);
+    auto pt = j_funcs.first;
+    auto rtscc = j_funcs.second;
 
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
@@ -622,6 +698,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // LCOV_EXCL_STOP
                 }
 
+                // Check if multiple roots are detected in the cooldown
+                // period for a terminal event. For non-terminal events,
+                // this will be unused.
                 [[maybe_unused]] const bool has_multi_roots = [&]() {
                     if constexpr (is_terminal_event_v<ev_type>) {
                         // Establish the cooldown time.
@@ -630,6 +709,12 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                         // to a detected terminal event.
                         const auto cd
                             = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown() : taylor_deduce_cooldown(h);
+
+                        // NOTE: if the cooldown is zero, no sense to
+                        // run the check.
+                        if (cd == 0) {
+                            return false;
+                        }
 
                         // Evaluate the polynomial at the cooldown boundaries.
                         const auto e1 = poly_eval(ptr, root + cd, order);
@@ -643,29 +728,41 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     }
                 }();
 
-                // Fetch and cache the event direction.
+                // Evaluate the derivative.
+                const auto der = poly_eval_1(ptr, root, order);
+
+                // Check it before proceeding.
+                if (!isfinite(der)) {
+                    // LCOV_EXCL_START
+                    get_logger()->warn(
+                        "polynomial root finding produced a root of {} with nonfinite derivative - skipping the event",
+                        root);
+                    return;
+                    // LCOV_EXCL_STOP
+                }
+
+                // Compute sign of the derivative.
+                const auto d_sgn = sgn(der);
+
+                // Fetch and cache the desired event direction.
                 const auto dir = ev_vec[i].get_direction();
 
                 if (dir == event_direction::any) {
                     // If the event direction does not
                     // matter, just add it.
                     if constexpr (is_terminal_event_v<ev_type>) {
-                        out.emplace_back(i, root, has_multi_roots);
+                        out.emplace_back(i, root, has_multi_roots, d_sgn);
                     } else {
-                        out.emplace_back(i, root);
+                        out.emplace_back(i, root, d_sgn);
                     }
                 } else {
-                    // Otherwise, we need to compute the derivative
-                    // and record the event only if its direction
+                    // Otherwise, we need to record the event only if its direction
                     // matches the sign of the derivative.
-                    const auto der = poly_eval_1(ptr, root, order);
-
-                    if ((der > 0 && dir == event_direction::positive)
-                        || (der < 0 && dir == event_direction::negative)) {
+                    if (static_cast<event_direction>(d_sgn) == dir) {
                         if constexpr (is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, root, has_multi_roots);
+                            out.emplace_back(i, root, has_multi_roots, d_sgn);
                         } else {
-                            out.emplace_back(i, root);
+                            out.emplace_back(i, root, d_sgn);
                         }
                     }
                 }
@@ -706,8 +803,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                 // LCOV_EXCL_STOP
             }
 
-            // Rescale it so that the range [0, h)
-            // becomes [0, 1).
+            // Rescale the event polynomial so that the range [0, h)
+            // becomes [0, 1), and write the resulting polynomial into tmp.
             // NOTE: at the first iteration (i.e., for the first event),
             // tmp has been constructed correctly outside this function.
             // Below, tmp will first be moved into wl (thus rendering
@@ -717,6 +814,66 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
             assert(!tmp.v.empty());
             assert(tmp.v.size() - 1u == order);
             poly_rescale(tmp.v.data(), ptr, h, order);
+
+            // Determine the polynomial degree.
+            auto degree = order;
+            // NOTE: use < rather than <= in order to avoid
+            // wrapping degree around. I.e., degree will
+            // always be at least 0, even if the order 0
+            // coefficient is zero.
+            for (std::uint32_t o = 0; o < order; ++o) {
+                if (tmp.v[order - o] != 0) {
+                    break;
+                }
+                --degree;
+            }
+
+            // Optimise the cases in which the event polynomial
+            // is linear or quadratic.
+            switch (degree) {
+                case 1u: {
+                    // Linear case.
+                    const auto root = -tmp.v[0] / tmp.v[1];
+
+                    // Add the root only if it falls outside
+                    // the cooldown range and within the [0, 1)
+                    // range.
+                    if (root >= lb_offset && root < 1) {
+                        add_d_event(root * h);
+                    }
+
+                    continue;
+                }
+                case 2u: {
+                    // Quadratic case.
+                    using std::sqrt;
+
+                    const auto a = tmp.v[2], b = tmp.v[1], c = tmp.v[0];
+                    const auto delta = b * b - 4 * a * c;
+
+                    if (delta < 0) {
+                        // Negative discriminant, no real zeroes.
+                        // Move to the next event.
+                        continue;
+                    }
+
+                    const auto sqrt_delta = sqrt(delta);
+                    const auto root1 = (-b - sqrt_delta) / (2 * a);
+                    const auto root2 = (-b + sqrt_delta) / (2 * a);
+
+                    // Add the roots only if they fall outside
+                    // the cooldown range and within the [0, 1)
+                    // range.
+                    if (root1 >= lb_offset && root1 < 1) {
+                        add_d_event(root1 * h);
+                    }
+                    if (root2 >= lb_offset && root2 < 1) {
+                        add_d_event(root2 * h);
+                    }
+
+                    continue;
+                }
+            }
 
             // Place the first element in the working list.
             wl.emplace_back(0, 1, std::move(tmp));
@@ -775,14 +932,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     }
                 }
 
-                // Reverse it.
-                std::copy(tmp.v.rbegin(), tmp.v.rend(), tmp1.v.data());
-
-                // Translate it.
-                pt1(tmp2.v.data(), tmp1.v.data());
-
-                // Count the sign changes.
-                const auto n_sc = count_sign_changes(tmp2.v.data(), order);
+                // Reverse tmp into tmp1, translate tmp1 by 1 with output
+                // in tmp2, and count the sign changes in tmp2.
+                std::uint32_t n_sc;
+                rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
                 if (n_sc == 1u) {
                     // Found isolating interval, add it to isol.
@@ -794,7 +947,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
                     // into tmp1.
                     poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                    pt1(tmp2.v.data(), tmp1.v.data());
+                    pt(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
                     const auto mid = (lb + ub) / 2;
@@ -919,8 +1072,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool>> &
 } // namespace
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, double>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, int>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, double, int>> &d_ntes,
                           const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
                           const std::vector<std::optional<std::pair<double, double>>> &cooldowns, double h,
                           const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
@@ -929,8 +1082,8 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool>> &
 }
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, long double>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, int>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, long double, int>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
                           const std::vector<std::optional<std::pair<long double, long double>>> &cooldowns,
                           long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
@@ -941,8 +1094,8 @@ void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, boo
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, mppp::real128>> &d_ntes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, int>> &d_tes,
+                          std::vector<std::tuple<std::uint32_t, mppp::real128, int>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
                           const std::vector<nt_event<mppp::real128>> &ntes,
                           const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &cooldowns,

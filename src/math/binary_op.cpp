@@ -9,13 +9,11 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <iterator>
-#include <memory>
+#include <initializer_list>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -31,7 +29,9 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -40,228 +40,189 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
-#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
-binary_operator::binary_operator(type t, expression e1, expression e2)
-    : m_type(t),
-      // NOTE: need to use naked new as make_unique won't work with aggregate
-      // initialization.
-      m_ops(new std::array<expression, 2>{std::move(e1), std::move(e2)})
+namespace detail
 {
-}
 
-binary_operator::binary_operator(const binary_operator &other)
-    : m_type(other.m_type), m_ops(std::make_unique<std::array<expression, 2>>(*other.m_ops))
-{
-}
+binary_op::binary_op() : binary_op(type::add, 0_dbl, 0_dbl) {}
 
-binary_operator::binary_operator(binary_operator &&) noexcept = default;
-
-binary_operator::~binary_operator() = default;
-
-binary_operator &binary_operator::operator=(const binary_operator &bo)
-{
-    if (this != &bo) {
-        *this = binary_operator(bo);
-    }
-    return *this;
-}
-
-binary_operator &binary_operator::operator=(binary_operator &&) noexcept = default;
-
-expression &binary_operator::lhs()
-{
-    assert(m_ops);
-    return (*m_ops)[0];
-}
-
-expression &binary_operator::rhs()
-{
-    assert(m_ops);
-    return (*m_ops)[1];
-}
-
-binary_operator::type &binary_operator::op()
+binary_op::binary_op(type t, expression a, expression b)
+    : func_base("binary_op", std::vector{std::move(a), std::move(b)}), m_type(t)
 {
     assert(m_type >= type::add && m_type <= type::div);
-    return m_type;
 }
 
-std::array<expression, 2> &binary_operator::args()
+bool binary_op::extra_equal_to(const func &f) const
 {
-    assert(m_ops);
-    return *m_ops;
+    // NOTE: this should be ensured by the
+    // implementation of func's equality operator.
+    assert(f.extract<binary_op>() == f.get_ptr());
+
+    return static_cast<const binary_op *>(f.get_ptr())->m_type == m_type;
 }
 
-const expression &binary_operator::lhs() const
+std::size_t binary_op::extra_hash() const
 {
-    assert(m_ops);
-    return (*m_ops)[0];
+    return std::hash<type>{}(m_type);
 }
 
-const expression &binary_operator::rhs() const
+void binary_op::to_stream(std::ostream &os) const
 {
-    assert(m_ops);
-    return (*m_ops)[1];
-}
-
-const binary_operator::type &binary_operator::op() const
-{
+    assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
-    return m_type;
-}
 
-const std::array<expression, 2> &binary_operator::args() const
-{
-    assert(m_ops);
-    return *m_ops;
-}
+    os << '(' << lhs() << ' ';
 
-void swap(binary_operator &bo0, binary_operator &bo1) noexcept
-{
-    std::swap(bo0.m_type, bo1.m_type);
-    std::swap(bo0.m_ops, bo1.m_ops);
-}
-
-std::size_t hash(const binary_operator &bo)
-{
-    return std::hash<binary_operator::type>{}(bo.op()) + hash(bo.lhs()) + hash(bo.rhs());
-}
-
-std::ostream &operator<<(std::ostream &os, const binary_operator &bo)
-{
-    os << '(' << bo.lhs() << ' ';
-
-    switch (bo.op()) {
-        case binary_operator::type::add:
+    switch (m_type) {
+        case type::add:
             os << '+';
             break;
-        case binary_operator::type::sub:
+        case type::sub:
             os << '-';
             break;
-        case binary_operator::type::mul:
+        case type::mul:
             os << '*';
             break;
-        case binary_operator::type::div:
+        default:
             os << '/';
             break;
     }
 
-    return os << ' ' << bo.rhs() << ')';
+    os << ' ' << rhs() << ')';
 }
 
-std::vector<std::string> get_variables(const binary_operator &bo)
+binary_op::type binary_op::op() const
 {
-    auto lhs_vars = get_variables(bo.lhs());
-    auto rhs_vars = get_variables(bo.rhs());
-
-    lhs_vars.insert(lhs_vars.end(), std::make_move_iterator(rhs_vars.begin()), std::make_move_iterator(rhs_vars.end()));
-
-    std::sort(lhs_vars.begin(), lhs_vars.end());
-    lhs_vars.erase(std::unique(lhs_vars.begin(), lhs_vars.end()), lhs_vars.end());
-
-    return lhs_vars;
+    return m_type;
 }
 
-void rename_variables(binary_operator &bo, const std::unordered_map<std::string, std::string> &repl_map)
+const expression &binary_op::lhs() const
 {
-    rename_variables(bo.lhs(), repl_map);
-    rename_variables(bo.rhs(), repl_map);
+    assert(args().size() == 2u);
+    return args()[0];
 }
 
-bool operator==(const binary_operator &o1, const binary_operator &o2)
+const expression &binary_op::rhs() const
 {
-    return o1.op() == o2.op() && o1.lhs() == o2.lhs() && o1.rhs() == o2.rhs();
+    assert(args().size() == 2u);
+    return args()[1];
 }
 
-bool operator!=(const binary_operator &o1, const binary_operator &o2)
+expression &binary_op::lhs()
 {
-    return !(o1 == o2);
+    assert(args().size() == 2u);
+    return *(get_mutable_args_it().first);
 }
 
-expression subs(const binary_operator &bo, const std::unordered_map<std::string, expression> &smap)
+expression &binary_op::rhs()
 {
-    return expression{binary_operator{bo.op(), subs(bo.lhs(), smap), subs(bo.rhs(), smap)}};
+    assert(args().size() == 2u);
+    return *(get_mutable_args_it().first + 1);
 }
 
-expression diff(const binary_operator &bo, const std::string &s)
+expression binary_op::diff(const std::string &s) const
 {
-    switch (bo.op()) {
-        case binary_operator::type::add:
-            return diff(bo.lhs(), s) + diff(bo.rhs(), s);
-        case binary_operator::type::sub:
-            return diff(bo.lhs(), s) - diff(bo.rhs(), s);
-        case binary_operator::type::mul:
-            return diff(bo.lhs(), s) * bo.rhs() + bo.lhs() * diff(bo.rhs(), s);
+    assert(args().size() == 2u);
+    assert(m_type >= type::add && m_type <= type::div);
+
+    switch (m_type) {
+        case type::add:
+            return heyoka::diff(lhs(), s) + heyoka::diff(rhs(), s);
+        case type::sub:
+            return heyoka::diff(lhs(), s) - heyoka::diff(rhs(), s);
+        case type::mul:
+            return heyoka::diff(lhs(), s) * rhs() + lhs() * heyoka::diff(rhs(), s);
         default:
-            return (diff(bo.lhs(), s) * bo.rhs() - bo.lhs() * diff(bo.rhs(), s)) / (bo.rhs() * bo.rhs());
+            return (heyoka::diff(lhs(), s) * rhs() - lhs() * heyoka::diff(rhs(), s)) / (rhs() * rhs());
     }
 }
 
-namespace detail
+namespace
 {
+
 template <class T>
-T eval_bo_impl(const binary_operator &bo, const std::unordered_map<std::string, T> &map, const std::vector<T> &pars)
+T eval_bo_impl(const binary_op &bo, const std::unordered_map<std::string, T> &map, const std::vector<T> &pars)
 {
+    assert(bo.args().size() == 2u);
+    assert(bo.op() >= binary_op::type::add && bo.op() <= binary_op::type::div);
+
     switch (bo.op()) {
-        case binary_operator::type::add:
+        case binary_op::type::add:
             return eval<T>(bo.lhs(), map, pars) + eval<T>(bo.rhs(), map, pars);
-        case binary_operator::type::sub:
+        case binary_op::type::sub:
             return eval<T>(bo.lhs(), map, pars) - eval<T>(bo.rhs(), map, pars);
-        case binary_operator::type::mul:
+        case binary_op::type::mul:
             return eval<T>(bo.lhs(), map, pars) * eval<T>(bo.rhs(), map, pars);
         default:
             return eval<T>(bo.lhs(), map, pars) / eval<T>(bo.rhs(), map, pars);
     }
 }
-} // namespace detail
 
-double eval_dbl(const binary_operator &bo, const std::unordered_map<std::string, double> &map,
-                const std::vector<double> &pars)
+} // namespace
+
+double binary_op::eval_dbl(const std::unordered_map<std::string, double> &map, const std::vector<double> &pars) const
 {
-    return detail::eval_bo_impl<double>(bo, map, pars);
+    return eval_bo_impl<double>(*this, map, pars);
 }
 
-long double eval_ldbl(const binary_operator &bo, const std::unordered_map<std::string, long double> &map,
-                      const std::vector<long double> &pars)
+long double binary_op::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                 const std::vector<long double> &pars) const
 {
-    return detail::eval_bo_impl<long double>(bo, map, pars);
+    return eval_bo_impl<long double>(*this, map, pars);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 eval_f128(const binary_operator &bo, const std::unordered_map<std::string, mppp::real128> &map,
-                        const std::vector<mppp::real128> &pars)
+
+mppp::real128 binary_op::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                   const std::vector<mppp::real128> &pars) const
 {
-    return detail::eval_bo_impl<mppp::real128>(bo, map, pars);
+    return eval_bo_impl<mppp::real128>(*this, map, pars);
 }
+
 #endif
 
-void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
-                    const std::unordered_map<std::string, std::vector<double>> &map, const std::vector<double> &pars)
+void binary_op::eval_batch_dbl(std::vector<double> &out_values,
+                               const std::unordered_map<std::string, std::vector<double>> &map,
+                               const std::vector<double> &pars) const
 {
+    assert(args().size() == 2u);
+    assert(m_type >= type::add && m_type <= type::div);
+
     auto tmp = out_values;
-    eval_batch_dbl(out_values, bo.lhs(), map, pars);
-    eval_batch_dbl(tmp, bo.rhs(), map, pars);
-    switch (bo.op()) {
-        case binary_operator::type::add:
+    heyoka::eval_batch_dbl(out_values, lhs(), map, pars);
+    heyoka::eval_batch_dbl(tmp, rhs(), map, pars);
+    switch (m_type) {
+        case type::add:
             std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::plus<>());
             break;
-        case binary_operator::type::sub:
+        case type::sub:
             std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::minus<>());
             break;
-        case binary_operator::type::mul:
+        case type::mul:
             std::transform(out_values.begin(), out_values.end(), tmp.begin(), out_values.begin(), std::multiplies<>());
             break;
         default:
@@ -269,119 +230,6 @@ void eval_batch_dbl(std::vector<double> &out_values, const binary_operator &bo,
             break;
     }
 }
-
-void update_node_values_dbl(std::vector<double> &node_values, const binary_operator &bo,
-                            const std::unordered_map<std::string, double> &map,
-                            const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    // We have to recurse first as to make sure out is filled before being accessed later.
-    update_node_values_dbl(node_values, bo.lhs(), map, node_connections, node_counter);
-    update_node_values_dbl(node_values, bo.rhs(), map, node_connections, node_counter);
-    switch (bo.op()) {
-        case binary_operator::type::add:
-            node_values[node_id]
-                = node_values[node_connections[node_id][0]] + node_values[node_connections[node_id][1]];
-            break;
-        case binary_operator::type::sub:
-            node_values[node_id]
-                = node_values[node_connections[node_id][0]] - node_values[node_connections[node_id][1]];
-            break;
-        case binary_operator::type::mul:
-            node_values[node_id]
-                = node_values[node_connections[node_id][0]] * node_values[node_connections[node_id][1]];
-            break;
-        default:
-            node_values[node_id]
-                = node_values[node_connections[node_id][0]] / node_values[node_connections[node_id][1]];
-            break;
-    }
-}
-
-void update_grad_dbl(std::unordered_map<std::string, double> &grad, const binary_operator &bo,
-                     const std::unordered_map<std::string, double> &map, const std::vector<double> &node_values,
-                     const std::vector<std::vector<std::size_t>> &node_connections, std::size_t &node_counter,
-                     double acc)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    switch (bo.op()) {
-        case binary_operator::type::add:
-            // lhs (a + b -> 1)
-            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter, acc);
-            // rhs (a + b -> 1)
-            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter, acc);
-            break;
-
-        case binary_operator::type::sub:
-            // lhs (a + b -> 1)
-            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter, acc);
-            // rhs (a + b -> 1)
-            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter, -acc);
-            break;
-
-        case binary_operator::type::mul:
-            // lhs (a*b -> b)
-            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter,
-                            acc * node_values[node_connections[node_id][1]]);
-            // rhs (a*b -> a)
-            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter,
-                            acc * node_values[node_connections[node_id][0]]);
-            break;
-
-        default:
-            // lhs (a/b -> 1/b)
-            update_grad_dbl(grad, bo.lhs(), map, node_values, node_connections, node_counter,
-                            acc / node_values[node_connections[node_id][1]]);
-            // rhs (a/b -> -a/b^2)
-            update_grad_dbl(grad, bo.rhs(), map, node_values, node_connections, node_counter,
-                            -acc * node_values[node_connections[node_id][0]] / node_values[node_connections[node_id][1]]
-                                / node_values[node_connections[node_id][1]]);
-            break;
-    }
-}
-
-void update_connections(std::vector<std::vector<std::size_t>> &node_connections, const binary_operator &bo,
-                        std::size_t &node_counter)
-{
-    const auto node_id = node_counter;
-    node_counter++;
-    node_connections.push_back(std::vector<std::size_t>(2));
-    node_connections[node_id][0] = node_counter;
-    update_connections(node_connections, bo.lhs(), node_counter);
-    node_connections[node_id][1] = node_counter;
-    update_connections(node_connections, bo.rhs(), node_counter);
-}
-
-std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(binary_operator &&bo,
-                          std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs)
-{
-    if (const auto dres_lhs = taylor_decompose_in_place(std::move(bo.lhs()), u_vars_defs)) {
-        // The lhs required decomposition, and its decomposition
-        // was placed at index dres_lhs in u_vars_defs. Replace the lhs
-        // a u variable pointing at index dres_lhs.
-        bo.lhs() = expression{variable{"u_" + detail::li_to_string(dres_lhs)}};
-    }
-
-    if (const auto dres_rhs = taylor_decompose_in_place(std::move(bo.rhs()), u_vars_defs)) {
-        bo.rhs() = expression{variable{"u_" + detail::li_to_string(dres_rhs)}};
-    }
-
-    // Append the binary operator after decomposition
-    // of lhs and rhs.
-    // NOTE: the binary operators have no hidden dependencies.
-    u_vars_defs.emplace_back(std::move(bo), std::vector<std::uint32_t>{});
-
-    // The decomposition of binary operators
-    // results in a new u variable, whose definition
-    // we added to u_vars_defs above.
-    return u_vars_defs.size() - 1u;
-}
-
-namespace detail
-{
 
 namespace
 {
@@ -470,13 +318,12 @@ template <bool, typename, typename V1, typename V2,
 llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
                                         llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of add()/sub()");
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                 std::uint32_t batch_size)
 {
@@ -488,7 +335,7 @@ llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_operator &bo, const 
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_sub(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+llvm::Value *bo_taylor_diff_sub(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                 std::uint32_t batch_size)
 {
@@ -570,13 +417,12 @@ template <typename, typename V1, typename V2,
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
                                      llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of mul()");
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                 std::uint32_t batch_size)
 {
@@ -683,13 +529,12 @@ template <typename, typename V1, typename V2,
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
                                      llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of div()");
 }
 
 template <typename T>
-llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_operator &bo, const std::vector<llvm::Value *> &arr,
+llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
                                 llvm::Value *par_ptr, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                 std::uint32_t batch_size)
 {
@@ -701,52 +546,24 @@ llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_operator &bo, const 
 }
 
 template <typename T>
-llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
+llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_op &bo, const std::vector<std::uint32_t> &deps,
                                  const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                  std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
-    if (!deps.empty()) {
-        using namespace fmt::literals;
+    assert(bo.args().size() == 2u);
+    assert(bo.op() >= binary_op::type::add && bo.op() <= binary_op::type::div);
 
-        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff phase for a binary operator "
+    if (!deps.empty()) {
+        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a binary operator "
                                     "should be empty, but instead it has a size of {}"_format(deps.size()));
     }
 
-    // lhs and rhs must be u vars or numbers.
-    auto check_arg = [](const expression &e) {
-        std::visit(
-            [](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, variable>) {
-                    // The expression is a variable. Check that it
-                    // is a u variable.
-                    const auto &var_name = v.name();
-                    if (var_name.rfind("u_", 0) != 0) {
-                        throw std::invalid_argument(
-                            "Invalid variable name '" + var_name
-                            + "' encountered in the Taylor diff phase for a binary operator expression (the name "
-                              "must be in the form 'u_n', where n is a non-negative integer)");
-                    }
-                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
-                    // Not a variable and not a number.
-                    throw std::invalid_argument(
-                        "An invalid expression type was passed to the Taylor diff phase of a binary operator (the "
-                        "expression must be either a variable or a number/param, but it is neither)");
-                }
-            },
-            e.value());
-    };
-
-    check_arg(bo.lhs());
-    check_arg(bo.rhs());
-
     switch (bo.op()) {
-        case binary_operator::type::add:
+        case binary_op::type::add:
             return bo_taylor_diff_add<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
-        case binary_operator::type::sub:
+        case binary_op::type::sub:
             return bo_taylor_diff_sub<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
-        case binary_operator::type::mul:
+        case binary_op::type::mul:
             return bo_taylor_diff_mul<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
         default:
             return bo_taylor_diff_div<T>(s, bo, arr, par_ptr, n_uvars, order, idx, batch_size);
@@ -755,35 +572,34 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_operator &bo, const
 
 } // namespace
 
-} // namespace detail
-
-llvm::Value *taylor_diff_dbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *binary_op::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                        std::uint32_t batch_size) const
 {
-    return detail::taylor_diff_bo_impl<double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+
+    return taylor_diff_bo_impl<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
-llvm::Value *taylor_diff_ldbl(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *binary_op::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                         std::uint32_t batch_size) const
 {
-    return detail::taylor_diff_bo_impl<long double>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_bo_impl<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *taylor_diff_f128(llvm_state &s, const binary_operator &bo, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+llvm::Value *binary_op::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                         std::uint32_t batch_size) const
 {
-    return detail::taylor_diff_bo_impl<mppp::real128>(s, bo, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+    return taylor_diff_bo_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
 #endif
-
-namespace detail
-{
 
 namespace
 {
@@ -792,7 +608,7 @@ namespace
 // 'number/param op number/param' in compact mode. The function will always return zero,
 // unless the order is 0 (in which case it will return the result of the codegen).
 template <typename T, typename U, typename V>
-llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operator &bo, const U &n0, const V &n1,
+llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo, const U &n0, const V &n1,
                                               std::uint32_t batch_size, const std::string &fname,
                                               const std::string &op_name)
 {
@@ -853,13 +669,13 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operat
                 auto vnum1 = taylor_c_diff_numparam_codegen(s, n1, num1, par_ptr, batch_size);
 
                 switch (bo.op()) {
-                    case binary_operator::type::add:
+                    case binary_op::type::add:
                         builder.CreateStore(builder.CreateFAdd(vnum0, vnum1), retval);
                         break;
-                    case binary_operator::type::sub:
+                    case binary_op::type::sub:
                         builder.CreateStore(builder.CreateFSub(vnum0, vnum1), retval);
                         break;
-                    case binary_operator::type::mul:
+                    case binary_op::type::mul:
                         builder.CreateStore(builder.CreateFMul(vnum0, vnum1), retval);
                         break;
                     default:
@@ -885,8 +701,8 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operat
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of " + op_name
-                                        + " in compact mode detected");
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of {}() "
+                                        "in compact mode detected"_format(op_name));
         }
     }
 
@@ -896,11 +712,9 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_operat
 // Derivative of number/param +- number/param.
 template <bool AddOrSub, typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_operator &bo, const U &num0,
-                                                  const V &num1, std::uint32_t, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
+                                                  std::uint32_t, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return bo_taylor_c_diff_func_num_num<T>(
         s, bo, num0, num1, batch_size,
         "heyoka_taylor_diff_{}_{}_{}_{}"_format(AddOrSub ? "add" : "sub", taylor_c_diff_numparam_mangle(num0),
@@ -911,11 +725,9 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
 // Derivative of number +- var.
 template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_operator &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
                                                   std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1017,11 +829,9 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
 // Derivative of var +- number.
 template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_operator &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
                                                   std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1116,8 +926,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
 // Derivative of var +- var.
 template <bool AddOrSub, typename T>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_operator &, const variable &,
-                                                  const variable &, std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
+                                                  std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1202,16 +1012,15 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 // All the other cases.
 template <bool, typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_operator &, const V1 &, const V2 &,
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_op &, const V1 &, const V2 &,
                                                   std::uint32_t, std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of add()/sub() in compact mode");
 }
 
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_add(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
+llvm::Function *bo_taylor_c_diff_func_add(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
                                           std::uint32_t batch_size)
 {
     return std::visit(
@@ -1222,7 +1031,7 @@ llvm::Function *bo_taylor_c_diff_func_add(llvm_state &s, const binary_operator &
 }
 
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
+llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
                                           std::uint32_t batch_size)
 {
     return std::visit(
@@ -1235,11 +1044,9 @@ llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_operator &
 // Derivative of number/param * number/param.
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_operator &bo, const U &num0, const V &num1,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
                                                std::uint32_t, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return bo_taylor_c_diff_func_num_num<T>(
         s, bo, num0, num1, batch_size,
         "heyoka_taylor_diff_mul_{}_{}_{}"_format(taylor_c_diff_numparam_mangle(num0),
@@ -1250,11 +1057,9 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
 
 // Derivative of var * number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_operator &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1334,11 +1139,9 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
 
 // Derivative of number * var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_operator &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1418,8 +1221,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
 
 // Derivative of var * var.
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_operator &, const variable &,
-                                               const variable &, std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1508,16 +1311,15 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_opera
 // All the other cases.
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_operator &, const V1 &, const V2 &,
-                                               std::uint32_t, std::uint32_t)
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
+                                               std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of mul() in compact mode");
 }
 
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
+llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
                                           std::uint32_t batch_size)
 {
     return std::visit(
@@ -1530,11 +1332,9 @@ llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_operator &
 // Derivative of number/param / number/param.
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_operator &bo, const U &num0, const V &num1,
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
                                                std::uint32_t, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return bo_taylor_c_diff_func_num_num<T>(
         s, bo, num0, num1, batch_size,
         "heyoka_taylor_diff_div_{}_{}_{}"_format(taylor_c_diff_numparam_mangle(num0),
@@ -1545,11 +1345,9 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
 
 // Derivative of var / number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_operator &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1629,11 +1427,9 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
 
 // Derivative of number / var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_operator &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1749,8 +1545,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
 
 // Derivative of var / var.
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_operator &, const variable &,
-                                               const variable &, std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1843,16 +1639,15 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_opera
 // All the other cases.
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_operator &, const V1 &, const V2 &,
-                                               std::uint32_t, std::uint32_t)
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
+                                               std::uint32_t)
 {
-    assert(false);
-
-    return nullptr;
+    throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
+                                "of div() in compact mode");
 }
 
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
+llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
                                           std::uint32_t batch_size)
 {
     return std::visit(
@@ -1863,45 +1658,15 @@ llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_operator &
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_bo_impl(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_bo_impl(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
                                            std::uint32_t batch_size)
 {
-    // lhs and rhs must be u vars or numbers.
-    auto check_arg = [](const expression &e) {
-        std::visit(
-            [](const auto &v) {
-                using type = detail::uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, variable>) {
-                    // The expression is a variable. Check that it
-                    // is a u variable.
-                    const auto &var_name = v.name();
-                    if (var_name.rfind("u_", 0) != 0) {
-                        throw std::invalid_argument("Invalid variable name '" + var_name
-                                                    + "' encountered in the Taylor diff phase for a binary operator "
-                                                      "expression in compact mode (the name "
-                                                      "must be in the form 'u_n', where n is a non-negative integer)");
-                    }
-                } else if constexpr (!std::is_same_v<type, number> && !std::is_same_v<type, param>) {
-                    // Not a variable and not a number.
-                    throw std::invalid_argument(
-                        "An invalid expression type was passed to the Taylor diff phase of a "
-                        "binary operator in compact mode (the "
-                        "expression must be either a variable or a number/param, but it is neither)");
-                }
-            },
-            e.value());
-    };
-
-    check_arg(bo.lhs());
-    check_arg(bo.rhs());
-
     switch (bo.op()) {
-        case binary_operator::type::add:
+        case binary_op::type::add:
             return bo_taylor_c_diff_func_add<T>(s, bo, n_uvars, batch_size);
-        case binary_operator::type::sub:
+        case binary_op::type::sub:
             return bo_taylor_c_diff_func_sub<T>(s, bo, n_uvars, batch_size);
-        case binary_operator::type::mul:
+        case binary_op::type::mul:
             return bo_taylor_c_diff_func_mul<T>(s, bo, n_uvars, batch_size);
         default:
             return bo_taylor_c_diff_func_div<T>(s, bo, n_uvars, batch_size);
@@ -1910,28 +1675,45 @@ llvm::Function *taylor_c_diff_func_bo_impl(llvm_state &s, const binary_operator 
 
 } // namespace
 
-} // namespace detail
-
-llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size)
+llvm::Function *binary_op::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    return detail::taylor_c_diff_func_bo_impl<double>(s, bo, n_uvars, batch_size);
+    return taylor_c_diff_func_bo_impl<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+llvm::Function *binary_op::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    return detail::taylor_c_diff_func_bo_impl<long double>(s, bo, n_uvars, batch_size);
+    return taylor_c_diff_func_bo_impl<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const binary_operator &bo, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+llvm::Function *binary_op::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    return detail::taylor_c_diff_func_bo_impl<mppp::real128>(s, bo, n_uvars, batch_size);
+    return taylor_c_diff_func_bo_impl<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif
+
+} // namespace detail
+
+expression add(expression x, expression y)
+{
+    return expression{func{detail::binary_op(detail::binary_op::type::add, std::move(x), std::move(y))}};
+}
+
+expression sub(expression x, expression y)
+{
+    return expression{func{detail::binary_op(detail::binary_op::type::sub, std::move(x), std::move(y))}};
+}
+
+expression mul(expression x, expression y)
+{
+    return expression{func{detail::binary_op(detail::binary_op::type::mul, std::move(x), std::move(y))}};
+}
+
+expression div(expression x, expression y)
+{
+    return expression{func{detail::binary_op(detail::binary_op::type::div, std::move(x), std::move(y))}};
+}
 
 } // namespace heyoka

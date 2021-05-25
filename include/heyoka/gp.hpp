@@ -14,7 +14,6 @@
 #include <string>
 #include <vector>
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/splitmix64.hpp>
@@ -29,7 +28,6 @@ public:
 
 private:
     std::vector<std::string> m_vars;
-    std::vector<binary_operator::type> m_bos;
     std::vector<expression (*)(expression)> m_u_funcs;
     std::vector<expression (*)(expression, expression)> m_b_funcs;
     std::vector<double> m_weights;
@@ -41,7 +39,6 @@ public:
     expression operator()(unsigned, unsigned, unsigned = 0u) const;
 
     // getters
-    const std::vector<binary_operator::type> &get_bos() const;
     const std::vector<expression (*)(expression)> &get_u_funcs() const;
     const std::vector<expression (*)(expression, expression)> &get_b_funcs() const;
     const std::vector<std::string> &get_vars() const;
@@ -49,7 +46,6 @@ public:
     const std::vector<double> &get_weights() const;
 
     // setters
-    void set_bos(const std::vector<binary_operator::type> &);
     void set_u_funcs(const std::vector<expression (*)(expression)> &);
     void set_b_funcs(const std::vector<expression (*)(expression, expression)> &);
     void set_vars(const std::vector<std::string> &);

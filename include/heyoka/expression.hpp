@@ -30,7 +30,6 @@
 
 #endif
 
-#include <heyoka/binary_operator.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -47,7 +46,7 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC expression
 {
 public:
-    using value_type = std::variant<number, variable, binary_operator, func, param>;
+    using value_type = std::variant<number, variable, func, param>;
 
 private:
     value_type m_value;
@@ -64,7 +63,6 @@ public:
 
     explicit expression(number);
     explicit expression(variable);
-    explicit expression(binary_operator);
     explicit expression(func);
     explicit expression(param);
 
@@ -120,8 +118,7 @@ inline expression func_inner<T>::diff(const std::string &s) const
 }
 
 template <typename T>
-inline std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-func_inner<T>::taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+inline taylor_dc_t::size_type func_inner<T>::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     if constexpr (func_has_taylor_decompose_v<T>) {
         return std::move(m_value).taylor_decompose(u_vars_defs);
@@ -307,8 +304,7 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
 
-HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-taylor_decompose_in_place(expression &&, std::vector<std::pair<expression, std::vector<std::uint32_t>>> &);
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(expression &&, taylor_dc_t &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)

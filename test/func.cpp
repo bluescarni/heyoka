@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <cstddef>
 #include <initializer_list>
 #include <iostream>
 #include <sstream>
@@ -23,6 +24,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
 
@@ -189,7 +191,7 @@ TEST_CASE("func minimal")
                            Message("float128 Taylor diff in compact mode is not implemented for the function 'f'"));
 #endif
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> dec{{"x"_var, {}}};
+    taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
     std::move(f).taylor_decompose(dec);
 }
@@ -305,7 +307,8 @@ struct func_06 : func_base {
         return 42;
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &, const std::vector<mppp::real128> &) const
+    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
+                            const std::vector<mppp::real128> &) const
     {
         return mppp::real128(42);
     }
@@ -375,8 +378,7 @@ struct func_10 : func_base {
     func_10() : func_base("f", {}) {}
     explicit func_10(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
         u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
@@ -388,8 +390,7 @@ struct func_10a : func_base {
     func_10a() : func_base("f", {}) {}
     explicit func_10a(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
         u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
@@ -401,8 +402,7 @@ struct func_10b : func_base {
     func_10b() : func_base("f", {}) {}
     explicit func_10b(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>>::size_type
-    taylor_decompose(std::vector<std::pair<expression, std::vector<std::uint32_t>>> &u_vars_defs) &&
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &u_vars_defs) &&
     {
         u_vars_defs.emplace_back("foo", std::vector<std::uint32_t>{});
 
@@ -416,10 +416,9 @@ TEST_CASE("func taylor_decompose")
 
     auto f = func(func_10{{"x"_var}});
 
-    std::vector<std::pair<expression, std::vector<std::uint32_t>>> u_vars_defs{{"x"_var, {}}};
+    taylor_dc_t u_vars_defs{{"x"_var, {}}};
     REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 1u);
-    REQUIRE(u_vars_defs
-            == std::vector<std::pair<expression, std::vector<std::uint32_t>>>{{"x"_var, {}}, {"foo"_var, {}}});
+    REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
 
     f = func(func_10a{{"x"_var}});
 
@@ -719,4 +718,52 @@ TEST_CASE("func extract")
     REQUIRE(static_cast<const func &>(f1).extract<int>() == nullptr);
 
 #endif
+}
+
+struct func_17 : func_base {
+    func_17(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_17(int n, std::vector<expression> args) : func_base("f", std::move(args)), value(n) {}
+
+    bool extra_equal_to(const func &f) const
+    {
+        return f.extract<func_17>()->value == value;
+    }
+
+    int value = 0;
+};
+
+TEST_CASE("func extra_equal_to")
+{
+    auto f1 = func(func_17{0, {"x"_var, "y"_var}});
+    auto f2 = func(func_17{0, {"x"_var, "y"_var}});
+    auto f3 = func(func_17{1, {"x"_var, "y"_var}});
+
+    REQUIRE(f1 == f2);
+    REQUIRE(f1 != f3);
+}
+
+struct func_18 : func_base {
+    func_18(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+    explicit func_18(int n, std::vector<expression> args) : func_base("f", std::move(args)), value(n) {}
+
+    std::size_t extra_hash() const
+    {
+        return static_cast<std::size_t>(value);
+    }
+
+    int value = 0;
+};
+
+TEST_CASE("func extra_hash")
+{
+    auto f1 = func(func_18{0, {"x"_var, "y"_var}});
+    auto f2 = func(func_18{0, {"x"_var, "y"_var}});
+    auto f3 = func(func_18{-1, {"x"_var, "y"_var}});
+
+    REQUIRE(hash(f1) == hash(f2));
+    REQUIRE(hash(f1) != hash(f3));
 }

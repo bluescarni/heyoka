@@ -28,7 +28,7 @@ const auto pi_const = boost::math::constants::pi<double>();
 
 auto make_wavy_ramp(bool check_event)
 {
-    auto cb_curve = [check_event](taylor_adaptive<double> &ta, bool) {
+    auto cb_curve = [check_event](taylor_adaptive<double> &ta, bool, int) {
         auto x = ta.get_state()[0];
         auto y = ta.get_state()[1];
 
@@ -53,7 +53,7 @@ auto make_wavy_ramp(bool check_event)
         return true;
     };
 
-    auto cb_bottom = [check_event](taylor_adaptive<double> &ta, bool) {
+    auto cb_bottom = [check_event](taylor_adaptive<double> &ta, bool, int) {
         if (check_event) {
             auto y = ta.get_state()[1];
 
@@ -70,10 +70,11 @@ auto make_wavy_ramp(bool check_event)
     auto eq_w_curve = y - (1. - x + 0.05 * cos(11 * pi_const * x));
     auto eq_bottom = y;
 
-    auto ta
-        = taylor_adaptive<double>({prime(x) = vx, prime(y) = vy, prime(vx) = 0_dbl, prime(vy) = -1_dbl}, {0, 1.2, 0, 0},
-                                  kw::t_events = {t_event<double>(eq_w_curve, kw::callback = cb_curve),
-                                                  t_event<double>(eq_bottom, kw::callback = cb_bottom)});
+    auto ta = taylor_adaptive<double>(
+        {prime(x) = vx, prime(y) = vy, prime(vx) = 0_dbl, prime(vy) = -1_dbl}, {0, 1.2, 0, 0},
+        kw::t_events
+        = {t_event<double>(eq_w_curve, kw::callback = cb_curve, kw::direction = event_direction::negative),
+           t_event<double>(eq_bottom, kw::callback = cb_bottom, kw::direction = event_direction::negative)});
 
     return ta;
 }

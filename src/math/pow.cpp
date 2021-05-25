@@ -28,7 +28,10 @@
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Casting.h>
@@ -53,6 +56,18 @@
 #include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -149,7 +164,7 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     std::vector<llvm::Value *> retvals;
     for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
         retvals.push_back(llvm_invoke_external(
-            s, "heyoka_pow128", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
+            s, "powq", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
@@ -170,7 +185,8 @@ double pow_impl::eval_dbl(const std::unordered_map<std::string, double> &map, co
     return std::pow(heyoka::eval_dbl(args()[0], map, pars), heyoka::eval_dbl(args()[1], map, pars));
 }
 
-long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map, const std::vector<long double> &pars) const
+long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
+                                const std::vector<long double> &pars) const
 {
     assert(args().size() == 2u);
 
@@ -178,7 +194,8 @@ long double pow_impl::eval_ldbl(const std::unordered_map<std::string, long doubl
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
-mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map, const std::vector<mppp::real128> &pars) const
+mppp::real128 pow_impl::eval_f128(const std::unordered_map<std::string, mppp::real128> &map,
+                                  const std::vector<mppp::real128> &pars) const
 {
     assert(args().size() == 2u);
 
@@ -202,8 +219,6 @@ void pow_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
 double pow_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 2u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
             "exponentiation over doubles (2 arguments were expected, but {} arguments were provided"_format(a.size()));
@@ -321,8 +336,6 @@ llvm::Value *taylor_diff_pow(llvm_state &s, const pow_impl &f, const std::vector
     assert(f.args().size() == 2u);
 
     if (!deps.empty()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
                                     "derivative of the exponentiation, but a vector of size {} was passed "
                                     "instead"_format(deps.size()));
@@ -374,8 +387,6 @@ template <typename T, typename U, typename V,
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -472,8 +483,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &, const U &n,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -482,8 +491,8 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(
-        taylor_c_diff_numparam_mangle(n), taylor_mangle_suffix(val_t), li_to_string(n_uvars));
+    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
+                                                                            taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

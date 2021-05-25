@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     struct cb_left_right {
         unsigned idx;
 
-        bool operator()(taylor_adaptive<double> &ta, bool) const
+        bool operator()(taylor_adaptive<double> &ta, bool, int) const
         {
             ta.get_state_data()[idx * 4u + 2u] = -ta.get_state_data()[idx * 4u + 2u];
 
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
     struct cb_top_bottom {
         unsigned idx;
 
-        bool operator()(taylor_adaptive<double> &ta, bool) const
+        bool operator()(taylor_adaptive<double> &ta, bool, int) const
         {
             ta.get_state_data()[idx * 4u + 3u] = -ta.get_state_data()[idx * 4u + 3u];
 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     struct cb_sph_sph {
         unsigned i, j;
 
-        bool operator()(taylor_adaptive<double> &ta, bool) const
+        bool operator()(taylor_adaptive<double> &ta, bool, int) const
         {
             ++coll_counter;
 

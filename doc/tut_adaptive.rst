@@ -226,6 +226,22 @@ integrating if a non-finite value is detected in the state vector
 at the end of the timestep. In such case, the outcome of the
 integration will be ``taylor_outcome::err_nf_state``.
 
+.. versionadded:: 0.7.0
+
+The ``propagate_for()`` and ``propagate_until()`` functions
+can be invoked with two additional optional keyword arguments:
+
+- ``max_delta_t``: similarly to the ``step()`` function, this value
+  represents the maximum timestep size in absolute value;
+- ``callback``: this is a callable with signature
+
+  .. code-block:: c++
+
+     void (taylor_adaptive<double> &);
+
+  which will be invoked at the end of each timestep, with the integrator
+  object as argument.
+
 Propagation over a time grid
 ----------------------------
 
@@ -270,6 +286,22 @@ contiguously in row-major order:
 
 There are no special requirements on the time values in the grid (apart from the
 fact that they must be finite and ordered monotonically).
+
+.. versionadded:: 0.7.0
+
+The ``propagate_grid()`` function
+can be invoked with two additional optional keyword arguments:
+
+- ``max_delta_t``: similarly to the ``step()`` function, this value
+  represents the maximum timestep size in absolute value;
+- ``callback``: this is a callable with signature
+
+  .. code-block:: c++
+
+     void (taylor_adaptive<double> &);
+
+  which will be invoked at the end of each timestep, with the integrator
+  object as argument.
 
 Full code listing
 -----------------
