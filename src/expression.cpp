@@ -702,36 +702,69 @@ expression subs(const expression &e, const std::unordered_map<std::string, expre
     return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Pairwise reduction of a vector of expressions.
+template <typename F>
+expression pairwise_reduce(const F &func, std::vector<expression> list)
+{
+    assert(!list.empty());
+
+    // LCOV_EXCL_START
+    if (list.size() == std::numeric_limits<decltype(list.size())>::max()) {
+        throw std::overflow_error("Overflow detected in pairwise_reduce()");
+    }
+    // LCOV_EXCL_STOP
+
+    while (list.size() != 1u) {
+        std::vector<expression> new_list;
+
+        for (decltype(list.size()) i = 0; i < list.size(); i += 2u) {
+            if (i + 1u == list.size()) {
+                // We are at the last element of the vector
+                // and the size of the vector is odd. Just append
+                // the existing value.
+                new_list.push_back(std::move(list[i]));
+            } else {
+                new_list.push_back(func(std::move(list[i]), std::move(list[i + 1u])));
+            }
+        }
+
+        new_list.swap(list);
+    }
+
+    return std::move(list[0]);
+}
+
+} // namespace
+
+} // namespace detail
+
 // Pairwise summation of a vector of expressions.
 // https://en.wikipedia.org/wiki/Pairwise_summation
 expression pairwise_sum(std::vector<expression> sum)
 {
-    if (sum.size() == std::numeric_limits<decltype(sum.size())>::max()) {
-        throw std::overflow_error("Overflow detected in pairwise_sum()");
-    }
-
     if (sum.empty()) {
         return expression{0.};
     }
 
-    while (sum.size() != 1u) {
-        std::vector<expression> new_sum;
+    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) + std::move(b); },
+                                   std::move(sum));
+}
 
-        for (decltype(sum.size()) i = 0; i < sum.size(); i += 2u) {
-            if (i + 1u == sum.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing value.
-                new_sum.push_back(std::move(sum[i]));
-            } else {
-                new_sum.push_back(std::move(sum[i]) + std::move(sum[i + 1u]));
-            }
-        }
-
-        new_sum.swap(sum);
+// Pairwise product.
+expression pairwise_prod(std::vector<expression> prod)
+{
+    if (prod.empty()) {
+        return expression{1.};
     }
 
-    return sum[0];
+    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
+                                   std::move(prod));
 }
 
 double eval_dbl(const expression &e, const std::unordered_map<std::string, double> &map,
