@@ -8,7 +8,7 @@ New
 ~~~
 
 - Add a pairwise product primitive
-  (`#146 <https://github.com/bluescarni/heyoka/pull/146>`__).
+  (`#147 <https://github.com/bluescarni/heyoka/pull/147>`__).
 
 0.9.0 (2021-05-25)
 ------------------
