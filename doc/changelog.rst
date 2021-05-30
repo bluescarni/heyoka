@@ -1,6 +1,15 @@
 Changelog
 =========
 
+0.10.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Add a pairwise product primitive
+  (`#146 <https://github.com/bluescarni/heyoka/pull/146>`__).
+
 0.9.0 (2021-05-25)
 ------------------
 
