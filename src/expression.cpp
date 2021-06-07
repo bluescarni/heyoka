@@ -218,7 +218,7 @@ expression operator-(expression e)
 
 expression operator+(expression e1, expression e2)
 {
-    // Simplify x + (-y) to x - y.
+    // Simplify x + neg(y) to x - y.
     if (auto fptr = detail::is_neg(e2)) {
         auto rng = fptr->get_mutable_args_it();
         assert(rng.first != rng.second);
@@ -238,18 +238,20 @@ expression operator+(expression e1, expression e2)
                 // 0 + e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
-            // NOTE: fall through the standard case if e1 is not zero.
+            if constexpr (std::is_same_v<func, type2>) {
+                if (auto pbop = v2.template extract<detail::binary_op>();
+                    pbop != nullptr && pbop->op() == detail::binary_op::type::add
+                    && std::holds_alternative<number>(pbop->args()[0].value())) {
+                    // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
+                    return expression{std::forward<decltype(v1)>(v1) + std::get<number>(pbop->args()[0].value())}
+                           + pbop->args()[1];
+                }
+            }
+
+            // NOTE: fall through the standard case.
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number.
-            if (is_zero(v2)) {
-                // e1 + 0 = e1.
-                return expression{std::forward<decltype(v1)>(v1)};
-            }
-            if (std::visit([](const auto &x) { return x < 0; }, v2.value())) {
-                // e1 + -x = e1 - x.
-                return expression{std::forward<decltype(v1)>(v1)} - expression{-std::forward<decltype(v2)>(v2)};
-            }
-            // NOTE: fall through the standard case if e2 is not zero.
+            // e1 symbolic, e2 number. Swap the operands so that the number comes first.
+            return expression{std::forward<decltype(v2)>(v2)} + expression{std::forward<decltype(v1)>(v1)};
         }
 
         // The standard case.
@@ -283,16 +285,9 @@ expression operator-(expression e1, expression e2)
             }
             // NOTE: fall through the standard case if e1 is not zero.
         } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number.
-            if (is_zero(v2)) {
-                // e1 - 0 = e1.
-                return expression{std::forward<decltype(v1)>(v1)};
-            }
-            if (std::visit([](const auto &x) { return x < 0; }, v2.value())) {
-                // e1 - -x = e1 + x.
-                return expression{std::forward<decltype(v1)>(v1)} + expression{-std::forward<decltype(v2)>(v2)};
-            }
-            // NOTE: fall through the standard case if e2 is not zero.
+            // e1 symbolic, e2 number. Turn e1 - e2 into e1 + (-e2),
+            // because addition provides more simplification capabilities.
+            return expression{std::forward<decltype(v1)>(v1)} + expression{-std::forward<decltype(v2)>(v2)};
         }
 
         // The standard case.
@@ -318,6 +313,11 @@ expression operator*(expression e1, expression e2)
         return std::move(*rng1.first) * std::move(*rng2.first);
     }
 
+    // Simplify x*x -> square(x).
+    if (e1 == e2) {
+        return square(std::move(e1));
+    }
+
     auto visitor = [](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
@@ -334,27 +334,25 @@ expression operator*(expression e1, expression e2)
                 // 1 * e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
-            // NOTE: fall through the standard case if e1 is not zero or one.
-        } else if constexpr (std::is_same_v<type2, number>) {
-            // e1 symbolic, e2 number.
-            if (is_zero(v2)) {
-                // e1 * 0 = 0.
-                return expression{number{0.}};
-            } else if (is_one(v2)) {
-                // e1 * 1 = e1.
-                return expression{std::forward<decltype(v1)>(v1)};
+            if constexpr (std::is_same_v<func, type2>) {
+                if (auto pbop = v2.template extract<detail::binary_op>();
+                    pbop != nullptr && pbop->op() == detail::binary_op::type::mul
+                    && std::holds_alternative<number>(pbop->args()[0].value())) {
+                    // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
+                    return expression{std::forward<decltype(v1)>(v1) * std::get<number>(pbop->args()[0].value())}
+                           * pbop->args()[1];
+                }
             }
-            // NOTE: fall through the standard case if e1 is not zero or one.
+
+            // NOTE: fall through the standard case.
+        } else if constexpr (std::is_same_v<type2, number>) {
+            // e1 symbolic, e2 number. Swap the operands so that the number comes first.
+            return expression{std::forward<decltype(v2)>(v2)} * expression{std::forward<decltype(v1)>(v1)};
         }
 
         // The standard case.
         return mul(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };
-
-    // Simplify x*x -> square(x).
-    if (e1 == e2) {
-        return square(std::move(e1));
-    }
 
     return std::visit(visitor, std::move(e1.value()), std::move(e2.value()));
 }
