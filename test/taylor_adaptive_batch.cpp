@@ -370,6 +370,8 @@ TEST_CASE("propagate for_until")
         if (t.get_last_h()[1] != 0) {
             ++counter1;
         }
+
+        return true;
     };
 
     ta.propagate_until({10., 11.}, kw::max_delta_t = {1e-4, 5e-5}, kw::callback = cb);
@@ -458,11 +460,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_until(
         {10., 11.}, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_until(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2};
@@ -470,11 +474,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_for(
         {10., 11.}, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_for(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 }
 
@@ -526,6 +532,8 @@ TEST_CASE("propagate grid 2")
         if (t.get_last_h()[1] != 0) {
             ++counter1;
         }
+
+        return true;
     };
 
     auto out

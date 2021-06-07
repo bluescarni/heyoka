@@ -3639,7 +3639,7 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              std::function<void(taylor_adaptive_impl &)> cb, bool wtc)
+                                              std::function<bool(taylor_adaptive_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -3765,7 +3765,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
 taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
-                                             std::function<void(taylor_adaptive_impl &)> cb)
+                                             std::function<bool(taylor_adaptive_impl &)> cb)
 {
     using std::abs;
     using std::isfinite;
@@ -4575,7 +4575,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
                                                        const std::vector<T> &max_delta_ts,
-                                                       std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                       std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -4595,7 +4595,7 @@ void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &del
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloat<T>> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -4779,7 +4779,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -4801,7 +4801,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
 template <typename T>
 std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
                                                                   const std::vector<T> &max_delta_ts,
-                                                                  std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                                  std::function<bool(taylor_adaptive_batch_impl &)> cb)
 {
     using std::abs;
     using std::isnan;
@@ -5729,6 +5729,7 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::step_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::cb_stop);
         default:
             if (oc >= taylor_outcome{0}) {
                 // Continuing terminal event.
