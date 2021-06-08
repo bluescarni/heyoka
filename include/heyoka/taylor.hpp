@@ -191,16 +191,16 @@ taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<s
     }
 }
 
-// Enum to represent the outcome of a Taylor integration
-// stepping function.
+// Enum to represent the outcome of a stepping/propagate function.
 enum class taylor_outcome : std::int64_t {
     // NOTE: we make these enums start at -2**32 - 1,
     // so that we have 2**32 values in the [-2**32, -1]
     // range to use for signalling stopping terminal events.
-    success = -4294967296ll - 1,     // Integration step was successful, no time/step limits were reached.
-    step_limit = -4294967296ll - 2,  // Maximum number of steps reached.
-    time_limit = -4294967296ll - 3,  // Time limit reached.
-    err_nf_state = -4294967296ll - 4 // Non-finite state detected at the end of the timestep.
+    success = -4294967296ll - 1,      // Integration step was successful, no time/step limits were reached.
+    step_limit = -4294967296ll - 2,   // Maximum number of steps reached.
+    time_limit = -4294967296ll - 3,   // Time limit reached.
+    err_nf_state = -4294967296ll - 4, // Non-finite state detected at the end of the timestep.
+    cb_stop = -4294967296ll - 5       // Propagation stopped by callback.
 };
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
@@ -706,7 +706,7 @@ private:
             }();
 
             // Callback (defaults to empty).
-            auto cb = [&p]() -> std::function<void(taylor_adaptive_impl &)> {
+            auto cb = [&p]() -> std::function<bool(taylor_adaptive_impl &)> {
                 if constexpr (p.has(kw::callback)) {
                     return std::forward<decltype(p(kw::callback))>(p(kw::callback));
                 } else {
@@ -730,9 +730,9 @@ private:
 
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t>
-    propagate_until_impl(const dfloat<T> &, std::size_t, T, std::function<void(taylor_adaptive_impl &)>, bool);
+    propagate_until_impl(const dfloat<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(const std::vector<T> &, std::size_t, T, std::function<void(taylor_adaptive_impl &)>);
+    propagate_grid_impl(const std::vector<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>);
 
 public:
     // NOTE: return values:
@@ -992,7 +992,7 @@ private:
             }();
 
             // Callback (defaults to empty).
-            auto cb = [&p]() -> std::function<void(taylor_adaptive_batch_impl &)> {
+            auto cb = [&p]() -> std::function<bool(taylor_adaptive_batch_impl &)> {
                 if constexpr (p.has(kw::callback)) {
                     return std::forward<decltype(p(kw::callback))>(p(kw::callback));
                 } else {
@@ -1018,13 +1018,13 @@ private:
 
     // Implementations of the propagate_*() functions.
     HEYOKA_DLL_LOCAL void propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
-                                               std::function<void(taylor_adaptive_batch_impl &)>, bool);
+                                               std::function<bool(taylor_adaptive_batch_impl &)>, bool);
     void propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                              std::function<void(taylor_adaptive_batch_impl &)>, bool);
+                              std::function<bool(taylor_adaptive_batch_impl &)>, bool);
     void propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                            std::function<void(taylor_adaptive_batch_impl &)>, bool);
+                            std::function<bool(taylor_adaptive_batch_impl &)>, bool);
     std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                                       std::function<void(taylor_adaptive_batch_impl &)>);
+                                       std::function<bool(taylor_adaptive_batch_impl &)>);
 
 public:
     template <typename... KwArgs>

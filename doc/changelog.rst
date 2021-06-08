@@ -7,8 +7,18 @@ Changelog
 New
 ~~~
 
+- The callback that can be passed to the ``propagate_*()`` functions
+  can now be used to stop the integration
+  (`#149 <https://github.com/bluescarni/heyoka/pull/149>`__).
 - Add a pairwise product primitive
   (`#147 <https://github.com/bluescarni/heyoka/pull/147>`__).
+
+Changes
+~~~~~~~
+
+- **BREAKING**: a :ref:`breaking change <bchanges_0_10_0>`
+  in the ``propagate_*()`` callback API
+  (`#149 <https://github.com/bluescarni/heyoka/pull/149>`__).
 
 0.9.0 (2021-05-25)
 ------------------
