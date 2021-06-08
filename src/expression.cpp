@@ -315,8 +315,9 @@ expression operator*(expression e1, expression e2)
         return std::move(*rng1.first) * std::move(*rng2.first);
     }
 
-    // Simplify x*x -> square(x).
-    if (e1 == e2) {
+    // Simplify x*x -> square(x) if x is not a number (otherwise,
+    // we will numerically compute the result below).
+    if (e1 == e2 && !std::holds_alternative<number>(e1.value())) {
         return square(std::move(e1));
     }
 

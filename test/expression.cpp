@@ -515,6 +515,11 @@ TEST_CASE("mul simpls")
 {
     auto [x, y] = make_vars("x", "y");
 
+    // Verify simplification to square(),
+    // for non-number arguments.
+    REQUIRE(2_dbl * 2_dbl == 4_dbl);
+    REQUIRE(x * x == square(x));
+
     REQUIRE(1_dbl * 2_dbl == 2_dbl);
     REQUIRE(3_ldbl * 2_dbl == 6_dbl);
 
