@@ -1264,3 +1264,49 @@ TEST_CASE("event direction stream")
         REQUIRE(oss.str() == "event_direction::??");
     }
 }
+
+// Test the interruption of the propagate_*() functions via callback.
+TEST_CASE("cb interrupt")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    // propagate_for/until().
+    {
+        auto res = ta.propagate_until(
+            1., kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 1u);
+        REQUIRE(ta.get_time() < 1.);
+
+        auto counter = 0u;
+        res = ta.propagate_for(
+            10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 6u);
+        REQUIRE(ta.get_time() < 11.);
+    }
+
+    // propagate_grid().
+    {
+        auto res = ta.propagate_grid(
+            {10., 11., 12.}, kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 1u);
+        REQUIRE(std::get<4>(res).size() == 2u);
+        REQUIRE(ta.get_time() < 11.);
+
+        auto counter = 0u;
+        res = ta.propagate_grid(
+            {11., 12., 13., 14, 15, 16, 17, 18, 19}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 6u);
+        REQUIRE(std::get<4>(res).size() < 9u);
+        REQUIRE(ta.get_time() < 19.);
+    }
+}
