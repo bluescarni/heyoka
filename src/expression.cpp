@@ -35,6 +35,7 @@
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -385,9 +386,16 @@ expression operator/(expression e1, expression e2)
         return std::move(*rng1.first) / std::move(*rng2.first);
     }
 
-    auto visitor = [](auto &&v1, auto &&v2) {
+    auto visitor = [fptr1, fptr2](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
+
+        if constexpr (std::is_same_v<type2, number>) {
+            // If the divisor is zero, always raise an error.
+            if (is_zero(v2)) {
+                throw zero_division_error("Division by zero");
+            }
+        }
 
         if constexpr (std::is_same_v<type1, number> && std::is_same_v<type2, number>) {
             // Both are numbers, divide them.
@@ -397,10 +405,30 @@ expression operator/(expression e1, expression e2)
             if (is_one(v2)) {
                 // e1 / 1 = e1.
                 return expression{std::forward<decltype(v1)>(v1)};
-            } else if (is_negative_one(v2)) {
+            }
+            if (is_negative_one(v2)) {
                 // e1 / -1 = -e1.
                 return -expression{std::forward<decltype(v1)>(v1)};
             }
+            if (fptr1 != nullptr) {
+                // (-e1) / a = e1 / (-a).
+                auto rng1 = fptr1->get_mutable_args_it();
+                assert(rng1.first != rng1.second);
+
+                return std::move(*rng1.first) / expression{-std::forward<decltype(v2)>(v2)};
+            }
+            if constexpr (std::is_same_v<func, type1>) {
+                if (auto pbop = v1.template extract<detail::binary_op>();
+                    pbop != nullptr && pbop->op() == detail::binary_op::type::div
+                    && std::holds_alternative<number>(pbop->args()[1].value())) {
+                    // e1 = x / a, where a is a number. Simplify (x / a) / b -> x / (a * b).
+                    auto rng1 = pbop->get_mutable_args_it();
+
+                    return std::move(*rng1.first)
+                           / (std::move(*(rng1.first + 1)) * expression{std::forward<decltype(v2)>(v2)});
+                }
+            }
+
             // NOTE: fall through to the standard case.
         } else if constexpr (std::is_same_v<type1, number>) {
             // e1 is a number, e2 is symbolic.
@@ -408,8 +436,17 @@ expression operator/(expression e1, expression e2)
                 // 0 / e2 == 0.
                 return expression{number{0.}};
             }
+            if (fptr2 != nullptr) {
+                // a / (-e2) = (-a) / e2.
+                auto rng2 = fptr2->get_mutable_args_it();
+                assert(rng2.first != rng2.second);
+
+                return expression{-std::forward<decltype(v1)>(v1)} / std::move(*rng2.first);
+            }
+
             // NOTE: fall through to the standard case.
         }
+
         // The standard case.
         return div(expression{std::forward<decltype(v1)>(v1)}, expression{std::forward<decltype(v2)>(v2)});
     };

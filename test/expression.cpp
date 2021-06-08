@@ -13,6 +13,7 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
@@ -565,6 +566,44 @@ TEST_CASE("neg simpls")
     REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
     REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
     REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
+}
+
+TEST_CASE("div simpls")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(-x / -y == x / y);
+
+    REQUIRE_THROWS_MATCHES(x / 0_dbl, zero_division_error, Message("Division by zero"));
+
+    REQUIRE(1_dbl / 2_dbl == 0.5_dbl);
+    REQUIRE(1_dbl / -2_dbl == -0.5_dbl);
+
+    REQUIRE(x / 1_dbl == x);
+    REQUIRE(-x / 1_dbl == -x);
+    REQUIRE(x / -1_dbl == -x);
+    REQUIRE(-x / -1_dbl == x);
+    REQUIRE(-x / 2_dbl == x / -2_dbl);
+
+    REQUIRE(0_dbl / -x == 0_dbl);
+    REQUIRE(1_dbl / -x == -1_dbl / x);
+    REQUIRE(-2_dbl / -x == 2_dbl / x);
+
+    REQUIRE(x / 2_dbl / 2_dbl == x / 4_dbl);
+
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
+
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->args() == std::vector{y, 2_dbl});
+
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
 TEST_CASE("has time")
