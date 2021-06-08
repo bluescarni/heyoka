@@ -19,6 +19,10 @@ Changes
 - **BREAKING**: a :ref:`breaking change <bchanges_0_10_0>`
   in the ``propagate_*()`` callback API
   (`#149 <https://github.com/bluescarni/heyoka/pull/149>`__).
+- Implement additional automatic simplifications in the expression system
+  (`#148 <https://github.com/bluescarni/heyoka/pull/148>`__).
+- Division by zero in the expression system now raises an error
+  (`#148 <https://github.com/bluescarni/heyoka/pull/148>`__).
 
 0.9.0 (2021-05-25)
 ------------------

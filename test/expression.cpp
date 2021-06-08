@@ -7,9 +7,13 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cstddef>
+#include <initializer_list>
 #include <limits>
 #include <stdexcept>
+#include <variant>
+#include <vector>
 
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
@@ -198,7 +202,7 @@ TEST_CASE("operator == and !=")
         expression ex2 = cos("x"_var) + 1_dbl;
         expression ex3 = cos("x"_var) + 1_dbl + ex1 - ex1;
 
-        REQUIRE(ex1 != ex2);
+        REQUIRE(ex1 == ex2);
         REQUIRE(ex3 != ex2);
     }
 }
@@ -459,8 +463,89 @@ TEST_CASE("binary simpls")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(x + -1. == x - 1.);
     REQUIRE(y - -1. == y + 1.);
+}
+
+TEST_CASE("add simpls")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(1_dbl + 2_dbl == 3_dbl);
+    REQUIRE(1_ldbl + 2_dbl == 3_dbl);
+
+    REQUIRE(0_dbl + (x + y) == x + y);
+
+    REQUIRE(1_dbl + (1_dbl + x) == 2_dbl + x);
+    REQUIRE(1_dbl + (1_dbl + (x + 3_dbl)) == 5_dbl + x);
+    REQUIRE(1_dbl + (1_dbl + (4_dbl + (x + 3_dbl))) == 9_dbl + x);
+
+    REQUIRE(x + 0_dbl == x);
+    REQUIRE(x + 1_dbl == 1_dbl + x);
+
+    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::add);
+    REQUIRE(std::get<func>((1_dbl + y).value()).extract<detail::binary_op>()->args() == std::vector{1_dbl, y});
+
+    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::add);
+    REQUIRE(std::get<func>((x + y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
+}
+
+TEST_CASE("sub simpls")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(1_dbl - 2_dbl == -1_dbl);
+    REQUIRE(1_ldbl - 3_dbl == -2_dbl);
+
+    REQUIRE(0_dbl - x == -x);
+
+    REQUIRE((x + y) - 0_dbl == x + y);
+    REQUIRE((x + y) - 1_dbl == x + y + -1_dbl);
+
+    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::sub);
+    REQUIRE(std::get<func>((1_dbl - y).value()).extract<detail::binary_op>()->args() == std::vector{1_dbl, y});
+
+    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::sub);
+    REQUIRE(std::get<func>((x - y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
+}
+
+TEST_CASE("mul simpls")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    // Verify simplification to square(),
+    // for non-number arguments.
+    REQUIRE(2_dbl * 2_dbl == 4_dbl);
+    REQUIRE(x * x == square(x));
+
+    REQUIRE(1_dbl * 2_dbl == 2_dbl);
+    REQUIRE(3_ldbl * 2_dbl == 6_dbl);
+
+    REQUIRE(0_dbl * x == 0_dbl);
+    REQUIRE(1_dbl * (x + y) == x + y);
+
+    REQUIRE(1_dbl * (1_dbl * x) == x);
+    REQUIRE(1_dbl * (2_dbl * (x * 3_dbl)) == 6_dbl * x);
+    REQUIRE(1_dbl * (1_dbl * (-4_dbl * (x * 3_dbl))) == -12_dbl * x);
+
+    REQUIRE(x * 2_dbl == 2_dbl * x);
+    REQUIRE(x * -1_dbl == -1_dbl * x);
+
+    REQUIRE(2_dbl * -x == -2_dbl * x);
+    REQUIRE(2_dbl * (-3_dbl * -x) == 6_dbl * x);
+    REQUIRE(2_dbl * (-x * -3_dbl) == 6_dbl * x);
+    REQUIRE(2_dbl * (-3_dbl * (-x * -4_dbl)) == -24_dbl * x);
+
+    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
+    REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
+
+    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
+    REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
 }
 
 TEST_CASE("neg simpls")
@@ -481,6 +566,44 @@ TEST_CASE("neg simpls")
     REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
     REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
     REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
+}
+
+TEST_CASE("div simpls")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(-x / -y == x / y);
+
+    REQUIRE_THROWS_MATCHES(x / 0_dbl, zero_division_error, Message("Division by zero"));
+
+    REQUIRE(1_dbl / 2_dbl == 0.5_dbl);
+    REQUIRE(1_dbl / -2_dbl == -0.5_dbl);
+
+    REQUIRE(x / 1_dbl == x);
+    REQUIRE(-x / 1_dbl == -x);
+    REQUIRE(x / -1_dbl == -x);
+    REQUIRE(-x / -1_dbl == x);
+    REQUIRE(-x / 2_dbl == x / -2_dbl);
+
+    REQUIRE(0_dbl / -x == 0_dbl);
+    REQUIRE(1_dbl / -x == -1_dbl / x);
+    REQUIRE(-2_dbl / -x == 2_dbl / x);
+
+    REQUIRE(x / 2_dbl / 2_dbl == x / 4_dbl);
+
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((2_dbl / y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
+
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((y / 2_dbl).value()).extract<detail::binary_op>()->args() == std::vector{y, 2_dbl});
+
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>() != nullptr);
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::div);
+    REQUIRE(std::get<func>((y / x).value()).extract<detail::binary_op>()->args() == std::vector{y, x});
 }
 
 TEST_CASE("has time")

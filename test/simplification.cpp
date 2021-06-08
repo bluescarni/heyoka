@@ -53,7 +53,7 @@ TEST_CASE("merc")
                                        prime(x) = diff(Ham, vx), prime(y) = diff(Ham, vy), prime(z) = diff(Ham, vz)},
                                       std::vector<double>(6u)};
 
-    REQUIRE(ta.get_decomposition().size() <= 119u);
+    REQUIRE(ta.get_decomposition().size() <= 113u);
 
     std::cout << "Mercury: " << ta.get_decomposition().size() << '\n';
 }
