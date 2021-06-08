@@ -248,6 +248,11 @@
             <nav id="bd-toc-nav">
                 <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#bchanges-0-10-0">
+   0.10.0
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#bchanges-0-8-0">
    0.8.0
   </a>
@@ -265,8 +270,17 @@
                 
   <div class="section" id="breaking-changes">
 <span id="id1"></span><h1>Breaking changes<a class="headerlink" href="#breaking-changes" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="bchanges-0-10-0">
+<span id="id2"></span><h2>0.10.0<a class="headerlink" href="#bchanges-0-10-0" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>The callback that can (optionally) be passed to
+the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions must now return
+a <code class="docutils literal notranslate"><span class="pre">bool</span></code> indicating whether the integration should
+continue or not. The callback used to return <code class="docutils literal notranslate"><span class="pre">void</span></code>.</p></li>
+</ul>
+</div>
 <div class="section" id="bchanges-0-8-0">
-<span id="id2"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
+<span id="id3"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p>The direction of a non-terminal event is now specified
 with the (optional) keyword argument <code class="docutils literal notranslate"><span class="pre">direction</span></code> for

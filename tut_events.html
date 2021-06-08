@@ -335,7 +335,7 @@ of the spheres’ centres.</p>
 <p>heyoka features a flexible and accurate event detection framework in which the <a class="reference internal" href="tut_expression_system.html#tut-expression-system"><span class="std std-ref">expression system</span></a>
 can be used to formulate arbitrary event equations. The event equations are then added to the ODE system and
 integrated together with the other equations, so that, at every timestep, a Taylor series expansion of the event equations
-in powers of time is available. Polynomial root finding techniques <span id="id1">[<a class="reference internal" href="bibliography.html#id9">CA76</a>]</span> are then employed
+in powers of time is available. Polynomial root finding techniques <span id="id1">[<a class="reference internal" href="bibliography.html#id9" title="George E. Collins and Alkiviadis G. Akritas. Polynomial real root isolation using Descartes' rule of signs. In Proceedings of the third ACM symposium on Symbolic and algebraic computation, 272–275. 1976.">CA76</a>]</span> are then employed
 on the Taylor series of the event equations to accurately locate the time of occurrence of an event within the timestep.</p>
 <p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
 We will begin with non-terminal events, as they are conceptually simpler.</p>
