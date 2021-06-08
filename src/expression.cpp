@@ -318,7 +318,7 @@ expression operator*(expression e1, expression e2)
         return square(std::move(e1));
     }
 
-    auto visitor = [](auto &&v1, auto &&v2) {
+    auto visitor = [fptr2](auto &&v1, auto &&v2) {
         using type1 = detail::uncvref_t<decltype(v1)>;
         using type2 = detail::uncvref_t<decltype(v2)>;
 
@@ -330,9 +330,17 @@ expression operator*(expression e1, expression e2)
             if (is_zero(v1)) {
                 // 0 * e2 = 0.
                 return expression{number{0.}};
-            } else if (is_one(v1)) {
+            }
+            if (is_one(v1)) {
                 // 1 * e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
+            }
+            if (fptr2 != nullptr) {
+                // a * (-x) = (-a) * x.
+                auto rng2 = fptr2->get_mutable_args_it();
+                assert(rng2.first != rng2.second);
+
+                return expression{-std::forward<decltype(v1)>(v1)} * std::move(*rng2.first);
             }
             if constexpr (std::is_same_v<func, type2>) {
                 if (auto pbop = v2.template extract<detail::binary_op>();

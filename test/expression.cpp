@@ -528,6 +528,11 @@ TEST_CASE("mul simpls")
     REQUIRE(x * 2_dbl == 2_dbl * x);
     REQUIRE(x * -1_dbl == -1_dbl * x);
 
+    REQUIRE(2_dbl * -x == -2_dbl * x);
+    REQUIRE(2_dbl * (-3_dbl * -x) == 6_dbl * x);
+    REQUIRE(2_dbl * (-x * -3_dbl) == 6_dbl * x);
+    REQUIRE(2_dbl * (-3_dbl * (-x * -4_dbl)) == -24_dbl * x);
+
     REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>() != nullptr);
     REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
     REQUIRE(std::get<func>((2_dbl * y).value()).extract<detail::binary_op>()->args() == std::vector{2_dbl, y});
