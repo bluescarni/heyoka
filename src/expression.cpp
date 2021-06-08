@@ -243,8 +243,10 @@ expression operator+(expression e1, expression e2)
                     pbop != nullptr && pbop->op() == detail::binary_op::type::add
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
-                    return expression{std::forward<decltype(v1)>(v1) + std::get<number>(pbop->args()[0].value())}
-                           + pbop->args()[1];
+                    auto rng2 = pbop->get_mutable_args_it();
+
+                    return expression{std::forward<decltype(v1)>(v1)} + std::move(*rng2.first)
+                           + std::move(*(rng2.first + 1));
                 }
             }
 
@@ -346,9 +348,10 @@ expression operator*(expression e1, expression e2)
                 if (auto pbop = v2.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::mul
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
-                    // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
-                    return expression{std::forward<decltype(v1)>(v1) * std::get<number>(pbop->args()[0].value())}
-                           * pbop->args()[1];
+                    auto rng2 = pbop->get_mutable_args_it();
+
+                    return expression{std::forward<decltype(v1)>(v1)} * std::move(*rng2.first)
+                           * std::move(*(rng2.first + 1));
                 }
             }
 
