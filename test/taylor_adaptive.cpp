@@ -961,7 +961,10 @@ TEST_CASE("propagate for_until")
     auto counter = 0ul;
 
     auto oc = std::get<0>(ta.propagate_until(
-        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        }));
     auto oc_copy = std::get<0>(ta_copy.propagate_until(10.));
 
     REQUIRE(ta.get_time() == 10.);
@@ -976,7 +979,10 @@ TEST_CASE("propagate for_until")
 
     // Do propagate_for() too.
     oc = std::get<0>(ta.propagate_for(
-        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+        10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        }));
     oc_copy = std::get<0>(ta_copy.propagate_for(10.));
 
     REQUIRE(ta.get_time() == 20.);
@@ -991,7 +997,10 @@ TEST_CASE("propagate for_until")
 
     // Do backwards in time too.
     oc = std::get<0>(ta.propagate_for(
-        -10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+        -10., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        }));
     oc_copy = std::get<0>(ta_copy.propagate_for(-10.));
 
     REQUIRE(ta.get_time() == 10.);
@@ -1005,7 +1014,10 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
 
     oc = std::get<0>(ta.propagate_until(
-        0., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; }));
+        0., kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        }));
     oc_copy = std::get<0>(ta_copy.propagate_until(0.));
 
     REQUIRE(ta.get_time() == 0.);
@@ -1030,11 +1042,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_until(
         10, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_until(
         20, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
@@ -1042,11 +1056,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_for(
         10, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_for(
         20, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 }
 
@@ -1082,7 +1098,10 @@ TEST_CASE("propagate grid")
     auto counter = 0ul;
 
     auto [oc, _1, _2, _3, out] = ta.propagate_grid(
-        {1., 5., 10.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; });
+        {1., 5., 10.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        });
     auto [oc_copy, _4, _5, _6, out_copy] = ta_copy.propagate_grid({1., 5., 10.});
 
     REQUIRE(ta.get_time() == 10.);
@@ -1099,7 +1118,10 @@ TEST_CASE("propagate grid")
 
     // Backwards.
     std::tie(oc, _1, _2, _3, out) = ta.propagate_grid(
-        {10., 5., 1.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) { ++counter; });
+        {10., 5., 1.}, kw::max_delta_t = 1e-4, kw::callback = [&counter](taylor_adaptive<double> &) {
+            ++counter;
+            return true;
+        });
     std::tie(oc_copy, _4, _5, _6, out_copy) = ta_copy.propagate_grid({10., 5., 1.});
 
     REQUIRE(ta.get_time() == 1);
@@ -1153,6 +1175,14 @@ TEST_CASE("outcome stream")
     {
         std::ostringstream oss;
 
+        oss << taylor_outcome::cb_stop;
+
+        REQUIRE(oss.str() == "taylor_outcome::cb_stop");
+    }
+
+    {
+        std::ostringstream oss;
+
         oss << taylor_outcome{0};
 
         REQUIRE(oss.str() == "taylor_outcome::terminal_event_0 (continuing)");
@@ -1185,7 +1215,7 @@ TEST_CASE("outcome stream")
     {
         std::ostringstream oss;
 
-        oss << taylor_outcome{static_cast<std::int64_t>(taylor_outcome::err_nf_state) - 1};
+        oss << taylor_outcome{static_cast<std::int64_t>(taylor_outcome::cb_stop) - 1};
 
         REQUIRE(oss.str() == "taylor_outcome::??");
     }
@@ -1232,5 +1262,51 @@ TEST_CASE("event direction stream")
         oss << event_direction{2};
 
         REQUIRE(oss.str() == "event_direction::??");
+    }
+}
+
+// Test the interruption of the propagate_*() functions via callback.
+TEST_CASE("cb interrupt")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}};
+
+    // propagate_for/until().
+    {
+        auto res = ta.propagate_until(
+            1., kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 1u);
+        REQUIRE(ta.get_time() < 1.);
+
+        auto counter = 0u;
+        res = ta.propagate_for(
+            10., kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 6u);
+        REQUIRE(ta.get_time() < 11.);
+    }
+
+    // propagate_grid().
+    {
+        auto res = ta.propagate_grid(
+            {10., 11., 12.}, kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 1u);
+        REQUIRE(std::get<4>(res).size() == 2u);
+        REQUIRE(ta.get_time() < 11.);
+
+        auto counter = 0u;
+        res = ta.propagate_grid(
+            {11., 12., 13., 14, 15, 16, 17, 18, 19}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<3>(res) == 6u);
+        REQUIRE(std::get<4>(res).size() < 9u);
+        REQUIRE(ta.get_time() < 19.);
     }
 }

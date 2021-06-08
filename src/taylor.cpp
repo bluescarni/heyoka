@@ -3639,7 +3639,7 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              std::function<void(taylor_adaptive_impl &)> cb, bool wtc)
+                                              std::function<bool(taylor_adaptive_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -3707,33 +3707,34 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
             return std::tuple{res, min_h, max_h, step_counter};
         }
 
-        // The step was successful, execute the callback.
-        if (cb) {
-            cb(*this);
-        }
-
         // Update the number of iterations.
         ++iter_counter;
 
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
 
-        // Break out if the final time is reached,
-        // *before* updating the min_h/max_h values.
-        // NOTE: the idea is that if we reached the time
-        // limit the timestep has been artificially
-        // reduced, thus we don't want to count it.
-        if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
-            return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
-        }
-
-        // Update min_h/max_h, but only if we did not trigger a terminal event
-        // (in which case the timestep is artificially clamped).
+        // Update min_h/max_h, but only if the outcome is success (otherwise
+        // the step was artificially clamped either by a time limit or
+        // by a terminal event).
         if (res == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
+        }
+
+        // The step was successful, execute the callback if applicable.
+        if (cb && !cb(*this)) {
+            // Interruption via callback.
+            return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter};
+        }
+
+        // Break out if the final time is reached,
+        // NOTE: here we check h == rem_time, instead of just
+        // res == time_limit, because clamping via max_delta_t
+        // could also result in time_limit.
+        if (h == static_cast<T>(rem_time)) {
+            assert(res == taylor_outcome::time_limit);
+            return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
 
         // Check the iteration limit.
@@ -3765,7 +3766,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
 taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
-                                             std::function<void(taylor_adaptive_impl &)> cb)
+                                             std::function<bool(taylor_adaptive_impl &)> cb)
 {
     using std::abs;
     using std::isfinite;
@@ -3942,24 +3943,25 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
         }
 
-        // Step successful: invoke the callback, if needed.
-        if (cb) {
-            cb(*this);
-        }
-
         // Update the number of iterations.
         ++iter_counter;
 
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
 
-        // Update the min/max h value, but only if we did not trigger a continuing
-        // terminal event and we did not hit the time limit at the end of the grid
-        // (in which case the timestep is artificially clamped).
-        if (res < taylor_outcome{0} && res != taylor_outcome::time_limit) {
+        // Update min_h/max_h, but only if the outcome is success (otherwise
+        // the step was artificially clamped either by a time limit or
+        // by a terminal event).
+        if (res == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
+        }
+
+        // Step successful: invoke the callback, if needed.
+        if (cb && !cb(*this)) {
+            // Interruption via callback.
+            return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter, std::move(retval)};
         }
 
         // Check the iteration limit.
@@ -4575,7 +4577,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
                                                        const std::vector<T> &max_delta_ts,
-                                                       std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                       std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -4595,7 +4597,7 @@ void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &del
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloat<T>> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     using std::abs;
     using std::isfinite;
@@ -4691,25 +4693,45 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             return;
         }
 
-        // The step was successful, execute the callback.
-        if (cb) {
-            cb(*this);
-        }
-
         // Update the iteration counter.
         ++iter_counter;
 
-        // Update the local step counters.
+        // Update the local step counters and min_h/max_h.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto [res, h] = m_step_res[i];
+
             // NOTE: the local step counters increase only if we integrated
             // for a nonzero time.
-            m_ts_count[i] += static_cast<std::size_t>(std::get<1>(m_step_res[i]) != 0);
+            m_ts_count[i] += static_cast<std::size_t>(h != 0);
+
+            // Update min_h/max_h only if the outcome is success (otherwise
+            // the step was artificially clamped either by a time limit or
+            // by a terminal event).
+            if (res == taylor_outcome::success) {
+                const auto abs_h = abs(h);
+                m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+                m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+            }
+        }
+
+        // The step was successful, execute the callback.
+        if (cb && !cb(*this)) {
+            // Setup m_prop_res before exiting. We set all outcomes
+            // to cb_stop regardless of the timestep outcome.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i] = std::tuple{taylor_outcome::cb_stop, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            }
+
+            return;
         }
 
         // Break out if we have reached the final time
         // for all batch elements.
         bool all_done = true;
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // NOTE: here we check h == rem_time, instead of just
+            // res == time_limit, because clamping via max_delta_t
+            // could also result in time_limit.
             if (std::get<1>(m_step_res[i]) != static_cast<T>(m_rem_time[i])) {
                 all_done = false;
                 break;
@@ -4724,20 +4746,6 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             return;
         }
 
-        // Update min_h/max_h.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            // Don't update if we reached the time limit or triggered a continuing
-            // terminal event.
-            if (std::get<0>(m_step_res[i]) == taylor_outcome::time_limit
-                || std::get<0>(m_step_res[i]) >= taylor_outcome{0}) {
-                continue;
-            }
-
-            const auto abs_h = abs(std::get<1>(m_step_res[i]));
-            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
-            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
-        }
-
         // Check the iteration limit.
         // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
         // then this condition will never trigger as by this point we are
@@ -4745,6 +4753,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         if (iter_counter == max_steps) {
             // We reached the max_steps limit: the outcome for each batch element must be
             // either step_limit or time_limit.
+            // NOTE: how does the outcome logic change with events?
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 m_prop_res[i]
                     = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
@@ -4779,7 +4788,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 template <typename T>
 void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
                                                          const std::vector<T> &max_delta_ts,
-                                                         std::function<void(taylor_adaptive_batch_impl &)> cb, bool wtc)
+                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -4801,7 +4810,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
 template <typename T>
 std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
                                                                   const std::vector<T> &max_delta_ts,
-                                                                  std::function<void(taylor_adaptive_batch_impl &)> cb)
+                                                                  std::function<bool(taylor_adaptive_batch_impl &)> cb)
 {
     using std::abs;
     using std::isnan;
@@ -5107,11 +5116,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             return retval;
         }
 
-        // Step successful: invoke the callback, if needed.
-        if (cb) {
-            cb(*this);
-        }
-
         // Update the number of iterations.
         ++iter_counter;
 
@@ -5141,16 +5145,25 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                     = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
             }
 
-            // Don't update if we reached the time limit or if we
-            // triggered a continuing terminal event
-            // (in which case the timestep is artificially clamped).
-            if (res == taylor_outcome::time_limit || res >= taylor_outcome{0}) {
-                continue;
+            // Update min_h/max_h, but only if the outcome is success (otherwise
+            // the step was artificially clamped either by a time limit or
+            // by a terminal event).
+            if (res == taylor_outcome::success) {
+                const auto abs_h = abs(h);
+                m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+                m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+            }
+        }
+
+        // Step successful: invoke the callback, if needed.
+        if (cb && !cb(*this)) {
+            // Setup m_prop_res before exiting. We set all outcomes
+            // to cb_stop regardless of the timestep outcome.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                m_prop_res[i] = std::tuple{taylor_outcome::cb_stop, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            const auto abs_h = abs(h);
-            m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
-            m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
+            return retval;
         }
 
         // Check the iteration limit.
@@ -5729,6 +5742,7 @@ std::ostream &operator<<(std::ostream &os, taylor_outcome oc)
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::step_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::time_limit);
         HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::err_nf_state);
+        HEYOKA_TAYLOR_ENUM_STREAM_CASE(taylor_outcome::cb_stop);
         default:
             if (oc >= taylor_outcome{0}) {
                 // Continuing terminal event.

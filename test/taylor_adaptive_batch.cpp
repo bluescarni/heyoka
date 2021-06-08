@@ -370,6 +370,8 @@ TEST_CASE("propagate for_until")
         if (t.get_last_h()[1] != 0) {
             ++counter1;
         }
+
+        return true;
     };
 
     ta.propagate_until({10., 11.}, kw::max_delta_t = {1e-4, 5e-5}, kw::callback = cb);
@@ -458,11 +460,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_until(
         {10., 11.}, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_until(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2};
@@ -470,11 +474,13 @@ TEST_CASE("propagate for_until write_tc")
     ta.propagate_for(
         {10., 11.}, kw::callback = [](auto &t) {
             REQUIRE(std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 
     ta.propagate_for(
         {20., 21.}, kw::write_tc = true, kw::callback = [](auto &t) {
             REQUIRE(!std::all_of(t.get_tc().begin(), t.get_tc().end(), [](const auto &x) { return x == 0.; }));
+            return true;
         });
 }
 
@@ -526,6 +532,8 @@ TEST_CASE("propagate grid 2")
         if (t.get_last_h()[1] != 0) {
             ++counter1;
         }
+
+        return true;
     };
 
     auto out
@@ -568,5 +576,71 @@ TEST_CASE("propagate grid 2")
         REQUIRE(out[4u * i + 1u] == approximately(out_copy[4u * i + 1u], 1000.));
         REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
         REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
+    }
+}
+
+// Test the interruption of the propagate_*() functions via callback.
+TEST_CASE("cb interrupt")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.06, 0.025, 0.026}, 2u};
+
+    // propagate_for/until().
+    {
+        ta.propagate_until(
+            {1., 1.1}, kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
+
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
+
+        REQUIRE(ta.get_time()[0] < 1.);
+        REQUIRE(ta.get_time()[1] < 1.);
+
+        auto counter = 0u;
+        ta.propagate_for(
+            {10., 10.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
+
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 6u);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 6u);
+
+        REQUIRE(ta.get_time()[0] < 10.);
+        REQUIRE(ta.get_time()[1] < 10.);
+    }
+
+    // propagate_grid().
+    {
+        auto res = ta.propagate_grid(
+            {10., 10.1, 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return x == 0; }));
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
+
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
+
+        REQUIRE(ta.get_time()[0] < 11.);
+        REQUIRE(ta.get_time()[1] < 11.);
+
+        auto counter = 0u;
+        res = ta.propagate_grid(
+            {20., 20.1, 21., 21.1, 32., 32.1}, kw::callback = [&counter](auto &) { return counter++ != 5u; });
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
+
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 6u);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 6u);
+
+        REQUIRE(ta.get_time()[0] < 32.);
+        REQUIRE(ta.get_time()[1] < 32.);
     }
 }
