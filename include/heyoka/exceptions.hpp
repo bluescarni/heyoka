@@ -20,6 +20,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS not_implemented_error final : std::runtime
     using std::runtime_error::runtime_error;
 };
 
+// Exception to signal division by zero.
+struct HEYOKA_DLL_PUBLIC_INLINE_CLASS zero_division_error final : std::domain_error {
+    using std::domain_error::domain_error;
+};
+
 } // namespace heyoka
 
 #endif
