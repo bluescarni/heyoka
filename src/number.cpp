@@ -27,6 +27,9 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Value.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -36,11 +39,22 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -299,12 +313,11 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
             // to. Then we use them to construct a FP constant from
             // the string representation of v.
             // NOTE: v must be cast to long double so that we ensure
-            // that li_to_string() produces a string representation
+            // that fmt produces a string representation
             // of v in long double precision accurate to the
             // last digit.
             const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(s.context(),
-                                         llvm::APFloat(sem, detail::li_to_string(static_cast<long double>(v))));
+            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, "{}"_format(static_cast<long double>(v))));
         },
         n.value());
 }
@@ -316,8 +329,7 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
     return std::visit(
         [&s](const auto &v) {
             const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(s.context(),
-                                         llvm::APFloat(sem, detail::li_to_string(static_cast<mppp::real128>(v))));
+            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, "{}"_format(static_cast<mppp::real128>(v))));
         },
         n.value());
 }

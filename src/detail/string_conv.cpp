@@ -7,8 +7,13 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <charconv>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
+#include <system_error>
+
+#include <fmt/format.h>
 
 #include <heyoka/detail/string_conv.hpp>
 
@@ -17,8 +22,18 @@ namespace heyoka::detail
 
 std::uint32_t uname_to_index(const std::string &s)
 {
+    using namespace fmt::literals;
+
     assert(s.rfind("u_", 0) == 0);
-    return li_from_string<std::uint32_t>(std::string(s.begin() + 2, s.end()));
+
+    std::uint32_t value;
+    auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
+
+    if (ret.ec != std::errc{}) {
+        throw std::invalid_argument("Cannot extract a u variable index from the string '{}'"_format(s));
+    }
+
+    return value;
 }
 
 } // namespace heyoka::detail

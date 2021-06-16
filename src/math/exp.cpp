@@ -51,6 +51,18 @@
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -160,8 +172,6 @@ void exp_impl::eval_batch_dbl(std::vector<double> &out, const std::unordered_map
 double exp_impl::eval_num_dbl(const std::vector<double> &a) const
 {
     if (a.size() != 1u) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments when computing the numerical value of the "
             "exponential over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
@@ -249,8 +259,6 @@ llvm::Value *taylor_diff_exp(llvm_state &s, const exp_impl &f, const std::vector
     assert(f.args().size() == 1u);
 
     if (!deps.empty()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("An empty hidden dependency vector is expected in order to compute the Taylor "
                                     "derivative of the exponential, but a vector of size {} was passed "
                                     "instead"_format(deps.size()));
@@ -299,8 +307,6 @@ template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, const U &num, std::uint32_t,
                                             std::uint32_t batch_size)
 {
-    using namespace fmt::literals;
-
     return taylor_c_diff_func_unary_num_det<T>(
         s, fn, num, batch_size,
         "heyoka_taylor_diff_exp_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
@@ -321,8 +327,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_exp_var_" + taylor_mangle_suffix(val_t) + "_n_uvars_" + li_to_string(n_uvars);
+    const auto fname = "heyoka_taylor_diff_exp_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
 
     // The function arguments:
     // - diff order,

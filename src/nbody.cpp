@@ -18,12 +18,23 @@
 
 #include <fmt/format.h>
 
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -49,15 +60,13 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
     for (std::uint32_t i = 0; i < n; ++i) {
-        const auto i_str = li_to_string(i);
+        x_vars.emplace_back(variable("x_{}"_format(i)));
+        y_vars.emplace_back(variable("y_{}"_format(i)));
+        z_vars.emplace_back(variable("z_{}"_format(i)));
 
-        x_vars.emplace_back(variable("x_" + i_str));
-        y_vars.emplace_back(variable("y_" + i_str));
-        z_vars.emplace_back(variable("z_" + i_str));
-
-        vx_vars.emplace_back(variable("vx_" + i_str));
-        vy_vars.emplace_back(variable("vy_" + i_str));
-        vz_vars.emplace_back(variable("vz_" + i_str));
+        vx_vars.emplace_back(variable("vx_{}"_format(i)));
+        vy_vars.emplace_back(variable("vy_{}"_format(i)));
+        vz_vars.emplace_back(variable("vz_{}"_format(i)));
     }
 
     // Create the return value.
@@ -235,15 +244,13 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
     std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
 
     for (std::uint32_t i = 0; i < n; ++i) {
-        const auto i_str = li_to_string(i);
+        x_vars.emplace_back(variable("x_{}"_format(i)));
+        y_vars.emplace_back(variable("y_{}"_format(i)));
+        z_vars.emplace_back(variable("z_{}"_format(i)));
 
-        x_vars.emplace_back(variable("x_" + i_str));
-        y_vars.emplace_back(variable("y_" + i_str));
-        z_vars.emplace_back(variable("z_" + i_str));
-
-        vx_vars.emplace_back(variable("vx_" + i_str));
-        vy_vars.emplace_back(variable("vy_" + i_str));
-        vz_vars.emplace_back(variable("vz_" + i_str));
+        vx_vars.emplace_back(variable("vx_{}"_format(i)));
+        vy_vars.emplace_back(variable("vy_{}"_format(i)));
+        vz_vars.emplace_back(variable("vz_{}"_format(i)));
     }
 
     // Create the return value.
