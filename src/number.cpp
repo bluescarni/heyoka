@@ -316,8 +316,15 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
             // that fmt produces a string representation
             // of v in long double precision accurate to the
             // last digit.
+            // NOTE: regarding the format string: we use the general format
+            // 'g' and a precision of max_digits10, which should guarantee
+            // round trip behaviour. Note that when using 'g', the precision
+            // argument represents the total number of significant digits
+            // printed (before and after the decimal point).
             const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, "{}"_format(static_cast<long double>(v))));
+            return llvm::ConstantFP::get(
+                s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
+                                                                 std::numeric_limits<long double>::max_digits10)));
         },
         n.value());
 }
@@ -329,7 +336,9 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
     return std::visit(
         [&s](const auto &v) {
             const auto &sem = detail::to_llvm_type<mppp::real128>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, "{}"_format(static_cast<mppp::real128>(v))));
+            // NOTE: for real128 use directly the to_string() member function, which guarantees
+            // round trip behaviour.
+            return llvm::ConstantFP::get(s.context(), llvm::APFloat(sem, static_cast<mppp::real128>(v).to_string()));
         },
         n.value());
 }
