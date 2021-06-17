@@ -9,11 +9,8 @@
 #include <cassert>
 #include <charconv>
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <system_error>
-
-#include <fmt/format.h>
 
 #include <heyoka/detail/string_conv.hpp>
 
@@ -22,16 +19,11 @@ namespace heyoka::detail
 
 std::uint32_t uname_to_index(const std::string &s)
 {
-    using namespace fmt::literals;
-
     assert(s.rfind("u_", 0) == 0);
 
     std::uint32_t value;
-    auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
-
-    if (ret.ec != std::errc{}) {
-        throw std::invalid_argument("Cannot extract a u variable index from the string '{}'"_format(s));
-    }
+    [[maybe_unused]] auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
+    assert(ret.ec == std::errc{});
 
     return value;
 }
