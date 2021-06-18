@@ -237,10 +237,12 @@ can be invoked with two additional optional keyword arguments:
 
   .. code-block:: c++
 
-     void (taylor_adaptive<double> &);
+     bool (taylor_adaptive<double> &);
 
   which will be invoked at the end of each timestep, with the integrator
-  object as argument.
+  object as only argument. If the callback returns ``true`` then the integration
+  will continue after the invocation of the callback, otherwise the integration
+  will be interrupted.
 
 Propagation over a time grid
 ----------------------------
@@ -298,10 +300,12 @@ can be invoked with two additional optional keyword arguments:
 
   .. code-block:: c++
 
-     void (taylor_adaptive<double> &);
+     bool (taylor_adaptive<double> &);
 
   which will be invoked at the end of each timestep, with the integrator
-  object as argument.
+  object as only argument. If the callback returns ``true`` then the integration
+  will continue after the invocation of the callback, otherwise the integration
+  will be interrupted.
 
 Full code listing
 -----------------
