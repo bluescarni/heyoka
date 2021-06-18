@@ -552,11 +552,13 @@ can be invoked with two additional optional keyword arguments:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
 represents the maximum timestep size in absolute value;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">callback</span></code>: this is a callable with signature</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">bool</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>which will be invoked at the end of each timestep, with the integrator
-object as argument.</p>
+object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
+will continue after the invocation of the callback, otherwise the integration
+will be interrupted.</p>
 </li>
 </ul>
 </div>
@@ -616,11 +618,13 @@ can be invoked with two additional optional keyword arguments:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">max_delta_t</span></code>: similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> function, this value
 represents the maximum timestep size in absolute value;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">callback</span></code>: this is a callable with signature</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">bool</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>which will be invoked at the end of each timestep, with the integrator
-object as argument.</p>
+object as only argument. If the callback returns <code class="docutils literal notranslate"><span class="pre">true</span></code> then the integration
+will continue after the invocation of the callback, otherwise the integration
+will be interrupted.</p>
 </li>
 </ul>
 </div>
