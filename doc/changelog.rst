@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.11.0 (unreleased)
+-------------------
+
+Changes
+~~~~~~~
+
+- Various performance optimisations for the creation
+  of large ODE systems
+  (`#152 <https://github.com/bluescarni/heyoka/pull/152>`__).
+
 0.10.0 (2021-06-09)
 -------------------
 

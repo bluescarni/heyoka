@@ -48,11 +48,22 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -109,7 +120,7 @@ void func_default_td_impl(func_base &fb, taylor_dc_t &u_vars_defs)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
-            *r.first = expression{variable{"u_" + li_to_string(dres)}};
+            *r.first = expression{variable{"u_{}"_format(dres)}};
         }
     }
 }

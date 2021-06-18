@@ -7,8 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <charconv>
 #include <cstdint>
 #include <string>
+#include <system_error>
 
 #include <heyoka/detail/string_conv.hpp>
 
@@ -18,7 +20,12 @@ namespace heyoka::detail
 std::uint32_t uname_to_index(const std::string &s)
 {
     assert(s.rfind("u_", 0) == 0);
-    return li_from_string<std::uint32_t>(std::string(s.begin() + 2, s.end()));
+
+    std::uint32_t value;
+    [[maybe_unused]] auto ret = std::from_chars(s.data() + 2, s.data() + s.size(), value);
+    assert(ret.ec == std::errc{});
+
+    return value;
 }
 
 } // namespace heyoka::detail
