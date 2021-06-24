@@ -1,3 +1,6 @@
+# Editor stuff.
+.vscode*
+
 # Build dirs.
 build*
 
