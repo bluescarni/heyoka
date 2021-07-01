@@ -2498,6 +2498,25 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
     return retval;
 }
 
+// Small helper to deduce the number of parameters
+// present in the Taylor decomposition of an ODE system.
+// NOTE: this will also include the functions of state variables,
+// as they are part of the decomposition.
+// NOTE: the first few entries in the decomposition are the mapping
+// u variables -> state variables. These never contain any param
+// by construction.
+template <typename T>
+std::uint32_t n_pars_in_dc(const T &dc)
+{
+    std::uint32_t retval = 0;
+
+    for (const auto &p : dc) {
+        retval = std::max(retval, get_param_size(p.first));
+    }
+
+    return retval;
+}
+
 // Helper function to compute the jet of Taylor derivatives up to a given order. n_eq
 // is the number of equations/variables in the ODE sys, dc its Taylor decomposition,
 // n_uvars the total number of u variables in the decomposition.
@@ -2545,10 +2564,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // NOTE: in default mode the check is done inside taylor_codegen_numparam_par().
 
         // Deduce the size of the param array from the expressions in the decomposition.
-        std::uint32_t param_size = 0;
-        for (auto i = n_eq; i < dc.size(); ++i) {
-            param_size = std::max(param_size, get_param_size(dc[i].first));
-        }
+        const auto param_size = n_pars_in_dc(dc);
         // LCOV_EXCL_START
         if (param_size > std::numeric_limits<std::uint32_t>::max() / batch_size) {
             throw std::overflow_error(
@@ -2870,24 +2886,6 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     s.optimise();
 
     return std::tuple{std::move(dc), order};
-}
-
-// Small helper to deduce the number of parameters
-// present in the rhs of an ODE.
-template <typename T>
-std::uint32_t n_pars_in_sys(const T &sys)
-{
-    std::uint32_t retval = 0;
-
-    for (const auto &p : sys) {
-        if constexpr (std::is_same_v<uncvref_t<decltype(p)>, expression>) {
-            retval = std::max(retval, get_param_size(p));
-        } else {
-            retval = std::max(retval, get_param_size(p.second));
-        }
-    }
-
-    return retval;
 }
 
 // Run the Horner scheme to propagate an ODE state via the evaluation of the Taylor polynomials.
@@ -3272,17 +3270,6 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
     const auto with_events = !m_tes.empty() || !m_ntes.empty();
 
-    // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_sys(sys);
-    if (m_pars.size() < npars) {
-        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
-    } else if (m_pars.size() > npars) {
-        throw std::invalid_argument(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
-                m_pars.size(), npars));
-    }
-
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -3306,6 +3293,17 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     } else {
         std::tie(m_dc, m_order)
             = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
+    }
+
+    // Fix m_pars' size, if necessary.
+    const auto npars = n_pars_in_dc(m_dc);
+    if (m_pars.size() < npars) {
+        m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars));
+    } else if (m_pars.size() > npars) {
+        throw std::invalid_argument(
+            "Excessive number of parameter values passed to the constructor of an adaptive "
+            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters"_format(
+                m_pars.size(), npars));
     }
 
     // Add the function for the computation of
@@ -4328,8 +4326,20 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                 tol));
     }
 
+    // Store the dimension of the system.
+    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
+
+    // Temporarily disable optimisations in s, so that
+    // we don't optimise twice when adding the step
+    // and then the d_out.
+    std::optional<opt_disabler> od(m_llvm);
+
+    // Add the stepper function.
+    std::tie(m_dc, m_order)
+        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
+
     // Fix m_pars' size, if necessary.
-    const auto npars = n_pars_in_sys(sys);
+    const auto npars = n_pars_in_dc(m_dc);
     // LCOV_EXCL_START
     if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
         throw std::overflow_error(
@@ -4346,18 +4356,6 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
         // LCOV_EXCL_STOP
     }
-
-    // Store the dimension of the system.
-    m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
-
-    // Temporarily disable optimisations in s, so that
-    // we don't optimise twice when adding the step
-    // and then the d_out.
-    std::optional<opt_disabler> od(m_llvm);
-
-    // Add the stepper function.
-    std::tie(m_dc, m_order)
-        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
 
     // Add the function for the computation of
     // the dense output.

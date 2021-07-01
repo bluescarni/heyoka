@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.10.1 (unreleased)
+-------------------
+
+Fix
+~~~
+
+- Parameters in event equations are now correctly counted
+  when inferring the total number of parameters in an ODE system
+  (`#154 <https://github.com/bluescarni/heyoka/pull/154>`__).
+
 0.10.0 (2021-06-09)
 -------------------
 
