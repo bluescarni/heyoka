@@ -1310,3 +1310,57 @@ TEST_CASE("cb interrupt")
         REQUIRE(ta.get_time() < 19.);
     }
 }
+
+// Test excessive number of params provided upon construction
+// of the integrator.
+TEST_CASE("param too many")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES(
+        (void)(taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       {0.05, 0.025},
+                                       kw::pars = std::vector{1., 2.},
+                                       kw::t_events = {t_event<double>(v - par[0])}}),
+        std::invalid_argument,
+        Message("Excessive number of parameter values passed to the constructor of an adaptive "
+                "Taylor integrator: 2 parameter values were passed, but the ODE system contains only 1 parameters"));
+}
+
+// Test case for bug: parameters in event equations are ignored
+// in the determination of the total number of params in a system.
+TEST_CASE("param deduction from events")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // Terminal events.
+    {
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0.05, 0.025}, kw::t_events = {t_event<double>(v - par[0])}};
+
+        REQUIRE(ta.get_pars().size() == 1u);
+    }
+
+    // Non-terminal events.
+    {
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0.05, 0.025},
+            kw::nt_events = {nt_event<double>(v - par[1], [](taylor_adaptive<double> &, double, int) {})}};
+
+        REQUIRE(ta.get_pars().size() == 2u);
+    }
+
+    // Both.
+    {
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0.05, 0.025},
+            kw::t_events = {t_event<double>(v - par[10])},
+            kw::nt_events = {nt_event<double>(v - par[1], [](taylor_adaptive<double> &, double, int) {})}};
+
+        REQUIRE(ta.get_pars().size() == 11u);
+    }
+}

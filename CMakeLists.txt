@@ -298,24 +298,6 @@ else()
     # Otherwise, LLVM is built as a collection of
     # separate libraries/components.
 
-    # NOTE: this is a nasty hack originating from the fact
-    # that currently the CMake files installed by LLVM contain a direct
-    # link to an entity called "z" representing the zlib library.
-    # If the file z.lib is not in a "standard" location (as it is
-    # often the case), the linker will not find it, resulting in
-    # an error at build time. Thus, we fetch the location
-    # of z.lib from CMake's FindZLIB.cmake and add it
-    # to the linker path.
-    find_package(ZLIB REQUIRED)
-    get_target_property(_HEYOKA_ZLIB_LOCATION ZLIB::ZLIB LOCATION)
-    message(STATUS "ZLIB::ZLIB location : ${_HEYOKA_ZLIB_LOCATION}")
-    get_filename_component(_HEYOKA_ZLIB_LOCATION_DIR "${_HEYOKA_ZLIB_LOCATION}" DIRECTORY)
-    message(STATUS "ZLIB::ZLIB directory : ${_HEYOKA_ZLIB_LOCATION_DIR}")
-    target_link_directories(heyoka_llvm_internal INTERFACE "${_HEYOKA_ZLIB_LOCATION_DIR}")
-
-    unset(_HEYOKA_ZLIB_LOCATION)
-    unset(_HEYOKA_ZLIB_LOCATION_DIR)
-
     # NOTE: these components have been determined heuristically.
     set(_HEYOKA_LLVM_COMPONENTS native orcjit)
     # NOTE: not sure what these two do, I copied from symengine's CMakeLists.txt.
