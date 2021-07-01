@@ -310,12 +310,23 @@
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
 <p>heyoka is written in modern C++, and it requires a compiler able to understand
 at least C++17. The library is regularly tested on
-a comprehensive continuous integration pipeline, which includes:</p>
+a continuous integration pipeline which currently includes:</p>
 <ul class="simple">
-<li><p>various versions of the three major compilers (GCC, Clang and MSVC),</p></li>
-<li><p>various versions of the three major operating systems
-(Linux, Windows and OSX).</p></li>
+<li><p>GCC 9 on Linux,</p></li>
+<li><p>Clang 11 on OSX,</p></li>
+<li><p>MSVC 2019 and Clang 12 on Windows.</p></li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using MSVC, heyoka currently requires MSVC&gt;=2019. It is also possible
+to compile heyoka using the standard library from MSVC 2017 in conjunction
+with the <code class="docutils literal notranslate"><span class="pre">clang-cl</span></code> compiler.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>heyoka is currently being developed and tested on x86-64 processors, but support
+for 64-bit ARM processors is expected in the near future.</p>
+</div>
 <p>heyoka has the following <strong>mandatory</strong> dependencies:</p>
 <ul class="simple">
 <li><p>the <a class="reference external" href="https://llvm.org/">LLVM</a> compiler infrastructure library (version &gt;= 10),</p></li>
