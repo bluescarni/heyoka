@@ -11,7 +11,7 @@ Changes
   of large ODE systems
   (`#152 <https://github.com/bluescarni/heyoka/pull/152>`__).
 
-0.10.1 (unreleased)
+0.10.1 (2021-07-02)
 -------------------
 
 Fix
