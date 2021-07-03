@@ -42,6 +42,7 @@
 #include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/math/tpoly.hpp>
 #include <heyoka/number.hpp>
@@ -796,6 +797,8 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
 // https://en.wikipedia.org/wiki/Pairwise_summation
 expression pairwise_sum(std::vector<expression> sum)
 {
+    // return heyoka::sum(std::move(sum));
+
     if (sum.empty()) {
         return expression{0.};
     }
