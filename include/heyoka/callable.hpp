@@ -176,9 +176,8 @@ inline void swap(callable<R(Args...)> &c0, callable<R(Args...)> &c1) noexcept
 
 } // namespace heyoka
 
-// Disable Boost.Serialization tracking for callable and its implementation details.
-// NOTE: these bits are taken verbatim from the
-// BOOST_CLASS_TRACKING macro, which does not support
+// Disable Boost.Serialization tracking for the implementation details of callable.
+// NOTE: these bits are taken verbatim from the BOOST_CLASS_TRACKING macro, which does not support
 // class templates.
 
 namespace boost
@@ -205,19 +204,12 @@ struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
                                       mpl::int_<primitive_type>>::value));
 };
 
-template <typename R, typename... Args>
-struct tracking_level<heyoka::callable<R(Args...)>> {
-    typedef mpl::integral_c_tag tag;
-    typedef mpl::int_<track_never> type;
-    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
-    BOOST_STATIC_ASSERT(
-        (mpl::greater<implementation_level<heyoka::callable<R(Args...)>>, mpl::int_<primitive_type>>::value));
-};
-
 } // namespace serialization
 
 } // namespace boost
 
+// NOTE: these are verbatim re-implementations of the BOOST_CLASS_EXPORT_KEY
+// and BOOST_CLASS_EXPORT_IMPLEMENT macros, which do not work well with class templates.
 #define HEYOKA_S11N_CALLABLE_EXPORT_KEY(...)                                                                           \
     namespace boost                                                                                                    \
     {                                                                                                                  \
@@ -229,6 +221,7 @@ struct tracking_level<heyoka::callable<R(Args...)>> {
     template <>                                                                                                        \
     inline const char *guid<heyoka::detail::callable_inner<__VA_ARGS__>>()                                             \
     {                                                                                                                  \
+        /* NOTE: the stringize here will produce a name enclosed by brackets. */                                       \
         return BOOST_PP_STRINGIZE((heyoka::detail::callable_inner<__VA_ARGS__>));                                    \
     }                                                                                                                  \
     }                                                                                                                  \
