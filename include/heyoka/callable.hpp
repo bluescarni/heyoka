@@ -17,6 +17,17 @@
 
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
+
+// NOTE: here we implement a stripped-down version of std::function
+// on top of classic OOP polymorphism.
+//
+// The reason for this (as opposed to using std::function directly)
+// is principally because we can make our implementation serialisable
+// via Boost.Serialization, whereas std::function cannot be supported
+// by Boost. We need a serialisable function wrapper in order to be
+// able to serialise the callbacks of the events, whose serialisation,
+// in turn, is needed in the serialisation of the integrator objects.
 
 namespace heyoka
 {
@@ -31,6 +42,12 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner_base {
     virtual std::unique_ptr<callable_inner_base> clone() const = 0;
 
     virtual R operator()(Args...) const = 0;
+
+    // Serialization (empty, no data members).
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
 };
 
 template <typename T, typename R, typename... Args>
@@ -57,6 +74,14 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
     R operator()(Args... args) const final
     {
         return m_value(std::forward<Args>(args)...);
+    }
+
+    // Serialization.
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<callable_inner_base<R, Args...>>(*this);
+        ar &m_value;
     }
 };
 
@@ -123,6 +148,24 @@ public:
     {
         return static_cast<bool>(m_ptr);
     }
+
+    // Serialisation support.
+    template <typename Archive>
+    void save(Archive &ar, unsigned) const
+    {
+        ar << m_ptr;
+    }
+    template <typename Archive>
+    void load(Archive &ar, unsigned)
+    {
+        // Deserialize in a separate object and move it in later, for exception safety.
+        callable tmp_callable;
+
+        ar >> tmp_callable.m_ptr;
+
+        *this = std::move(tmp_callable);
+    }
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 template <typename R, typename... Args>
@@ -132,5 +175,90 @@ inline void swap(callable<R(Args...)> &c0, callable<R(Args...)> &c1) noexcept
 }
 
 } // namespace heyoka
+
+// Disable Boost.Serialization tracking for callable and its implementation details.
+// NOTE: these bits are taken verbatim from the
+// BOOST_CLASS_TRACKING macro, which does not support
+// class templates.
+
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename R, typename... Args>
+struct tracking_level<heyoka::detail::callable_inner_base<R, Args...>> {
+    typedef mpl::integral_c_tag tag;
+    typedef mpl::int_<track_never> type;
+    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
+    BOOST_STATIC_ASSERT((mpl::greater<implementation_level<heyoka::detail::callable_inner_base<R, Args...>>,
+                                      mpl::int_<primitive_type>>::value));
+};
+
+template <typename T, typename R, typename... Args>
+struct tracking_level<heyoka::detail::callable_inner<T, R, Args...>> {
+    typedef mpl::integral_c_tag tag;
+    typedef mpl::int_<track_never> type;
+    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
+    BOOST_STATIC_ASSERT((mpl::greater<implementation_level<heyoka::detail::callable_inner<T, R, Args...>>,
+                                      mpl::int_<primitive_type>>::value));
+};
+
+template <typename R, typename... Args>
+struct tracking_level<heyoka::callable<R(Args...)>> {
+    typedef mpl::integral_c_tag tag;
+    typedef mpl::int_<track_never> type;
+    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
+    BOOST_STATIC_ASSERT(
+        (mpl::greater<implementation_level<heyoka::callable<R(Args...)>>, mpl::int_<primitive_type>>::value));
+};
+
+} // namespace serialization
+
+} // namespace boost
+
+#define HEYOKA_S11N_CALLABLE_EXPORT_KEY(...)                                                                           \
+    namespace boost                                                                                                    \
+    {                                                                                                                  \
+    namespace serialization                                                                                            \
+    {                                                                                                                  \
+    template <>                                                                                                        \
+    struct guid_defined<heyoka::detail::callable_inner<__VA_ARGS__>> : boost::mpl::true_ {                             \
+    };                                                                                                                 \
+    template <>                                                                                                        \
+    inline const char *guid<heyoka::detail::callable_inner<__VA_ARGS__>>()                                             \
+    {                                                                                                                  \
+        return BOOST_PP_STRINGIZE((heyoka::detail::callable_inner<__VA_ARGS__>));                                    \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    }
+
+#define HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(...)                                                                     \
+    namespace boost                                                                                                    \
+    {                                                                                                                  \
+    namespace archive                                                                                                  \
+    {                                                                                                                  \
+    namespace detail                                                                                                   \
+    {                                                                                                                  \
+    namespace extra_detail                                                                                             \
+    {                                                                                                                  \
+    template <>                                                                                                        \
+    struct init_guid<heyoka::detail::callable_inner<__VA_ARGS__>> {                                                    \
+        static guid_initializer<heyoka::detail::callable_inner<__VA_ARGS__>> const &g;                                 \
+    };                                                                                                                 \
+    guid_initializer<heyoka::detail::callable_inner<__VA_ARGS__>> const                                                \
+        &init_guid<heyoka::detail::callable_inner<__VA_ARGS__>>::g                                                     \
+        = ::boost::serialization::singleton<                                                                           \
+              guid_initializer<heyoka::detail::callable_inner<__VA_ARGS__>>>::get_mutable_instance()                   \
+              .export_guid();                                                                                          \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    }
+
+#define HEYOKA_S11N_CALLABLE_EXPORT(...)                                                                               \
+    HEYOKA_S11N_CALLABLE_EXPORT_KEY(__VA_ARGS__)                                                                       \
+    HEYOKA_S11N_CALLABLE_EXPORT_IMPLEMENT(__VA_ARGS__)
 
 #endif

@@ -7,12 +7,14 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <initializer_list>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <heyoka/callable.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -154,4 +156,48 @@ TEST_CASE("callable call")
 
         REQUIRE_THROWS_AS(c0(1, 2), std::bad_function_call);
     }
+}
+
+struct foo_s11n {
+    int addval = 0;
+
+    int operator()(int n) const
+    {
+        return n + addval;
+    }
+
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &addval;
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, int, int)
+
+TEST_CASE("callable s11n")
+{
+    callable<int(int)> c(foo_s11n{100});
+
+    REQUIRE(c(1) == 101);
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << c;
+    }
+
+    c = callable<int(int)>{};
+    REQUIRE(!c);
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> c;
+    }
+
+    REQUIRE(!!c);
+    REQUIRE(c(1) == 101);
 }
