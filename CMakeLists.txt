@@ -322,10 +322,8 @@ find_package(spdlog REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE spdlog::spdlog)
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED)
-
-# Public dependency on the headers.
-target_link_libraries(heyoka PUBLIC Boost::boost)
+find_package(Boost 1.60 REQUIRED serialization)
+target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 

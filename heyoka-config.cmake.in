@@ -1,5 +1,5 @@
-# Mandatory public dependency on the Boost headers.
-find_package(Boost 1.60 REQUIRED)
+# Mandatory public dependency on Boost.
+find_package(Boost 1.60 REQUIRED serialization)
 
 if(@HEYOKA_WITH_MPPP@)
     find_package(mp++ REQUIRED CONFIG)

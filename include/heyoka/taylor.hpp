@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -292,7 +293,7 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, int)>;
+    using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
 
 private:
     void finalise_ctor(event_direction);
@@ -367,7 +368,7 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool, int)>;
+    using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
 
 private:
     void finalise_ctor(callback_t, T, event_direction);
