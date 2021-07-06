@@ -9,9 +9,9 @@
 #ifndef HEYOKA_S11N_HPP
 #define HEYOKA_S11N_HPP
 
+#include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
-#include <boost/serialization/split_member.hpp>
 #include <boost/serialization/tracking.hpp>
 #include <boost/serialization/unique_ptr.hpp>
 

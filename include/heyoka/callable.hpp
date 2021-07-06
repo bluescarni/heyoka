@@ -43,6 +43,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner_base {
 
     virtual R operator()(Args...) const = 0;
 
+private:
+    friend class boost::serialization::access;
     // Serialization (empty, no data members).
     template <typename Archive>
     void serialize(Archive &, unsigned)
@@ -76,6 +78,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
         return m_value(std::forward<Args>(args)...);
     }
 
+private:
+    friend class boost::serialization::access;
     // Serialization.
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
@@ -149,23 +153,14 @@ public:
         return static_cast<bool>(m_ptr);
     }
 
+private:
+    friend class boost::serialization::access;
     // Serialisation support.
     template <typename Archive>
-    void save(Archive &ar, unsigned) const
+    void serialize(Archive &ar, unsigned)
     {
-        ar << m_ptr;
+        ar &m_ptr;
     }
-    template <typename Archive>
-    void load(Archive &ar, unsigned)
-    {
-        // Deserialize in a separate object and move it in later, for exception safety.
-        callable tmp_callable;
-
-        ar >> tmp_callable.m_ptr;
-
-        *this = std::move(tmp_callable);
-    }
-    BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 template <typename R, typename... Args>
