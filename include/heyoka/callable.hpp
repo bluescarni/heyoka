@@ -126,7 +126,7 @@ public:
 };
 
 template <typename R, typename... Args>
-inline void swap(callable<R, Args...> &c0, callable<R, Args...> &c1) noexcept
+inline void swap(callable<R(Args...)> &c0, callable<R(Args...)> &c1) noexcept
 {
     c0.swap(c1);
 }
