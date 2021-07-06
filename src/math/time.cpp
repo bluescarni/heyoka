@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -63,6 +64,13 @@ time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
 void time_impl::to_stream(std::ostream &os) const
 {
     os << 't';
+}
+
+expression time_impl::diff(const std::string &) const
+{
+    assert(args().empty());
+
+    return 0_dbl;
 }
 
 namespace

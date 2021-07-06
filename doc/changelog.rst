@@ -4,6 +4,13 @@ Changelog
 0.11.0 (unreleased)
 -------------------
 
+New
+~~~
+
+- The ``time`` expression now supports symbolic
+  differentiation
+  (`#160 <https://github.com/bluescarni/heyoka/pull/160>`__).
+
 Changes
 ~~~~~~~
 
