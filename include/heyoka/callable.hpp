@@ -44,8 +44,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner_base {
     virtual R operator()(Args...) const = 0;
 
 private:
-    friend class boost::serialization::access;
     // Serialization (empty, no data members).
+    friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &, unsigned)
     {
@@ -79,8 +79,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
     }
 
 private:
-    friend class boost::serialization::access;
     // Serialization.
+    friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive &ar, unsigned)
     {
@@ -101,6 +101,14 @@ template <typename R, typename... Args>
 class HEYOKA_DLL_PUBLIC_INLINE_CLASS callable<R(Args...)>
 {
     std::unique_ptr<detail::callable_inner_base<R, Args...>> m_ptr;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_ptr;
+    }
 
     // Dispatching of the generic constructor with specialisation
     // for construction from a function (second overload).
@@ -151,15 +159,6 @@ public:
     explicit operator bool() const noexcept
     {
         return static_cast<bool>(m_ptr);
-    }
-
-private:
-    friend class boost::serialization::access;
-    // Serialisation support.
-    template <typename Archive>
-    void serialize(Archive &ar, unsigned)
-    {
-        ar &m_ptr;
     }
 };
 
