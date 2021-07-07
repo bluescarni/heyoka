@@ -11,6 +11,7 @@
 #include <functional>
 #include <initializer_list>
 #include <limits>
+#include <sstream>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -23,6 +24,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -116,4 +118,89 @@ TEST_CASE("number hash eq")
     // Make sure the vector of constants has been
     // optimised out because both constants are 1.
     REQUIRE(!boost::contains(s.get_ir(), "internal constant [2 x double]"));
+}
+
+TEST_CASE("number s11n")
+{
+    std::stringstream ss;
+
+    number n{4.5l};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << n;
+    }
+
+    n = number{0.};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> n;
+    }
+
+    REQUIRE(n == number{4.5l});
+
+    ss.str("");
+
+    n = number{1.2};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << n;
+    }
+
+    n = number{0.l};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> n;
+    }
+
+    REQUIRE(n == number{1.2});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    ss.str("");
+
+    n = number{1.1_rq};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << n;
+    }
+
+    n = number{0.};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> n;
+    }
+
+    REQUIRE(n == number{1.1_rq});
+
+    ss.str("");
+
+    n = number{1.1};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << n;
+    }
+
+    n = number{0._rq};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> n;
+    }
+
+    REQUIRE(n == number{1.1});
+#endif
 }

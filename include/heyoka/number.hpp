@@ -29,6 +29,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -45,6 +46,20 @@ public:
 
 private:
     value_type m_value;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void save(Archive &ar, unsigned) const
+    {
+        detail::s11n_variant_save(ar, m_value);
+    }
+    template <typename Archive>
+    void load(Archive &ar, unsigned)
+    {
+        detail::s11n_variant_load(ar, m_value);
+    }
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     explicit number(double);
