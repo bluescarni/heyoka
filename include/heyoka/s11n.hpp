@@ -20,6 +20,7 @@
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
 #include <boost/serialization/split_member.hpp>
+#include <boost/serialization/string.hpp>
 #include <boost/serialization/tracking.hpp>
 #include <boost/serialization/unique_ptr.hpp>
 
@@ -84,9 +85,11 @@ inline void s11n_variant_load(Archive &ar, std::variant<Args...> &var)
     std::size_t idx;
     ar >> idx;
 
+    // LCOV_EXCL_START
     if (idx >= sizeof...(Args)) {
         throw std::invalid_argument("Invalid index loaded during the deserialisation of a variant");
     }
+    // LCOV_EXCL_STOP
 
     s11n_variant_load_impl(ar, var, idx, std::make_index_sequence<sizeof...(Args)>{});
 }
