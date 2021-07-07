@@ -38,6 +38,7 @@
 #include <heyoka/func.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -50,6 +51,20 @@ public:
 
 private:
     value_type m_value;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void save(Archive &ar, unsigned) const
+    {
+        detail::s11n_variant_save(ar, m_value);
+    }
+    template <typename Archive>
+    void load(Archive &ar, unsigned)
+    {
+        detail::s11n_variant_load(ar, m_value);
+    }
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     expression();

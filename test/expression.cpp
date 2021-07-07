@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <variant>
 #include <vector>
@@ -18,6 +19,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -650,4 +652,67 @@ TEST_CASE("pairwise_prod")
     REQUIRE(pairwise_prod({x0, x1, x2, x3}) == (x0 * x1) * (x2 * x3));
     REQUIRE(pairwise_prod({x0, x1, x2, x3, x4}) == (x0 * x1) * (x2 * x3) * x4);
     REQUIRE(pairwise_prod({x0, x1, x2, x3, x4, x5}) == ((x0 * x1) * (x2 * x3)) * (x4 * x5));
+}
+
+TEST_CASE("s11n")
+{
+    std::stringstream ss;
+
+    auto x = "x"_var;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << x;
+    }
+
+    x = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> x;
+    }
+
+    REQUIRE(x == "x"_var);
+
+    ss.str("");
+
+    x = par[42];
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << x;
+    }
+
+    x = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> x;
+    }
+
+    REQUIRE(x == par[42]);
+
+    ss.str("");
+
+    x = 0.1_ldbl;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << x;
+    }
+
+    x = "x"_var;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> x;
+    }
+
+    REQUIRE(x == 0.1_ldbl);
 }

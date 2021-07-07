@@ -43,6 +43,7 @@ class HEYOKA_DLL_PUBLIC variable
     }
 
 public:
+    variable();
     explicit variable(std::string);
     variable(const variable &);
     variable(variable &&) noexcept;

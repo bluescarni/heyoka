@@ -44,6 +44,8 @@ class HEYOKA_DLL_PUBLIC param
     }
 
 public:
+    param();
+
     explicit param(std::uint32_t);
 
     param(const param &);

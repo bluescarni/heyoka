@@ -23,6 +23,7 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/tracking.hpp>
 #include <boost/serialization/unique_ptr.hpp>
+#include <boost/serialization/vector.hpp>
 
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>

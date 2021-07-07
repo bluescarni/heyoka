@@ -42,6 +42,8 @@
 namespace heyoka
 {
 
+variable::variable() : variable("") {}
+
 variable::variable(std::string s) : m_name(std::move(s)) {}
 
 variable::variable(const variable &) = default;

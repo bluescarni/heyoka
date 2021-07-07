@@ -59,6 +59,8 @@ using fmt::literals::operator""_format;
 namespace heyoka
 {
 
+number::number() : number(0.) {}
+
 number::number(double x) : m_value(x) {}
 
 number::number(long double x) : m_value(x) {}

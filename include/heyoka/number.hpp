@@ -62,6 +62,7 @@ private:
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
+    number();
     explicit number(double);
     explicit number(long double);
 #if defined(HEYOKA_HAVE_REAL128)
