@@ -27,8 +27,13 @@
 
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/polymorphic_iarchive.hpp>
-#include <boost/archive/polymorphic_oarchive.hpp>
+// NOTE: we used to have polymorphic
+// archives here instead, but apparently
+// those do not support long double and thus
+// lead to compilation errors when trying
+// to (de)serialize numbers.
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 
 namespace heyoka::detail
 {

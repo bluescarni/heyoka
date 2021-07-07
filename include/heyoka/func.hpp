@@ -841,4 +841,13 @@ struct tracking_level<heyoka::detail::func_inner<T>> {
 
 } // namespace boost
 
+// Macros for the registration of s11n for concrete functions.
+#define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f) BOOST_CLASS_EXPORT_IMPLEMENT(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_KEY(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f)
+
 #endif
