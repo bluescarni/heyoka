@@ -26,6 +26,7 @@
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -33,6 +34,14 @@ namespace heyoka
 class HEYOKA_DLL_PUBLIC param
 {
     std::uint32_t m_index;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_index;
+    }
 
 public:
     explicit param(std::uint32_t);

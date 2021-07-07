@@ -8,8 +8,8 @@
 
 #include <sstream>
 
+#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
-#include <heyoka/variable.hpp>
 
 #include "catch.hpp"
 
@@ -17,23 +17,23 @@ using namespace heyoka;
 
 TEST_CASE("variable s11n")
 {
-    variable var{"pippo"};
+    param p{42};
 
     std::stringstream ss;
 
     {
         boost::archive::binary_oarchive oa(ss);
 
-        oa << var;
+        oa << p;
     }
 
-    var = variable{"pluto"};
+    p = param{0};
 
     {
         boost::archive::binary_iarchive ia(ss);
 
-        ia >> var;
+        ia >> p;
     }
 
-    REQUIRE(var.name() == "pippo");
+    REQUIRE(p.idx() == 42u);
 }
