@@ -11,6 +11,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/atanh.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -22,4 +23,29 @@ TEST_CASE("atanh diff")
 
     REQUIRE(diff(atanh(x * x - y), x) == 1. / (1. - square(square(x) - y)) * (2. * x));
     REQUIRE(diff(atanh(x * x + y), y) == 1. / (1. - square(square(x) + y)));
+}
+
+TEST_CASE("atanh s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = atanh(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == atanh(x));
 }

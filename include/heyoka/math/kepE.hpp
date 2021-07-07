@@ -25,6 +25,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -34,6 +35,13 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC kepE_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     kepE_impl();
     explicit kepE_impl(expression, expression);
@@ -84,5 +92,7 @@ HEYOKA_DLL_PUBLIC expression kepE(mppp::real128, expression);
 #endif
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::kepE_impl)
 
 #endif

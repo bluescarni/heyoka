@@ -13,6 +13,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 #include "catch.hpp"
@@ -50,10 +51,35 @@ TEST_CASE("erf diff")
 {
     auto [x, y] = make_vars("x", "y");
 #if defined(HEYOKA_HAVE_REAL128)
-    auto coeff = 1./sqrt_pi_2<mppp::real128>;
+    auto coeff = 1. / sqrt_pi_2<mppp::real128>;
 #else
-    auto coeff = 1./sqrt_pi_2<long double>;
+    auto coeff = 1. / sqrt_pi_2<long double>;
 #endif
-    REQUIRE(diff(erf(x * x - y), x) == (coeff * exp((-(x*x - y) * (x*x - y)))) * (2. * x));
-    REQUIRE(diff(erf(x * x + y), y) == (coeff * exp((-(x*x + y) * (x*x + y)))));
+    REQUIRE(diff(erf(x * x - y), x) == (coeff * exp((-(x * x - y) * (x * x - y)))) * (2. * x));
+    REQUIRE(diff(erf(x * x + y), y) == (coeff * exp((-(x * x + y) * (x * x + y)))));
+}
+
+TEST_CASE("erf s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = erf(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == erf(x));
 }

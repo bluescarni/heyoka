@@ -11,6 +11,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/neg.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -24,4 +25,29 @@ TEST_CASE("cos neg simpl")
     REQUIRE(cos(neg(x + y)) == cos(x + y));
     REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
     REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
+}
+
+TEST_CASE("cos s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = cos(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == cos(x));
 }

@@ -12,6 +12,7 @@
 #include <heyoka/math/asinh.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -23,4 +24,29 @@ TEST_CASE("asinh diff")
 
     REQUIRE(diff(asinh(x * x - y), x) == pow(square(square(x) - y) + 1., -.5) * (2. * x));
     REQUIRE(diff(asinh(x * x + y), y) == pow(square(square(x) + y) + 1., -.5));
+}
+
+TEST_CASE("asinh s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = asinh(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == asinh(x));
 }
