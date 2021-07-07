@@ -9,11 +9,19 @@
 #ifndef HEYOKA_VARIABLE_HPP
 #define HEYOKA_VARIABLE_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstddef>
 #include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
