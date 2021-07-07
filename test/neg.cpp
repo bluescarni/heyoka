@@ -11,6 +11,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -57,4 +58,29 @@ TEST_CASE("unary minus minus simpl")
     REQUIRE(-(-(x + y)) == x + y);
     REQUIRE(-(-sin(x + y)) == sin(x + y));
     REQUIRE(-sin(x + y) == neg(sin(x + y)));
+}
+
+TEST_CASE("neg s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = -x;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == -x);
 }
