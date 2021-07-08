@@ -630,8 +630,8 @@ void llvm_state::load_impl(Archive &ar, unsigned)
                 compile();
             }
         }
-    } catch (...) {
         // LCOV_EXCL_START
+    } catch (...) {
         // Reset to a def-cted state in case of error,
         // as it looks like there's no way of recovering.
         *this = []() noexcept { return llvm_state{}; }();
@@ -918,8 +918,8 @@ void llvm_state::compile()
 
         // Clear out the builder, which won't be usable any more.
         m_builder.reset();
-    } catch (...) {
         // LCOV_EXCL_START
+    } catch (...) {
         // Reset to a def-cted state in case of error,
         // as it looks like there's no way of recovering.
         *this = []() noexcept { return llvm_state{}; }();
