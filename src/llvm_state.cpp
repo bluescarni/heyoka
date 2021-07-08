@@ -440,7 +440,26 @@ llvm_state &llvm_state::operator=(const llvm_state &other)
     return *this;
 }
 
-llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
+// NOTE: this cannot be defaulted because the moving of the LLVM objects
+// needs to be done in a different order.
+llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
+{
+    if (this != &other) {
+        // The LLVM bits.
+        m_builder = std::move(other.m_builder);
+        m_module = std::move(other.m_module);
+        m_jitter = std::move(other.m_jitter);
+
+        // The remaining bits.
+        m_opt_level = other.m_opt_level;
+        m_ir_snapshot = std::move(other.m_ir_snapshot);
+        m_fast_math = other.m_fast_math;
+        m_module_name = std::move(other.m_module_name);
+        m_inline_functions = other.m_inline_functions;
+    }
+
+    return *this;
+}
 
 llvm_state::~llvm_state() = default;
 
