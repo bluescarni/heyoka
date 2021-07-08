@@ -19,6 +19,7 @@
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
+#include <boost/serialization/split_free.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/tracking.hpp>
@@ -38,21 +39,7 @@
 namespace heyoka::detail
 {
 
-// NOTE: helpers to (de)serialise a std::variant, inspired
-// by the boost::variant implementation. Requires s11n support
-// from all variant members, and requires all variant members
-// to be def-ctible and move-assignable/ctible, due to the non-intrusive
-// character of the implementation.
-template <typename Archive, typename... Args>
-inline void s11n_variant_save(Archive &ar, const std::variant<Args...> &var)
-{
-    const auto idx = var.index();
-
-    ar << idx;
-
-    std::visit([&ar](const auto &x) { ar << x; }, var);
-}
-
+// Implementation detail for loading a std::variant.
 template <typename Archive, typename... Args, std::size_t... Is>
 inline void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std::size_t idx, std::index_sequence<Is...>)
 {
@@ -84,8 +71,31 @@ inline void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std:
     assert(var.index() == idx);
 }
 
+} // namespace heyoka::detail
+
+// Implement serialization for a few std types currently missing
+// from Boost. We should drop these if/when they become available
+// in Boost.
+
+namespace boost
+{
+
+namespace serialization
+{
+
+// NOTE: inspired by the boost::variant implementation.
 template <typename Archive, typename... Args>
-inline void s11n_variant_load(Archive &ar, std::variant<Args...> &var)
+inline void save(Archive &ar, const std::variant<Args...> &var, unsigned)
+{
+    const auto idx = var.index();
+
+    ar << idx;
+
+    std::visit([&ar](const auto &x) { ar << x; }, var);
+}
+
+template <typename Archive, typename... Args>
+inline void load(Archive &ar, std::variant<Args...> &var, unsigned)
 {
     // Recover the variant index.
     std::size_t idx;
@@ -97,9 +107,17 @@ inline void s11n_variant_load(Archive &ar, std::variant<Args...> &var)
     }
     // LCOV_EXCL_STOP
 
-    s11n_variant_load_impl(ar, var, idx, std::make_index_sequence<sizeof...(Args)>{});
+    heyoka::detail::s11n_variant_load_impl(ar, var, idx, std::make_index_sequence<sizeof...(Args)>{});
 }
 
-} // namespace heyoka::detail
+template <typename Archive, typename... Args>
+inline void serialize(Archive &ar, std::variant<Args...> &var, unsigned v)
+{
+    split_free(ar, var, v);
+}
+
+} // namespace serialization
+
+} // namespace boost
 
 #endif
