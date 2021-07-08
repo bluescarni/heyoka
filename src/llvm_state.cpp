@@ -555,13 +555,7 @@ void llvm_state::load_impl(Archive &ar, unsigned)
     bool with_obj{};
     ar >> with_obj;
 
-    // Sanity check.
-    if (with_obj && !cmp) {
-        // LCOV_EXCL_START
-        throw std::invalid_argument("Invalid llvm_state detected during deserialisation: the llvm_state contains "
-                                    "object code without having been compiled");
-        // LCOV_EXCL_STOP
-    }
+    assert(!with_obj || cmp);
 
     // Load the config options.
     unsigned opt_level{};
