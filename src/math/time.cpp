@@ -39,6 +39,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -264,3 +265,5 @@ bool is_time(const expression &ex)
 const expression time{func{detail::time_impl{}}};
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::time_impl)

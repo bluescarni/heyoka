@@ -44,6 +44,7 @@
 #include <heyoka/math/tpoly.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -375,3 +376,5 @@ expression tpoly(expression b, expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tpoly_impl)

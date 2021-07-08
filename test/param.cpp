@@ -15,7 +15,7 @@
 
 using namespace heyoka;
 
-TEST_CASE("variable s11n")
+TEST_CASE("param s11n")
 {
     param p{42};
 

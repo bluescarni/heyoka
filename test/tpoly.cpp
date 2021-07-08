@@ -6,10 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <sstream>
 #include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/tpoly.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -51,4 +53,29 @@ TEST_CASE("tpoly ctors")
                            Message("Cannot construct a time polynomial from a non-param argument"));
     REQUIRE_THROWS_MATCHES(tpoly(par[11], "x"_var), std::invalid_argument,
                            Message("Cannot construct a time polynomial from a non-param argument"));
+}
+
+TEST_CASE("tpoly s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = tpoly(par[10], par[20]) + x;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == tpoly(par[10], par[20]) + x);
 }

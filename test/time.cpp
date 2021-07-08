@@ -12,6 +12,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -34,4 +35,29 @@ TEST_CASE("time diff")
 
     REQUIRE(diff(heyoka::time * cos(2. * x + 2. * heyoka::time), "x")
             == heyoka::time * (-2. * sin(2. * x + 2. * heyoka::time)));
+}
+
+TEST_CASE("time s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = heyoka::time + x;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == heyoka::time + x);
 }

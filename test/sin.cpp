@@ -9,30 +9,20 @@
 #include <sstream>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/math/cosh.hpp>
-#include <heyoka/math/sinh.hpp>
-#include <heyoka/math/square.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
 
-TEST_CASE("sinh diff")
-{
-    auto [x, y] = make_vars("x", "y");
-
-    REQUIRE(diff(sinh(x * x - y), x) == cosh(square(x) - y) * (2. * x));
-    REQUIRE(diff(sinh(x * x + y), y) == cosh(square(x) + y));
-}
-
-TEST_CASE("sinh s11n")
+TEST_CASE("sin s11n")
 {
     std::stringstream ss;
 
     auto [x] = make_vars("x");
 
-    auto ex = sinh(x);
+    auto ex = sin(x);
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -48,5 +38,5 @@ TEST_CASE("sinh s11n")
         ia >> ex;
     }
 
-    REQUIRE(ex == sinh(x));
+    REQUIRE(ex == sin(x));
 }
