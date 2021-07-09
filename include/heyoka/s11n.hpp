@@ -65,10 +65,12 @@ inline void s11n_variant_load_impl(Archive &ar, std::variant<Args...> &var, std:
         }
     };
 
+    // LCOV_EXCL_START
     [[maybe_unused]] auto ret = (loader(std::integral_constant<std::size_t, Is>{}) || ...);
 
     assert(ret);
     assert(var.index() == idx);
+    // LCOV_EXCL_STOP
 }
 
 } // namespace heyoka::detail
