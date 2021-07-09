@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
@@ -156,6 +157,19 @@ TEST_CASE("callable call")
 
         REQUIRE_THROWS_AS(c0(1, 2), std::bad_function_call);
     }
+}
+
+TEST_CASE("callable type idx")
+{
+    callable<void()> c;
+
+    REQUIRE(c.get_type_index() == typeid(void));
+
+    auto f = []() {};
+
+    c = callable<void()>{f};
+
+    REQUIRE(c.get_type_index() == typeid(f));
 }
 
 struct foo_s11n {

@@ -13,6 +13,8 @@
 #include <functional>
 #include <memory>
 #include <type_traits>
+#include <typeindex>
+#include <typeinfo>
 #include <utility>
 
 #include <heyoka/detail/type_traits.hpp>
@@ -42,6 +44,8 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner_base {
     virtual std::unique_ptr<callable_inner_base> clone() const = 0;
 
     virtual R operator()(Args...) const = 0;
+
+    virtual std::type_index get_type_index() const = 0;
 
 private:
     // Serialization (empty, no data members).
@@ -76,6 +80,11 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS callable_inner final : callable_inner_base
     R operator()(Args... args) const final
     {
         return m_value(std::forward<Args>(args)...);
+    }
+
+    std::type_index get_type_index() const final
+    {
+        return typeid(T);
     }
 
 private:
@@ -159,6 +168,15 @@ public:
     explicit operator bool() const noexcept
     {
         return static_cast<bool>(m_ptr);
+    }
+
+    std::type_index get_type_index() const
+    {
+        if (m_ptr) {
+            return m_ptr->get_type_index();
+        } else {
+            return typeid(void);
+        }
     }
 };
 
