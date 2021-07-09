@@ -40,6 +40,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -296,6 +297,20 @@ public:
     using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &dir;
+    }
+
     void finalise_ctor(event_direction);
 
 public:
@@ -334,11 +349,6 @@ public:
     const expression &get_expression() const;
     const callback_t &get_callback() const;
     event_direction get_direction() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    event_direction dir;
 };
 
 template <typename T>
@@ -371,6 +381,22 @@ public:
     using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    T cooldown;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &cooldown;
+        ar &dir;
+    }
+
     void finalise_ctor(callback_t, T, event_direction);
 
 public:
@@ -428,12 +454,6 @@ public:
     const callback_t &get_callback() const;
     event_direction get_direction() const;
     T get_cooldown() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    T cooldown;
-    event_direction dir;
 };
 
 template <typename T>
