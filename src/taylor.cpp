@@ -71,6 +71,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -3410,6 +3411,100 @@ taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl
 
 template <typename T>
 taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
+
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers
+    // and the vectors of detected events.
+    ar << m_state;
+    ar << m_time;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_tes;
+    ar << m_ntes;
+    ar << m_ev_jet;
+    ar << m_te_cooldowns;
+
+    // Save the capacities of the vectors
+    // of detected events.
+    ar << m_d_tes.capacity();
+    ar << m_d_ntes.capacity();
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
+{
+    ar >> m_state;
+    ar >> m_time;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_tes;
+    ar >> m_ntes;
+    ar >> m_ev_jet;
+    ar >> m_te_cooldowns;
+
+    // Load the capacities of the vectors
+    // of detected events.
+    decltype(m_d_tes.capacity()) d_tes_cap{};
+    ar >> d_tes_cap;
+    decltype(m_d_ntes.capacity()) d_ntes_cap{};
+    ar >> d_ntes_cap;
+
+    // Recover the function pointers.
+    if (m_tes.empty() && m_ntes.empty()) {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    }
+
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // Clear and reserve the capacities.
+    m_d_tes.clear();
+    m_d_tes.reserve(d_tes_cap);
+    m_d_ntes.clear();
+    m_d_ntes.reserve(d_ntes_cap);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::save(boost::archive::text_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::load(boost::archive::text_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will

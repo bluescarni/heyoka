@@ -11,7 +11,9 @@
 
 #include <cassert>
 #include <cstddef>
+#include <optional>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -24,6 +26,7 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/tracking.hpp>
 #include <boost/serialization/unique_ptr.hpp>
+#include <boost/serialization/utility.hpp>
 #include <boost/serialization/vector.hpp>
 
 #include <boost/archive/binary_iarchive.hpp>
@@ -116,6 +119,61 @@ template <typename Archive, typename... Args>
 inline void serialize(Archive &ar, std::variant<Args...> &var, unsigned v)
 {
     split_free(ar, var, v);
+}
+
+template <typename Archive, typename... Args>
+inline void serialize(Archive &ar, std::tuple<Args...> &tup, unsigned)
+{
+    // NOTE: this is a right fold, which, in conjunction with the
+    // builtin comma operator, ensures that the serialisation of
+    // the tuple elements proceeds in the correct order and with
+    // the correct sequencing.
+    std::apply([&ar](auto &...x) { (void(ar & x), ...); }, tup);
+}
+
+// NOTE: inspired by the boost::optional implementation.
+template <typename Archive, typename T>
+inline void save(Archive &ar, const std::optional<T> &opt, unsigned)
+{
+    // First check if opt contains something.
+    const auto flag = static_cast<bool>(opt);
+    ar << flag;
+
+    if (flag) {
+        // Save the contained value.
+        ar << *opt;
+    }
+}
+
+template <typename Archive, typename T>
+inline void load(Archive &ar, std::optional<T> &opt, unsigned)
+{
+    // Recover the flag.
+    bool flag{};
+    ar >> flag;
+
+    if (!flag) {
+        // No value in the archive,
+        // reset opt and return.
+        opt.reset();
+
+        return;
+    }
+
+    if (!opt) {
+        // opt is currently empty, reset it
+        // to the def-cted value.
+        opt = T{};
+    }
+
+    // Deserialise the value.
+    ar >> *opt;
+}
+
+template <typename Archive, typename T>
+inline void serialize(Archive &ar, std::optional<T> &opt, unsigned v)
+{
+    split_free(ar, opt, v);
 }
 
 } // namespace serialization

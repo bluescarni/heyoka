@@ -548,6 +548,19 @@ private:
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
 
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void save(boost::archive::text_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    void load(boost::archive::text_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
