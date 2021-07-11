@@ -1052,3 +1052,13 @@ TEST_CASE("t s11n")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("te def ctor")
+{
+    t_event<double> te;
+
+    REQUIRE(te.get_expression() == 0_dbl);
+    REQUIRE(!te.get_callback());
+    REQUIRE(te.get_direction() == event_direction::any);
+    REQUIRE(te.get_cooldown() == -1.);
+}

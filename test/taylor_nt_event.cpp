@@ -611,3 +611,12 @@ TEST_CASE("nt s11n")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("nte def ctor")
+{
+    nt_event<double> nte;
+
+    REQUIRE(nte.get_expression() == 0_dbl);
+    REQUIRE(nte.get_callback());
+    REQUIRE(nte.get_direction() == event_direction::any);
+}

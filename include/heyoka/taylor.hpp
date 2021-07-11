@@ -314,6 +314,8 @@ private:
     void finalise_ctor(event_direction);
 
 public:
+    nt_event_impl();
+
     template <typename... KwArgs>
     explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
     {
@@ -400,6 +402,8 @@ private:
     void finalise_ctor(callback_t, T, event_direction);
 
 public:
+    t_event_impl();
+
     template <typename... KwArgs>
     explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
