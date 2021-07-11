@@ -4036,6 +4036,11 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 }
 
 template <typename T>
+nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+{
+}
+
+template <typename T>
 void nt_event_impl<T>::finalise_ctor(event_direction d)
 {
     if (!callback) {
@@ -4118,6 +4123,11 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e
 }
 
 #endif
+
+template <typename T>
+t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
+{
+}
 
 template <typename T>
 void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
