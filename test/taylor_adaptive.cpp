@@ -1396,66 +1396,131 @@ private:
 
 HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive<double> &, bool, int);
 
-TEST_CASE("s11n")
+template <typename Oa, typename Ia>
+void s11n_test_impl()
 {
     auto [x, v] = make_vars("x", "v");
 
-    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
-                                      {0., 0.5},
-                                      kw::t_events = {t_event<double>(v, kw::callback = s11n_t_cb{})},
-                                      kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
-                                      kw::pars = std::vector<double>{-1e-4}};
-
-    auto oc = std::get<0>(ta.step(true));
-    while (oc == taylor_outcome::success) {
-        oc = std::get<0>(ta.step(true));
-    }
-
-    std::stringstream ss;
-
+    // A test with events.
     {
-        boost::archive::binary_oarchive oa(ss);
+        auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0., 0.5},
+                                          kw::t_events = {t_event<double>(v, kw::callback = s11n_t_cb{})},
+                                          kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
+                                          kw::pars = std::vector<double>{-1e-4}};
 
-        oa << ta;
+        auto oc = std::get<0>(ta.step(true));
+        while (oc == taylor_outcome::success) {
+            oc = std::get<0>(ta.step(true));
+        }
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive<double>{
+            {prime(x) = x}, {0.123}, kw::tol = 1e-3, kw::t_events = {t_event<double>(x, kw::callback = s11n_t_cb{})}};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
+                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
+        REQUIRE(ta.get_te_cooldowns()[0] == ta_copy.get_te_cooldowns()[0]);
+
+        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
+                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+        ta.update_d_output(-.1, true);
+        ta_copy.update_d_output(-.1, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
     }
 
-    auto ta_copy = ta;
-    ta = taylor_adaptive<double>{{prime(x) = x}, {0.123}, kw::tol = 1e-3};
-
+    // Test without events.
     {
-        boost::archive::binary_iarchive ia(ss);
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x + par[0])}, {0., 0.5}, kw::pars = std::vector<double>{-1e-4}};
 
-        ia >> ta;
+        for (auto i = 0; i < 10; ++i) {
+            ta.step();
+        }
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive<double>{{prime(x) = x}, {0.123}, kw::tol = 1e-3};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+        ta.update_d_output(-.1, true);
+        ta_copy.update_d_output(-.1, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
     }
+}
 
-    REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
-    REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
-    REQUIRE(ta.get_order() == ta_copy.get_order());
-    REQUIRE(ta.get_dim() == ta_copy.get_dim());
-    REQUIRE(ta.get_time() == ta_copy.get_time());
-    REQUIRE(ta.get_state() == ta_copy.get_state());
-    REQUIRE(ta.get_pars() == ta_copy.get_pars());
-    REQUIRE(ta.get_tc() == ta_copy.get_tc());
-    REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
-    REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
-
-    REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
-            == ta_copy.get_t_events()[0].get_callback().get_type_index());
-
-    REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
-            == ta_copy.get_nt_events()[0].get_callback().get_type_index());
-
-    // Take a step in ta and in ta_copy.
-    ta.step(true);
-    ta_copy.step(true);
-
-    REQUIRE(ta.get_time() == ta_copy.get_time());
-    REQUIRE(ta.get_state() == ta_copy.get_state());
-    REQUIRE(ta.get_tc() == ta_copy.get_tc());
-    REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
-
-    ta.update_d_output(-.1, true);
-    ta_copy.update_d_output(-.1, true);
-
-    REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+TEST_CASE("s11n")
+{
+    s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
+    s11n_test_impl<boost::archive::text_oarchive, boost::archive::text_iarchive>();
 }

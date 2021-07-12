@@ -704,6 +704,10 @@ public:
     {
         return m_tes;
     }
+    const auto &get_te_cooldowns() const
+    {
+        return m_te_cooldowns;
+    }
     const std::vector<nt_event_t> &get_nt_events() const
     {
         return m_ntes;
