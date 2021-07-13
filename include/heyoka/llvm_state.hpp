@@ -24,6 +24,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -72,6 +73,17 @@ class HEYOKA_DLL_PUBLIC llvm_state
     bool m_fast_math;
     std::string m_module_name;
     bool m_inline_functions;
+
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // Check functions.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;

@@ -49,6 +49,7 @@
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/sinh.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -444,3 +445,5 @@ expression cosh(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::cosh_impl)

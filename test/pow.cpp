@@ -8,6 +8,8 @@
 
 #include <heyoka/config.hpp>
 
+#include <sstream>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -18,6 +20,7 @@
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -197,4 +200,29 @@ TEST_CASE("powi")
     REQUIRE(powi(x + 1., 5) == square(x + 1.) * square(x + 1.) * (x + 1.));
     REQUIRE(powi(x + 1., 6) == square(x + 1.) * square(x + 1.) * square(x + 1.));
     REQUIRE(powi(x + 1., 7) == square(x + 1.) * square(x + 1.) * (square(x + 1.) * (x + 1.)));
+}
+
+TEST_CASE("pow s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = pow(x, y);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == pow(x, y));
 }

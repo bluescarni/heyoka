@@ -71,6 +71,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -3373,7 +3374,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers.
+    // NOTE: make a manual copy of all members, apart from the function pointers
+    // and the vectors of detected events.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
       m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
       m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
@@ -3409,6 +3411,88 @@ taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl
 
 template <typename T>
 taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
+
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers
+    // and the vectors of detected events.
+    ar << m_state;
+    ar << m_time;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_tes;
+    ar << m_ntes;
+    ar << m_ev_jet;
+    ar << m_te_cooldowns;
+
+    // Save the capacities of the vectors
+    // of detected events.
+    ar << m_d_tes.capacity();
+    ar << m_d_ntes.capacity();
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
+{
+    ar >> m_state;
+    ar >> m_time;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_tes;
+    ar >> m_ntes;
+    ar >> m_ev_jet;
+    ar >> m_te_cooldowns;
+
+    // Load the capacities of the vectors
+    // of detected events.
+    decltype(m_d_tes.capacity()) d_tes_cap{};
+    ar >> d_tes_cap;
+    decltype(m_d_ntes.capacity()) d_ntes_cap{};
+    ar >> d_ntes_cap;
+
+    // Recover the function pointers.
+    if (m_tes.empty() && m_ntes.empty()) {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    }
+
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // Clear and reserve the capacities.
+    m_d_tes.clear();
+    m_d_tes.reserve(d_tes_cap);
+    m_d_ntes.clear();
+    m_d_ntes.reserve(d_ntes_cap);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will
@@ -4035,6 +4119,11 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 }
 
 template <typename T>
+nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+{
+}
+
+template <typename T>
 void nt_event_impl<T>::finalise_ctor(event_direction d)
 {
     if (!callback) {
@@ -4117,6 +4206,11 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e
 }
 
 #endif
+
+template <typename T>
+t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
+{
+}
 
 template <typename T>
 void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
@@ -4451,6 +4545,86 @@ taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers.
+    ar << m_batch_size;
+    ar << m_state;
+    ar << m_time_hi;
+    ar << m_time_lo;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_pinf;
+    ar << m_minf;
+    ar << m_delta_ts;
+    ar << m_step_res;
+    ar << m_prop_res;
+    ar << m_ts_count;
+    ar << m_min_abs_h;
+    ar << m_max_abs_h;
+    ar << m_cur_max_delta_ts;
+    ar << m_pfor_ts;
+    ar << m_t_dir;
+    ar << m_rem_time;
+    ar << m_d_out_time;
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
+{
+    ar >> m_batch_size;
+    ar >> m_state;
+    ar >> m_time_hi;
+    ar >> m_time_lo;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_pinf;
+    ar >> m_minf;
+    ar >> m_delta_ts;
+    ar >> m_step_res;
+    ar >> m_prop_res;
+    ar >> m_ts_count;
+    ar >> m_min_abs_h;
+    ar >> m_max_abs_h;
+    ar >> m_cur_max_delta_ts;
+    ar >> m_pfor_ts;
+    ar >> m_t_dir;
+    ar >> m_rem_time;
+    ar >> m_d_out_time;
+
+    // Recover the function pointers.
+    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)

@@ -77,7 +77,20 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -286,14 +299,12 @@ struct llvm_state::jit {
 #endif
     }
 
-    void add_module(std::unique_ptr<llvm::Module> &&m)
+    void add_module(std::unique_ptr<llvm::Module> m)
     {
         auto err = m_lljit->addIRModule(llvm::orc::ThreadSafeModule(std::move(m), *m_ctx));
 
         // LCOV_EXCL_START
         if (err) {
-            using namespace fmt::literals;
-
             std::string err_report;
             llvm::raw_string_ostream ostr(err_report);
 
@@ -313,7 +324,7 @@ struct llvm_state::jit {
 };
 
 // Small shared helper to setup the math flags in the builder at the
-// end of a constructor.
+// end of a constructor or a deserialization.
 void llvm_state::ctor_setup_math_flags()
 {
     assert(m_builder);
@@ -335,6 +346,61 @@ void llvm_state::ctor_setup_math_flags()
 
     m_builder->setFastMathFlags(fmf);
 }
+
+namespace detail
+{
+
+namespace
+{
+
+// Helper to load object code into a jit.
+template <typename Jit>
+void llvm_state_add_obj_to_jit(Jit &j, const std::string &obj)
+{
+    llvm::SmallVector<char, 0> buffer(obj.begin(), obj.end());
+    auto err = j.m_lljit->addObjectFile(std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buffer)));
+
+    // LCOV_EXCL_START
+    if (err) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        ostr << err;
+
+        throw std::invalid_argument(
+            "The function for adding a compiled module to the jit failed. The full error message:\n{}"_format(
+                ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+}
+
+// Helper to create an LLVM module from a IR in string representation.
+auto llvm_state_ir_to_module(std::string &&ir, llvm::LLVMContext &ctx)
+{
+    // Create the corresponding memory buffer.
+    auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(ir));
+
+    // Construct a new module from the parsed IR.
+    llvm::SMDiagnostic err;
+    auto ret = llvm::parseIR(*mb, err, ctx);
+
+    // LCOV_EXCL_START
+    if (!ret) {
+        std::string err_report;
+        llvm::raw_string_ostream ostr(err_report);
+
+        err.print("", ostr);
+
+        throw std::invalid_argument("IR parsing failed. The full error message:\n{}"_format(ostr.str()));
+    }
+    // LCOV_EXCL_STOP
+
+    return ret;
+}
+
+} // namespace
+
+} // namespace detail
 
 llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
@@ -364,29 +430,13 @@ llvm_state::llvm_state(const llvm_state &other)
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
       m_module_name(other.m_module_name), m_inline_functions(other.m_inline_functions)
 {
-    using namespace fmt::literals;
-
     if (other.is_compiled() && other.m_jitter->m_object_file) {
         // 'other' was compiled and code was generated.
         // We leave module and builder empty, copy over the
         // IR snapshot and add the cached compiled module
         // to the jit.
         m_ir_snapshot = other.m_ir_snapshot;
-
-        llvm::SmallVector<char, 0> buffer(other.m_jitter->m_object_file->begin(), other.m_jitter->m_object_file->end());
-        auto err = m_jitter->m_lljit->addObjectFile(std::make_unique<llvm::SmallVectorMemoryBuffer>(std::move(buffer)));
-
-        // LCOV_EXCL_START
-        if (err) {
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            ostr << err;
-
-            throw std::invalid_argument("The function for adding a compiled module to the jit during the deep copy of "
-                                        "an llvm_state failed. The full error message:\n{}"_format(ostr.str()));
-        }
-        // LCOV_EXCL_STOP
+        detail::llvm_state_add_obj_to_jit(*m_jitter, *other.m_jitter->m_object_file);
     } else {
         // 'other' has not been compiled yet, or
         // it has been compiled but no code has been
@@ -395,26 +445,12 @@ llvm_state::llvm_state(const llvm_state &other)
         // module and builder.
 
         // Get the IR of other.
+        // NOTE: this works regardless of the compiled
+        // status of other.
         auto other_ir = other.get_ir();
 
-        // Create the corresponding memory buffer.
-        auto mb = llvm::MemoryBuffer::getMemBuffer(std::move(other_ir));
-
-        // Construct a new module from the parsed IR.
-        llvm::SMDiagnostic err;
-        m_module = llvm::parseIR(*mb, err, context());
-        // LCOV_EXCL_START
-        if (!m_module) {
-            std::string err_report;
-            llvm::raw_string_ostream ostr(err_report);
-
-            err.print("", ostr);
-
-            throw std::invalid_argument(
-                "Error parsing the IR while deep-copying an llvm_state. The full error message:\n{}"_format(
-                    ostr.str()));
-        }
-        // LCOV_EXCL_STOP
+        // Create the module from the IR.
+        m_module = detail::llvm_state_ir_to_module(std::move(other_ir), context());
 
         // Create a new builder for the module.
         m_builder = std::make_unique<ir_builder>(context());
@@ -423,6 +459,8 @@ llvm_state::llvm_state(const llvm_state &other)
         ctor_setup_math_flags();
 
         // Compile if needed.
+        // NOTE: compilation will take care of setting up m_ir_snapshot.
+        // If no compilation happens, m_ir_snapshot is left empty after init.
         if (other.is_compiled()) {
             compile();
         }
@@ -440,9 +478,172 @@ llvm_state &llvm_state::operator=(const llvm_state &other)
     return *this;
 }
 
-llvm_state &llvm_state::operator=(llvm_state &&) noexcept = default;
+// NOTE: this cannot be defaulted because the moving of the LLVM objects
+// needs to be done in a different order.
+llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
+{
+    if (this != &other) {
+        // The LLVM bits.
+        m_builder = std::move(other.m_builder);
+        m_module = std::move(other.m_module);
+        m_jitter = std::move(other.m_jitter);
+
+        // The remaining bits.
+        m_opt_level = other.m_opt_level;
+        m_ir_snapshot = std::move(other.m_ir_snapshot);
+        m_fast_math = other.m_fast_math;
+        m_module_name = std::move(other.m_module_name);
+        m_inline_functions = other.m_inline_functions;
+    }
+
+    return *this;
+}
 
 llvm_state::~llvm_state() = default;
+
+// NOTE: the save/load logic is essentially the same as in the
+// copy constructor. Specifically, we have 2 different paths
+// depending on whether the state is compiled AND object
+// code was generated.
+template <typename Archive>
+void llvm_state::save_impl(Archive &ar, unsigned) const
+{
+    // Start by establishing if the state is compiled and binary
+    // code has been emitted.
+    // NOTE: we need both flags when deserializing.
+    const auto cmp = is_compiled();
+    ar << cmp;
+
+    const auto with_obj = static_cast<bool>(m_jitter->m_object_file);
+    ar << with_obj;
+
+    assert(!with_obj || cmp);
+
+    // Store the config options.
+    ar << m_opt_level;
+    ar << m_fast_math;
+    ar << m_module_name;
+    ar << m_inline_functions;
+
+    // Store the IR.
+    // NOTE: avoid get_ir() if the module has been compiled,
+    // and use the snapshot directly, so that we don't make
+    // a useless copy.
+    if (cmp) {
+        ar << m_ir_snapshot;
+    } else {
+        ar << get_ir();
+    }
+
+    if (with_obj) {
+        // Save the object file if available.
+        ar << *m_jitter->m_object_file;
+    }
+}
+
+template <typename Archive>
+void llvm_state::load_impl(Archive &ar, unsigned)
+{
+    // NOTE: all serialised objects in the archive
+    // are primitive types, no need to reset the
+    // addresses.
+
+    // Load the status flags from the archive.
+    bool cmp{};
+    ar >> cmp;
+
+    bool with_obj{};
+    ar >> with_obj;
+
+    assert(!with_obj || cmp);
+
+    // Load the config options.
+    unsigned opt_level{};
+    ar >> opt_level;
+
+    bool fast_math{};
+    ar >> fast_math;
+
+    std::string module_name;
+    ar >> module_name;
+
+    bool inline_functions{};
+    ar >> inline_functions;
+
+    // Load the ir
+    std::string ir;
+    ar >> ir;
+
+    // Recover the object file, if available.
+    std::optional<std::string> obj_file;
+    if (with_obj) {
+        obj_file.emplace();
+        ar >> *obj_file;
+    }
+
+    try {
+        // Set the config options.
+        m_opt_level = opt_level;
+        m_fast_math = fast_math;
+        m_module_name = module_name;
+        m_inline_functions = inline_functions;
+
+        // Reset module and builder to the def-cted state.
+        m_module.reset();
+        m_builder.reset();
+
+        // Reset the jit with a new one.
+        m_jitter = std::make_unique<jit>();
+
+        if (cmp && with_obj) {
+            // Assign the ir snapshot.
+            m_ir_snapshot = std::move(ir);
+
+            // Add the object code to the jit.
+            detail::llvm_state_add_obj_to_jit(*m_jitter, *obj_file);
+        } else {
+            // Clear the existing ir snapshot
+            // (it will be replaced with the
+            // actual ir if compilation is needed).
+            m_ir_snapshot.clear();
+
+            // Create the module from the IR.
+            m_module = detail::llvm_state_ir_to_module(std::move(ir), context());
+
+            // Create a new builder for the module.
+            m_builder = std::make_unique<ir_builder>(context());
+
+            // Setup the math flags in the builder.
+            ctor_setup_math_flags();
+
+            // Compile if needed.
+            // NOTE: compilation will take care of setting up m_ir_snapshot.
+            // If no compilation happens, m_ir_snapshot is left empty after
+            // clearing earlier.
+            if (cmp) {
+                compile();
+            }
+        }
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Reset to a def-cted state in case of error,
+        // as it looks like there's no way of recovering.
+        *this = []() noexcept { return llvm_state{}; }();
+
+        throw;
+        // LCOV_EXCL_STOP
+    }
+}
+
+void llvm_state::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+void llvm_state::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 llvm::Module &llvm_state::module()
 {
@@ -511,8 +712,6 @@ const bool &llvm_state::inline_functions() const
 void llvm_state::check_uncompiled(const char *f) const
 {
     if (!m_module) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "The function '{}' can be invoked only if the module has not been compiled yet"_format(f));
     }
@@ -521,8 +720,6 @@ void llvm_state::check_uncompiled(const char *f) const
 void llvm_state::check_compiled(const char *f) const
 {
     if (m_module) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "The function '{}' can be invoked only after the module has been compiled"_format(f));
     }
@@ -539,8 +736,6 @@ void llvm_state::verify_function(llvm::Function *f)
     std::string err_report;
     llvm::raw_string_ostream ostr(err_report);
     if (llvm::verifyFunction(*f, &ostr)) {
-        using namespace fmt::literals;
-
         // Remove function before throwing.
         const auto fname = std::string(f->getName());
         f->eraseFromParent();
@@ -557,8 +752,6 @@ void llvm_state::verify_function(const std::string &name)
     // Lookup the function in the module.
     auto f = m_module->getFunction(name);
     if (f == nullptr) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("The function '{}' does not exist in the module"_format(name));
     }
 
@@ -695,17 +888,29 @@ void llvm_state::compile()
         llvm::raw_string_ostream ostr(out);
 
         if (llvm::verifyModule(*m_module, &ostr)) {
-            using namespace fmt::literals;
-
             throw std::runtime_error(
                 "The verification of the module '{}' produced an error:\n{}"_format(m_module_name, ostr.str()));
         }
     }
 
-    // Store a snapshot of the IR before compiling.
-    m_ir_snapshot = get_ir();
+    try {
+        // Store a snapshot of the IR before compiling.
+        m_ir_snapshot = get_ir();
 
-    m_jitter->add_module(std::move(m_module));
+        // Add the module (this will clear out m_module).
+        m_jitter->add_module(std::move(m_module));
+
+        // Clear out the builder, which won't be usable any more.
+        m_builder.reset();
+        // LCOV_EXCL_START
+    } catch (...) {
+        // Reset to a def-cted state in case of error,
+        // as it looks like there's no way of recovering.
+        *this = []() noexcept { return llvm_state{}; }();
+
+        throw;
+        // LCOV_EXCL_STOP
+    }
 }
 
 bool llvm_state::is_compiled() const
@@ -722,8 +927,6 @@ std::uintptr_t llvm_state::jit_lookup(const std::string &name)
 
     auto sym = m_jitter->lookup(name);
     if (!sym) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument("Could not find the symbol '{}' in the compiled module"_format(name));
     }
 

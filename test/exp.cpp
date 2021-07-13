@@ -11,6 +11,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 #include "catch.hpp"
@@ -41,4 +42,29 @@ TEST_CASE("exp")
     point["x"] = 2.3;
     auto grad = compute_grad_dbl(ex, point, connections);
     REQUIRE(grad["x"] == std::exp(2.3));
+}
+
+TEST_CASE("exp s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = exp(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == exp(x));
 }

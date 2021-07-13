@@ -42,6 +42,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -509,3 +510,5 @@ expression sqrt(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::sqrt_impl)

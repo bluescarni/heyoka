@@ -51,6 +51,7 @@
 #include <heyoka/math/sigmoid.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -545,3 +546,5 @@ expression sigmoid(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::sigmoid_impl)
