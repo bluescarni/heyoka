@@ -244,7 +244,7 @@ TEST_CASE("s11n")
         s.jit_lookup("jet");
 
         {
-            boost::archive::text_oarchive oa(ss);
+            boost::archive::binary_oarchive oa(ss);
 
             oa << s;
         }
@@ -253,7 +253,7 @@ TEST_CASE("s11n")
                        kw::inline_functions = false};
 
         {
-            boost::archive::text_iarchive ia(ss);
+            boost::archive::binary_iarchive ia(ss);
 
             ia >> s;
         }

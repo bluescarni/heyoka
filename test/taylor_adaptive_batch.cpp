@@ -11,6 +11,7 @@
 #include <initializer_list>
 #include <limits>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
@@ -24,6 +25,7 @@
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -662,4 +664,71 @@ TEST_CASE("param too many")
         Message("Excessive number of parameter values passed to the constructor of an adaptive "
                 "Taylor integrator: 3 parameter values were passed, but the ODE system contains only 1 parameters "
                 "(in batches of 2)"));
+}
+
+template <typename Oa, typename Ia>
+void s11n_test_impl()
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // Test without events.
+    {
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x + par[0])},
+                                                {0., 0.01, 0.5, 0.51},
+                                                2u,
+                                                kw::pars = std::vector<double>{-1e-4, -1.1e-4}};
+
+        ta.propagate_until({10., 10.1});
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive_batch<double>{{prime(x) = x}, {0.123, 0.1231}, 2u, kw::tol = 1e-3};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        REQUIRE(ta.get_step_res() == ta_copy.get_step_res());
+        REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_step_res() == ta_copy.get_step_res());
+
+        ta.update_d_output({-.1, -.11}, true);
+        ta_copy.update_d_output({-.1, -.11}, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+    }
+}
+
+TEST_CASE("s11n")
+{
+    s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
 }

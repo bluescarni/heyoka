@@ -3489,19 +3489,7 @@ void taylor_adaptive_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned
 }
 
 template <typename T>
-void taylor_adaptive_impl<T>::save(boost::archive::text_oarchive &ar, unsigned v) const
-{
-    save_impl(ar, v);
-}
-
-template <typename T>
 void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
-{
-    load_impl(ar, v);
-}
-
-template <typename T>
-void taylor_adaptive_impl<T>::load(boost::archive::text_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }
@@ -4557,6 +4545,86 @@ taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers.
+    ar << m_batch_size;
+    ar << m_state;
+    ar << m_time_hi;
+    ar << m_time_lo;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_pinf;
+    ar << m_minf;
+    ar << m_delta_ts;
+    ar << m_step_res;
+    ar << m_prop_res;
+    ar << m_ts_count;
+    ar << m_min_abs_h;
+    ar << m_max_abs_h;
+    ar << m_cur_max_delta_ts;
+    ar << m_pfor_ts;
+    ar << m_t_dir;
+    ar << m_rem_time;
+    ar << m_d_out_time;
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
+{
+    ar >> m_batch_size;
+    ar >> m_state;
+    ar >> m_time_hi;
+    ar >> m_time_lo;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_pinf;
+    ar >> m_minf;
+    ar >> m_delta_ts;
+    ar >> m_step_res;
+    ar >> m_prop_res;
+    ar >> m_ts_count;
+    ar >> m_min_abs_h;
+    ar >> m_max_abs_h;
+    ar >> m_cur_max_delta_ts;
+    ar >> m_pfor_ts;
+    ar >> m_t_dir;
+    ar >> m_rem_time;
+    ar >> m_d_out_time;
+
+    // Recover the function pointers.
+    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)

@@ -640,17 +640,7 @@ void llvm_state::save(boost::archive::binary_oarchive &ar, unsigned v) const
     save_impl(ar, v);
 }
 
-void llvm_state::save(boost::archive::text_oarchive &ar, unsigned v) const
-{
-    save_impl(ar, v);
-}
-
 void llvm_state::load(boost::archive::binary_iarchive &ar, unsigned v)
-{
-    load_impl(ar, v);
-}
-
-void llvm_state::load(boost::archive::text_iarchive &ar, unsigned v)
 {
     load_impl(ar, v);
 }

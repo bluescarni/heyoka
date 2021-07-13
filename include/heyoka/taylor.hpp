@@ -209,6 +209,68 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
+} // namespace heyoka
+
+// NOTE: implement a workaround for the serialisation of tuples whose first element
+// is a taylor outcome. We need this because Boost.Serialization treats all enums
+// as ints, which is not ok for taylor_outcome (whose underyling type will not
+// be an int on most platforms). Because it is not possible to override Boost's
+// enum implementation, we override the serialisation of tuples with outcomes
+// as first elements, which is all we need in the serialisation of the batch
+// integrator. The implementation below will be preferred over the generic tuple
+// s11n because it is more specialised.
+// NOTE: this workaround is not necessary for the other enums in heyoka because
+// those all have ints as underlying type.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename Archive, typename... Args>
+inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](const auto &x) {
+        if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
+            ar << static_cast<std::underlying_type_t<heyoka::taylor_outcome>>(x);
+        } else {
+            ar << x;
+        }
+    };
+
+    std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](auto &x) {
+        if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
+            std::underlying_type_t<heyoka::taylor_outcome> val{};
+            ar >> val;
+
+            x = static_cast<heyoka::taylor_outcome>(val);
+        } else {
+            ar >> x;
+        }
+    };
+
+    std::apply([&tf](auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
+{
+    split_free(ar, tup, v);
+}
+
+} // namespace serialization
+
+} // namespace boost
+
+namespace heyoka
+{
+
 namespace kw
 {
 
@@ -556,9 +618,7 @@ private:
 
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &, unsigned) const;
-    void save(boost::archive::text_oarchive &, unsigned) const;
     void load(boost::archive::binary_iarchive &, unsigned);
-    void load(boost::archive::text_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
@@ -871,6 +931,17 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<dfloat<T>> m_rem_time;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
+
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 

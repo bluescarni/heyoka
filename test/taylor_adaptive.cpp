@@ -1522,5 +1522,4 @@ void s11n_test_impl()
 TEST_CASE("s11n")
 {
     s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
-    s11n_test_impl<boost::archive::text_oarchive, boost::archive::text_iarchive>();
 }

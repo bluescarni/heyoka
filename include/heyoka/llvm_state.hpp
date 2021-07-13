@@ -82,9 +82,7 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     friend class boost::serialization::access;
     void save(boost::archive::binary_oarchive &, unsigned) const;
-    void save(boost::archive::text_oarchive &, unsigned) const;
     void load(boost::archive::binary_iarchive &, unsigned);
-    void load(boost::archive::text_iarchive &, unsigned);
     BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // Check functions.
