@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Installation &#8212; heyoka 0.11.0 documentation</title>
+    <title>Installation &#8212; heyoka 0.12.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -57,7 +57,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.11.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.12.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -136,6 +136,11 @@
    <li class="toctree-l2">
     <a class="reference internal" href="tut_batch_mode.html">
      Batch mode
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_s11n.html">
+     Serialisation
     </a>
    </li>
   </ul>
@@ -337,7 +342,8 @@ for 64-bit ARM processors is expected in the near future.</p>
 <p>Additionally, heyoka has the following <strong>optional</strong> dependencies:</p>
 <ul class="simple">
 <li><p>the <a class="reference external" href="https://bluescarni.github.io/mppp/">mp++</a> multiprecision library
-(provides support for quadruple-precision integrations),</p></li>
+(provides support for quadruple-precision integrations on platforms
+supporting the non-standard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> type),</p></li>
 <li><p>the <a class="reference external" href="https://sleef.org/">SLEEF</a> vectorized math library (improves the performance
 of integrations in batch mode),</p></li>
 <li><p>the <a class="reference external" href="https://xtensor.readthedocs.io/en/latest/">xtensor and xtensor-blas</a>
@@ -359,13 +365,11 @@ in order to enable 80-bit computations.</p>
 </div>
 <div class="section" id="id2">
 <h4>128-bit precision<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
-<p>Currently quadruple-precision support in heyoka has the following prerequisites:</p>
-<ul class="simple">
-<li><p>either GCC or Clang must be used,</p></li>
-<li><p>the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type must be
-<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>,</p></li>
-<li><p>heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p></li>
-</ul>
+<p>On platforms where <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
+quadruple-precision integrations are always supported. Otherwise,
+on platforms such as x86-64, the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type must be
+<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>
+and heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p>
 </div>
 </div>
 </div>
@@ -398,7 +402,9 @@ of heyoka, you can use <code class="docutils literal notranslate"><span class="p
 (e.g., enabling optional features, customizing the installation
 path, etc.). The available configuration options are:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code>: enable features relying on the mp++ library (off by default),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code>: enable features relying on the mp++ library (i.e., support for
+quadruple-precision computations on platforms supporting the <code class="docutils literal notranslate"><span class="pre">__float128</span></code>
+datatype, off by default),</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_SLEEF</span></code>: enable features relying on the SLEEF library (off by default),</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TESTS</span></code>: build the test suite (off by default),</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_BENCHMARKS</span></code>: build the benchmarking suite (off by default),</p></li>

@@ -1,0 +1,685 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Serialisation &#8212; heyoka 0.12.0 documentation</title>
+    
+  <link href="_static/css/theme.css" rel="stylesheet" />
+  <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.acff12b8f9c144ce68a297486a2fa670.css" type="text/css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
+
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="prev" title="Batch mode" href="tut_batch_mode.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+      <img src="_static/white_logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">heyoka 0.12.0 documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_param.html">
+     Runtime parameters
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_nonauto.html">
+     Non-autonomous systems
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_d_output.html">
+     Dense output
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_events.html">
+     Event detection
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1 current active has-children">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Serialisation
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ad_notes.html">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="breaking_changes.html">
+   Breaking changes
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_s11n.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_s11n.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-simple-example">
+   A simple example
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#full-code-listing">
+     Full code listing
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#serialising-event-callbacks">
+   Serialising event callbacks
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id1">
+     Full code listing
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="serialisation">
+<h1>Serialisation<a class="headerlink" href="#serialisation" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.12.0.</span></p>
+</div>
+<p>Starting with version 0.12.0, heyoka supports serialisation via the
+<a class="reference external" href="https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html">Boost.Serialization</a>
+library. Before showing a couple of examples of serialisation in action,
+we need to emphasise a couple of very important <strong>caveats</strong>:</p>
+<ul class="simple">
+<li><p>currently, heyoka supports serialisation only to/from binary archives;</p></li>
+<li><p>the serialisation format is platform-dependent and it also depends
+on the versions of heyoka, LLVM and Boost. Thus, the serialised
+representation of heyoka objects is <strong>not portable</strong> across platforms
+or across different versions of heyoka or its dependencies. Do <strong>not</strong>
+try to use the serialised representation of heyoka objects as an exchange
+format, as this will result in undefined behaviour;</p></li>
+<li><p>heyoka does not make any attempt to validate the state of a deserialised object.
+Thus, a maliciously-crafted binary archive could be used
+to crash heyoka or even execute arbitrary code on the machine.</p></li>
+</ul>
+<p>The last point is particularly important: because the integrator objects
+contain blobs of binary code which are saved and loaded during (de)serialisation,
+a maliciously-crafted archive can easily be used
+to execute arbitrary code on the host machine.</p>
+<p>Let us repeat again these warnings in a red box for visibility:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Do <strong>not</strong> load heyoka objects from untrusted archives, as this could lead
+to the execution of malicious code.</p>
+<p>Do <strong>not</strong> use heyoka archives as a data exchange format, and make sure that
+all archives you load from have been produced with the same versions of heyoka,
+LLVM and Boost that you are currently using.</p>
+</div>
+<p>With these warnings out of the way, let us proceed to the code.</p>
+<div class="section" id="a-simple-example">
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this headline">¶</a></h2>
+<p>In order to illustrate the (de)serialisation workflow, we will be using
+our good old friend, the simple pendulum. We begin as usual with the definition
+of the symbolic variables and the integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+</pre></div>
+</div>
+<p>We then integrate for a few timesteps, so that the time coordinate and the state
+will evolve from their initial values:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for a few timesteps.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Print out the time and state at the</span>
+    <span class="c1">// end of the integration.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (original)     : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (original)    : [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ta time (original)     : 1.04348</span>
+<span class="go">ta state (original)    : [-0.0506049, -0.00537327]</span>
+</pre></div>
+</div>
+<p>Let us then proceed to the serialisation of the integrator object into
+a binary archive. For the purpose of this tutorial we will be writing the archive
+into a string stream, but the same code would work for serialisation into a file
+object or into any other standard C++ stream:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Serialise ta into a string stream.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_oarchive</span> <span class="nf">oa</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">oa</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Note how we bracket the lifetime of the binary archive <code class="docutils literal notranslate"><span class="pre">oa</span></code> by placing it into a
+separate scope: the invocation of the destructor of <code class="docutils literal notranslate"><span class="pre">oa</span></code> at the end of the block
+will ensure that the data is written to the stream <code class="docutils literal notranslate"><span class="pre">ss</span></code>. Please refer to the
+<a class="reference external" href="https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html">Boost.Serialization docs</a>
+for more information about the serialisation API.</p>
+<p>After having serialised <code class="docutils literal notranslate"><span class="pre">ta</span></code> into <code class="docutils literal notranslate"><span class="pre">ss</span></code>, we reset <code class="docutils literal notranslate"><span class="pre">ta</span></code> to its initial state, and we
+print the time and the state vector to screen in order to confirm that <code class="docutils literal notranslate"><span class="pre">ta</span></code> has indeed
+been reset:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset ta to the initial state.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (after reset)  : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (after reset) : [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ta time (after reset)  : 0</span>
+<span class="go">ta state (after reset) : [0.05, 0.025]</span>
+</pre></div>
+</div>
+<p>We are now ready to recover the serialised representation of <code class="docutils literal notranslate"><span class="pre">ta</span></code> from the string stream. After
+loading <code class="docutils literal notranslate"><span class="pre">ta</span></code> from the archive, we will print the time and the state vector to screen to confirm that,
+indeed, the previous state of <code class="docutils literal notranslate"><span class="pre">ta</span></code> has been correctly recovered:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Restore the serialised representation of ta.</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_iarchive</span> <span class="nf">ia</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">ia</span> <span class="o">&gt;&gt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Print out the time and state after</span>
+    <span class="c1">// deserialisation.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (from archive) : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (from archive): [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ta time (from archive) : 1.04348</span>
+<span class="go">ta state (from archive): [-0.0506049, -0.00537327]</span>
+</pre></div>
+</div>
+<div class="section" id="full-code-listing">
+<h3>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;sstream&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="nn">heyoka</span><span class="p">;</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="c1">// Integrate for a few timesteps.</span>
+    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Print out the time and state at the</span>
+    <span class="c1">// end of the integration.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (original)     : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (original)    : [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Serialise ta into a string stream.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_oarchive</span> <span class="n">oa</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">oa</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Reset ta to the initial state.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (after reset)  : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (after reset) : [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+
+    <span class="c1">// Restore the serialised representation of ta.</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_iarchive</span> <span class="n">ia</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">ia</span> <span class="o">&gt;&gt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Print out the time and state after</span>
+    <span class="c1">// deserialisation.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta time (from archive) : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ta state (from archive): [&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="serialising-event-callbacks">
+<h2>Serialising event callbacks<a class="headerlink" href="#serialising-event-callbacks" title="Permalink to this headline">¶</a></h2>
+<p>The serialisation of integrator objects in the presence
+of <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">events</span></a> needs special attention, because
+the event callbacks are internally implemented as type-erased classes
+on top of a traditional object-oriented hierarchy. In other words, an integrator
+stores the callbacks as pointers to a base class, and in this situation
+the Boost.Serialization library needs some extra assistance in order to work
+correctly.</p>
+<p>There are two steps that need to be taken in order to enable the
+serialisation of event callbacks:</p>
+<ul class="simple">
+<li><p>make the callback itself serialisable. The <a class="reference external" href="https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html">Boost.Serialization docs</a>
+explain in detail how to add serialisation capabilities to a class.
+Note that, in order to be serialisable, a callback must be implemented
+as a function object - it is not possible to serialise function pointers
+or lambdas;</p></li>
+<li><p>register the callback in the serialisation system via the invocation
+of a macro (see below).</p></li>
+</ul>
+<p>Let us see a concrete example. We begin with the definition of a simple callback
+class:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// The callback function object.</span>
+<span class="k">struct</span> <span class="nc">callback</span> <span class="p">{</span>
+    <span class="c1">// Leave the callback body empty.</span>
+    <span class="kt">void</span> <span class="nf">operator</span><span class="p">()(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="k">const</span> <span class="p">{}</span>
+
+<span class="k">private</span><span class="o">:</span>
+    <span class="c1">// Make the callback serialisable.</span>
+    <span class="k">friend</span> <span class="k">class</span> <span class="nc">boost</span><span class="o">::</span><span class="n">serialization</span><span class="o">::</span><span class="n">access</span><span class="p">;</span>
+    <span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Archive</span><span class="o">&gt;</span>
+    <span class="kt">void</span> <span class="n">serialize</span><span class="p">(</span><span class="n">Archive</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">unsigned</span><span class="p">)</span>
+    <span class="p">{</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>This trivial callback function object is meant to be used in a non-terminal event.
+In order to make the callback serialisable we add
+a member function template called <code class="docutils literal notranslate"><span class="pre">serialize()</span></code> which, in this specific case,
+also does not perform any action because the callback has no state. If the callback
+contained data members, we would need to serialise them one by one - see the
+<a class="reference external" href="https://www.boost.org/doc/libs/release/libs/serialization/doc/index.html">Boost.Serialization docs</a>
+for details about adding serialisation capabilities to a class.</p>
+<p>After having added serialisation capabilities to our <code class="docutils literal notranslate"><span class="pre">callback</span></code>, we need to register
+it in heyoka’s serialisation system. This is accomplished through the use of the
+<code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Register the callback in the serialisation system.</span>
+<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">callback</span><span class="p">,</span> <span class="kt">void</span><span class="p">,</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro takes as first input argument the name of the class
+being registered (<code class="docutils literal notranslate"><span class="pre">callback</span></code> in this case). The remaining arguments are the signature
+of the callback: <code class="docutils literal notranslate"><span class="pre">void</span></code> is the return type, <code class="docutils literal notranslate"><span class="pre">taylor_adaptive&lt;double&gt;</span> <span class="pre">&amp;</span></code>, <code class="docutils literal notranslate"><span class="pre">double</span></code>
+and <code class="docutils literal notranslate"><span class="pre">int</span></code> its argument types. Note that this macro must be invoked in the
+root namespace and all arguments should be spelled out as fully-qualified
+names (in this example we can avoid the extra typing due to the <code class="docutils literal notranslate"><span class="pre">using</span> <span class="pre">namespace</span> <span class="pre">heyoka</span></code>
+statement).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">callback</span></code> class is now ready to be (de)serialised. Let us see a simple
+example, again based on the simple pendulum:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
+                                      <span class="c1">// Add the non-terminal event v = 0, using</span>
+                                      <span class="c1">// the callback defined above.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">callback</span><span class="p">{})}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (original)    : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Serialise ta into a string stream.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_oarchive</span> <span class="nf">oa</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">oa</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Reset ta to an integrator without events.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (after reset) : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Restore the serialised representation of ta.</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_iarchive</span> <span class="nf">ia</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">ia</span> <span class="o">&gt;&gt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (from archive): &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Number of events (original)    : 1</span>
+<span class="go">Number of events (after reset) : 0</span>
+<span class="go">Number of events (from archive): 1</span>
+</pre></div>
+</div>
+<p>The screen output indeed confirms that the event callback was correctly (de)serialised.
+If we had not used the <code class="docutils literal notranslate"><span class="pre">HEYOKA_S11N_CALLABLE_EXPORT()</span></code> macro to register the callback, a runtime
+exception would have been raised during the serialisation of the integrator object.</p>
+<div class="section" id="id1">
+<h3>Full code listing<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;sstream&gt;</span><span class="cp"></span>
+
+<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+
+<span class="k">using</span> <span class="k">namespace</span> <span class="nn">heyoka</span><span class="p">;</span>
+
+<span class="c1">// The callback function object.</span>
+<span class="k">struct</span> <span class="nc">callback</span> <span class="p">{</span>
+    <span class="c1">// Leave the callback body empty.</span>
+    <span class="kt">void</span> <span class="nf">operator</span><span class="p">()(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="k">const</span> <span class="p">{}</span>
+
+<span class="k">private</span><span class="o">:</span>
+    <span class="c1">// Make the callback serialisable.</span>
+    <span class="k">friend</span> <span class="k">class</span> <span class="nc">boost</span><span class="o">::</span><span class="n">serialization</span><span class="o">::</span><span class="n">access</span><span class="p">;</span>
+    <span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Archive</span><span class="o">&gt;</span>
+    <span class="kt">void</span> <span class="n">serialize</span><span class="p">(</span><span class="n">Archive</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">unsigned</span><span class="p">)</span>
+    <span class="p">{</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+
+<span class="c1">// Register the callback in the serialisation system.</span>
+<span class="n">HEYOKA_S11N_CALLABLE_EXPORT</span><span class="p">(</span><span class="n">callback</span><span class="p">,</span> <span class="kt">void</span><span class="p">,</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span>
+
+<span class="kt">int</span> <span class="n">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// Create the symbolic variables x and v.</span>
+    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+
+    <span class="c1">// Create the integrator object</span>
+    <span class="c1">// in double precision.</span>
+    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+                                      <span class="c1">// x&#39; = v</span>
+                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
+                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
+                                      <span class="c1">// Initial conditions</span>
+                                      <span class="c1">// for x and v.</span>
+                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
+                                      <span class="c1">// Add the non-terminal event v = 0, using</span>
+                                      <span class="c1">// the callback defined above.</span>
+                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">callback</span><span class="p">{})}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (original)    : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Serialise ta into a string stream.</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_oarchive</span> <span class="nf">oa</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">oa</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Reset ta to an integrator without events.</span>
+    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">}};</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (after reset) : &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+
+    <span class="c1">// Restore the serialised representation of ta.</span>
+    <span class="p">{</span>
+        <span class="n">boost</span><span class="o">::</span><span class="n">archive</span><span class="o">::</span><span class="n">binary_iarchive</span> <span class="nf">ia</span><span class="p">(</span><span class="n">ss</span><span class="p">);</span>
+        <span class="n">ia</span> <span class="o">&gt;&gt;</span> <span class="n">ta</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Number of events (from archive): &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_nt_events</span><span class="p">().</span><span class="n">size</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+
+
+              </div>
+              
+        
+        <div class='prev-next-bottom'>
+            
+    <a class='left-prev' id="prev-link" href="tut_batch_mode.html" title="previous page">Batch mode</a>
+    <a class='right-next' id="next-link" href="ad_notes.html" title="next page">Notes on automatic differentiation</a>
+
+        </div>
+        
+        </div>
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
+
+  
+  </body>
+</html>

@@ -25,3 +25,4 @@ the tutorials should not be too hard to follow.
   :maxdepth: 1
 
   tut_batch_mode
+  tut_s11n

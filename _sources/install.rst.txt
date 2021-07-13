@@ -35,7 +35,8 @@ heyoka has the following **mandatory** dependencies:
 Additionally, heyoka has the following **optional** dependencies:
 
 * the `mp++ <https://bluescarni.github.io/mppp/>`__ multiprecision library
-  (provides support for quadruple-precision integrations),
+  (provides support for quadruple-precision integrations on platforms
+  supporting the non-standard ``__float128`` type),
 * the `SLEEF <https://sleef.org/>`__ vectorized math library (improves the performance
   of integrations in batch mode),
 * the `xtensor and xtensor-blas <https://xtensor.readthedocs.io/en/latest/>`__
@@ -64,12 +65,11 @@ in order to enable 80-bit computations.
 128-bit precision
 ^^^^^^^^^^^^^^^^^
 
-Currently quadruple-precision support in heyoka has the following prerequisites:
-
-* either GCC or Clang must be used,
-* the nonstandard ``__float128`` floating-point type must be
-  `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__,
-* heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+On platforms where ``long double`` is a quadruple-precision floating-point datatype (e.g., 64-bit ARM),
+quadruple-precision integrations are always supported. Otherwise,
+on platforms such as x86-64, the nonstandard ``__float128`` floating-point type must be
+`available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__
+and heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
 
 Packages
 --------
@@ -108,7 +108,9 @@ of heyoka, you can use ``cmake`` to configure the build to your liking
 (e.g., enabling optional features, customizing the installation
 path, etc.). The available configuration options are:
 
-* ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (off by default),
+* ``HEYOKA_WITH_MPPP``: enable features relying on the mp++ library (i.e., support for
+  quadruple-precision computations on platforms supporting the ``__float128``
+  datatype, off by default),
 * ``HEYOKA_WITH_SLEEF``: enable features relying on the SLEEF library (off by default),
 * ``HEYOKA_BUILD_TESTS``: build the test suite (off by default),
 * ``HEYOKA_BUILD_BENCHMARKS``: build the benchmarking suite (off by default),
