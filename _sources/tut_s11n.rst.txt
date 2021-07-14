@@ -20,11 +20,11 @@ we need to emphasise a couple of very important **caveats**:
   to crash heyoka or even execute arbitrary code on the machine.
 
 The last point is particularly important: because the integrator objects
-contain blobs of binary code which are saved and loaded during (de)serialisation,
+contain blobs of binary code,
 a maliciously-crafted archive can easily be used
 to execute arbitrary code on the host machine.
 
-Let us repeat again these warnings in a red box for visibility:
+Let us repeat again these warnings for visibility:
 
 .. warning::
 
@@ -32,7 +32,7 @@ Let us repeat again these warnings in a red box for visibility:
    to the execution of malicious code.
 
    Do **not** use heyoka archives as a data exchange format, and make sure that
-   all archives you load from have been produced with the same versions of heyoka,
+   all the archives you load from have been produced with the same versions of heyoka,
    LLVM and Boost that you are currently using.
 
 With these warnings out of the way, let us proceed to the code.

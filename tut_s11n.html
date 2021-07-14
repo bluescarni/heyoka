@@ -309,16 +309,16 @@ Thus, a maliciously-crafted binary archive could be used
 to crash heyoka or even execute arbitrary code on the machine.</p></li>
 </ul>
 <p>The last point is particularly important: because the integrator objects
-contain blobs of binary code which are saved and loaded during (de)serialisation,
+contain blobs of binary code,
 a maliciously-crafted archive can easily be used
 to execute arbitrary code on the host machine.</p>
-<p>Let us repeat again these warnings in a red box for visibility:</p>
+<p>Let us repeat again these warnings for visibility:</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Do <strong>not</strong> load heyoka objects from untrusted archives, as this could lead
 to the execution of malicious code.</p>
 <p>Do <strong>not</strong> use heyoka archives as a data exchange format, and make sure that
-all archives you load from have been produced with the same versions of heyoka,
+all the archives you load from have been produced with the same versions of heyoka,
 LLVM and Boost that you are currently using.</p>
 </div>
 <p>With these warnings out of the way, let us proceed to the code.</p>
