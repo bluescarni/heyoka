@@ -215,3 +215,31 @@ TEST_CASE("callable s11n")
     REQUIRE(!!c);
     REQUIRE(c(1) == 101);
 }
+
+struct vfunc {
+    void operator()() const {}
+    int n = 0;
+};
+
+TEST_CASE("callable extract")
+{
+    callable<void()> c;
+    REQUIRE(c.extract<void (*)()>() == nullptr);
+    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
+
+    c = callable<void()>(blap);
+    REQUIRE(c.extract<void (*)()>() != nullptr);
+    REQUIRE(c.extract<vfunc>() == nullptr);
+    REQUIRE(std::as_const(c).extract<void (*)()>() != nullptr);
+    REQUIRE(std::as_const(c).extract<vfunc>() == nullptr);
+
+    c = callable<void()>(vfunc{});
+    REQUIRE(c.extract<void (*)()>() == nullptr);
+    REQUIRE(c.extract<vfunc>() != nullptr);
+    REQUIRE(std::as_const(c).extract<void (*)()>() == nullptr);
+    REQUIRE(std::as_const(c).extract<vfunc>() != nullptr);
+
+    c = callable<void()>(vfunc{42});
+    ++(c.extract<vfunc>()->n);
+    REQUIRE(c.extract<vfunc>()->n == 43);
+}

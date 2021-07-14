@@ -178,6 +178,28 @@ public:
             return typeid(void);
         }
     }
+
+    // Extraction.
+    template <typename T>
+    const T *extract() const noexcept
+    {
+        if (!(*this)) {
+            return nullptr;
+        }
+
+        auto p = dynamic_cast<const detail::callable_inner<T, R, Args...> *>(m_ptr.get());
+        return p == nullptr ? nullptr : &(p->m_value);
+    }
+    template <typename T>
+    T *extract() noexcept
+    {
+        if (!(*this)) {
+            return nullptr;
+        }
+
+        auto p = dynamic_cast<detail::callable_inner<T, R, Args...> *>(m_ptr.get());
+        return p == nullptr ? nullptr : &(p->m_value);
+    }
 };
 
 template <typename R, typename... Args>
