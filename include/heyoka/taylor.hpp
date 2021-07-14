@@ -679,6 +679,8 @@ private:
     }
 
 public:
+    taylor_adaptive_impl();
+
     template <typename... KwArgs>
     explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
@@ -977,6 +979,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     }
 
 public:
+    taylor_adaptive_batch_impl();
+
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> state, std::uint32_t batch_size,
                                         KwArgs &&...kw_args)

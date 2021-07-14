@@ -3373,6 +3373,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 }
 
 template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl()
+    : taylor_adaptive_impl({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
+{
+}
+
+template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers
     // and the vectors of detected events.
@@ -4509,6 +4515,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
     m_rem_time.resize(m_batch_size);
 
     m_d_out_time.resize(m_batch_size);
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl()
+    : taylor_adaptive_batch_impl({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+{
 }
 
 template <typename T>

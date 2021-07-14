@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +26,12 @@
 
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
@@ -51,6 +59,13 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
 
     return ret;
 }
+
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 TEST_CASE("batch init outcome")
 {
@@ -1522,4 +1537,18 @@ void s11n_test_impl()
 TEST_CASE("s11n")
 {
     s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
+}
+
+TEST_CASE("def ctor")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        taylor_adaptive<fp_t> ta;
+
+        REQUIRE(ta.get_state() == std::vector{fp_t(0)});
+        REQUIRE(ta.get_time() == 0);
+    };
+
+    tuple_for_each(fp_types, tester);
 }

@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
@@ -20,6 +22,12 @@
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xview.hpp>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
@@ -36,6 +44,13 @@ std::mt19937 rng;
 using namespace heyoka;
 namespace hy = heyoka;
 using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 TEST_CASE("batch consistency")
 {
@@ -731,4 +746,19 @@ void s11n_test_impl()
 TEST_CASE("s11n")
 {
     s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
+}
+
+TEST_CASE("def ctor")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        taylor_adaptive_batch<fp_t> ta;
+
+        REQUIRE(ta.get_state() == std::vector{fp_t(0)});
+        REQUIRE(ta.get_time() == std::vector{fp_t(0)});
+        REQUIRE(ta.get_batch_size() == 1u);
+    };
+
+    tuple_for_each(fp_types, tester);
 }
