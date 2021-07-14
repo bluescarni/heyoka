@@ -79,6 +79,9 @@ TEST_CASE("callable basics")
     callable<void()> c5 = c;
     REQUIRE(!!c5);
     REQUIRE(!!c);
+
+    REQUIRE(std::is_nothrow_move_constructible_v<callable<void()>>);
+    REQUIRE(std::is_nothrow_move_assignable_v<callable<void()>>);
 }
 
 TEST_CASE("callable call")
@@ -191,29 +194,55 @@ HEYOKA_S11N_CALLABLE_EXPORT(foo_s11n, int, int)
 
 TEST_CASE("callable s11n")
 {
-    callable<int(int)> c(foo_s11n{100});
-
-    REQUIRE(c(1) == 101);
-
-    std::stringstream ss;
-
     {
-        boost::archive::binary_oarchive oa(ss);
+        callable<int(int)> c(foo_s11n{100});
 
-        oa << c;
+        REQUIRE(c(1) == 101);
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << c;
+        }
+
+        c = callable<int(int)>{};
+        REQUIRE(!c);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> c;
+        }
+
+        REQUIRE(!!c);
+        REQUIRE(c(1) == 101);
     }
 
-    c = callable<int(int)>{};
-    REQUIRE(!c);
-
+    // Test an empty callable too.
     {
-        boost::archive::binary_iarchive ia(ss);
+        callable<int(int)> c;
 
-        ia >> c;
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << c;
+        }
+
+        c = callable<int(int)>(foo_s11n{100});
+        REQUIRE(c);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> c;
+        }
+
+        REQUIRE(!c);
     }
-
-    REQUIRE(!!c);
-    REQUIRE(c(1) == 101);
 }
 
 struct vfunc {

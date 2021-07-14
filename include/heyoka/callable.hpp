@@ -183,7 +183,7 @@ public:
     template <typename T>
     const T *extract() const noexcept
     {
-        if (!(*this)) {
+        if (!m_ptr) {
             return nullptr;
         }
 
@@ -193,7 +193,7 @@ public:
     template <typename T>
     T *extract() noexcept
     {
-        if (!(*this)) {
+        if (!m_ptr) {
             return nullptr;
         }
 
