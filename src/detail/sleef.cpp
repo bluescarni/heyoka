@@ -73,6 +73,8 @@ auto make_sleef_map_dbl()
         retval[{"sin", 2}] = "Sleef_sind2_u10sse4";
     } else if (features.sse2) {
         retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
     }
 
     // cos().
@@ -88,6 +90,8 @@ auto make_sleef_map_dbl()
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse4";
     } else if (features.sse2) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
     }
 
     // log().
