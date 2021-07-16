@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -39,6 +40,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -207,6 +209,68 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
+} // namespace heyoka
+
+// NOTE: implement a workaround for the serialisation of tuples whose first element
+// is a taylor outcome. We need this because Boost.Serialization treats all enums
+// as ints, which is not ok for taylor_outcome (whose underyling type will not
+// be an int on most platforms). Because it is not possible to override Boost's
+// enum implementation, we override the serialisation of tuples with outcomes
+// as first elements, which is all we need in the serialisation of the batch
+// integrator. The implementation below will be preferred over the generic tuple
+// s11n because it is more specialised.
+// NOTE: this workaround is not necessary for the other enums in heyoka because
+// those all have ints as underlying type.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename Archive, typename... Args>
+inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](const auto &x) {
+        if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
+            ar << static_cast<std::underlying_type_t<heyoka::taylor_outcome>>(x);
+        } else {
+            ar << x;
+        }
+    };
+
+    std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](auto &x) {
+        if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
+            std::underlying_type_t<heyoka::taylor_outcome> val{};
+            ar >> val;
+
+            x = static_cast<heyoka::taylor_outcome>(val);
+        } else {
+            ar >> x;
+        }
+    };
+
+    std::apply([&tf](auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
+{
+    split_free(ar, tup, v);
+}
+
+} // namespace serialization
+
+} // namespace boost
+
+namespace heyoka
+{
+
 namespace kw
 {
 
@@ -292,12 +356,28 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, int)>;
+    using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &dir;
+    }
+
     void finalise_ctor(event_direction);
 
 public:
+    nt_event_impl();
+
     template <typename... KwArgs>
     explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
     {
@@ -333,11 +413,6 @@ public:
     const expression &get_expression() const;
     const callback_t &get_callback() const;
     event_direction get_direction() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    event_direction dir;
 };
 
 template <typename T>
@@ -367,12 +442,30 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool, int)>;
+    using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    T cooldown;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &cooldown;
+        ar &dir;
+    }
+
     void finalise_ctor(callback_t, T, event_direction);
 
 public:
+    t_event_impl();
+
     template <typename... KwArgs>
     explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
     {
@@ -427,12 +520,6 @@ public:
     const callback_t &get_callback() const;
     event_direction get_direction() const;
     T get_cooldown() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    T cooldown;
-    event_direction dir;
 };
 
 template <typename T>
@@ -523,6 +610,17 @@ private:
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
 
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
@@ -581,6 +679,8 @@ private:
     }
 
 public:
+    taylor_adaptive_impl();
+
     template <typename... KwArgs>
     explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
@@ -665,6 +765,10 @@ public:
     const std::vector<t_event_t> &get_t_events() const
     {
         return m_tes;
+    }
+    const auto &get_te_cooldowns() const
+    {
+        return m_te_cooldowns;
     }
     const std::vector<nt_event_t> &get_nt_events() const
     {
@@ -830,6 +934,17 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
 
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
@@ -864,6 +979,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     }
 
 public:
+    taylor_adaptive_batch_impl();
+
     template <typename... KwArgs>
     explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> state, std::uint32_t batch_size,
                                         KwArgs &&...kw_args)

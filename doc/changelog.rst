@@ -1,8 +1,31 @@
 Changelog
 =========
 
-0.11.0 (unreleased)
+0.12.0 (unreleased)
 -------------------
+
+New
+~~~
+
+- Implement serialisation for the main classes via
+  Boost.Serialization
+  (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).
+
+Fix
+~~~
+
+- Fix a bug in the move assignment operator of ``llvm_state``
+  (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).
+
+0.11.0 (2021-07-06)
+-------------------
+
+New
+~~~
+
+- The ``time`` expression now supports symbolic
+  differentiation
+  (`#160 <https://github.com/bluescarni/heyoka/pull/160>`__).
 
 Changes
 ~~~~~~~

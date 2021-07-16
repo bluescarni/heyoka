@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.11.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.12.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -234,8 +234,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "11.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 11)
+    set_property(TARGET heyoka PROPERTY VERSION "12.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 12)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
@@ -322,10 +322,8 @@ find_package(spdlog REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE spdlog::spdlog)
 
 # Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED)
-
-# Public dependency on the headers.
-target_link_libraries(heyoka PUBLIC Boost::boost)
+find_package(Boost 1.60 REQUIRED serialization)
+target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 

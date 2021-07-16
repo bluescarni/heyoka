@@ -12,6 +12,7 @@
 #include <heyoka/math/acos.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -23,4 +24,29 @@ TEST_CASE("acos diff")
 
     REQUIRE(diff(acos(x * x - y), x) == -pow(1. - square(square(x) - y), -.5) * (2. * x));
     REQUIRE(diff(acos(x * x + y), y) == -pow(1. - square(square(x) + y), -.5));
+}
+
+TEST_CASE("acos s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = acos(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == acos(x));
 }

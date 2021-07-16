@@ -24,6 +24,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -766,4 +767,45 @@ TEST_CASE("func extra_hash")
 
     REQUIRE(hash(f1) == hash(f2));
     REQUIRE(hash(f1) != hash(f3));
+}
+
+struct func_19 : func_base {
+    func_19(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+};
+
+HEYOKA_S11N_FUNC_EXPORT(func_19)
+
+TEST_CASE("func s11n")
+{
+    std::stringstream ss;
+
+    func f{func_19{"pluto", {"x"_var}}};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "pluto");
+    REQUIRE(f.args().size() == 1u);
+    REQUIRE(f.args()[0] == "x"_var);
 }

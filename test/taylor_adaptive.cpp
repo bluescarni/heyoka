@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -25,9 +27,17 @@
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/nbody.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -49,6 +59,13 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
 
     return ret;
 }
+
+const auto fp_types = std::tuple<double, long double
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
 
 TEST_CASE("batch init outcome")
 {
@@ -1363,4 +1380,175 @@ TEST_CASE("param deduction from events")
 
         REQUIRE(ta.get_pars().size() == 11u);
     }
+}
+
+struct s11n_nt_cb {
+    void operator()(taylor_adaptive<double> &, double, int) const {}
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive<double> &, double, int);
+
+struct s11n_t_cb {
+    bool operator()(taylor_adaptive<double> &, bool, int) const
+    {
+        return false;
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive<double> &, bool, int);
+
+template <typename Oa, typename Ia>
+void s11n_test_impl()
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // A test with events.
+    {
+        auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0., 0.5},
+                                          kw::t_events = {t_event<double>(v, kw::callback = s11n_t_cb{})},
+                                          kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
+                                          kw::pars = std::vector<double>{-1e-4}};
+
+        auto oc = std::get<0>(ta.step(true));
+        while (oc == taylor_outcome::success) {
+            oc = std::get<0>(ta.step(true));
+        }
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive<double>{
+            {prime(x) = x}, {0.123}, kw::tol = 1e-3, kw::t_events = {t_event<double>(x, kw::callback = s11n_t_cb{})}};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
+                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
+        REQUIRE(ta.get_te_cooldowns()[0] == ta_copy.get_te_cooldowns()[0]);
+
+        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
+                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+        ta.update_d_output(-.1, true);
+        ta_copy.update_d_output(-.1, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+    }
+
+    // Test without events.
+    {
+        auto ta = taylor_adaptive<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x + par[0])}, {0., 0.5}, kw::pars = std::vector<double>{-1e-4}};
+
+        for (auto i = 0; i < 10; ++i) {
+            ta.step();
+        }
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive<double>{{prime(x) = x}, {0.123}, kw::tol = 1e-3};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+        ta.update_d_output(-.1, true);
+        ta_copy.update_d_output(-.1, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+    }
+}
+
+TEST_CASE("s11n")
+{
+    s11n_test_impl<boost::archive::binary_oarchive, boost::archive::binary_iarchive>();
+}
+
+TEST_CASE("def ctor")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        taylor_adaptive<fp_t> ta;
+
+        REQUIRE(ta.get_state() == std::vector{fp_t(0)});
+        REQUIRE(ta.get_time() == 0);
+    };
+
+    tuple_for_each(fp_types, tester);
 }

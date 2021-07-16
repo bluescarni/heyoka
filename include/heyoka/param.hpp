@@ -9,6 +9,8 @@
 #ifndef HEYOKA_PARAM_HPP
 #define HEYOKA_PARAM_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
@@ -16,8 +18,15 @@
 #include <unordered_map>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -26,7 +35,17 @@ class HEYOKA_DLL_PUBLIC param
 {
     std::uint32_t m_index;
 
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_index;
+    }
+
 public:
+    param();
+
     explicit param(std::uint32_t);
 
     param(const param &);

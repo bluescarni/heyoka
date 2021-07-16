@@ -143,7 +143,18 @@ void func_default_to_stream_impl(std::ostream &os, const func_base &f)
 
 func_inner_base::~func_inner_base() = default;
 
+namespace
+{
+
+struct null_func : func_base {
+    null_func() : func_base("null_func", {}) {}
+};
+
+} // namespace
+
 } // namespace detail
+
+func::func() : func(detail::null_func{}) {}
 
 func::func(const func &f) : m_ptr(f.ptr()->clone()) {}
 

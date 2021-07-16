@@ -27,6 +27,8 @@
 namespace heyoka
 {
 
+param::param() : param(0) {}
+
 param::param(std::uint32_t idx) : m_index(idx) {}
 
 param::param(const param &) = default;

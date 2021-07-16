@@ -10,6 +10,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/binary_op.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -111,4 +112,29 @@ TEST_CASE("diff")
     REQUIRE(diff(x - y, "y") == -1_dbl);
     REQUIRE(diff(x * y, "x") == y);
     REQUIRE(diff(x / y, "x") == y / (y * y));
+}
+
+TEST_CASE("asin s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = x + y;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = x - y;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == x + y);
 }

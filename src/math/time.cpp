@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -38,6 +39,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -63,6 +65,13 @@ time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
 void time_impl::to_stream(std::ostream &os) const
 {
     os << 't';
+}
+
+expression time_impl::diff(const std::string &) const
+{
+    assert(args().empty());
+
+    return 0_dbl;
 }
 
 namespace
@@ -256,3 +265,5 @@ bool is_time(const expression &ex)
 const expression time{func{detail::time_impl{}}};
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::time_impl)

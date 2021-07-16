@@ -12,6 +12,8 @@
 #include <cmath>
 #include <string>
 
+#include <heyoka/s11n.hpp>
+
 namespace heyoka::detail
 {
 
@@ -28,6 +30,16 @@ struct dfloat {
     explicit operator F() const
     {
         return hi;
+    }
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &hi;
+        ar &lo;
     }
 };
 

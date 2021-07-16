@@ -34,6 +34,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -42,6 +43,15 @@ class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_name;
     std::vector<expression> m_args;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_name;
+        ar &m_args;
+    }
 
 public:
     explicit func_base(std::string, std::vector<expression>);
@@ -119,6 +129,14 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 #if defined(HEYOKA_HAVE_REAL128)
     virtual llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const = 0;
 #endif
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
 };
 
 template <typename T>
@@ -207,8 +225,8 @@ template <typename T>
 inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
 
 template <typename T>
-using func_eval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(
-    std::declval<const std::vector<double> &>()));
+using func_eval_num_dbl_t = decltype(
+    std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
@@ -535,6 +553,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 #endif
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_inner_base>(*this);
+        ar &m_value;
+    }
 };
 
 template <typename T>
@@ -567,6 +595,14 @@ class HEYOKA_DLL_PUBLIC func
     // Pointer to the inner base.
     std::unique_ptr<detail::func_inner_base> m_ptr;
 
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_ptr;
+    }
+
     // Just two small helpers to make sure that whenever we require
     // access to the pointer it actually points to something.
     const detail::func_inner_base *ptr() const;
@@ -579,6 +615,8 @@ class HEYOKA_DLL_PUBLIC func
                            int>;
 
 public:
+    func();
+
     template <typename T, generic_ctor_enabler<T &&> = 0>
     explicit func(T &&x) : m_ptr(std::make_unique<detail::func_inner<detail::uncvref_t<T>>>(std::forward<T>(x)))
     {
@@ -777,5 +815,39 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const func &f, std::uin
 }
 
 } // namespace heyoka
+
+// Disable Boost.Serialization tracking for the implementation
+// details of func.
+BOOST_CLASS_TRACKING(heyoka::detail::func_inner_base, boost::serialization::track_never)
+
+// NOTE: these bits are taken verbatim from the BOOST_CLASS_TRACKING macro, which does not support
+// class templates.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename T>
+struct tracking_level<heyoka::detail::func_inner<T>> {
+    typedef mpl::integral_c_tag tag;
+    typedef mpl::int_<track_never> type;
+    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
+    BOOST_STATIC_ASSERT(
+        (mpl::greater<implementation_level<heyoka::detail::func_inner<T>>, mpl::int_<primitive_type>>::value));
+};
+
+} // namespace serialization
+
+} // namespace boost
+
+// Macros for the registration of s11n for concrete functions.
+#define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f) BOOST_CLASS_EXPORT_IMPLEMENT(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_KEY(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f)
 
 #endif

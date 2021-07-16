@@ -28,6 +28,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -42,6 +43,14 @@ public:
 
 private:
     type m_type;
+
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+        ar &m_type;
+    }
 
 public:
     binary_op();
@@ -101,5 +110,7 @@ HEYOKA_DLL_PUBLIC expression mul(expression, expression);
 HEYOKA_DLL_PUBLIC expression div(expression, expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::binary_op)
 
 #endif
