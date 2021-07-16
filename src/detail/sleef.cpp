@@ -175,6 +175,8 @@ auto make_sleef_map_dbl()
         retval[{"asin", 2}] = "Sleef_asind2_u10sse4";
     } else if (features.sse2) {
         retval[{"asin", 2}] = "Sleef_asind2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"asin", 2}] = "Sleef_asind2_u10advsimd";
     }
 
     // acos().
@@ -190,6 +192,8 @@ auto make_sleef_map_dbl()
         retval[{"acos", 2}] = "Sleef_acosd2_u10sse4";
     } else if (features.sse2) {
         retval[{"acos", 2}] = "Sleef_acosd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"acos", 2}] = "Sleef_acosd2_u10advsimd";
     }
 
     // atan().
@@ -205,6 +209,8 @@ auto make_sleef_map_dbl()
         retval[{"atan", 2}] = "Sleef_atand2_u10sse4";
     } else if (features.sse2) {
         retval[{"atan", 2}] = "Sleef_atand2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"atan", 2}] = "Sleef_atand2_u10advsimd";
     }
 
     // cosh().
@@ -220,6 +226,8 @@ auto make_sleef_map_dbl()
         retval[{"cosh", 2}] = "Sleef_coshd2_u10sse4";
     } else if (features.sse2) {
         retval[{"cosh", 2}] = "Sleef_coshd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10advsimd";
     }
 
     // sinh().
@@ -235,6 +243,8 @@ auto make_sleef_map_dbl()
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10advsimd";
     }
 
     // tanh().
@@ -250,6 +260,8 @@ auto make_sleef_map_dbl()
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10advsimd";
     }
 
     // asinh().
@@ -265,6 +277,8 @@ auto make_sleef_map_dbl()
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10advsimd";
     }
 
     // acosh().
@@ -280,6 +294,8 @@ auto make_sleef_map_dbl()
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse4";
     } else if (features.sse2) {
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10advsimd";
     }
 
     // atanh().
@@ -295,6 +311,8 @@ auto make_sleef_map_dbl()
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10advsimd";
     }
 
     // erf().
@@ -310,6 +328,8 @@ auto make_sleef_map_dbl()
         retval[{"erf", 2}] = "Sleef_erfd2_u10sse4";
     } else if (features.sse2) {
         retval[{"erf", 2}] = "Sleef_erfd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"erf", 2}] = "Sleef_erfd2_u10advsimd";
     }
 
     return retval;
