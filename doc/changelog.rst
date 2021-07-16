@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add support for 64-bit ARM processors
+  (`#167 <https://github.com/bluescarni/heyoka/pull/167>`__).
 - Implement serialisation for the main classes via
   Boost.Serialization
   (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).

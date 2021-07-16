@@ -141,9 +141,13 @@ target_features get_target_features_impl()
             retval.avx = true;
         }
 
-        // SSE2 is always available on x86-64.
-        assert(boost::algorithm::contains(t_features, "+sse2"));
-        retval.sse2 = true;
+        if (boost::algorithm::contains(t_features, "+sse2")) {
+            retval.sse2 = true;
+        }
+    }
+
+    if (boost::starts_with(target_name, "aarch64")) {
+        retval.aarch64 = true;
     }
 
     return retval;

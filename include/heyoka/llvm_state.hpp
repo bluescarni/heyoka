@@ -39,6 +39,7 @@ struct target_features {
     bool avx = false;
     bool avx2 = false;
     bool avx512f = false;
+    bool aarch64 = false;
 };
 
 // NOTE: no need to make this DLL-public as long
