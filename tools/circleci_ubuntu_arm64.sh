@@ -6,6 +6,9 @@ set -x
 # Exit on error.
 set -e
 
+# TMP debug
+cat /proc/cpuinfo
+
 # Core deps.
 sudo apt-get install build-essential wget
 
