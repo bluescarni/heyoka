@@ -18,6 +18,8 @@
 #include <tuple>
 #include <unordered_map>
 
+#include <iostream>
+
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 
@@ -74,6 +76,7 @@ auto make_sleef_map_dbl()
     } else if (features.sse2) {
         retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
     } else if (features.aarch64) {
+        std::cout << "ADVSIMD sin\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
     }
 
@@ -91,6 +94,7 @@ auto make_sleef_map_dbl()
     } else if (features.sse2) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
     } else if (features.aarch64) {
+        std::cout << "ADVSIMD cos\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
     }
 
