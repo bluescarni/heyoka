@@ -107,6 +107,8 @@ auto make_sleef_map_dbl()
         retval[{"log", 2}] = "Sleef_logd2_u10sse4";
     } else if (features.sse2) {
         retval[{"log", 2}] = "Sleef_logd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"log", 2}] = "Sleef_logd2_u10advsimd";
     }
 
     // exp().
@@ -122,6 +124,8 @@ auto make_sleef_map_dbl()
         retval[{"exp", 2}] = "Sleef_expd2_u10sse4";
     } else if (features.sse2) {
         retval[{"exp", 2}] = "Sleef_expd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"exp", 2}] = "Sleef_expd2_u10advsimd";
     }
 
     // pow().
@@ -137,6 +141,8 @@ auto make_sleef_map_dbl()
         retval[{"pow", 2}] = "Sleef_powd2_u10sse4";
     } else if (features.sse2) {
         retval[{"pow", 2}] = "Sleef_powd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"pow", 2}] = "Sleef_powd2_u10advsimd";
     }
 
     // tan().
@@ -152,6 +158,8 @@ auto make_sleef_map_dbl()
         retval[{"tan", 2}] = "Sleef_tand2_u10sse4";
     } else if (features.sse2) {
         retval[{"tan", 2}] = "Sleef_tand2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"tan", 2}] = "Sleef_tand2_u10advsimd";
     }
 
     // asin().
