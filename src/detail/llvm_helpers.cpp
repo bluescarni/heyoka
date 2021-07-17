@@ -94,7 +94,7 @@ const auto type_map = []() {
         };
     }
 
-    // Try to associate C++ long double to LLVM double, x86_fp80 or fp128.
+    // Try to associate C++ long double to an LLVM fp type.
     if (std::numeric_limits<long double>::is_iec559) {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
@@ -112,7 +112,7 @@ const auto type_map = []() {
             };
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // IEEE quadruple-precision format (ARM 64).
+                // IEEE quadruple-precision format (e.g., ARM 64).
                 auto ret = llvm::Type::getFP128Ty(c);
                 assert(ret != nullptr);
                 return ret;
