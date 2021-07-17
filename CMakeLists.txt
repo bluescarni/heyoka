@@ -146,23 +146,11 @@ endif()
 # Mandatory dependency on LLVM.
 # NOTE: do it early so that we can set up
 # compiler flags based on the LLVM version
-# (see below).
+# if needed.
 find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
-endif()
-
-# NOTE: LLVM >= 12 deprecates the use of llvm::VectorType::getNumElements()
-# in favour of llvm::FixedVectorType::getNumElements(), which is however not
-# available in LLVM 10. Thus, as long as we support LLVM 10, we suppress
-# these deprecation warnings. Moving forward, we need to either drop support
-# for LLVM 10 or find a better solution.
-if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 12)
-    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
-        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
-        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
-    endif()
 endif()
 
 # Explanation: on MSVC, when building static libraries, it is good practice to link
