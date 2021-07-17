@@ -23,6 +23,12 @@ message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "heyoka version: ${heyoka_VERSION}")
 
+# Print some info about the long double type.
+include(CheckTypeSize)
+CHECK_TYPE_SIZE("long double" _HEYOKA_LONG_DOUBLE_SIZE LANGUAGE CXX)
+message(STATUS "Size of the long double type: ${_HEYOKA_LONG_DOUBLE_SIZE}")
+unset(_HEYOKA_LONG_DOUBLE_SIZE)
+
 # Run the YACMA compiler setup.
 include(YACMACompilerLinkerSettings)
 
