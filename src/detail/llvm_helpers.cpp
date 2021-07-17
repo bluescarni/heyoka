@@ -110,6 +110,15 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
+        } else if (std::numeric_limits<long double>::digits == 106) {
+            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+                // Double-double precision format.
+                // NOTE: this is PowerPC-specific, perhaps we might
+                // want to bracket this into an #ifdef.
+                auto ret = llvm::Type::getPPC_FP128Ty(c);
+                assert(ret != nullptr);
+                return ret;
+            };
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
