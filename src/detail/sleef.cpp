@@ -21,8 +21,6 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 
-#include <sleef.h>
-
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -355,17 +353,6 @@ std::string sleef_function_name(llvm::LLVMContext &c, const std::string &f, llvm
     } else {
         return "";
     }
-}
-
-// NOTE: this function is here only to introduce a fake
-// dependency of heyoka on libsleef. This is needed
-// in certain setups that would otherwise unlink libsleef
-// from heyoka after detecting that no symbol from libsleef
-// is being used (even though we need libsleef to be linked
-// in for use in the JIT machinery).
-HEYOKA_DLL_PUBLIC double sleef_dummy_f(double x)
-{
-    return ::Sleef_sin_u10(x);
 }
 
 } // namespace heyoka::detail
