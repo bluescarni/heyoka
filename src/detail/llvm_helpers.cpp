@@ -24,7 +24,6 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/binomial.hpp>
 #include <boost/math/tools/precision.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -55,6 +54,7 @@
 
 #endif
 
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -1544,9 +1544,7 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i),
-                                                                             boost::numeric_cast<unsigned>(j))
-                                      : T(0);
+            const auto val = (j <= i) ? binomial<T>(i, j) : T(0);
             bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
         }
     }
