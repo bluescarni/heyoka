@@ -233,6 +233,15 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
+if(HEYOKA_WITH_SLEEF)
+    # NOTE: the sleef dummy file needs to be compiled only
+    # if we are building with sleef support on.
+    set(HEYOKA_SRC_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
+        "${HEYOKA_SRC_FILES}"
+    )
+endif()
+
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
     message(STATUS "heyoka will be built as a static library.")
