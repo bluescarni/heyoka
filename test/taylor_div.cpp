@@ -34,7 +34,7 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double /*, long double*/
+const auto fp_types = std::tuple<double, long double
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -156,6 +156,7 @@ TEST_CASE("taylor div")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
         }
 
+#if 0
         {
             llvm_state s{kw::opt_level = opt_level};
 
@@ -348,6 +349,7 @@ TEST_CASE("taylor div")
         // Do the batch/scalar comparison.
         compare_batch_scalar<fp_t>({div(expression{number{fp_t(1)}}, 3_dbl), x + y}, opt_level, high_accuracy,
                                    compact_mode);
+#endif
 
         // Variable-number tests.
         {
@@ -414,6 +416,7 @@ TEST_CASE("taylor div")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] / -4)));
         }
 
+#if 0
         {
             llvm_state s{kw::opt_level = opt_level};
 
@@ -594,6 +597,7 @@ TEST_CASE("taylor div")
         }
 
         compare_batch_scalar<fp_t>({y / 2_dbl, x / -4_dbl}, opt_level, high_accuracy, compact_mode);
+#endif
 
         // Number/variable tests.
         {
@@ -660,6 +664,7 @@ TEST_CASE("taylor div")
             REQUIRE(jet[5] == approximately(2 * jet[2] / (2 * 2)));
         }
 
+#if 0
         {
             llvm_state s{kw::opt_level = opt_level};
 
@@ -863,6 +868,8 @@ TEST_CASE("taylor div")
 
         compare_batch_scalar<fp_t>({2_dbl / y, -3_dbl / x}, opt_level, high_accuracy, compact_mode);
 
+#endif
+
         // Variable/variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
@@ -906,6 +913,7 @@ TEST_CASE("taylor div")
             REQUIRE(jet[5] == approximately(1 / fp_t{2} * (jet[3] * 2 - jet[2] * 3) / (2 * 2)));
         }
 
+#if 0
         {
             llvm_state s{kw::opt_level = opt_level};
 
@@ -1038,6 +1046,7 @@ TEST_CASE("taylor div")
         }
 
         compare_batch_scalar<fp_t>({x / y, y / x}, opt_level, high_accuracy, compact_mode);
+#endif
     };
 
     for (auto cm : {false, true}) {
