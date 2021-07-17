@@ -62,6 +62,7 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -1382,7 +1383,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef
         // function available for pow().
-        if (auto *vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
             // NOTE: if sfn ends up empty, we will be falling through
             // below and use the LLVM intrinsic instead.
             if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),

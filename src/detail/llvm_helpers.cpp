@@ -57,6 +57,7 @@
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -163,7 +164,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 {
     assert(t != nullptr);
 
-    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
+    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
@@ -208,7 +209,7 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
 {
-    if (auto v_ptr_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+    if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
 
@@ -253,13 +254,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
     if (vector_size == 1u) {
         return t;
     } else {
-        auto retval =
-#if LLVM_VERSION_MAJOR == 10
-            llvm::VectorType::get
-#else
-            llvm::FixedVectorType::get
-#endif
-            (t, boost::numeric_cast<unsigned>(vector_size));
+        auto retval = llvm_vector_type::get(t, boost::numeric_cast<unsigned>(vector_size));
 
         assert(retval != nullptr);
 
@@ -271,7 +266,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 // return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
@@ -853,7 +848,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
     } else {
 #endif
-        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x->getType())) {
+        if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
             // NOTE: although there exists a SLEEF function for computing sin/cos
             // at the same time, we cannot use it directly because it returns a pair
             // of SIMD vectors rather than a single one and that does not play
@@ -1080,7 +1075,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
     // Convert to int32.
     llvm::Type *int_type;
-    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(cmp0->getType())) {
+    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
         int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
     } else {
         int_type = builder.getInt32Ty();

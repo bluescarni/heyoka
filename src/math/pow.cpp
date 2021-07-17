@@ -43,6 +43,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -107,7 +108,7 @@ llvm::Value *pow_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
     // NOTE: we want to try the SLEEF route only if we are *not* approximating
     // pow() with sqrt() or iterated multiplications (in which case we are fine
     // with the LLVM builtin).
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
         if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
