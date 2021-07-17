@@ -25,6 +25,7 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/special_functions/binomial.hpp>
+#include <boost/math/tools/precision.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -93,7 +94,7 @@ const auto type_map = []() {
         };
     }
 
-    // Try to associate C++ long double to LLVM double, x86_fp80 or fp128.
+    // Try to associate C++ long double to an LLVM fp type.
     if (std::numeric_limits<long double>::is_iec559) {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
@@ -109,9 +110,18 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
+        } else if (std::numeric_limits<long double>::digits == 106) {
+            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+                // Double-double precision format.
+                // NOTE: this is PowerPC-specific, perhaps we might
+                // want to bracket this into an #ifdef.
+                auto ret = llvm::Type::getPPC_FP128Ty(c);
+                assert(ret != nullptr);
+                return ret;
+            };
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // IEEE quadruple-precision format (ARM 64).
+                // IEEE quadruple-precision format (e.g., ARM 64).
                 auto ret = llvm::Type::getFP128Ty(c);
                 assert(ret != nullptr);
                 return ret;
@@ -1413,7 +1423,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto max_iter = builder.getInt32(50);
         auto loop_cond = [&,
                           // NOTE: tolerance is 4 * eps.
-                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
+                          tol = vector_splat(builder, codegen<T>(s, number{boost::math::tools::epsilon<T>() * 4}),
                                              batch_size)]() -> llvm::Value * {
             auto c_cond = builder.CreateICmpULT(builder.CreateLoad(counter), max_iter);
 

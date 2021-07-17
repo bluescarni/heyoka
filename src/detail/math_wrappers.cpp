@@ -11,11 +11,11 @@
 
 #if defined(HEYOKA_HAVE_REAL128)
 
+#include <limits>
+
+#include <boost/math/tools/precision.hpp>
+
 #include <mp++/real128.hpp>
-
-#endif
-
-#if defined(HEYOKA_HAVE_REAL128)
 
 // Make sure that the size and alignment of __float128
 // and mppp::real128 coincide. This is required if we
@@ -23,6 +23,9 @@
 // for __float128.
 static_assert(sizeof(__float128) == sizeof(mppp::real128));
 static_assert(alignof(__float128) == alignof(mppp::real128));
+
+// Make sure Boost.Math gets the correct epsilon value from mp++.
+static_assert(std::numeric_limits<mppp::real128>::epsilon() == boost::math::tools::epsilon<mppp::real128>());
 
 // NOTE: these wrappers are needed as a replacement
 // for the LLVM builtins, which seem to have issues
