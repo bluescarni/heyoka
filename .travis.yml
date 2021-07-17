@@ -13,7 +13,7 @@ matrix:
       arch: ppc64le
       dist: bionic
 script:
-    - ../tools/travis_ubuntu_ppc64.sh
+    - tools/travis_ubuntu_ppc64.sh
 
 notifications:
   email: false
