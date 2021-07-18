@@ -8,6 +8,7 @@
 
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -29,6 +30,10 @@ TEST_CASE("empty state")
     llvm_state s;
     std::cout << s << '\n';
     std::cout << s.get_ir() << '\n';
+
+    // Print also some info on the FP types.
+    std::cout << "Double digits     : " << std::numeric_limits<double>::digits << '\n';
+    std::cout << "Long double digits: " << std::numeric_limits<long double>::digits << '\n';
 }
 
 TEST_CASE("copy semantics")
