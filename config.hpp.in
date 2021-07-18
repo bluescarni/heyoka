@@ -38,4 +38,29 @@
 
 #endif
 
+#if defined(__i386) || defined(_M_IX86) || defined(_X86_) || defined(__amd64__) || defined(_M_AMD64)
+
+#define HEYOKA_ARCH_X86
+
+#elif defined(_ARCH_PPC) || defined(_M_PPC)
+
+#define HEYOKA_ARCH_PPC
+
+#endif
+
+namespace heyoka::detail
+{
+
+template <typename T>
+inline constexpr bool has_batch_mode = true;
+
+#if defined(HEYOKA_ARCH_PPC)
+
+template <>
+inline constexpr bool has_batch_mode<long double> = false;
+
+#endif
+
+} // namespace heyoka::detail
+
 #endif
