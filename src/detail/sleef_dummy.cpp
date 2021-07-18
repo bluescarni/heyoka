@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// LCOV_EXCL_START
+
 #include <sleef.h>
 
 extern "C" {
@@ -26,3 +28,5 @@ __attribute__((visibility("default")))
     return ::Sleef_sin_u10(x);
 }
 }
+
+// LCOV_EXCL_STOP

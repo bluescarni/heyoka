@@ -1002,140 +1002,176 @@ TEST_CASE("taylor div")
             REQUIRE(jet[5] == approximately(1 / fp_t{2} * (jet[3] * 2 - jet[2] * 3) / (2 * 2)));
         }
 
-#if 0
-        {
-            llvm_state s{kw::opt_level = opt_level};
+        if constexpr (detail::has_batch_mode<fp_t>) {
+            {
+                llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 1, 2, high_accuracy, compact_mode);
+                taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 1, 2, high_accuracy, compact_mode);
 
-            s.compile();
+                s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{3}, fp_t{4}};
-            jet.resize(8);
+                std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{3}, fp_t{4}};
+                jet.resize(8);
 
-            jptr(jet.data(), nullptr, nullptr);
+                jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == 2);
-            REQUIRE(jet[1] == -5);
+                REQUIRE(jet[0] == 2);
+                REQUIRE(jet[1] == -5);
 
-            REQUIRE(jet[2] == 3);
-            REQUIRE(jet[3] == 4);
+                REQUIRE(jet[2] == 3);
+                REQUIRE(jet[3] == 4);
 
-            REQUIRE(jet[4] == approximately(2 / fp_t{3}));
-            REQUIRE(jet[5] == approximately(-5 / fp_t{4}));
+                REQUIRE(jet[4] == approximately(2 / fp_t{3}));
+                REQUIRE(jet[5] == approximately(-5 / fp_t{4}));
 
-            REQUIRE(jet[6] == approximately(3 / fp_t{2}));
-            REQUIRE(jet[7] == approximately(4 / fp_t{-5}));
-        }
+                REQUIRE(jet[6] == approximately(3 / fp_t{2}));
+                REQUIRE(jet[7] == approximately(4 / fp_t{-5}));
+            }
 
-        {
-            llvm_state s{kw::opt_level = opt_level};
+            {
+                llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 2, high_accuracy, compact_mode);
+                taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 2, 2, high_accuracy, compact_mode);
 
-            s.compile();
+                s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{3}, fp_t{4}};
-            jet.resize(12);
+                std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{3}, fp_t{4}};
+                jet.resize(12);
 
-            jptr(jet.data(), nullptr, nullptr);
+                jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == 2);
-            REQUIRE(jet[1] == -5);
+                REQUIRE(jet[0] == 2);
+                REQUIRE(jet[1] == -5);
 
-            REQUIRE(jet[2] == 3);
-            REQUIRE(jet[3] == 4);
+                REQUIRE(jet[2] == 3);
+                REQUIRE(jet[3] == 4);
 
-            REQUIRE(jet[4] == approximately(2 / fp_t{3}));
-            REQUIRE(jet[5] == approximately(-5 / fp_t{4}));
+                REQUIRE(jet[4] == approximately(2 / fp_t{3}));
+                REQUIRE(jet[5] == approximately(-5 / fp_t{4}));
 
-            REQUIRE(jet[6] == approximately(3 / fp_t{2}));
-            REQUIRE(jet[7] == approximately(4 / fp_t{-5}));
+                REQUIRE(jet[6] == approximately(3 / fp_t{2}));
+                REQUIRE(jet[7] == approximately(4 / fp_t{-5}));
 
-            REQUIRE(jet[8] == approximately(1 / fp_t{2} * (jet[4] * 3 - jet[6] * 2) / (3 * 3)));
-            REQUIRE(jet[9] == approximately(1 / fp_t{2} * (jet[5] * 4 - jet[7] * -5) / (4 * 4)));
+                REQUIRE(jet[8] == approximately(1 / fp_t{2} * (jet[4] * 3 - jet[6] * 2) / (3 * 3)));
+                REQUIRE(jet[9] == approximately(1 / fp_t{2} * (jet[5] * 4 - jet[7] * -5) / (4 * 4)));
 
-            REQUIRE(jet[10] == approximately(1 / fp_t{2} * (jet[6] * 2 - jet[4] * 3) / (2 * 2)));
-            REQUIRE(jet[11] == approximately(1 / fp_t{2} * (jet[7] * -5 - jet[5] * 4) / (5 * 5)));
-        }
+                REQUIRE(jet[10] == approximately(1 / fp_t{2} * (jet[6] * 2 - jet[4] * 3) / (2 * 2)));
+                REQUIRE(jet[11] == approximately(1 / fp_t{2} * (jet[7] * -5 - jet[5] * 4) / (5 * 5)));
+            }
 
-        {
-            llvm_state s{kw::opt_level = opt_level};
+            {
+                llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 3, 3, high_accuracy, compact_mode);
+                taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 3, 3, high_accuracy, compact_mode);
 
-            s.compile();
+                s.compile();
 
-            auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
 
-            std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{1}, fp_t{3}, fp_t{4}, fp_t{-2}};
-            jet.resize(24);
+                std::vector<fp_t> jet{fp_t{2}, fp_t{-5}, fp_t{1}, fp_t{3}, fp_t{4}, fp_t{-2}};
+                jet.resize(24);
 
-            jptr(jet.data(), nullptr, nullptr);
+                jptr(jet.data(), nullptr, nullptr);
 
-            REQUIRE(jet[0] == 2);
-            REQUIRE(jet[1] == -5);
-            REQUIRE(jet[2] == 1);
+                REQUIRE(jet[0] == 2);
+                REQUIRE(jet[1] == -5);
+                REQUIRE(jet[2] == 1);
 
-            REQUIRE(jet[3] == 3);
-            REQUIRE(jet[4] == 4);
-            REQUIRE(jet[5] == -2);
+                REQUIRE(jet[3] == 3);
+                REQUIRE(jet[4] == 4);
+                REQUIRE(jet[5] == -2);
 
-            REQUIRE(jet[6] == approximately(2 / fp_t{3}));
-            REQUIRE(jet[7] == approximately(-5 / fp_t{4}));
-            REQUIRE(jet[8] == approximately(1 / fp_t{-2}));
+                REQUIRE(jet[6] == approximately(2 / fp_t{3}));
+                REQUIRE(jet[7] == approximately(-5 / fp_t{4}));
+                REQUIRE(jet[8] == approximately(1 / fp_t{-2}));
 
-            REQUIRE(jet[9] == approximately(3 / fp_t{2}));
-            REQUIRE(jet[10] == approximately(4 / fp_t{-5}));
-            REQUIRE(jet[11] == approximately(-2 / fp_t{1}));
+                REQUIRE(jet[9] == approximately(3 / fp_t{2}));
+                REQUIRE(jet[10] == approximately(4 / fp_t{-5}));
+                REQUIRE(jet[11] == approximately(-2 / fp_t{1}));
 
-            REQUIRE(jet[12] == approximately(1 / fp_t{2} * (jet[6] * 3 - jet[9] * 2) / (3 * 3)));
-            REQUIRE(jet[13] == approximately(1 / fp_t{2} * (jet[7] * 4 - jet[10] * -5) / (4 * 4)));
-            REQUIRE(jet[14] == approximately(1 / fp_t{2} * (jet[8] * -2 - jet[11] * 1) / (2 * 2)));
+                REQUIRE(jet[12] == approximately(1 / fp_t{2} * (jet[6] * 3 - jet[9] * 2) / (3 * 3)));
+                REQUIRE(jet[13] == approximately(1 / fp_t{2} * (jet[7] * 4 - jet[10] * -5) / (4 * 4)));
+                REQUIRE(jet[14] == approximately(1 / fp_t{2} * (jet[8] * -2 - jet[11] * 1) / (2 * 2)));
 
-            REQUIRE(jet[15] == approximately(1 / fp_t{2} * (jet[9] * 2 - jet[6] * 3) / (2 * 2)));
-            REQUIRE(jet[16] == approximately(1 / fp_t{2} * (jet[10] * -5 - jet[7] * 4) / (5 * 5)));
-            REQUIRE(jet[17] == approximately(1 / fp_t{2} * (jet[11] * 1 - jet[8] * -2) / (1 * 1)));
+                REQUIRE(jet[15] == approximately(1 / fp_t{2} * (jet[9] * 2 - jet[6] * 3) / (2 * 2)));
+                REQUIRE(jet[16] == approximately(1 / fp_t{2} * (jet[10] * -5 - jet[7] * 4) / (5 * 5)));
+                REQUIRE(jet[17] == approximately(1 / fp_t{2} * (jet[11] * 1 - jet[8] * -2) / (1 * 1)));
 
-            REQUIRE(jet[18]
+                REQUIRE(
+                    jet[18]
                     == approximately(1 / fp_t{6}
                                      * ((2 * jet[12] * 3 + jet[6] * jet[9] - 2 * jet[15] * 2 - jet[9] * jet[6]) * 3 * 3
                                         - 2 * 3 * jet[9] * (jet[6] * 3 - jet[9] * 2))
                                      / (3 * 3 * 3 * 3)));
-            REQUIRE(jet[19]
-                    == approximately(
-                        1 / fp_t{6}
-                        * ((2 * jet[13] * 4 - 2 * jet[16] * -5) * 4 * 4 - 2 * 4 * jet[10] * (jet[7] * 4 - jet[10] * -5))
-                        / (4 * 4 * 4 * 4)));
-            REQUIRE(jet[20]
-                    == approximately(1 / fp_t{6}
-                                     * ((2 * jet[14] * -2 - 2 * jet[17] * 1) * 2 * 2
-                                        - 2 * -2 * jet[11] * (jet[8] * -2 - jet[11] * 1))
-                                     / (2 * 2 * 2 * 2)));
+                REQUIRE(jet[19]
+                        == approximately(1 / fp_t{6}
+                                         * ((2 * jet[13] * 4 - 2 * jet[16] * -5) * 4 * 4
+                                            - 2 * 4 * jet[10] * (jet[7] * 4 - jet[10] * -5))
+                                         / (4 * 4 * 4 * 4)));
+                REQUIRE(jet[20]
+                        == approximately(1 / fp_t{6}
+                                         * ((2 * jet[14] * -2 - 2 * jet[17] * 1) * 2 * 2
+                                            - 2 * -2 * jet[11] * (jet[8] * -2 - jet[11] * 1))
+                                         / (2 * 2 * 2 * 2)));
 
-            REQUIRE(jet[21]
+                REQUIRE(
+                    jet[21]
                     == approximately(1 / fp_t{6}
                                      * ((2 * jet[15] * 2 + jet[9] * jet[6] - 2 * jet[12] * 3 - jet[9] * jet[6]) * 2 * 2
                                         - 2 * 2 * jet[6] * (jet[9] * 2 - jet[6] * 3))
                                      / (2 * 2 * 2 * 2)));
-            REQUIRE(jet[22]
-                    == approximately(
-                        1 / fp_t{6}
-                        * ((2 * jet[16] * -5 - 2 * jet[13] * 4) * 5 * 5 - 2 * -5 * jet[7] * (jet[10] * -5 - jet[7] * 4))
-                        / (5 * 5 * 5 * 5)));
-            REQUIRE(jet[23]
-                    == approximately(
-                        1 / fp_t{6}
-                        * ((2 * jet[17] * 1 - 2 * jet[14] * -2) * 1 * 1 - 2 * 1 * jet[8] * (jet[11] * 1 - jet[8] * -2))
-                        / (1 * 1 * 1 * 1)));
-        }
+                REQUIRE(jet[22]
+                        == approximately(1 / fp_t{6}
+                                         * ((2 * jet[16] * -5 - 2 * jet[13] * 4) * 5 * 5
+                                            - 2 * -5 * jet[7] * (jet[10] * -5 - jet[7] * 4))
+                                         / (5 * 5 * 5 * 5)));
+                REQUIRE(jet[23]
+                        == approximately(1 / fp_t{6}
+                                         * ((2 * jet[17] * 1 - 2 * jet[14] * -2) * 1 * 1
+                                            - 2 * 1 * jet[8] * (jet[11] * 1 - jet[8] * -2))
+                                         / (1 * 1 * 1 * 1)));
+            }
 
-        compare_batch_scalar<fp_t>({x / y, y / x}, opt_level, high_accuracy, compact_mode);
-#endif
+            compare_batch_scalar<fp_t>({x / y, y / x}, opt_level, high_accuracy, compact_mode);
+        } else {
+            {
+                llvm_state s{kw::opt_level = opt_level};
+
+                taylor_add_jet<fp_t>(s, "jet", {x / y, y / x}, 3, 1, high_accuracy, compact_mode);
+
+                s.compile();
+
+                auto jptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("jet"));
+
+                std::vector<fp_t> jet{fp_t{2}, fp_t{3}};
+                jet.resize(24);
+
+                jptr(jet.data(), nullptr, nullptr);
+
+                REQUIRE(jet[0] == 2);
+                REQUIRE(jet[1] == 3);
+                REQUIRE(jet[2] == approximately(2 / fp_t{3}));
+                REQUIRE(jet[3] == approximately(3 / fp_t{2}));
+                REQUIRE(jet[4] == approximately(1 / fp_t{2} * (jet[2] * 3 - jet[3] * 2) / (3 * 3)));
+                REQUIRE(jet[5] == approximately(1 / fp_t{2} * (jet[3] * 2 - jet[2] * 3) / (2 * 2)));
+                REQUIRE(
+                    jet[6]
+                    == approximately(1 / fp_t{6}
+                                     * ((2 * jet[4] * 3 + jet[2] * jet[3] - 2 * jet[5] * 2 - jet[3] * jet[2]) * 3 * 3
+                                        - 2 * 3 * jet[3] * (jet[2] * 3 - jet[3] * 2))
+                                     / (3 * 3 * 3 * 3)));
+                REQUIRE(
+                    jet[7]
+                    == approximately(1 / fp_t{6}
+                                     * ((2 * jet[5] * 2 + jet[3] * jet[2] - 2 * jet[4] * 3 - jet[3] * jet[2]) * 2 * 2
+                                        - 2 * 2 * jet[2] * (jet[3] * 2 - jet[2] * 3))
+                                     / (2 * 2 * 2 * 2)));
+            }
+        }
     };
 
     for (auto cm : {false, true}) {
