@@ -34,6 +34,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -5505,6 +5506,11 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
+    }
+
+    if (!has_batch_mode<T> && batch_size > 1u) {
+        throw std::invalid_argument("Batch mode is not supported for the type '{}' on this platform"_format(
+            boost::core::demangle(typeid(T).name())));
     }
 
     auto &builder = s.builder();

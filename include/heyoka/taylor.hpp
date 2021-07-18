@@ -25,6 +25,7 @@
 #include <variant>
 #include <vector>
 
+#include <boost/core/demangle.hpp>
 #include <boost/math/tools/precision.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -956,6 +957,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     template <typename U, typename... KwArgs>
     void finalise_ctor(U sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
+        if constexpr (!has_batch_mode<T>) {
+            throw std::invalid_argument("Batch mode is not supported for the type '"
+                                        + boost::core::demangle(typeid(T).name()) + "' on this platform");
+        }
+
         igor::parser p{kw_args...};
 
         if constexpr (p.has_unnamed_arguments()) {
