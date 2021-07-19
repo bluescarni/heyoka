@@ -113,15 +113,6 @@ const auto type_map = []() {
                 return ret;
             };
 #endif
-#if defined(HEYOKA_ARCH_PPC)
-        } else if (std::numeric_limits<long double>::digits == 106) {
-            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // Double-double precision format.
-                auto ret = llvm::Type::getPPC_FP128Ty(c);
-                assert(ret != nullptr);
-                return ret;
-            };
-#endif
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).

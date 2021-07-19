@@ -48,19 +48,4 @@
 
 #endif
 
-namespace heyoka::detail
-{
-
-template <typename T>
-inline constexpr bool has_batch_mode = true;
-
-#if defined(HEYOKA_ARCH_PPC)
-
-template <>
-inline constexpr bool has_batch_mode<long double> = false;
-
-#endif
-
-} // namespace heyoka::detail
-
 #endif
