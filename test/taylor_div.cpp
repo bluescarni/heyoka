@@ -800,7 +800,7 @@ TEST_CASE("taylor div")
                     == approximately(4 / fp_t{6} * (2 * jet[12] * 2 * 2 - jet[6] * 2 * 2 * jet[6]) / (2 * 2 * 2 * 2)));
             REQUIRE(jet[22]
                     == approximately(4 / fp_t{6} * (2 * jet[13] * 4 * 4 + jet[7] * 2 * 4 * jet[7]) / (4 * 4 * 4 * 4)));
-            REQUIRE(jet[22]
+            REQUIRE(jet[23]
                     == approximately(4 / fp_t{6} * (2 * jet[14] * 1 * 1 - jet[8] * 2 * 1 * jet[8]) / (1 * 1 * 1 * 1)));
         }
 
@@ -857,7 +857,7 @@ TEST_CASE("taylor div")
                     == approximately(4 / fp_t{6} * (2 * jet[12] * 2 * 2 - jet[6] * 2 * 2 * jet[6]) / (2 * 2 * 2 * 2)));
             REQUIRE(jet[22]
                     == approximately(4 / fp_t{6} * (2 * jet[13] * 4 * 4 + jet[7] * 2 * 4 * jet[7]) / (4 * 4 * 4 * 4)));
-            REQUIRE(jet[22]
+            REQUIRE(jet[23]
                     == approximately(4 / fp_t{6} * (2 * jet[14] * 1 * 1 - jet[8] * 2 * 1 * jet[8]) / (1 * 1 * 1 * 1)));
         }
 
