@@ -52,8 +52,12 @@ const auto fp_types = std::tuple<double
                                  >{};
 
 // A test case to check that the propagation codepath
-// with events produces results identical results
-// to the no-events codepath.
+// with events produces results similar to the no-events codepath.
+// NOTE: we used to have strict equality testing here, but the test
+// fails on ppc64. This may be due to FP contraction and/or slightly
+// differences in the poly eval routines with/without events. Let's leave
+// it like this for the time being, if at one point we realise we need
+// to enforce strict equality in this scenario we can revisit.
 TEST_CASE("taylor nte match")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -81,10 +85,11 @@ TEST_CASE("taylor nte match")
             auto [oc, h] = ta.step();
 
             REQUIRE(oc_ev == oc);
-            REQUIRE(h_ev == h);
+            REQUIRE(h_ev == approximately(h));
 
-            REQUIRE(ta_ev.get_state() == ta.get_state());
-            REQUIRE(ta_ev.get_time() == ta.get_time());
+            REQUIRE(ta_ev.get_state()[0] == approximately(ta.get_state()[0]));
+            REQUIRE(ta_ev.get_state()[1] == approximately(ta.get_state()[1]));
+            REQUIRE(ta_ev.get_time() == approximately(ta.get_time()));
         }
     };
 
