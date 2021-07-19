@@ -26,6 +26,8 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
+#include <iostream>
+
 namespace heyoka::detail
 {
 
@@ -73,6 +75,11 @@ auto make_sleef_map_dbl()
         retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
     } else if (features.aarch64) {
         retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
+    } else if (features.vsx3) {
+        std::cout << "SLEEF SIN VSX3\n";
+        retval[{"sin", 2}] = "Sleef_sind2_u10vsx3";
+    } else if (features.vsx) {
+        retval[{"sin", 2}] = "Sleef_sind2_u10vsx";
     }
 
     // cos().
@@ -90,6 +97,11 @@ auto make_sleef_map_dbl()
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
+    } else if (features.vsx3) {
+        std::cout << "SLEEF COS VSX3\n";
+        retval[{"cos", 2}] = "Sleef_cosd2_u10vsx3";
+    } else if (features.vsx) {
+        retval[{"cos", 2}] = "Sleef_cosd2_u10vsx";
     }
 
     // log().
