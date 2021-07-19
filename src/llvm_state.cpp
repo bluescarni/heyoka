@@ -184,7 +184,7 @@ target_features get_target_features_impl()
                 if (ret.ec == std::errc{}) {
                     if (pwr_idx >= 9) {
                         std::cout << "PPC VSX3\n";
-                        retval.vsx3 = true;
+                        // retval.vsx3 = true;
                     }
 
                     if (pwr_idx >= 7) {

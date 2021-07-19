@@ -79,6 +79,7 @@ auto make_sleef_map_dbl()
         std::cout << "SLEEF SIN VSX3\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10vsx3";
     } else if (features.vsx) {
+        std::cout << "SLEEF SIN VSX\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10vsx";
     }
 
@@ -101,6 +102,7 @@ auto make_sleef_map_dbl()
         std::cout << "SLEEF COS VSX3\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10vsx3";
     } else if (features.vsx) {
+        std::cout << "SLEEF COS VSX\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10vsx";
     }
 
