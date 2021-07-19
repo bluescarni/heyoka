@@ -83,6 +83,8 @@
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
+#include <iostream>
+
 #if defined(_MSC_VER) && !defined(__clang__)
 
 // NOTE: MSVC has issues with the other "using"
@@ -153,10 +155,15 @@ target_features get_target_features_impl()
         retval.aarch64 = true;
     }
 
+    std::cout << "TARGET NAME: " << target_name << '\n';
+
     if (boost::starts_with(target_name, "powerpc64")) {
+        std::cout << "PPC detected\n";
         // On powerpc, detect the presence of the VSX
         // instruction set from the CPU string.
         const auto target_cpu = std::string{(*tm)->getTargetCPU()};
+
+        std::cout << "TARGET cpu: " << target_cpu << '\n';
 
         // NOTE: the pattern reported by LLVM here seems to be pwrN
         // (sample size of 1, on travis...).
@@ -164,6 +171,7 @@ target_features get_target_features_impl()
         std::cmatch m;
 
         if (std::regex_match(target_cpu.c_str(), m, pattern)) {
+            std::cout << "REGEX MATCH\n";
             if (m.size() == 2u) {
                 // The CPU name matches and contains a subgroup.
                 // Extract the N from "pwrN".
@@ -175,10 +183,12 @@ target_features get_target_features_impl()
                 // https://packages.gentoo.org/useflags/cpu_flags_ppc_vsx3
                 if (ret.ec == std::errc{}) {
                     if (pwr_idx >= 9) {
+                        std::cout << "PPC VSX3\n";
                         retval.vsx3 = true;
                     }
 
                     if (pwr_idx >= 7) {
+                        std::cout << "PPC VSX\n";
                         retval.vsx = true;
                     }
                 }
