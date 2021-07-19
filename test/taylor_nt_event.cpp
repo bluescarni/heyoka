@@ -85,11 +85,11 @@ TEST_CASE("taylor nte match")
             auto [oc, h] = ta.step();
 
             REQUIRE(oc_ev == oc);
-            REQUIRE(h_ev == approximately(h));
+            REQUIRE(h_ev == approximately(h, fp_t(1000)));
 
-            REQUIRE(ta_ev.get_state()[0] == approximately(ta.get_state()[0]));
-            REQUIRE(ta_ev.get_state()[1] == approximately(ta.get_state()[1]));
-            REQUIRE(ta_ev.get_time() == approximately(ta.get_time()));
+            REQUIRE(ta_ev.get_state()[0] == approximately(ta.get_state()[0], fp_t(1000)));
+            REQUIRE(ta_ev.get_state()[1] == approximately(ta.get_state()[1], fp_t(1000)));
+            REQUIRE(ta_ev.get_time() == approximately(ta.get_time(), fp_t(1000)));
         }
     };
 
