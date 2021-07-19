@@ -157,7 +157,7 @@ target_features get_target_features_impl()
 
     std::cout << "TARGET NAME: " << target_name << '\n';
 
-    if (boost::starts_with(target_name, "powerpc64")) {
+    if (boost::starts_with(target_name, "ppc64")) {
         std::cout << "PPC detected\n";
         // On powerpc, detect the presence of the VSX
         // instruction set from the CPU string.
