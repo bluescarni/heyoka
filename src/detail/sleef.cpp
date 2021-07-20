@@ -26,8 +26,6 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/llvm_state.hpp>
 
-#include <iostream>
-
 namespace heyoka::detail
 {
 
@@ -79,7 +77,6 @@ auto make_sleef_map_dbl()
     } else if (features.aarch64) {
         retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
     } else if (features.vsx) {
-        std::cout << "SLEEF SIN VSX\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10vsx";
     }
 
@@ -99,7 +96,6 @@ auto make_sleef_map_dbl()
     } else if (features.aarch64) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
     } else if (features.vsx) {
-        std::cout << "SLEEF COS VSX\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10vsx";
     }
 
@@ -232,6 +228,8 @@ auto make_sleef_map_dbl()
         retval[{"atan", 2}] = "Sleef_atand2_u10sse2";
     } else if (features.aarch64) {
         retval[{"atan", 2}] = "Sleef_atand2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"atan", 2}] = "Sleef_atand2_u10vsx";
     }
 
     // cosh().
@@ -249,6 +247,8 @@ auto make_sleef_map_dbl()
         retval[{"cosh", 2}] = "Sleef_coshd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"cosh", 2}] = "Sleef_coshd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10vsx";
     }
 
     // sinh().
@@ -266,6 +266,8 @@ auto make_sleef_map_dbl()
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10vsx";
     }
 
     // tanh().
@@ -283,6 +285,8 @@ auto make_sleef_map_dbl()
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10vsx";
     }
 
     // asinh().
@@ -300,6 +304,8 @@ auto make_sleef_map_dbl()
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10vsx";
     }
 
     // acosh().
@@ -317,6 +323,8 @@ auto make_sleef_map_dbl()
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10vsx";
     }
 
     // atanh().
@@ -334,6 +342,8 @@ auto make_sleef_map_dbl()
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10vsx";
     }
 
     // erf().
@@ -351,6 +361,8 @@ auto make_sleef_map_dbl()
         retval[{"erf", 2}] = "Sleef_erfd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"erf", 2}] = "Sleef_erfd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"erf", 2}] = "Sleef_erfd2_u10vsx";
     }
 
     return retval;
