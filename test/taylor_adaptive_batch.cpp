@@ -766,3 +766,18 @@ TEST_CASE("def ctor")
 
     tuple_for_each(fp_types, tester);
 }
+
+#if defined(HEYOKA_ARCH_PPC)
+
+TEST_CASE("ppc long double")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<long double>{
+                               {prime(x) = v, prime(v) = -9.8l * sin(x)}, {0.05l, 0.06l, 0.025l, 0.026l}, 2u}),
+                           std::invalid_argument, Message("'long double' computations are not supported on PowerPC"));
+}
+
+#endif

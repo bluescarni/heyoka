@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <stdexcept>
 #include <vector>
 
 #include <fmt/format.h>
@@ -15,6 +16,7 @@
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xview.hpp>
 
+#include <heyoka/config.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
@@ -469,3 +471,24 @@ TEST_CASE("nbody")
         }
     }
 }
+
+#if defined(HEYOKA_ARCH_PPC)
+
+TEST_CASE("ppc long double")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s;
+
+    REQUIRE_THROWS_MATCHES(
+        (taylor_add_jet<long double>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 1, false, false, {x + y})),
+        std::invalid_argument, Message("'long double' computations are not supported on PowerPC"));
+
+    REQUIRE_THROWS_MATCHES(
+        (taylor_add_jet<long double>(s, "jet", {prime(x) = y, prime(y) = x}, 3, 2, false, false, {x + y})),
+        std::invalid_argument, Message("'long double' computations are not supported on PowerPC"));
+}
+
+#endif

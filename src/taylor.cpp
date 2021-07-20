@@ -3227,6 +3227,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                  std::vector<nt_event_t> ntes)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Assign the data members.
@@ -4375,6 +4381,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Init the data members.
@@ -5506,6 +5518,12 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
     }
+
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+    }
+#endif
 
     auto &builder = s.builder();
 
