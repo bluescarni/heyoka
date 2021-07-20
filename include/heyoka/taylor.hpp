@@ -25,8 +25,6 @@
 #include <variant>
 #include <vector>
 
-#include <boost/math/tools/precision.hpp>
-
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -328,7 +326,7 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
             // the code below.
         }
 
-        return boost::math::tools::epsilon<T>();
+        return std::numeric_limits<T>::epsilon();
     }();
 
     // Compact mode (defaults to false).

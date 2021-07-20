@@ -20,8 +20,6 @@
 #include <type_traits>
 #include <utility>
 
-#include <boost/math/tools/precision.hpp>
-
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xfixed.hpp>
 #include <xtensor/xshape.hpp>
@@ -42,7 +40,7 @@ inline bool operator==(const T &cmp, const approximately<T> &a)
 {
     using std::abs;
 
-    const auto tol = boost::math::tools::epsilon<T>() * a.m_eps_mul;
+    const auto tol = std::numeric_limits<T>::epsilon() * a.m_eps_mul;
 
     if (abs(cmp) < tol) {
         return abs(cmp - a.m_value) <= tol;

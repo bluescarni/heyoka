@@ -24,7 +24,6 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/tools/precision.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -1411,7 +1410,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto max_iter = builder.getInt32(50);
         auto loop_cond = [&,
                           // NOTE: tolerance is 4 * eps.
-                          tol = vector_splat(builder, codegen<T>(s, number{boost::math::tools::epsilon<T>() * 4}),
+                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
                                              batch_size)]() -> llvm::Value * {
             auto c_cond = builder.CreateICmpULT(builder.CreateLoad(counter), max_iter);
 

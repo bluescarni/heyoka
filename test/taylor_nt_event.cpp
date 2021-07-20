@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <tuple>
 #include <typeinfo>
@@ -19,7 +20,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/math/tools/precision.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -183,7 +183,7 @@ TEST_CASE("taylor glancing blow test")
             {fp_t(0.), fp_t(0.), fp_t(-10.), fp_t(2), fp_t(0.), fp_t(0.), fp_t(1.), fp_t(0.)},
             kw::nt_events
             = {ev_t(square(x0 - x1) + square(y0 - y1) - 4., [&counter](taylor_adaptive<fp_t> &, fp_t t, int) {
-                  REQUIRE((t - 10.) * (t - 10.) <= boost::math::tools::epsilon<fp_t>());
+                  REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
 
                   ++counter;
               })}};
@@ -263,7 +263,7 @@ TEST_CASE("taylor nte multizero")
                                                     ta.update_d_output(t);
 
                                                     const auto v = ta.get_d_output()[1];
-                                                    REQUIRE(abs(v * v - 1e-10) < boost::math::tools::epsilon<fp_t>());
+                                                    REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                                     ++counter;
 
@@ -285,7 +285,7 @@ TEST_CASE("taylor nte multizero")
                                                ta.update_d_output(t);
 
                                                const auto v = ta.get_d_output()[1];
-                                               REQUIRE(abs(v) <= boost::math::tools::epsilon<fp_t>() * 100);
+                                               REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                ++counter;
 
@@ -330,7 +330,7 @@ TEST_CASE("taylor nte multizero")
                                                ta.update_d_output(t);
 
                                                const auto v = ta.get_d_output()[1];
-                                               REQUIRE(abs(v * v - 1e-10) < boost::math::tools::epsilon<fp_t>());
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                                ++counter;
 
@@ -357,7 +357,7 @@ TEST_CASE("taylor nte multizero")
                                               ta.update_d_output(t);
 
                                               const auto v = ta.get_d_output()[1];
-                                              REQUIRE(abs(v) <= boost::math::tools::epsilon<fp_t>() * 100);
+                                              REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                               ++counter;
 
@@ -424,7 +424,7 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                     ta.update_d_output(t);
 
                                                     const auto v = ta.get_d_output()[1];
-                                                    REQUIRE(abs(v * v - 1e-10) < boost::math::tools::epsilon<fp_t>());
+                                                    REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                                     ++counter;
 
@@ -446,7 +446,7 @@ TEST_CASE("taylor nte multizero negative timestep")
                                                ta.update_d_output(t);
 
                                                const auto v = ta.get_d_output()[1];
-                                               REQUIRE(abs(v) <= boost::math::tools::epsilon<fp_t>() * 100);
+                                               REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
 
                                                ++counter;
 
