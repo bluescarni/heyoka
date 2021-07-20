@@ -23,7 +23,7 @@
 
     
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="_static/sphinx-book-theme.acff12b8f9c144ce68a297486a2fa670.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sphinx-book-theme.e8e5499552300ddf5d7adccae7cc3b70.css" type="text/css" />
     
   <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
 
@@ -327,8 +327,8 @@ a continuous integration pipeline which currently includes:</p>
 to compile heyoka using the standard library from MSVC 2017 in conjunction
 with the <code class="docutils literal notranslate"><span class="pre">clang-cl</span></code> compiler.</p>
 </div>
-<p>The explicitly-supported CPU architectures at this time are x86-64
-and 64-bit ARM.</p>
+<p>The tested and supported CPU architectures at this time are x86-64,
+64-bit ARM and 64-bit PowerPC.</p>
 <p>heyoka has the following <strong>mandatory</strong> dependencies:</p>
 <ul class="simple">
 <li><p>the <a class="reference external" href="https://llvm.org/">LLVM</a> compiler infrastructure library (version &gt;= 10),</p></li>
@@ -367,6 +367,12 @@ quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, the nonstandard <code class="docutils literal notranslate"><span class="pre">__float128</span></code> floating-point type must be
 <a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html">available and supported</a>
 and heyoka must be compiled with the <code class="docutils literal notranslate"><span class="pre">HEYOKA_WITH_MPPP</span></code> option enabled (see <a class="reference internal" href="#installation-from-source"><span class="std std-ref">below</span></a>).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The non-IEEE <code class="docutils literal notranslate"><span class="pre">long</span> <span class="pre">double</span></code> type available on some PowerPC platforms
+(which implements a double-length floating-point representation with 106
+significant bits) is <strong>not</strong> supported by heyoka at this time.</p>
+</div>
 </div>
 </div>
 </div>
