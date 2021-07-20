@@ -8,6 +8,8 @@
 
 #include <sleef.h>
 
+// LCOV_EXCL_START
+
 extern "C" {
 
 // NOTE: this function is here only to introduce a fake
@@ -26,3 +28,5 @@ __attribute__((visibility("default")))
     return ::Sleef_sin_u10(x);
 }
 }
+
+// LCOV_EXCL_STOP

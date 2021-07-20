@@ -24,13 +24,15 @@ template <typename T>
 inline auto binomial(std::uint32_t i, std::uint32_t j)
 {
     // NOTE: the Boost implementation requires j <= i.
-    assert(j <= i);
+    assert(j <= i); // LCOV_EXCL_LINE
     return boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i), boost::numeric_cast<unsigned>(j));
 }
 
 // NOTE: if Boost does not support long double, we provide
 // our own implementation.
 #if defined(BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS)
+
+// LCOV_EXCL_START
 
 template <>
 inline auto binomial<long double>(std::uint32_t i, std::uint32_t j)
@@ -43,6 +45,8 @@ inline auto binomial<long double>(std::uint32_t i, std::uint32_t j)
 
     return std::exp(a - b - c);
 }
+
+// LCOV_EXCL_STOP
 
 #endif
 
