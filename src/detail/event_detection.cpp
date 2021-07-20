@@ -27,7 +27,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/math/policies/policy.hpp>
-#include <boost/math/tools/precision.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
@@ -1124,7 +1123,7 @@ T taylor_deduce_cooldown_impl(T h)
     using std::abs;
 
     const auto abs_h = abs(h);
-    constexpr auto delta = 12 * boost::math::tools::epsilon<T>();
+    constexpr auto delta = 12 * std::numeric_limits<T>::epsilon();
 
     // NOTE: in order to avoid issues with small timesteps
     // or zero timestep, we use delta as a relative value

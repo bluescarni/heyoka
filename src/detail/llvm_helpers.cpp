@@ -24,8 +24,6 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/binomial.hpp>
-#include <boost/math/tools/precision.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -55,6 +53,7 @@
 
 #endif
 
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
@@ -104,6 +103,7 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
+#if defined(HEYOKA_ARCH_X86)
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
@@ -111,15 +111,7 @@ const auto type_map = []() {
                 assert(ret != nullptr);
                 return ret;
             };
-        } else if (std::numeric_limits<long double>::digits == 106) {
-            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // Double-double precision format.
-                // NOTE: this is PowerPC-specific, perhaps we might
-                // want to bracket this into an #ifdef.
-                auto ret = llvm::Type::getPPC_FP128Ty(c);
-                assert(ret != nullptr);
-                return ret;
-            };
+#endif
         } else if (std::numeric_limits<long double>::digits == 113) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // IEEE quadruple-precision format (e.g., ARM 64).
@@ -1418,7 +1410,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto max_iter = builder.getInt32(50);
         auto loop_cond = [&,
                           // NOTE: tolerance is 4 * eps.
-                          tol = vector_splat(builder, codegen<T>(s, number{boost::math::tools::epsilon<T>() * 4}),
+                          tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
                                              batch_size)]() -> llvm::Value * {
             auto c_cond = builder.CreateICmpULT(builder.CreateLoad(counter), max_iter);
 
@@ -1551,9 +1543,7 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i),
-                                                                             boost::numeric_cast<unsigned>(j))
-                                      : T(0);
+            const auto val = (j <= i) ? binomial<T>(i, j) : T(0);
             bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
         }
     }

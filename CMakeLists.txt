@@ -23,6 +23,12 @@ message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "heyoka version: ${heyoka_VERSION}")
 
+# Print some info about the long double type.
+include(CheckTypeSize)
+CHECK_TYPE_SIZE("long double" _HEYOKA_LONG_DOUBLE_SIZE LANGUAGE CXX)
+message(STATUS "Size of the long double type: ${_HEYOKA_LONG_DOUBLE_SIZE}")
+unset(_HEYOKA_LONG_DOUBLE_SIZE)
+
 # Run the YACMA compiler setup.
 include(YACMACompilerLinkerSettings)
 
@@ -214,6 +220,15 @@ set(HEYOKA_SRC_FILES
     # building with sleef support on.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
+
+if(HEYOKA_WITH_SLEEF)
+    # NOTE: the sleef dummy file needs to be compiled only
+    # if we are building with sleef support on.
+    set(HEYOKA_SRC_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
+        "${HEYOKA_SRC_FILES}"
+    )
+endif()
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.

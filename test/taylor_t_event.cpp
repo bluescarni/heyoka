@@ -18,7 +18,6 @@
 #include <utility>
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/math/tools/precision.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -39,7 +38,11 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -179,7 +182,7 @@ TEST_CASE("taylor te basic")
                                          ta.update_d_output(t);
 
                                          const auto v = ta.get_d_output()[1];
-                                         REQUIRE(abs(v * v - 1e-10) < boost::math::tools::epsilon<fp_t>());
+                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
                                          ++counter_nt;
 
@@ -198,7 +201,7 @@ TEST_CASE("taylor te basic")
                     }
 
                     const auto v = ta.get_state()[1];
-                    REQUIRE(abs(v) < boost::math::tools::epsilon<fp_t>() * 100);
+                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                     ++counter_t;
 
@@ -346,7 +349,7 @@ TEST_CASE("taylor te close")
 
         t_ev_t ev1(x);
         t_ev_t ev2(
-            x - boost::math::tools::epsilon<fp_t>() * 2, kw::callback = [](taylor_adaptive<fp_t> &, bool mr, int) {
+            x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](taylor_adaptive<fp_t> &, bool mr, int) {
                 REQUIRE(!mr);
                 return true;
             });
@@ -418,7 +421,7 @@ TEST_CASE("taylor te retrigger")
 
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
-        t_ev_t ev(x - (1 - boost::math::tools::epsilon<fp_t>() * 6));
+        t_ev_t ev(x - (1 - std::numeric_limits<fp_t>::epsilon() * 6));
 
         auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                         {fp_t(1), fp_t(0)},
@@ -578,7 +581,7 @@ TEST_CASE("taylor te custom cooldown")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
 
         t_ev_t ev(
-            v * v - boost::math::tools::epsilon<fp_t>() * 4,
+            v * v - std::numeric_limits<fp_t>::epsilon() * 4,
             kw::callback =
                 [](taylor_adaptive<fp_t> &, bool mr, int) {
                     REQUIRE(mr);
@@ -863,7 +866,7 @@ TEST_CASE("taylor te boolean callback")
                     }
 
                     const auto v = ta.get_state()[1];
-                    REQUIRE(abs(v) < boost::math::tools::epsilon<fp_t>() * 100);
+                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
 
                     ++counter_t;
 

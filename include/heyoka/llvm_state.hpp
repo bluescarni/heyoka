@@ -35,11 +35,18 @@ namespace detail
 // Helper struct to signal the availability
 // of certain features on the host machine.
 struct target_features {
+    // x86.
     bool sse2 = false;
     bool avx = false;
     bool avx2 = false;
     bool avx512f = false;
+    // aarch64.
     bool aarch64 = false;
+    // powerpc64.
+    // NOTE: for now, in the sleef support
+    // bit we need only vsx and vsx3 (not vsx2).
+    bool vsx = false;
+    bool vsx3 = false;
 };
 
 // NOTE: no need to make this DLL-public as long

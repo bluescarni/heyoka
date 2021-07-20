@@ -14,7 +14,7 @@ wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge
 export deps_dir=$HOME/local
 export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
-conda create -y -q -p $deps_dir cmake llvmdev boost-cpp sleef xtensor xtensor-blas blas blas-devel fmt"<8" spdlog
+conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev boost-cpp sleef xtensor xtensor-blas blas blas-devel fmt"<8" spdlog
 source activate $deps_dir
 
 # Create the build dir and cd into it.
@@ -28,7 +28,7 @@ make -j2 VERBOSE=1
 ctest -V -j2
 
 # Upload coverage data.
-# bash <(curl -s https://codecov.io/bash) -x gcov-9
+bash <(curl -s https://codecov.io/bash) -x gcov-9
 
 set +e
 set +x
