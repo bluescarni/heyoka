@@ -228,6 +228,21 @@ if(HEYOKA_WITH_SLEEF)
         "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
         "${HEYOKA_SRC_FILES}"
     )
+
+    # NOTE: on the conda ppc packages for sleef VSX3 is not enabled.
+    # Thus, we run a check here to see which VSX version is supported.
+    # Note that this pattern can be extended to other archs if it
+    # becomes necessary (e.g., sleef has been compiled on x86 without
+    # AVX2 support).
+    if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "ppc")
+        include(CheckFunctionExists)
+        message(STATUS "PPC architecture detected, checking VSX support in SLEEF.")
+
+        set(CMAKE_REQUIRED_LIBRARIES "${HEYOKA_SLEEF_LIBRARY}")
+        check_function_exists("Sleef_sind2_u10vsx3" HEYOKA_SLEEF_WITH_VSX3)
+        check_function_exists("Sleef_sind2_u10vsx" HEYOKA_SLEEF_WITH_VSX)
+        unset(CMAKE_REQUIRED_LIBRARIES)
+    endif()
 endif()
 
 if(HEYOKA_BUILD_STATIC_LIBRARY)

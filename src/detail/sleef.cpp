@@ -75,12 +75,16 @@ auto make_sleef_map_dbl()
         retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
     } else if (features.aarch64) {
         retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
+#if defined(HEYOKA_SLEEF_WITH_VSX3)
     } else if (features.vsx3) {
         std::cout << "SLEEF SIN VSX3\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10vsx3";
+#endif
+#if defined(HEYOKA_SLEEF_WITH_VSX)
     } else if (features.vsx) {
         std::cout << "SLEEF SIN VSX\n";
         retval[{"sin", 2}] = "Sleef_sind2_u10vsx";
+#endif
     }
 
     // cos().
@@ -98,12 +102,16 @@ auto make_sleef_map_dbl()
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
     } else if (features.aarch64) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
+#if defined(HEYOKA_SLEEF_WITH_VSX3)
     } else if (features.vsx3) {
         std::cout << "SLEEF COS VSX3\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10vsx3";
+#endif
+#if defined(HEYOKA_SLEEF_WITH_VSX)
     } else if (features.vsx) {
         std::cout << "SLEEF COS VSX\n";
         retval[{"cos", 2}] = "Sleef_cosd2_u10vsx";
+#endif
     }
 
     // log().
