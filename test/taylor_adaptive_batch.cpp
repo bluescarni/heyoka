@@ -29,6 +29,7 @@
 
 #endif
 
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -777,7 +778,7 @@ TEST_CASE("ppc long double")
 
     REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<long double>{
                                {prime(x) = v, prime(v) = -9.8l * sin(x)}, {0.05l, 0.06l, 0.025l, 0.026l}, 2u}),
-                           std::invalid_argument, Message("'long double' computations are not supported on PowerPC"));
+                           not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
 }
 
 #endif

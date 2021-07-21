@@ -67,6 +67,7 @@
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -3229,7 +3230,7 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
-        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
 #endif
 
@@ -4383,7 +4384,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
-        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
 #endif
 
@@ -5521,7 +5522,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
-        throw std::invalid_argument("'long double' computations are not supported on PowerPC");
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
     }
 #endif
 
