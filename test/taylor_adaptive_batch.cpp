@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xview.hpp>
@@ -769,6 +771,24 @@ TEST_CASE("def ctor")
     };
 
     tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("stream output")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x + par[0])},
+                                            {0., 0.01, 0.5, 0.51},
+                                            2u,
+                                            kw::pars = std::vector<double>{-1e-4, -1.1e-4}};
+
+    std::ostringstream oss;
+
+    oss << ta;
+
+    REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
 }
 
 #if defined(HEYOKA_ARCH_PPC)
