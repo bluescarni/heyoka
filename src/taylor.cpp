@@ -3277,7 +3277,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
     // LCOV_EXCL_STOP
 
-    const auto with_events = !m_tes.empty() || !m_ntes.empty();
+    // Store the tolerance.
+    m_tol = tol;
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -3286,6 +3287,9 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // we don't optimise twice when adding the step
     // and then the d_out.
     std::optional<opt_disabler> od(m_llvm);
+
+    // Do we have events?
+    const auto with_events = !m_tes.empty() || !m_ntes.empty();
 
     // Add the stepper function.
     if (with_events) {
@@ -3391,8 +3395,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers
     // and the vectors of detected events.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
+      m_order(other.m_order), m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
+      m_d_out(other.m_d_out), m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet),
+      m_te_cooldowns(other.m_te_cooldowns)
 {
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3439,6 +3444,7 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
+    ar << m_tol;
     ar << m_pars;
     ar << m_tc;
     ar << m_last_h;
@@ -3456,7 +3462,7 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
+void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     ar >> m_state;
     ar >> m_time;
@@ -3464,6 +3470,13 @@ void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument("Unable to load a taylor_adaptive integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
     ar >> m_pars;
     ar >> m_tc;
     ar >> m_last_h;
@@ -4105,6 +4118,12 @@ std::uint32_t taylor_adaptive_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 {
     return m_dim;
@@ -4440,6 +4459,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                 tol));
     }
 
+    // Store the tolerance.
+    m_tol = tol;
+
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -4541,9 +4563,9 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
+      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf),
+      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
@@ -4586,6 +4608,7 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
+    ar << m_tol;
     ar << m_pars;
     ar << m_tc;
     ar << m_last_h;
@@ -4607,7 +4630,7 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
+void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     ar >> m_batch_size;
     ar >> m_state;
@@ -4617,6 +4640,14 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(
+            "Unable to load a taylor_adaptive_batch integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
     ar >> m_pars;
     ar >> m_tc;
     ar >> m_last_h;
@@ -5407,6 +5438,12 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_batch_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
 {
     return m_batch_size;
@@ -5806,6 +5843,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance               : " << ta.get_tol() << '\n';
     oss << "Taylor order            : " << ta.get_order() << '\n';
     oss << "Dimension               : " << ta.get_dim() << '\n';
     oss << "Time                    : " << ta.get_time() << '\n';
@@ -5850,6 +5888,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance   : " << ta.get_tol() << '\n';
     oss << "Taylor order: " << ta.get_order() << '\n';
     oss << "Dimension   : " << ta.get_dim() << '\n';
     oss << "Batch size  : " << ta.get_batch_size() << '\n';

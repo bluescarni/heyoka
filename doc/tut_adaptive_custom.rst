@@ -37,10 +37,11 @@ In order to specify a non-default tolerance, the keyword argument
 
 .. code-block:: console
 
-   Taylor order: 12
-   Dimension   : 2
-   Time        : 0.0000000000000000
-   State       : [0.050000000000000003, 0.025000000000000001]
+   Tolerance               : 1.0000000000000001e-09
+   Taylor order            : 12
+   Dimension               : 2
+   Time                    : 0.0000000000000000
+   State                   : [0.050000000000000003, 0.025000000000000001]
 
 The optimal Taylor order for a tolerance of :math:`10^{-9}`
 is now 12 (instead of 20 for a tolerance
@@ -55,10 +56,11 @@ integration is reduced with respect to the default tolerance value:
 
 .. code-block:: console
 
-   Taylor order: 12
-   Dimension   : 2
-   Time        : 0.0000000000000000
-   State       : [0.050000000001312876, 0.024999999997558964]
+   Tolerance               : 1.0000000000000001e-09
+   Taylor order            : 12
+   Dimension               : 2
+   Time                    : 0.0000000000000000
+   State                   : [0.050000000001312848, 0.024999999997558649]
 
 Compact mode
 ------------

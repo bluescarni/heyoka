@@ -576,6 +576,8 @@ private:
     taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
+    // Tolerance.
+    T m_tol;
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *);
@@ -708,6 +710,7 @@ public:
     const taylor_dc_t &get_decomposition() const;
 
     std::uint32_t get_order() const;
+    T get_tol() const;
     std::uint32_t get_dim() const;
 
     T get_time() const
@@ -899,6 +902,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
+    // Tolerance.
+    T m_tol;
     // The stepper.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     step_f_t m_step_f;
@@ -1010,6 +1015,7 @@ public:
 
     std::uint32_t get_batch_size() const;
     std::uint32_t get_order() const;
+    T get_tol() const;
     std::uint32_t get_dim() const;
 
     const std::vector<T> &get_time() const
@@ -1224,5 +1230,33 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 } // namespace detail
 
 } // namespace heyoka
+
+// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
+// not support class templates.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename T>
+struct version<heyoka::taylor_adaptive<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+template <typename T>
+struct version<heyoka::taylor_adaptive_batch<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+} // namespace serialization
+
+} // namespace boost
 
 #endif
