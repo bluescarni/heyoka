@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Customising the adaptive integrator &#8212; heyoka 0.12.0 documentation</title>
+    <title>Customising the adaptive integrator &#8212; heyoka 0.14.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -58,7 +58,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.12.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.14.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -324,10 +324,11 @@ element of the state vector has a magnitude greater than 1.</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 12</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.0000000000000000</span>
-<span class="go">State       : [0.050000000000000003, 0.025000000000000001]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 1.0000000000000001e-09</span>
+<span class="go">Taylor order            : 12</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.0000000000000000</span>
+<span class="go">State                   : [0.050000000000000003, 0.025000000000000001]</span>
 </pre></div>
 </div>
 <p>The optimal Taylor order for a tolerance of <span class="math notranslate nohighlight">\(10^{-9}\)</span>
@@ -342,10 +343,11 @@ integration is reduced with respect to the default tolerance value:</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 12</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.0000000000000000</span>
-<span class="go">State       : [0.050000000001312876, 0.024999999997558964]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 1.0000000000000001e-09</span>
+<span class="go">Taylor order            : 12</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.0000000000000000</span>
+<span class="go">State                   : [0.050000000001312848, 0.024999999997558649]</span>
 </pre></div>
 </div>
 </div>

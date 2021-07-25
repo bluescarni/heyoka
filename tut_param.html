@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Runtime parameters &#8212; heyoka 0.12.0 documentation</title>
+    <title>Runtime parameters &#8212; heyoka 0.14.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -58,7 +58,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.12.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.14.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -332,11 +332,12 @@ heyoka will infer that the ODE system contains 2 parameters and will then initia
 the array of parameter values with zeroes.</p>
 <p>If we try to print the integrator to screen, the output will confirm the
 presence of runtime parameters:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.0000000000000000</span>
-<span class="go">State       : [0.050000000000000003, 0.025000000000000001]</span>
-<span class="go">Parameters  : [9.8000000000000007, 1.0000000000000000]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.0000000000000000</span>
+<span class="go">State                   : [0.050000000000000003, 0.0000000000000000]</span>
+<span class="go">Parameters              : [9.8000000000000007, 1.0000000000000000]</span>
 </pre></div>
 </div>
 <p>Note that the array of parameter values, like the state vector and the time coordinate,
@@ -349,11 +350,12 @@ as it can be confirmed via numerical integration:</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 2.0074035758801299</span>
-<span class="go">State       : [0.050000000000000003, 2.2135840145976364e-16]</span>
-<span class="go">Parameters  : [9.8000000000000007, 1.0000000000000000]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 2.0074035758801299</span>
+<span class="go">State                   : [0.050000000000000003, 7.5784060331002885e-17]</span>
+<span class="go">Parameters              : [9.8000000000000007, 1.0000000000000000]</span>
 </pre></div>
 </div>
 <p>As you can see, after 1 period the state of the system went back to the initial conditions.</p>
@@ -384,11 +386,12 @@ holding the parameter values.</p>
     <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 3.2581889116828258</span>
-<span class="go">State       : [0.049999999999999996, 3.1292770074142271e-16]</span>
-<span class="go">Parameters  : [3.7200000000000002, 1.0000000000000000]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 3.2581889116828258</span>
+<span class="go">State                   : [0.050000000000000003, 2.1864533707994132e-16]</span>
+<span class="go">Parameters              : [3.7200000000000002, 1.0000000000000000]</span>
 </pre></div>
 </div>
 <div class="section" id="full-code-listing">

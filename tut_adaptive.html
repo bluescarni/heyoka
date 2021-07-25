@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>The adaptive integrator &#8212; heyoka 0.12.0 documentation</title>
+    <title>The adaptive integrator &#8212; heyoka 0.14.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -58,7 +58,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.12.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.14.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -346,10 +346,11 @@ of initial conditions for <code class="docutils literal notranslate"><span class
 </pre></div>
 </div>
 <p>This will produce the following output:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.0000000000000000</span>
-<span class="go">State       : [0.050000000000000003, 0.025000000000000001]</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.0000000000000000</span>
+<span class="go">State                   : [0.050000000000000003, 0.025000000000000001]</span>
 </pre></div>
 </div>
 <p>By default, the error tolerance of an adaptive integrator is set to the
@@ -382,10 +383,11 @@ The screen output will look something like this:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Outcome : taylor_outcome::success</span>
 <span class="go">Timestep: 0.216053</span>
 
-<span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.21605277478009474</span>
-<span class="go">State       : [0.043996448369926382, -0.078442455470687983]</span>
+<span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.21605277478009474</span>
+<span class="go">State                   : [0.043996448369926382, -0.078442455470687983]</span>
 </pre></div>
 </div>
 <p>It is also possible to perform a single timestep backward in time
@@ -538,10 +540,11 @@ to propagate both forward and backward in time:</p>
 <span class="go">Num. of steps: 97</span>
 <span class="go">Current time : 0</span>
 
-<span class="go">Taylor order: 20</span>
-<span class="go">Dimension   : 2</span>
-<span class="go">Time        : 0.0000000000000000</span>
-<span class="go">State       : [0.049999999999999843, 0.025000000000002819]</span>
+<span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 0.0000000000000000</span>
+<span class="go">State                   : [0.050000000000000044, 0.024999999999999991]</span>
 </pre></div>
 </div>
 <p>Note also that the time-limited propagation functions will stop
