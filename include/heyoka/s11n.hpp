@@ -28,6 +28,7 @@
 #include <boost/serialization/unique_ptr.hpp>
 #include <boost/serialization/utility.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/version.hpp>
 
 // NOTE: we used to have polymorphic
 // archives here instead, but apparently
