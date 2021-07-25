@@ -59,11 +59,12 @@ presence of runtime parameters:
 
 .. code-block:: console
 
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 0.0000000000000000
-   State       : [0.050000000000000003, 0.025000000000000001]
-   Parameters  : [9.8000000000000007, 1.0000000000000000]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 0.0000000000000000
+   State                   : [0.050000000000000003, 0.0000000000000000]
+   Parameters              : [9.8000000000000007, 1.0000000000000000]
 
 Note that the array of parameter values, like the state vector and the time coordinate,
 is stored as a data member in the integrator object.
@@ -78,11 +79,12 @@ as it can be confirmed via numerical integration:
 
 .. code-block:: console
 
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 2.0074035758801299
-   State       : [0.050000000000000003, 2.2135840145976364e-16]
-   Parameters  : [9.8000000000000007, 1.0000000000000000]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 2.0074035758801299
+   State                   : [0.050000000000000003, 7.5784060331002885e-17]
+   Parameters              : [9.8000000000000007, 1.0000000000000000]
 
 As you can see, after 1 period the state of the system went back to the initial conditions.
 
@@ -118,11 +120,12 @@ Because gravity is weaker on Mars, the period of a :math:`1\,\mathrm{m}` pendulu
 
 .. code-block:: console
 
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 3.2581889116828258
-   State       : [0.049999999999999996, 3.1292770074142271e-16]
-   Parameters  : [3.7200000000000002, 1.0000000000000000]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 3.2581889116828258
+   State                   : [0.050000000000000003, 2.1864533707994132e-16]
+   Parameters              : [3.7200000000000002, 1.0000000000000000]
 
 Full code listing
 -----------------
