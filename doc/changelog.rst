@@ -1,6 +1,15 @@
 Changelog
 =========
 
+0.14.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- The tolerance value is now stored in the integrator objects
+  (`#175 <https://github.com/bluescarni/heyoka/pull/175>`__).
+
 0.12.0 (2021-07-21)
 -------------------
 
