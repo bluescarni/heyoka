@@ -18,6 +18,7 @@
 #include <functional>
 #include <limits>
 #include <locale>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ostream>
@@ -2174,7 +2175,20 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// For each segment in s_dc, this function will return a vector containing a dict mapping an LLVM function
+namespace
+{
+
+// Comparision operator for LLVM functions based on their names.
+struct llvm_func_name_compare {
+    bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
+    {
+        return f0->getName() < f1->getName();
+    }
+};
+
+} // namespace
+
+// For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
 // {f : (2, [g_0, g_1, g_2])}
@@ -2186,8 +2200,13 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // Init the return value.
-    std::vector<std::unordered_map<llvm::Function *,
-                                   std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>>>
+    // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
+    // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly
+    // the pointer instead, the order could vary across different executions and different platforms. The name
+    // mangling we do when creating the function names should ensure that there are no possible name collisions.
+    std::vector<
+        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+                 llvm_func_name_compare>>
         retval;
 
     // Variable to keep track of the u variable
