@@ -26,7 +26,7 @@ TEST_CASE("scalar")
 {
     using std::abs;
     using std::exp;
-    using std::pow;
+    using std::log;
 
     using fp_t = double;
 
@@ -76,12 +76,12 @@ TEST_CASE("scalar")
                     dom1_inf = std::max(dom1_inf, abs(ta.get_tc()[i * (order + 1u) + order - 1u]));
                 }
 
-                auto rho_o = pow(x_inf / do_inf, fp_t{1} / order);
-                auto rho_om1 = pow(x_inf / dom1_inf, fp_t{1} / (order - 1u));
+                auto log_rho_o = log(x_inf / do_inf) / order;
+                auto log_rho_om1 = log(x_inf / dom1_inf) / (order - 1u);
 
-                auto rho_m = std::min(rho_o, rho_om1);
+                auto log_rho_m = std::min(log_rho_o, log_rho_om1);
 
-                auto h = rho_m / (exp(fp_t(1)) * exp(fp_t(1))) * exp((-fp_t(7) / 10) / (order - 1u));
+                auto h = exp(log_rho_m - (fp_t(7) / 10) / (order - 1u) - 2);
 
                 REQUIRE(h == approximately(ta.get_last_h()));
             }
