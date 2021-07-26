@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+#include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -89,25 +90,21 @@ void test_eval()
     // We test the implementation of all function.
     {
         std::unordered_map<std::string, T> in{{"x", T(0.125)}};
-        REQUIRE(eval(acos(x), in) == acos(T(0.125)));
-        REQUIRE(eval(asin(x), in) == asin(T(0.125)));
-        REQUIRE(eval(atan(x), in) == atan(T(0.125)));
-        REQUIRE(eval(atanh(x), in) == atanh(T(0.125)));
-        REQUIRE(eval(cos(x), in) == cos(T(0.125)));
-        REQUIRE(eval(sin(x), in) == sin(T(0.125)));
-        REQUIRE(eval(log(x), in) == log(T(0.125)));
-        REQUIRE(eval(exp(x), in) == exp(T(0.125)));
-        REQUIRE(eval(pow(x, x), in) == pow(T(0.125), T(0.125)));
-        REQUIRE(eval(tan(x), in) == tan(T(0.125)));
-        REQUIRE(eval(sqrt(x), in) == sqrt(T(0.125)));
-        REQUIRE(eval(sigmoid(x), in) == T(1.) / (T(1.) + exp(-T(0.125))));
-        REQUIRE(eval(erf(x), in) == erf(T(0.125)));
-        REQUIRE(eval(neg(x), in) == -T(0.125));
-        REQUIRE(eval(square(x), in) == T(0.125) * T(0.125));
-
-        // For these we require only an approximate match. The test may fail
-        // otherwise (not clear why, a possible substitution at compile time might
-        // be using an implementation for these functions that is not guaranteed to match the std one)
+        REQUIRE(eval(acos(x), in) == approximately(acos(T(0.125))));
+        REQUIRE(eval(asin(x), in) == approximately(asin(T(0.125))));
+        REQUIRE(eval(atan(x), in) == approximately(atan(T(0.125))));
+        REQUIRE(eval(atanh(x), in) == approximately(atanh(T(0.125))));
+        REQUIRE(eval(cos(x), in) == approximately(cos(T(0.125))));
+        REQUIRE(eval(sin(x), in) == approximately(sin(T(0.125))));
+        REQUIRE(eval(log(x), in) == approximately(log(T(0.125))));
+        REQUIRE(eval(exp(x), in) == approximately(exp(T(0.125))));
+        REQUIRE(eval(pow(x, x), in) == approximately(pow(T(0.125), T(0.125))));
+        REQUIRE(eval(tan(x), in) == approximately(tan(T(0.125))));
+        REQUIRE(eval(sqrt(x), in) == approximately(sqrt(T(0.125))));
+        REQUIRE(eval(sigmoid(x), in) == approximately(T(1.) / (T(1.) + exp(-T(0.125)))));
+        REQUIRE(eval(erf(x), in) == approximately(erf(T(0.125))));
+        REQUIRE(eval(neg(x), in) == approximately(-T(0.125)));
+        REQUIRE(eval(square(x), in) == approximately(T(0.125) * T(0.125)));
         REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
         REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
     }
@@ -116,7 +113,10 @@ void test_eval()
 TEST_CASE("eval")
 {
     test_eval<double>();
+
+#if !defined(HEYOKA_ARCH_PPC)
     test_eval<long double>();
+#endif
 
 #if defined(HEYOKA_HAVE_REAL128)
     test_eval<mppp::real128>();

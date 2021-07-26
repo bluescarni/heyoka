@@ -34,6 +34,7 @@
 #endif
 
 #include <heyoka/callable.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/nbody.hpp>
@@ -60,7 +61,11 @@ auto &horner_eval(Out &ret, const P &p, int order, const T &eval)
     return ret;
 }
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -1424,6 +1429,8 @@ void s11n_test_impl()
                                           kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
                                           kw::pars = std::vector<double>{-1e-4}};
 
+        REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
+
         auto oc = std::get<0>(ta.step(true));
         while (oc == taylor_outcome::success) {
             oc = std::get<0>(ta.step(true));
@@ -1450,6 +1457,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_tol() == ta_copy.get_tol());
         REQUIRE(ta.get_dim() == ta_copy.get_dim());
         REQUIRE(ta.get_time() == ta_copy.get_time());
         REQUIRE(ta.get_state() == ta_copy.get_state());
@@ -1552,3 +1560,17 @@ TEST_CASE("def ctor")
 
     tuple_for_each(fp_types, tester);
 }
+
+#if defined(HEYOKA_ARCH_PPC)
+
+TEST_CASE("ppc long double")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES((taylor_adaptive<long double>{{prime(x) = v, prime(v) = -9.8l * sin(x)}, {0.05l, 0.025l}}),
+                           not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
+}
+
+#endif

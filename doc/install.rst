@@ -20,10 +20,8 @@ a continuous integration pipeline which currently includes:
    to compile heyoka using the standard library from MSVC 2017 in conjunction
    with the ``clang-cl`` compiler.
 
-.. note::
-
-   heyoka is currently being developed and tested on x86-64 processors, but support
-   for 64-bit ARM processors is expected in the near future.
+The tested and supported CPU architectures at this time are x86-64,
+64-bit ARM and 64-bit PowerPC.
 
 heyoka has the following **mandatory** dependencies:
 
@@ -70,6 +68,12 @@ quadruple-precision integrations are always supported. Otherwise,
 on platforms such as x86-64, the nonstandard ``__float128`` floating-point type must be
 `available and supported <https://gcc.gnu.org/onlinedocs/gcc/Floating-Types.html>`__
 and heyoka must be compiled with the ``HEYOKA_WITH_MPPP`` option enabled (see :ref:`below <installation_from_source>`).
+
+.. note::
+
+   The non-IEEE ``long double`` type available on some PowerPC platforms
+   (which implements a double-length floating-point representation with 106
+   significant bits) is **not** supported by heyoka at this time.
 
 Packages
 --------

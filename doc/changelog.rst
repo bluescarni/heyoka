@@ -1,12 +1,32 @@
 Changelog
 =========
 
-0.12.0 (unreleased)
+0.14.0 (unreleased)
 -------------------
 
 New
 ~~~
 
+- The tolerance value is now stored in the integrator objects
+  (`#175 <https://github.com/bluescarni/heyoka/pull/175>`__).
+
+Fix
+~~~
+
+- Ensure that code generation in compact mode is deterministic
+  across executions
+  (`#176 <https://github.com/bluescarni/heyoka/pull/176>`__).
+
+0.12.0 (2021-07-21)
+-------------------
+
+New
+~~~
+
+- Add support for 64-bit PowerPC processors
+  (`#171 <https://github.com/bluescarni/heyoka/pull/171>`__).
+- Add support for 64-bit ARM processors
+  (`#167 <https://github.com/bluescarni/heyoka/pull/167>`__).
 - Implement serialisation for the main classes via
   Boost.Serialization
   (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).

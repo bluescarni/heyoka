@@ -19,6 +19,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/algorithm/string/predicate.hpp>
+
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xarray.hpp>
 #include <xtensor/xview.hpp>
@@ -29,6 +31,7 @@
 
 #endif
 
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
@@ -45,7 +48,11 @@ using namespace heyoka;
 namespace hy = heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -693,6 +700,8 @@ void s11n_test_impl()
                                                 2u,
                                                 kw::pars = std::vector<double>{-1e-4, -1.1e-4}};
 
+        REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
+
         ta.propagate_until({10., 10.1});
 
         std::stringstream ss;
@@ -715,6 +724,7 @@ void s11n_test_impl()
         REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_tol() == ta_copy.get_tol());
         REQUIRE(ta.get_dim() == ta_copy.get_dim());
         REQUIRE(ta.get_time() == ta_copy.get_time());
         REQUIRE(ta.get_state() == ta_copy.get_state());
@@ -762,3 +772,36 @@ TEST_CASE("def ctor")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("stream output")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x + par[0])},
+                                            {0., 0.01, 0.5, 0.51},
+                                            2u,
+                                            kw::pars = std::vector<double>{-1e-4, -1.1e-4}};
+
+    std::ostringstream oss;
+
+    oss << ta;
+
+    REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
+    REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
+}
+
+#if defined(HEYOKA_ARCH_PPC)
+
+TEST_CASE("ppc long double")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, v] = make_vars("x", "v");
+
+    REQUIRE_THROWS_MATCHES((taylor_adaptive_batch<long double>{
+                               {prime(x) = v, prime(v) = -9.8l * sin(x)}, {0.05l, 0.06l, 0.025l, 0.026l}, 2u}),
+                           not_implemented_error, Message("'long double' computations are not supported on PowerPC"));
+}
+
+#endif

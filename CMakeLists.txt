@@ -15,13 +15,19 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.12.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.14.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
 message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "heyoka version: ${heyoka_VERSION}")
+
+# Print some info about the long double type.
+include(CheckTypeSize)
+CHECK_TYPE_SIZE("long double" _HEYOKA_LONG_DOUBLE_SIZE LANGUAGE CXX)
+message(STATUS "Size of the long double type: ${_HEYOKA_LONG_DOUBLE_SIZE}")
+unset(_HEYOKA_LONG_DOUBLE_SIZE)
 
 # Run the YACMA compiler setup.
 include(YACMACompilerLinkerSettings)
@@ -140,23 +146,11 @@ endif()
 # Mandatory dependency on LLVM.
 # NOTE: do it early so that we can set up
 # compiler flags based on the LLVM version
-# (see below).
+# if needed.
 find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
-endif()
-
-# NOTE: LLVM >= 12 deprecates the use of llvm::VectorType::getNumElements()
-# in favour of llvm::FixedVectorType::getNumElements(), which is however not
-# available in LLVM 10. Thus, as long as we support LLVM 10, we suppress
-# these deprecation warnings. Moving forward, we need to either drop support
-# for LLVM 10 or find a better solution.
-if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 12)
-    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
-        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
-        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
-    endif()
 endif()
 
 # Explanation: on MSVC, when building static libraries, it is good practice to link
@@ -227,6 +221,15 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
+if(HEYOKA_WITH_SLEEF)
+    # NOTE: the sleef dummy file needs to be compiled only
+    # if we are building with sleef support on.
+    set(HEYOKA_SRC_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
+        "${HEYOKA_SRC_FILES}"
+    )
+endif()
+
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
     message(STATUS "heyoka will be built as a static library.")
@@ -234,8 +237,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "12.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 12)
+    set_property(TARGET heyoka PROPERTY VERSION "14.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 14)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()

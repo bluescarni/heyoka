@@ -15,7 +15,7 @@ install:
 - conda update -n base conda
 - conda config --add channels conda-forge
 - conda config --set channel_priority strict
-- if [%BUILD_TYPE%]==[MSVC17_clang_64] conda create --name heyoka cmake"<3.20" llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt"<8" spdlog ninja sleef clang clangxx
+- if [%BUILD_TYPE%]==[MSVC17_clang_64] conda create --name heyoka cmake"<3.20" llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog ninja sleef clang clangxx
 - call activate heyoka
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] clang-cl -v
 - if [%BUILD_TYPE%]==[MSVC17_clang_64] call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"

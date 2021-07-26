@@ -7,18 +7,20 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <cassert>
+#include <charconv>
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
 #include <ios>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <ostream>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -141,9 +143,46 @@ target_features get_target_features_impl()
             retval.avx = true;
         }
 
-        // SSE2 is always available on x86-64.
-        assert(boost::algorithm::contains(t_features, "+sse2"));
-        retval.sse2 = true;
+        if (boost::algorithm::contains(t_features, "+sse2")) {
+            retval.sse2 = true;
+        }
+    }
+
+    if (boost::starts_with(target_name, "aarch64")) {
+        retval.aarch64 = true;
+    }
+
+    if (boost::starts_with(target_name, "ppc")) {
+        // On powerpc, detect the presence of the VSX
+        // instruction set from the CPU string.
+        const auto target_cpu = std::string{(*tm)->getTargetCPU()};
+
+        // NOTE: the pattern reported by LLVM here seems to be pwrN
+        // (sample size of 1, on travis...).
+        std::regex pattern("pwr([1-9]*)");
+        std::cmatch m;
+
+        if (std::regex_match(target_cpu.c_str(), m, pattern)) {
+            if (m.size() == 2u) {
+                // The CPU name matches and contains a subgroup.
+                // Extract the N from "pwrN".
+                std::uint32_t pwr_idx{};
+                auto ret = std::from_chars(m[1].first, m[1].second, pwr_idx);
+
+                // NOTE: it looks like VSX3 is supported from Power9,
+                // VSX from Power7.
+                // https://packages.gentoo.org/useflags/cpu_flags_ppc_vsx3
+                if (ret.ec == std::errc{}) {
+                    if (pwr_idx >= 9) {
+                        retval.vsx3 = true;
+                    }
+
+                    if (pwr_idx >= 7) {
+                        retval.vsx = true;
+                    }
+                }
+            }
+        }
     }
 
     return retval;

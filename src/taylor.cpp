@@ -18,6 +18,7 @@
 #include <functional>
 #include <limits>
 #include <locale>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ostream>
@@ -62,10 +63,12 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -1382,7 +1385,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef
         // function available for pow().
-        if (auto *vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
             // NOTE: if sfn ends up empty, we will be falling through
             // below and use the LLVM intrinsic instead.
             if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
@@ -2235,7 +2238,20 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// For each segment in s_dc, this function will return a vector containing a dict mapping an LLVM function
+namespace
+{
+
+// Comparision operator for LLVM functions based on their names.
+struct llvm_func_name_compare {
+    bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
+    {
+        return f0->getName() < f1->getName();
+    }
+};
+
+} // namespace
+
+// For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
 // {f : (2, [g_0, g_1, g_2])}
@@ -2247,8 +2263,13 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     // Init the return value.
-    std::vector<std::unordered_map<llvm::Function *,
-                                   std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>>>
+    // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
+    // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
+    // comparisons instead, the order could vary across different executions and different platforms. The name
+    // mangling we do when creating the function names should ensure that there are no possible name collisions.
+    std::vector<
+        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+                 llvm_func_name_compare>>
         retval;
 
     // Variable to keep track of the u variable
@@ -3289,6 +3310,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                  std::vector<nt_event_t> ntes)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Assign the data members.
@@ -3332,7 +3359,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
     // LCOV_EXCL_STOP
 
-    const auto with_events = !m_tes.empty() || !m_ntes.empty();
+    // Store the tolerance.
+    m_tol = tol;
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -3341,6 +3369,9 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // we don't optimise twice when adding the step
     // and then the d_out.
     std::optional<opt_disabler> od(m_llvm);
+
+    // Do we have events?
+    const auto with_events = !m_tes.empty() || !m_ntes.empty();
 
     // Add the stepper function.
     if (with_events) {
@@ -3446,8 +3477,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers
     // and the vectors of detected events.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
+      m_order(other.m_order), m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
+      m_d_out(other.m_d_out), m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet),
+      m_te_cooldowns(other.m_te_cooldowns)
 {
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3494,6 +3526,7 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
+    ar << m_tol;
     ar << m_pars;
     ar << m_tc;
     ar << m_last_h;
@@ -3511,7 +3544,7 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
+void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     ar >> m_state;
     ar >> m_time;
@@ -3519,6 +3552,13 @@ void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned)
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument("Unable to load a taylor_adaptive integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
     ar >> m_pars;
     ar >> m_tc;
     ar >> m_last_h;
@@ -4160,6 +4200,12 @@ std::uint32_t taylor_adaptive_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 {
     return m_dim;
@@ -4437,6 +4483,12 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Init the data members.
@@ -4488,6 +4540,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
             "The tolerance in an adaptive Taylor integrator must be finite and positive, but it is {} instead"_format(
                 tol));
     }
+
+    // Store the tolerance.
+    m_tol = tol;
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -4590,9 +4645,9 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
-      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
-      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
+      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf),
+      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
@@ -4635,6 +4690,7 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_dim;
     ar << m_dc;
     ar << m_order;
+    ar << m_tol;
     ar << m_pars;
     ar << m_tc;
     ar << m_last_h;
@@ -4656,7 +4712,7 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
 
 template <typename T>
 template <typename Archive>
-void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
+void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
 {
     ar >> m_batch_size;
     ar >> m_state;
@@ -4666,6 +4722,14 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned)
     ar >> m_dim;
     ar >> m_dc;
     ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(
+            "Unable to load a taylor_adaptive_batch integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
     ar >> m_pars;
     ar >> m_tc;
     ar >> m_last_h;
@@ -5456,6 +5520,12 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_batch_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
 {
     return m_batch_size;
@@ -5568,6 +5638,12 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     if (batch_size == 0u) {
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
     }
+
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
 
     auto &builder = s.builder();
 
@@ -5849,6 +5925,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance               : " << ta.get_tol() << '\n';
     oss << "Taylor order            : " << ta.get_order() << '\n';
     oss << "Dimension               : " << ta.get_dim() << '\n';
     oss << "Time                    : " << ta.get_time() << '\n';
@@ -5893,6 +5970,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance   : " << ta.get_tol() << '\n';
     oss << "Taylor order: " << ta.get_order() << '\n';
     oss << "Dimension   : " << ta.get_dim() << '\n';
     oss << "Batch size  : " << ta.get_batch_size() << '\n';
