@@ -2067,6 +2067,24 @@ auto taylor_c_vv_transpose(const std::vector<std::variant<T...>> &v)
     return retval;
 }
 
+// Helper to check if a vector of indices consists of consecutive values:
+// [n, n + 1, n + 2, ...]
+// NOTE: requires a non-empty vector.
+bool is_consecutive(const std::vector<std::uint32_t> &v)
+{
+    assert(!v.empty());
+
+    for (decltype(v.size()) i = 1; i < v.size(); ++i) {
+        // NOTE: the first check is to avoid potential
+        // negative overflow in the second check.
+        if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != 1u) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 // Functions the create the arguments generators for the functions that compute
 // the Taylor derivatives in compact mode. The generators are created from vectors
 // of either u var indices or floating-point constants.
@@ -2084,26 +2102,78 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
         return [num = builder.getInt32(ind[0])](llvm::Value *) -> llvm::Value * { return num; };
     }
 
-    // Check if ind consists of consecutive indices.
-    bool are_consecutive = true;
-    auto prev_ind = ind[0];
-    for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
-        if (ind[i] != prev_ind + 1u) {
-            are_consecutive = false;
-            break;
-        }
-        prev_ind = ind[i];
-    }
-
-    if (are_consecutive) {
-        // If ind consists of consecutive indices, we can replace
-        // the index array with a simple offset computation.
-        return [&s, start_idx = builder.getInt32(ind[0])](llvm::Value *cur_call_idx) -> llvm::Value * {
-            return s.builder().CreateAdd(start_idx, cur_call_idx);
+    // If ind consists of consecutive indices, we can replace
+    // the index array with a simple offset computation.
+    if (is_consecutive(ind)) {
+        return [&builder, start_idx = builder.getInt32(ind[0])](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return builder.CreateAdd(start_idx, cur_call_idx);
         };
     }
 
-    auto &module = s.module();
+    // Check if ind consists of a repeated pattern like [a, a, a, b, b, b, c, c, c, ...],
+    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive numbers.
+    if (ind.size() > 1u) {
+        // Determine the candidate number of repetitions.
+        decltype(ind.size()) n_reps = 1;
+        for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
+            if (ind[i] == ind[i - 1u]) {
+                ++n_reps;
+            } else {
+                break;
+            }
+        }
+
+        if (n_reps > 1u && (ind.size() % n_reps) == 0u) {
+            // There is an initial number of repetitions
+            // and the vector size is a multiple of that.
+            // See if the repetitions continue, and keep
+            // track of the repeated indices.
+            std::vector<std::uint32_t> rep_indices{ind[0]};
+
+            bool rep_flag = true;
+
+            // Iterate over the blocks of repetitions.
+            for (decltype(ind.size()) rep_idx = 1; rep_idx < ind.size() / n_reps; ++rep_idx) {
+                for (decltype(ind.size()) i = 1; i < n_reps; ++i) {
+                    const auto cur_idx = rep_idx * n_reps + i;
+
+                    if (ind[cur_idx] != ind[cur_idx - 1u]) {
+                        rep_flag = false;
+                        break;
+                    }
+                }
+
+                if (rep_flag) {
+                    rep_indices.push_back(ind[rep_idx * n_reps]);
+                } else {
+                    break;
+                }
+            }
+
+            if (rep_flag && is_consecutive(rep_indices)) {
+                // The pattern is  [a X n, b X n, c X n, ...] and [a, b, c, ...]
+                // are consecutive numbers. The m-th value in the array can thus
+                // be computed as a + floor(m / n).
+
+#if !defined(NDEBUG)
+                // Double-check the result in debug mode.
+                std::vector<std::uint32_t> checker;
+                for (decltype(ind.size()) i = 0; i < ind.size(); ++i) {
+                    checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + i / n_reps));
+                }
+                assert(checker == ind);
+#endif
+
+                return [&builder, start_idx = builder.getInt32(rep_indices[0]),
+                        n_reps = builder.getInt32(boost::numeric_cast<std::uint32_t>(n_reps))](
+                           llvm::Value *cur_call_idx) -> llvm::Value * {
+                    return builder.CreateAdd(start_idx, builder.CreateUDiv(cur_call_idx, n_reps));
+                };
+            }
+        }
+    }
+
+    auto &md = s.module();
 
     // Generate the array of indices as llvm constants.
     std::vector<llvm::Constant *> tmp_c_vec;
@@ -2121,13 +2191,11 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
     assert(const_arr != nullptr);
     // NOTE: naked new here is fine, gvar will be registered in the module
     // object and cleaned up when the module is destroyed.
-    auto *gvar = new llvm::GlobalVariable(module, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
-                                          const_arr);
+    auto *gvar
+        = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, const_arr);
 
     // Return the generator.
-    return [gvar, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
-        auto &builder = s.builder();
-
+    return [gvar, &builder](llvm::Value *cur_call_idx) -> llvm::Value * {
         return builder.CreateLoad(builder.CreateInBoundsGEP(gvar, {builder.getInt32(0), cur_call_idx}));
     };
 }
@@ -2175,9 +2243,6 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-namespace
-{
-
 // Comparision operator for LLVM functions based on their names.
 struct llvm_func_name_compare {
     bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
@@ -2185,8 +2250,6 @@ struct llvm_func_name_compare {
         return f0->getName() < f1->getName();
     }
 };
-
-} // namespace
 
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry

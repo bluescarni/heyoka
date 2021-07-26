@@ -1574,3 +1574,14 @@ TEST_CASE("ppc long double")
 }
 
 #endif
+
+// Trigger a specific codepath in a compact mode simplification
+// which is otherwise untriggered in the rest of the test suite.
+TEST_CASE("cm simpl repeat fail")
+{
+    auto [x, y, z, t] = make_vars("x", "y", "z", "t");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = x + y, prime(y) = x + z, prime(z) = y + z, prime(t) = z + t},
+                                      {0.1, 0.2, 0.3, 0.4},
+                                      kw::compact_mode = true};
+}
