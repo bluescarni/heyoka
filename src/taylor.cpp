@@ -2238,9 +2238,6 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-namespace
-{
-
 // Comparision operator for LLVM functions based on their names.
 struct llvm_func_name_compare {
     bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
@@ -2248,8 +2245,6 @@ struct llvm_func_name_compare {
         return f0->getName() < f1->getName();
     }
 };
-
-} // namespace
 
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
