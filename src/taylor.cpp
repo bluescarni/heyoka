@@ -1407,6 +1407,118 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
 }
 
+// Helper to compute log(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_log(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector argument to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the log() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "logq", llvm::Type::getFP128Ty(s.context()), {x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // If we are operating on SIMD vectors, try to see if we have a sleef
+        // function available for log().
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
+            // NOTE: if sfn ends up empty, we will be falling through
+            // below and use the LLVM intrinsic instead.
+            if (const auto sfn = sleef_function_name(s.context(), "log", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x_v},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+
+        return llvm_invoke_intrinsic(s, "llvm.log", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Helper to compute exp(x_v) in the Taylor stepper implementation.
+llvm::Value *taylor_step_exp(llvm_state &s, llvm::Value *x_v)
+{
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x_v->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+        auto &builder = s.builder();
+
+        // Convert the vector argument to scalars.
+        auto x_scalars = vector_to_scalars(builder, x_v);
+
+        // Execute the exp() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "expq", llvm::Type::getFP128Ty(s.context()), {x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        // If we are operating on SIMD vectors, try to see if we have a sleef
+        // function available for exp().
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
+            // NOTE: if sfn ends up empty, we will be falling through
+            // below and use the LLVM intrinsic instead.
+            if (const auto sfn = sleef_function_name(s.context(), "exp", vec_t->getElementType(),
+                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                !sfn.empty()) {
+                return llvm_invoke_external(
+                    s, sfn, vec_t, {x_v},
+                    // NOTE: in theory we may add ReadNone here as well,
+                    // but for some reason, at least up to LLVM 10,
+                    // this causes strange codegen issues. Revisit
+                    // in the future.
+                    {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+            }
+        }
+
+        return llvm_invoke_intrinsic(s, "llvm.exp", {x_v->getType()}, {x_v});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 // Create a global read-only array containing the values in sv_funcs_dc, if any
 // (otherwise, the return value will be null). This is for use in the adaptive steppers
 // when employing compact mode.
@@ -1562,22 +1674,24 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
     auto abs_or_rel
         = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
 
-    // Estimate rho at orders order - 1 and order.
+    // Estimate log(rho) at orders order - 1 and order.
     auto num_rho
         = builder.CreateSelect(abs_or_rel, vector_splat(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
-    auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
-                                 vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
-    auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
-                                   vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
+    auto log_rho_o = builder.CreateFMul(taylor_step_log(s, builder.CreateFDiv(num_rho, max_abs_diff_o)),
+                                        vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
+    auto log_rho_om1
+        = builder.CreateFMul(taylor_step_log(s, builder.CreateFDiv(num_rho, max_abs_diff_om1)),
+                             vector_splat(builder, codegen<T>(s, number{T(1) / (order - 1u)}), batch_size));
 
     // Take the minimum.
-    auto rho_m = llvm_min(s, rho_o, rho_om1);
+    auto log_rho_m = llvm_min(s, log_rho_o, log_rho_om1);
 
-    // Compute the scaling + safety factor.
-    const auto rhofac = exp((T(-7) / T(10)) / (order - 1u)) / (exp(T(1)) * exp(T(1)));
+    // Compute the scaling + safety offset.
+    const auto sso = (T(-7) / T(10)) / (order - 1u) + 2;
 
     // Determine the step size in absolute value.
-    auto h = builder.CreateFMul(rho_m, vector_splat(builder, codegen<T>(s, number{rhofac}), batch_size));
+    auto h = taylor_step_exp(
+        s, builder.CreateFSub(log_rho_m, vector_splat(builder, codegen<T>(s, number{sso}), batch_size)));
 
     // Ensure that the step size does not exceed the limit in absolute value.
     auto *max_h_vec = load_vector_from_memory(builder, h_ptr, batch_size);
