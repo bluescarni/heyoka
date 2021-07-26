@@ -2075,6 +2075,8 @@ bool is_consecutive(const std::vector<std::uint32_t> &v)
     assert(!v.empty());
 
     for (decltype(v.size()) i = 1; i < v.size(); ++i) {
+        // NOTE: the first check is to avoid potential
+        // negative overflow in the second check.
         if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != 1u) {
             return false;
         }
@@ -2109,8 +2111,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
     }
 
     // Check if ind consists of a repeated pattern like [a, a, a, b, b, b, c, c, c, ...],
-    // that is, [a X n, b X n, c X n, ...].
-    if (ind.size() >= 2u) {
+    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive numbers.
+    if (ind.size() > 1u) {
         // Determine the candidate number of repetitions.
         decltype(ind.size()) n_reps = 1;
         for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
@@ -2130,7 +2132,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
             bool rep_flag = true;
 
-            for (decltype(ind.size()) rep_idx = 1; rep_flag && rep_idx < ind.size() / n_reps; ++rep_idx) {
+            // Iterate over the blocks of repetitions.
+            for (decltype(ind.size()) rep_idx = 1; rep_idx < ind.size() / n_reps; ++rep_idx) {
                 for (decltype(ind.size()) i = 1; i < n_reps; ++i) {
                     const auto cur_idx = rep_idx * n_reps + i;
 
@@ -2142,6 +2145,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
                 if (rep_flag) {
                     rep_indices.push_back(ind[rep_idx * n_reps]);
+                } else {
+                    break;
                 }
             }
 
