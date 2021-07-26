@@ -2201,8 +2201,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 {
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
-    // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly
-    // the pointer instead, the order could vary across different executions and different platforms. The name
+    // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
+    // comparisons instead, the order could vary across different executions and different platforms. The name
     // mangling we do when creating the function names should ensure that there are no possible name collisions.
     std::vector<
         std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,

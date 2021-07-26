@@ -10,6 +10,13 @@ New
 - The tolerance value is now stored in the integrator objects
   (`#175 <https://github.com/bluescarni/heyoka/pull/175>`__).
 
+Fix
+~~~
+
+- Ensure that code generation in compact mode is deterministic
+  across executions
+  (`#176 <https://github.com/bluescarni/heyoka/pull/176>`__).
+
 0.12.0 (2021-07-21)
 -------------------
 
