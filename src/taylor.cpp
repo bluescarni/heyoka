@@ -1687,7 +1687,7 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
     auto log_rho_m = llvm_min(s, log_rho_o, log_rho_om1);
 
     // Compute the scaling + safety offset.
-    const auto sso = (T(-7) / T(10)) / (order - 1u) + 2;
+    const auto sso = (T(7) / T(10)) / (order - 1u) + 2;
 
     // Determine the step size in absolute value.
     auto h = taylor_step_exp(
