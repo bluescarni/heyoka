@@ -1136,16 +1136,19 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 {
     using std::isfinite;
 
+    // LCOV_EXCL_START
     assert(isfinite(g_eps));
     assert(isfinite(abs_der));
     assert(g_eps >= 0);
     assert(abs_der >= 0);
+    // LCOV_EXCL_STOP
 
     // NOTE: the *4 is a safety factor.
     auto ret = g_eps / abs_der * 4;
 
     if (isfinite(ret)) {
         return ret;
+        // LCOV_EXCL_START
     } else {
         get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
                            "heuristic produced a non-finite value of {}",
@@ -1153,6 +1156,7 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 
         return 0;
     }
+    // LCOV_EXCL_STOP
 }
 
 } // namespace
