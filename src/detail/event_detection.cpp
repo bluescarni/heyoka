@@ -617,26 +617,33 @@ auto get_ed_jit_functions(std::uint32_t order)
 
 // Implementation of event detection.
 template <typename T>
-void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int>> &d_tes,
+void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int, T>> &d_tes,
                                std::vector<std::tuple<std::uint32_t, T, int>> &d_ntes,
                                const std::vector<t_event<T>> &tes, const std::vector<nt_event<T>> &ntes,
                                const std::vector<std::optional<std::pair<T, T>>> &cooldowns, T h,
-                               const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                               const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim, T g_eps)
 {
+    using std::abs;
     using std::isfinite;
 
     // Clear the vectors of detected events.
     // NOTE: do it here as this is always necessary,
-    // regardless of issues with h.
+    // regardless of issues with h/g_eps.
     d_tes.clear();
     d_ntes.clear();
 
+    // LCOV_EXCL_START
     if (!isfinite(h)) {
-        // LCOV_EXCL_START
         get_logger()->warn("event detection skipped due to an invalid timestep value of {}", h);
         return;
-        // LCOV_EXCL_STOP
     }
+    if (!isfinite(g_eps)) {
+        get_logger()->warn("event detection skipped due to an invalid value of {} for the maximum error on the Taylor "
+                           "series of the event equations",
+                           g_eps);
+        return;
+    }
+    // LCOV_EXCL_STOP
 
     if (h == 0) {
         // If the timestep is zero, skip event detection.
@@ -703,6 +710,20 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // LCOV_EXCL_STOP
                 }
 
+                // Evaluate the derivative and its absolute value.
+                const auto der = poly_eval_1(ptr, root, order);
+                const auto abs_der = abs(der);
+
+                // Check it before proceeding.
+                if (!isfinite(der)) {
+                    // LCOV_EXCL_START
+                    get_logger()->warn(
+                        "polynomial root finding produced a root of {} with nonfinite derivative - skipping the event",
+                        root);
+                    return;
+                    // LCOV_EXCL_STOP
+                }
+
                 // Check if multiple roots are detected in the cooldown
                 // period for a terminal event. For non-terminal events,
                 // this will be unused.
@@ -711,9 +732,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                         // Establish the cooldown time.
                         // NOTE: this is the same logic that is
                         // employed in taylor.cpp to assign a cooldown
-                        // to a detected terminal event.
-                        const auto cd
-                            = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown() : taylor_deduce_cooldown(h);
+                        // to a detected terminal event. g_eps has been checked
+                        // for finiteness early on, abs_der also has been checked for
+                        // finiteness above.
+                        const auto cd = (ev_vec[i].get_cooldown() >= 0) ? ev_vec[i].get_cooldown()
+                                                                        : taylor_deduce_cooldown(g_eps, abs_der);
 
                         // NOTE: if the cooldown is zero, no sense to
                         // run the check.
@@ -733,19 +756,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     }
                 }();
 
-                // Evaluate the derivative.
-                const auto der = poly_eval_1(ptr, root, order);
-
-                // Check it before proceeding.
-                if (!isfinite(der)) {
-                    // LCOV_EXCL_START
-                    get_logger()->warn(
-                        "polynomial root finding produced a root of {} with nonfinite derivative - skipping the event",
-                        root);
-                    return;
-                    // LCOV_EXCL_STOP
-                }
-
                 // Compute sign of the derivative.
                 const auto d_sgn = sgn(der);
 
@@ -756,7 +766,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // If the event direction does not
                     // matter, just add it.
                     if constexpr (is_terminal_event_v<ev_type>) {
-                        out.emplace_back(i, root, has_multi_roots, d_sgn);
+                        out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                     } else {
                         out.emplace_back(i, root, d_sgn);
                     }
@@ -765,7 +775,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // matches the sign of the derivative.
                     if (static_cast<event_direction>(d_sgn) == dir) {
                         if constexpr (is_terminal_event_v<ev_type>) {
-                            out.emplace_back(i, root, has_multi_roots, d_sgn);
+                            out.emplace_back(i, root, has_multi_roots, d_sgn, abs_der);
                         } else {
                             out.emplace_back(i, root, d_sgn);
                         }
@@ -780,8 +790,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             const auto lb_offset = [&]() {
                 if constexpr (is_terminal_event_v<ev_type>) {
                     if (cooldowns[i]) {
-                        using std::abs;
-
                         // NOTE: need to distinguish between forward
                         // and backward integration.
                         if (h >= 0) {
@@ -1077,37 +1085,38 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
 } // namespace
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, int>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, int, double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, double, int>> &d_ntes,
                           const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
                           const std::vector<std::optional<std::pair<double, double>>> &cooldowns, double h,
-                          const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                          const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim, double g_eps)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
 }
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, int>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, int, long double>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, long double, int>> &d_ntes,
                           const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
                           const std::vector<std::optional<std::pair<long double, long double>>> &cooldowns,
-                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim)
+                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim,
+                          long double g_eps)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, int>> &d_tes,
+void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, int, mppp::real128>> &d_tes,
                           std::vector<std::tuple<std::uint32_t, mppp::real128, int>> &d_ntes,
                           const std::vector<t_event<mppp::real128>> &tes,
                           const std::vector<nt_event<mppp::real128>> &ntes,
                           const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &cooldowns,
                           mppp::real128 h, const std::vector<mppp::real128> &ev_jet, std::uint32_t order,
-                          std::uint32_t dim)
+                          std::uint32_t dim, mppp::real128 g_eps)
 {
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim);
+    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
 }
 
 #endif
@@ -1116,46 +1125,56 @@ namespace
 {
 
 // Helper to automatically deduce the cooldown
-// for a terminal event which was detected within
-// a timestep of size h.
-// NOTE: the idea here is that event detection
-// yielded an event time accurate to about 4*eps
-// relative to the timestep size. Thus, we use as
-// cooldown time a small multiple of that accuracy.
+// for a terminal event. g_eps is the maximum
+// absolute error on the Taylor series of the event
+// equation (which depends on the integrator tolerance
+// and the infinity norm of the state vector/event equations),
+// abs_der is the absolute value of the time derivative of the
+// event equation at the zero.
 template <typename T>
-T taylor_deduce_cooldown_impl(T h)
+T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 {
-    using std::abs;
+    using std::isfinite;
 
-    const auto abs_h = abs(h);
-    constexpr auto delta = 12 * std::numeric_limits<T>::epsilon();
+    assert(isfinite(g_eps));
+    assert(isfinite(abs_der));
+    assert(g_eps >= 0);
+    assert(abs_der >= 0);
 
-    // NOTE: in order to avoid issues with small timesteps
-    // or zero timestep, we use delta as a relative value
-    // if abs_h >= 1, absolute otherwise.
-    return abs_h >= 1 ? (abs_h * delta) : delta;
+    // NOTE: the *4 is a safety factor.
+    auto ret = g_eps / abs_der * 4;
+
+    if (isfinite(ret)) {
+        return ret;
+    } else {
+        get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
+                           "heuristic produced a non-finite value of {}",
+                           ret);
+
+        return 0;
+    }
 }
 
 } // namespace
 
 template <>
-double taylor_deduce_cooldown(double h)
+double taylor_deduce_cooldown(double g_eps, double abs_der)
 {
-    return taylor_deduce_cooldown_impl(h);
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
 }
 
 template <>
-long double taylor_deduce_cooldown(long double h)
+long double taylor_deduce_cooldown(long double g_eps, long double abs_der)
 {
-    return taylor_deduce_cooldown_impl(h);
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-mppp::real128 taylor_deduce_cooldown(mppp::real128 h)
+mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 {
-    return taylor_deduce_cooldown_impl(h);
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
 }
 
 #endif
