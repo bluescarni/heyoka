@@ -77,6 +77,13 @@ in heyoka:
    :language: c++
    :lines: 9-
 
+Output:
+
+.. code-block:: console
+
+   x(10) = 0.0487397
+   y(10) = 0.0429423
+
 heyoka is released under the `MPL-2.0 <https://www.mozilla.org/en-US/MPL/2.0/FAQ/>`__
 license. The authors are Francesco Biscani (Max Planck Institute for Astronomy) and
 Dario Izzo (European Space Agency).

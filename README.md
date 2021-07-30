@@ -115,6 +115,13 @@ int main()
 }
 ```
 
+Output:
+
+```console
+x(10) = 0.0487397
+y(10) = 0.0429423
+```
+
 Documentation
 -------------
 
