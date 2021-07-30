@@ -10,11 +10,18 @@ New
 - The tolerance value is now stored in the integrator objects
   (`#175 <https://github.com/bluescarni/heyoka/pull/175>`__).
 
+Changes
+~~~~~~~
+
+- Improve the heuristic for the automatic deduction
+  of the cooldown value for terminal events
+  (`#178 <https://github.com/bluescarni/heyoka/pull/178>`__).
+
 Fix
 ~~~
 
-- Ensure that code generation in compact mode is deterministic
-  across executions
+- Ensure that code generation in compact mode is platform-agnostic
+  and deterministic across executions
   (`#176 <https://github.com/bluescarni/heyoka/pull/176>`__).
 
 0.12.0 (2021-07-21)
