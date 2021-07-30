@@ -717,9 +717,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // Check it before proceeding.
                 if (!isfinite(der)) {
                     // LCOV_EXCL_START
-                    get_logger()->warn(
-                        "polynomial root finding produced a root of {} with nonfinite derivative - skipping the event",
-                        root);
+                    get_logger()->warn("polynomial root finding produced the root {} with nonfinite derivative {} - "
+                                       "skipping the event",
+                                       root, der);
                     return;
                     // LCOV_EXCL_STOP
                 }
