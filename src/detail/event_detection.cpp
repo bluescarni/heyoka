@@ -1143,8 +1143,13 @@ T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
     assert(abs_der >= 0);
     // LCOV_EXCL_STOP
 
-    // NOTE: the *4 is a safety factor.
-    auto ret = g_eps / abs_der * 4;
+    // NOTE: the * 10 is a safety factor composed of:
+    // - 2 is the original factor from theoretical considerations,
+    // - 2 factor to deal with very small values of the derivative,
+    // - 2 factor to deal with the common case of event equation
+    //   flipping around after the event (e.g., for collisions).
+    // The rest is additional safety.
+    auto ret = g_eps / abs_der * 10;
 
     if (isfinite(ret)) {
         return ret;
