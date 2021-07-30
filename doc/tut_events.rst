@@ -408,12 +408,22 @@ Cooldown
 
 One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
-being made in the integration.
+being made in the integration. This phenomenon is sometimes called *discontinuity sticking* in the literature.
 
 In order to avoid this issue, whenever a terminal event occurs the event enters
 a *cooldown* period. Within the cooldown period, occurrences of the same event are ignored by the event detection
-system. The length of the cooldown period is, by default, automatically deduced by heyoka, but in some cases
-it might be useful to manually set a custom value. A custom cooldown period can be selected when constructing
+system.
+
+The length of the cooldown period is, by default, automatically deduced by heyoka, following a heuristic
+that takes into account:
+
+- the error tolerance of the integrator,
+- the derivative of the event equation at the trigger time.
+
+The heuristic works best under the assumption that the event equation does not change (much) after the
+execution of the event's callback. If, for any reason, the automatic deduction heuristic is
+to be avoided, it is possible to set a custom value for the cooldown.
+A custom cooldown period can be selected when constructing
 a terminal event via the ``kw::cooldown`` keyword argument.
 
 When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
@@ -448,6 +458,8 @@ will be troublesome, because both the event equation *and* its time derivative w
 when the event triggers. This will translate to a Taylor series with a double root in correspondence
 of the event trigger time, which will lead to a breakdown of the root finding algorithm.
 This, at best, will result in reduced performance and, at worst, in missing events altogether.
+Additionally, in case of terminal events the automatically-deduced cooldown value in correspondence of
+a double root will tend to infinity.
 
 As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.
@@ -460,6 +472,15 @@ Event equations and timestepping
 As explained earlier, the differential equations of the events are added to the ODE system and
 integrated together with the original equations. Because of this, event equations influence the
 selection of the adaptive timestep, even if no event is ever detected throughout the integration.
+
+For instance, the absolute value of the event equation at the beginning of the timestep is taken
+into account for the determination of the timestep size in relative error control mode. Thus, if
+the typical magnitude of the event equation throughout the integration is much larger than the typical
+magnitude of the state variables, the integration error for the state variables will increase with respect
+to an integration without event detection.
+
+As another example, an event equation which requires small timesteps for accurate numerical propagation
+will inevitably slow down also the propagation of the ODEs.
 
 
 Full code listing
