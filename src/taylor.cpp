@@ -1437,12 +1437,14 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
 // following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
 // the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
 // the clamping values for the timesteps. svf_ptr is a pointer to an LLVM array containing the
-// values in sv_funcs_dc.
+// values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
+// state vector (including sv_funcs, if any) will be written into it.
 template <typename T>
-llvm::Value *
-taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                   const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
-                   std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *taylor_determine_h(llvm_state &s,
+                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+                                const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                                std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                                std::uint32_t batch_size, llvm::Value *max_abs_state_ptr)
 {
     assert(batch_size != 0u);
 #if !defined(NDEBUG)
@@ -1556,6 +1558,11 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         max_abs_state = pairwise_reduce(v_max_abs_state, reducer);
         max_abs_diff_o = pairwise_reduce(v_max_abs_diff_o, reducer);
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
+    }
+
+    // Store max_abs_state, if requested.
+    if (max_abs_state_ptr != nullptr) {
+        store_vector_to_memory(builder, max_abs_state_ptr, max_abs_state);
     }
 
     // Determine if we are in absolute or relative tolerance mode.
@@ -2867,7 +2874,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 template <typename T, typename U>
 auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, U sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          std::vector<expression> ntes)
+                                          std::vector<expression> evs)
 {
     using std::isfinite;
 
@@ -2882,7 +2889,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(ntes));
+    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(evs));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -2896,9 +2903,10 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the current state vector (read only),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
-    // - pointer to the array of max timesteps (read & write).
+    // - pointer to the array of max timesteps (read & write),
+    // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -2939,6 +2947,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
 
+    auto *max_abs_state_ptr = h_ptr + 1;
+    max_abs_state_ptr->setName("max_abs_state_ptr");
+    max_abs_state_ptr->addAttr(llvm::Attribute::NoCapture);
+    max_abs_state_ptr->addAttr(llvm::Attribute::NoAlias);
+    max_abs_state_ptr->addAttr(llvm::Attribute::WriteOnly);
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
@@ -2953,7 +2967,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                               batch_size, compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                   max_abs_state_ptr);
 
     // Store h to memory.
     store_vector_to_memory(builder, h_ptr, h);
@@ -3240,7 +3255,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
                                               compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                   nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
@@ -3615,6 +3631,7 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
+    using std::abs;
     using std::isfinite;
 
 #if !defined(NDEBUG)
@@ -3648,16 +3665,22 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
     } else {
         assert(!m_tes.empty() || !m_ntes.empty());
 
-        using std::abs;
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
+        // event equations at the beginning of the timestep for later use.
+        T max_abs_state;
+        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
-        // Invoke the stepper for event handling.
-        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h);
+        // Compute the maximum absolute error on the Taylor series the event equations, which we will use for
+        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
+        // in taylor_detect_events we skip event detection altogether.
+        const auto g_eps = isfinite(max_abs_state) ? ((max_abs_state < 1) ? m_tol : (m_tol * max_abs_state))
+                                                   : std::numeric_limits<T>::infinity();
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim);
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim, g_eps);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -3676,10 +3699,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
-
-        // Store the timestep that was used during event
-        // detection, before possibly modifying it.
-        const auto orig_h = h;
 
         // If we have terminal events we need
         // to update the value of h.
@@ -3762,10 +3781,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                // NOTE: the automatic cooldown deduction is done on the
-                // timestep that was used for event detection, not on the timestep
-                // which was clamped by the occurrence of a terminal event.
-                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(orig_h));
+                // NOTE: if g_eps is not finite, we skipped event detection
+                // altogether and thus we never end up here. If the derivative
+                // of the event equation is not finite, the event is also skipped.
+                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(g_eps, std::get<4>(m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.

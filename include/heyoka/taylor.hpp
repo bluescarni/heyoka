@@ -580,7 +580,7 @@ private:
     T m_tol;
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *);
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
     std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
@@ -602,7 +602,7 @@ private:
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
-    std::vector<std::tuple<std::uint32_t, T, bool, int>> m_d_tes;
+    std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
     // The vector of cooldowns for the terminal events.
     // If an event is on cooldown, the corresponding optional
     // in this vector will contain the total time elapsed
