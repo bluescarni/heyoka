@@ -374,7 +374,7 @@ The screen output confirms that the first (and only) event triggered. For stoppi
 the numerical value of the outcome is the opposite of the event index minus one.
 
 Because here we used the single step
-function, even if the event's callback returned ``true`` the integration was stopped in correpondence of the
+function, even if the event's callback returned ``true`` the integration was stopped in correspondence of the
 event. Let us now use the ``propagate_grid()`` function instead, so that the integration resumes after the
 execution of the callback:
 
