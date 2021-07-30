@@ -702,7 +702,7 @@ the outcome of the integration will contain the index of the event that triggere
 <p>The screen output confirms that the first (and only) event triggered. For stopping terminal events,
 the numerical value of the outcome is the opposite of the event index minus one.</p>
 <p>Because here we used the single step
-function, even if the event’s callback returned <code class="docutils literal notranslate"><span class="pre">true</span></code> the integration was stopped in correpondence of the
+function, even if the event’s callback returned <code class="docutils literal notranslate"><span class="pre">true</span></code> the integration was stopped in correspondence of the
 event. Let us now use the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function instead, so that the integration resumes after the
 execution of the callback:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate over a time grid.</span>
@@ -738,11 +738,20 @@ for half of the total integration time) progressively slowed the bob down.</p>
 <span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">¶</a></h3>
 <p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
-being made in the integration.</p>
+being made in the integration. This phenomenon is sometimes called <em>discontinuity sticking</em> in the literature.</p>
 <p>In order to avoid this issue, whenever a terminal event occurs the event enters
 a <em>cooldown</em> period. Within the cooldown period, occurrences of the same event are ignored by the event detection
-system. The length of the cooldown period is, by default, automatically deduced by heyoka, but in some cases
-it might be useful to manually set a custom value. A custom cooldown period can be selected when constructing
+system.</p>
+<p>The length of the cooldown period is, by default, automatically deduced by heyoka, following a heuristic
+that takes into account:</p>
+<ul class="simple">
+<li><p>the error tolerance of the integrator,</p></li>
+<li><p>the derivative of the event equation at the trigger time.</p></li>
+</ul>
+<p>The heuristic works best under the assumption that the event equation does not change (much) after the
+execution of the event’s callback. If, for any reason, the automatic deduction heuristic is
+to be avoided, it is possible to set a custom value for the cooldown.
+A custom cooldown period can be selected when constructing
 a terminal event via the <code class="docutils literal notranslate"><span class="pre">kw::cooldown</span></code> keyword argument.</p>
 <p>When a terminal event triggers and enters the cooldown period, the event detection system will also try to detect
 the occurrence of multiple roots of the event equation within the cooldown period. If such multiple roots are detected,
@@ -769,7 +778,9 @@ with multiple roots.</p>
 <p>will be troublesome, because both the event equation <em>and</em> its time derivative will be zero
 when the event triggers. This will translate to a Taylor series with a double root in correspondence
 of the event trigger time, which will lead to a breakdown of the root finding algorithm.
-This, at best, will result in reduced performance and, at worst, in missing events altogether.</p>
+This, at best, will result in reduced performance and, at worst, in missing events altogether.
+Additionally, in case of terminal events the automatically-deduced cooldown value in correspondence of
+a double root will tend to infinity.</p>
 <p>As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.</p>
 <p>Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka’s logging system.</p>
@@ -779,6 +790,13 @@ are stationary points.</p>
 <p>As explained earlier, the differential equations of the events are added to the ODE system and
 integrated together with the original equations. Because of this, event equations influence the
 selection of the adaptive timestep, even if no event is ever detected throughout the integration.</p>
+<p>For instance, the absolute value of the event equation at the beginning of the timestep is taken
+into account for the determination of the timestep size in relative error control mode. Thus, if
+the typical magnitude of the event equation throughout the integration is much larger than the typical
+magnitude of the state variables, the integration error for the state variables will increase with respect
+to an integration without event detection.</p>
+<p>As another example, an event equation which requires small timesteps for accurate numerical propagation
+will inevitably slow down also the propagation of the ODEs.</p>
 </div>
 </div>
 <div class="section" id="full-code-listing">
