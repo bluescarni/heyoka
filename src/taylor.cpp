@@ -2874,7 +2874,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 template <typename T, typename U>
 auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, U sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          std::vector<expression> ntes)
+                                          std::vector<expression> evs)
 {
     using std::isfinite;
 
@@ -2889,7 +2889,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(ntes));
+    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(evs));
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
