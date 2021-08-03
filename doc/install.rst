@@ -81,7 +81,7 @@ Packages
 Conda
 `````
 
-heyoka is available via the `conda <https://conda.io/en/latest/>`__ package manager for Linux, OSX and Windows
+heyoka is available via the `conda <https://docs.conda.io/en/latest/>`__ package manager for Linux, OSX and Windows
 thanks to the infrastructure provided by `conda-forge <https://conda-forge.org/>`__.
 
 In order to install heyoka via conda, you just need to add ``conda-forge``
@@ -96,7 +96,7 @@ to the channels, and then we can immediately install heyoka:
 The conda package for heyoka is maintained by the core development team,
 and it is regularly updated when new heyoka versions are released.
 
-Please refer to the `conda documentation <https://conda.io/en/latest/>`__ for instructions
+Please refer to the `conda documentation <https://docs.conda.io/en/latest/>`__ for instructions
 on how to setup and manage
 your conda installation.
 
