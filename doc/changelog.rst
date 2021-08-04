@@ -1,6 +1,15 @@
 Changelog
 =========
 
+0.15.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Implement additional automatic simplifications for sin/cos
+  (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
+
 0.14.0 (2021-08-03)
 -------------------
 
