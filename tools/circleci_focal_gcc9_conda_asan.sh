@@ -16,9 +16,8 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda create -y -q -p $deps_dir cmake llvmdev boost-cpp mppp sleef xtensor xtensor-blas blas blas-devel fmt spdlog sphinx pip
+conda create -y -q -p $deps_dir cmake llvmdev boost-cpp mppp sleef xtensor xtensor-blas blas blas-devel fmt spdlog sphinx sphinxcontrib-bibtex sphinx-book-theme
 source activate $deps_dir
-pip install --user sphinx-book-theme sphinxcontrib-bibtex
 
 # Create the build dir and cd into it.
 mkdir build
