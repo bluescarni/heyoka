@@ -158,7 +158,7 @@ TEST_CASE("two body batch")
 
                 // Check the state vectors.
                 for (std::uint32_t j = 0; j < 12u; ++j) {
-                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], tol_mul));
+                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], tol_mul*10));
                 }
 
                 // Check the conservation of the orbital elements.
