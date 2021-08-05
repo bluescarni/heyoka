@@ -20,21 +20,11 @@ TEST_CASE("basic")
 {
     auto x = "x"_var;
 
-    auto merc_a = vsop2013_elliptic(1, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-9);
-
-    std::cout << "adasdsa\n";
+    auto merc_a = vsop2013_elliptic(1, 1, kw::vsop2013_time = par[0]);
 
     auto ta = taylor_adaptive<double>{{prime(x) = merc_a}, {0.}, kw::compact_mode = true};
-
-    // for (const auto &[ex, _] : ta.get_decomposition()) {
-    //     std::cout << ex << '\n';
-    // }
-
-    std::cout << "bbbb\n";
 
     ta.get_pars_data()[0] = (2447545.0 - 2451545.0) / 365250;
 
     ta.propagate_until(1);
-
-    std::cout << ta << '\n';
 }
