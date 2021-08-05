@@ -8,6 +8,8 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <limits>
+#include <stdexcept>
 #include <vector>
 
 #include <heyoka/celmec/vsop2013.hpp>
@@ -20,6 +22,31 @@ using namespace heyoka;
 
 const std::vector dates = {2411545.0, 2415545.0, 2419545.0, 2423545.0, 2427545.0, 2431545.0,
                            2435545.0, 2439545.0, 2443545.0, 2447545.0, 2451545.0};
+
+TEST_CASE("error handling")
+{
+    using Catch::Matchers::Message;
+
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(0, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 0 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(10, 1), std::invalid_argument,
+                           Message("Invalid planet index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 9] range, but it is 10 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 0), std::invalid_argument,
+                           Message("Invalid variable index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 6] range, but it is 0 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 7), std::invalid_argument,
+                           Message("Invalid variable index passed to vsop2013_elliptic(): "
+                                   "the index must be in the [1, 6] range, but it is 7 instead"));
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = -1.), std::invalid_argument,
+                           Message("Invalid threshold value passed to vsop2013_elliptic(): "
+                                   "the value must be finite and non-negative, but it is -1 instead"));
+    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = std::numeric_limits<double>::infinity()),
+                      std::invalid_argument);
+    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = std::numeric_limits<double>::quiet_NaN()),
+                      std::invalid_argument);
+}
 
 TEST_CASE("mercury")
 {
