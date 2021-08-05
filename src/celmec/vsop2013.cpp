@@ -42,6 +42,7 @@
 #include <heyoka/detail/vsop2013/vsop2013_4.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_5.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_6.hpp>
+#include <heyoka/detail/vsop2013/vsop2013_7.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
@@ -140,6 +141,13 @@ auto build_vsop2103_data()
     HEYOKA_VSOP2013_RECORD_DATA(6, 4);
     HEYOKA_VSOP2013_RECORD_DATA(6, 5);
     HEYOKA_VSOP2013_RECORD_DATA(6, 6);
+
+    HEYOKA_VSOP2013_RECORD_DATA(7, 1);
+    HEYOKA_VSOP2013_RECORD_DATA(7, 2);
+    HEYOKA_VSOP2013_RECORD_DATA(7, 3);
+    HEYOKA_VSOP2013_RECORD_DATA(7, 4);
+    HEYOKA_VSOP2013_RECORD_DATA(7, 5);
+    HEYOKA_VSOP2013_RECORD_DATA(7, 6);
 
 #undef HEYOKA_VSOP2013_RECORD_DATA
 

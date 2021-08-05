@@ -228,6 +228,12 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_6.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
