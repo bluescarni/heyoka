@@ -174,7 +174,24 @@ if(YACMA_COMPILER_IS_MSVC AND HEYOKA_BUILD_STATIC_LIBRARY)
     endforeach()
 endif()
 
-add_library(heyoka_vsop2013_data STATIC
+# List of source files.
+set(HEYOKA_SRC_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
+    # VSOP2013.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_3.cpp"
@@ -229,42 +246,6 @@ add_library(heyoka_vsop2013_data STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
-)
-
-# Set the compilation flags for heyoka_vsop2013_data.
-target_compile_options(heyoka_vsop2013_data PRIVATE
-    "$<$<CONFIG:Debug>:${HEYOKA_CXX_FLAGS_DEBUG}>"
-    "$<$<CONFIG:Release>:${HEYOKA_CXX_FLAGS_RELEASE}>"
-    "$<$<CONFIG:RelWithDebInfo>:${HEYOKA_CXX_FLAGS_RELEASE}>"
-    "$<$<CONFIG:MinSizeRel>:${HEYOKA_CXX_FLAGS_RELEASE}>"
-)
-
-# Make sure at least C++17 is being used and don't enable non-standard extensions.
-target_compile_features(heyoka_vsop2013_data PRIVATE cxx_std_17)
-set_property(TARGET heyoka_vsop2013_data PROPERTY CXX_EXTENSIONS NO)
-
-# Include dirs.
-target_include_directories(heyoka_vsop2013_data PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
-
-# List of source files.
-set(HEYOKA_SRC_FILES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/event_detection.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/binary_op.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/llvm_helpers.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/llvm_state.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/func.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/number.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/variable.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/param.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
     # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
@@ -352,8 +333,6 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.9.0")
         unset(_HEYOKA_IPO_OUTPUT)
     endif()
 endif()
-
-target_link_libraries(heyoka PRIVATE heyoka_vsop2013_data)
 
 message(STATUS "LLVM definitions: ${LLVM_DEFINITIONS}")
 message(STATUS "LLVM include dirs: ${LLVM_INCLUDE_DIRS}")
