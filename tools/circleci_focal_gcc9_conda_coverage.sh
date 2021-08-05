@@ -7,7 +7,7 @@ set -x
 set -e
 
 # Core deps.
-sudo apt-get install build-essential wget
+sudo apt-get install wget
 
 # Install conda+deps.
 wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
@@ -16,7 +16,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 bash miniconda.sh -b -p $HOME/miniconda
 conda config --add channels conda-forge
 conda config --set channel_priority strict
-conda create -y -q -p $deps_dir cmake llvmdev boost-cpp mppp sleef xtensor xtensor-blas blas blas-devel fmt spdlog
+conda create -y -q -p $deps_dir c-compiler cxx-compiler cmake llvmdev boost-cpp mppp sleef xtensor xtensor-blas blas blas-devel fmt spdlog
 source activate $deps_dir
 
 # Create the build dir and cd into it.
