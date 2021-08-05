@@ -72,6 +72,9 @@ TEST_CASE("N-body")
 
     for (auto cm : {false, true}) {
         for (auto ha : {false, true}) {
+            std::cout << "cm: " << cm << '\n';
+            std::cout << "ha: " << ha << '\n';
+
             // Initial states in orbital elements for Jupiter and Saturn.
             // NOTE: a, e, i are realistic, the angles are random.
             const auto j_kep = std::array{778.57e9, 0.0489, 0.02274164, .1, .2, .3};
@@ -89,6 +92,8 @@ TEST_CASE("N-body")
                                       s_x[0], s_x[1], s_x[2], s_v[0], s_v[1], s_v[2]},
                                      kw::high_accuracy = ha,
                                      kw::compact_mode = cm};
+
+            std::cout << "Built ta\n";
 
             // Create xtensor views on the the state and mass vectors
             // for ease of indexing.
@@ -182,7 +187,12 @@ TEST_CASE("N-body")
                     //               << '\n';
                     // }
 
+                    std::cout << "About to step\n";
+
                     const auto step_res = ta.step();
+
+                    std::cout << "Stepped\n";
+
                     REQUIRE(std::get<0>(step_res) == taylor_outcome::success);
 
                     // if (i % 100000 == 0) {
@@ -196,6 +206,8 @@ TEST_CASE("N-body")
             std::cout << "COM         : " << get_com() << '\n';
             std::cout << "COM velocity: " << get_com_v() << '\n';
             std::cout << "Energy diff : " << abs((init_energy - get_energy()) / init_energy) << '\n';
+
+            std::cout << "Finishing iter\n";
         }
     }
 }
