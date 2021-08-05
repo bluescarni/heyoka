@@ -441,3 +441,126 @@ TEST_CASE("uranus")
         }
     }
 }
+
+TEST_CASE("neptune")
+{
+    auto x = "x"_var;
+
+    {
+        auto a_sol = vsop2013_elliptic(8, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values
+            = {30.0385847963, 29.9279835646, 30.0170916189, 30.1299497658, 30.1872688174, 30.2554951881,
+               30.2115050254, 30.0346199466, 29.9603948982, 30.0263849856, 30.1036378528};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 5e-7);
+        }
+    }
+
+    {
+        auto lam_sol = vsop2013_elliptic(8, 2, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {1.1425611229, 1.5621276309, 1.9826291995, 2.4032479642, 2.8186551969, 3.2313775475,
+                                    3.6473388606, 4.0649027402, 4.4837211336, 4.9061335825, 5.3268940339};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(std::sin(ta.get_state()[0]) - std::sin(values[i])) < 3e-8);
+            REQUIRE(std::abs(std::cos(ta.get_state()[0]) - std::cos(values[i])) < 3e-8);
+        }
+    }
+
+    {
+        auto p_sol = vsop2013_elliptic(8, 6, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = p_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {0.0115258164, 0.0115145041, 0.0115137290, 0.0115053819, 0.0115078692, 0.0115165839,
+                                    0.0115253141, 0.0115221121, 0.0115153100, 0.0115124106, 0.0115020499};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 3e-8);
+        }
+    }
+}
+
+TEST_CASE("pluto")
+{
+    auto x = "x"_var;
+
+    {
+        auto a_sol = vsop2013_elliptic(9, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values
+            = {39.4227219159, 39.3129146524, 39.3965378947, 39.4657239282, 39.5593694964, 39.7847670022,
+               39.8105744754, 39.6397923115, 39.5355974284, 39.3577302458, 39.2648542648};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 5e-7);
+        }
+    }
+
+    {
+        auto lam_sol = vsop2013_elliptic(9, 2, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {1.3910260961, 1.6701997041, 1.9513031849, 2.2334191944, 2.5096847076, 2.7848046342,
+                                    3.0604019239, 3.3340683196, 3.6105864836, 3.8918549636, 4.1726045776};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(std::sin(ta.get_state()[0]) - std::sin(values[i])) < 3e-8);
+            REQUIRE(std::abs(std::cos(ta.get_state()[0]) - std::cos(values[i])) < 3e-8);
+        }
+    }
+
+    {
+        auto k_sol = vsop2013_elliptic(9, 3, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = k_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values
+            = {-0.1777508423, -0.1783612429, -0.1790052702, -0.1807103287, -0.1812211321, -0.1845941835,
+               -0.1852877487, -0.1822720892, -0.1808345328, -0.1773615624, -0.1758641167};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 3e-8);
+        }
+    }
+}
