@@ -37,6 +37,7 @@
 
 #include <heyoka/celmec/vsop2013.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_1.hpp>
+#include <heyoka/detail/vsop2013/vsop2013_2.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/pow.hpp>
@@ -101,6 +102,13 @@ auto build_vsop2103_data()
     HEYOKA_VSOP2013_RECORD_DATA(1, 5);
     HEYOKA_VSOP2013_RECORD_DATA(1, 6);
 
+    HEYOKA_VSOP2013_RECORD_DATA(2, 1);
+    HEYOKA_VSOP2013_RECORD_DATA(2, 2);
+    HEYOKA_VSOP2013_RECORD_DATA(2, 3);
+    HEYOKA_VSOP2013_RECORD_DATA(2, 4);
+    HEYOKA_VSOP2013_RECORD_DATA(2, 5);
+    HEYOKA_VSOP2013_RECORD_DATA(2, 6);
+
 #undef HEYOKA_VSOP2013_RECORD_DATA
 
     return retval;
@@ -144,11 +152,6 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     if (!std::isfinite(thresh) || thresh < 0.) {
         throw std::invalid_argument("Invalid threshold value passed to vsop2013_elliptic(): "
                                     "the value must be finite and non-negative, but it is {} instead"_format(thresh));
-    }
-
-    // TODO fix.
-    if (pl_idx != 1u) {
-        throw;
     }
 
     // Fetch the data.
