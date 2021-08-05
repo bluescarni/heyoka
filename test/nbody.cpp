@@ -187,11 +187,11 @@ TEST_CASE("N-body")
                     //               << '\n';
                     // }
 
-                    std::cout << "About to step\n";
+                    //std::cout << "About to step\n";
 
                     const auto step_res = ta.step();
 
-                    std::cout << "Stepped\n";
+                    //std::cout << "Stepped\n";
 
                     REQUIRE(std::get<0>(step_res) == taylor_outcome::success);
 
