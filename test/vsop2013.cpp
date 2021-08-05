@@ -200,3 +200,63 @@ TEST_CASE("emb")
         }
     }
 }
+
+TEST_CASE("mars")
+{
+    auto x = "x"_var;
+
+    {
+        auto a_sol = vsop2013_elliptic(4, 1, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {1.5236841626, 1.5236124046, 1.5236050441, 1.5236700442, 1.5236699766, 1.5236472115,
+                                    1.5236402785, 1.5236249712, 1.5237113425, 1.5237954208, 1.5236789921};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 2e-8);
+        }
+    }
+
+    {
+        auto lam_sol = vsop2013_elliptic(4, 2, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {4.7846953863, 3.6698641019, 2.5549157614, 1.4402987476, 0.3256326851, 5.4940145108,
+                                    4.3792616969, 3.2645748509, 2.1497402787, 1.0351666881, 6.2038755297};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(std::sin(ta.get_state()[0]) - std::sin(values[i])) < 2e-8);
+            REQUIRE(std::abs(std::cos(ta.get_state()[0]) - std::cos(values[i])) < 2e-8);
+        }
+    }
+
+    {
+        auto p_sol = vsop2013_elliptic(4, 6, kw::vsop2013_time = par[0]);
+        auto ta = taylor_adaptive<double>{{prime(x) = p_sol}, {0.}, kw::compact_mode = true};
+
+        const std::vector values = {0.0124027403, 0.0123912341, 0.0123796421, 0.0123681256, 0.0123558641, 0.0123428097,
+                                    0.0123306142, 0.0123188895, 0.0123067748, 0.0122967829, 0.0122862564};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - values[i]) < 2e-8);
+        }
+    }
+}
