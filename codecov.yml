@@ -2,5 +2,6 @@ coverage:
   ignore:
   - "test/.*"
   - "tutorial/.*"
+  - "src/detail/vsop2013/.*"
 
 comment: off

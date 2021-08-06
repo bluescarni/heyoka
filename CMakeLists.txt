@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.14.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.15.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -190,6 +190,63 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
+    # VSOP2013.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
+    # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
@@ -237,8 +294,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "14.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 14)
+    set_property(TARGET heyoka PROPERTY VERSION "15.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 15)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()

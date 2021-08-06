@@ -519,7 +519,18 @@ expression cos(expression e)
         assert(rng.first != rng.second);
         return cos(std::move(*rng.first));
     } else {
-        return expression{func{detail::cos_impl(std::move(e))}};
+        // Simplify cos(number) to its value.
+        if (auto num_ptr = std::get_if<number>(&e.value())) {
+            return expression{std::visit(
+                [](const auto &x) {
+                    using std::cos;
+
+                    return number{cos(x)};
+                },
+                num_ptr->value())};
+        } else {
+            return expression{func{detail::cos_impl(std::move(e))}};
+        }
     }
 }
 
