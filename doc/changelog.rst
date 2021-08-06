@@ -7,6 +7,10 @@ Changelog
 New
 ~~~
 
+- Add an implementation of the VSOP2013 analytical solution
+  for the motion of the planets of the Solar System, usable
+  in the definition of differential equations
+  (`#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
 - Implement additional automatic simplifications for sin/cos
   (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
 
