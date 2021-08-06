@@ -245,6 +245,11 @@ struct llvm_state::jit {
         // Set the codegen optimisation level to aggressive.
         jtmb->setCodeGenOptLevel(llvm::CodeGenOpt::Aggressive);
 
+        if (boost::starts_with(jtmb->getTargetTriple().str(), "powerpc")) {
+            std::cout << "PPC detected in jtmb, setting relocation model to pic\n";
+            jtmb->setRelocationModel(llvm::Reloc::Model::PIC_);
+        }
+
         // Create the jit builder.
         llvm::orc::LLJITBuilder lljit_builder;
         // NOTE: other settable properties may
