@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <initializer_list>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -50,6 +51,8 @@ TEST_CASE("error handling")
 
 TEST_CASE("mercury")
 {
+    std::cout << "Testing Mercury...\n";
+
     auto x = "x"_var;
 
     {
@@ -110,6 +113,8 @@ TEST_CASE("mercury")
 
 TEST_CASE("venus")
 {
+    std::cout << "Testing Venus...\n";
+
     auto x = "x"_var;
 
     {
@@ -170,6 +175,8 @@ TEST_CASE("venus")
 
 TEST_CASE("emb")
 {
+    std::cout << "Testing EMB...\n";
+
     auto x = "x"_var;
 
     {
@@ -230,6 +237,8 @@ TEST_CASE("emb")
 
 TEST_CASE("mars")
 {
+    std::cout << "Testing Mars...\n";
+
     auto x = "x"_var;
 
     {
@@ -290,6 +299,8 @@ TEST_CASE("mars")
 
 TEST_CASE("jupiter")
 {
+    std::cout << "Testing Jupiter...\n";
+
     auto x = "x"_var;
 
     {
@@ -350,6 +361,8 @@ TEST_CASE("jupiter")
 
 TEST_CASE("saturn")
 {
+    std::cout << "Testing Saturn...\n";
+
     auto x = "x"_var;
 
     {
@@ -410,6 +423,8 @@ TEST_CASE("saturn")
 
 TEST_CASE("uranus")
 {
+    std::cout << "Testing Uranus...\n";
+
     auto x = "x"_var;
 
     {
@@ -471,6 +486,8 @@ TEST_CASE("uranus")
 
 TEST_CASE("neptune")
 {
+    std::cout << "Testing Neptune...\n";
+
     auto x = "x"_var;
 
     {
@@ -532,6 +549,8 @@ TEST_CASE("neptune")
 
 TEST_CASE("pluto")
 {
+    std::cout << "Testing Pluto...\n";
+
     auto x = "x"_var;
 
     {
