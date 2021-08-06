@@ -20,13 +20,6 @@
 namespace heyoka
 {
 
-namespace detail
-{
-
-HEYOKA_DLL_PUBLIC expression vsop2013_elliptic_impl(std::uint32_t, std::uint32_t, expression, double);
-
-}
-
 namespace kw
 {
 
@@ -35,8 +28,12 @@ IGOR_MAKE_NAMED_ARGUMENT(vsop2013_thresh);
 
 } // namespace kw
 
+namespace detail
+{
+
+// Common options for the vsop2013 functions.
 template <typename... KwArgs>
-inline expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, KwArgs &&...kw_args)
+inline auto vsop2013_common_opts(KwArgs &&...kw_args)
 {
     igor::parser p{kw_args...};
 
@@ -57,6 +54,18 @@ inline expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx,
             return 1e-9;
         }
     }();
+
+    return std::tuple{std::move(time_expr), thresh};
+}
+
+HEYOKA_DLL_PUBLIC expression vsop2013_elliptic_impl(std::uint32_t, std::uint32_t, expression, double);
+
+} // namespace detail
+
+template <typename... KwArgs>
+inline expression vsop2013_elliptic(std::uint32_t pl_idx, std::uint32_t var_idx, KwArgs &&...kw_args)
+{
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
 
     return detail::vsop2013_elliptic_impl(pl_idx, var_idx, std::move(time_expr), thresh);
 }

@@ -191,7 +191,7 @@ const std::array<std::array<double, 2>, 17> lam_l_data = {{{4.402608631669, 2608
 
 } // namespace
 
-// Implementation of the function constructing the VSOP2013 series as heyoka expressions.
+// Implementation of the function constructing the VSOP2013 elliptic series as heyoka expressions.
 expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, expression t_expr, double thresh)
 {
     // Check the input values.
