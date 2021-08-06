@@ -59,6 +59,7 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Pass.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
@@ -81,6 +82,8 @@
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
+
+#include <iostream>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -116,6 +119,11 @@ target_features get_target_features_impl()
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
     // LCOV_EXCL_STOP
+
+    if (boost::starts_with(jtmb->getTargetTriple().str(), "powerpc")) {
+        std::cout << "PPC detected in jtmb, setting relocation model to pic\n";
+        jtmb->setRelocationModel(llvm::Reloc::Model::PIC_);
+    }
 
     auto tm = jtmb->createTargetMachine();
     // LCOV_EXCL_START
