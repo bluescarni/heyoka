@@ -26,7 +26,7 @@ cd build
 # GCC build.
 cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_MPPP=yes -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="-fsanitize=address" -DBoost_NO_BOOST_CMAKE=ON
 make -j2 VERBOSE=1
-ctest -V -j2
+ctest -V -j2 -E vsop2013
 
 # Build the docs.
 cd ../doc
