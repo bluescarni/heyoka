@@ -122,7 +122,7 @@ target_features get_target_features_impl()
 
     if (boost::starts_with(jtmb->getTargetTriple().str(), "powerpc")) {
         std::cout << "PPC detected in jtmb, setting relocation model to pic\n";
-        jtmb->setRelocationModel(llvm::Reloc::Model::DynamicNoPIC);
+        jtmb->setRelocationModel(llvm::Reloc::Model::Static);
     }
 
     auto tm = jtmb->createTargetMachine();
@@ -247,7 +247,7 @@ struct llvm_state::jit {
 
         if (boost::starts_with(jtmb->getTargetTriple().str(), "powerpc")) {
             std::cout << "PPC detected in jtmb, setting relocation model to pic\n";
-            jtmb->setRelocationModel(llvm::Reloc::Model::DynamicNoPIC);
+            jtmb->setRelocationModel(llvm::Reloc::Model::Static);
         }
 
         // Create the jit builder.
