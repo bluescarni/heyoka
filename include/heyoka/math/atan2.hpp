@@ -73,6 +73,24 @@ public:
 
 HEYOKA_DLL_PUBLIC expression atan2(expression, expression);
 
+HEYOKA_DLL_PUBLIC expression atan2(expression, double);
+HEYOKA_DLL_PUBLIC expression atan2(expression, long double);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression atan2(expression, mppp::real128);
+
+#endif
+
+HEYOKA_DLL_PUBLIC expression atan2(double, expression);
+HEYOKA_DLL_PUBLIC expression atan2(long double, expression);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC expression atan2(mppp::real128, expression);
+
+#endif
+
 } // namespace heyoka
 
 HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::atan2_impl)

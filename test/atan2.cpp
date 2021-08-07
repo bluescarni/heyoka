@@ -6,13 +6,26 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <initializer_list>
 #include <sstream>
+#include <variant>
 #include <vector>
 
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -90,6 +103,37 @@ TEST_CASE("atan2 decompose")
         REQUIRE(dec[7].first == atan2("u_2"_var, "u_3"_var));
         REQUIRE(dec[7].second == std::vector<std::uint32_t>{6});
     }
+}
+
+TEST_CASE("atan2 overloads")
+{
+    auto k = atan2("x"_var, 1.1);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1});
+
+    k = atan2("x"_var, 1.1l);
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = atan2("x"_var, mppp::real128{"1.1"});
+    REQUIRE(std::get<func>(k.value()).args()[0] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[1].value()) == number{mppp::real128{"1.1"}});
+#endif
+
+    k = atan2(1.1, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1});
+
+    k = atan2(1.1l, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{1.1l});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    k = atan2(mppp::real128{"1.1"}, "x"_var);
+    REQUIRE(std::get<func>(k.value()).args()[1] == "x"_var);
+    REQUIRE(std::get<number>(std::get<func>(k.value()).args()[0].value()) == number{mppp::real128{"1.1"}});
+#endif
 }
 
 TEST_CASE("atan2 cse")

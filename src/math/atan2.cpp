@@ -939,6 +939,44 @@ expression atan2(expression y, expression x)
     return expression{func{detail::atan2_impl(std::move(y), std::move(x))}};
 }
 
+expression atan2(expression y, double x)
+{
+    return atan2(std::move(y), expression(x));
+}
+
+expression atan2(expression y, long double x)
+{
+    return atan2(std::move(y), expression(x));
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression atan2(expression y, mppp::real128 x)
+{
+    return atan2(std::move(y), expression(x));
+}
+
+#endif
+
+expression atan2(double y, expression x)
+{
+    return atan2(expression(y), std::move(x));
+}
+
+expression atan2(long double y, expression x)
+{
+    return atan2(expression(y), std::move(x));
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+expression atan2(mppp::real128 y, expression x)
+{
+    return atan2(expression(y), std::move(x));
+}
+
+#endif
+
 } // namespace heyoka
 
 HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::atan2_impl)
