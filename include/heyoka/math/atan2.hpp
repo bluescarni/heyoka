@@ -28,6 +28,8 @@ public:
     explicit atan2_impl(expression, expression);
 
     expression diff(const std::string &) const;
+
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
 };
 
 } // namespace detail
