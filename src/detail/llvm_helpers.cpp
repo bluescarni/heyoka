@@ -1121,7 +1121,6 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
     assert(y->getType() == x->getType());
     assert(y->getType()->getScalarType()->isFloatingPointTy());
 
-    auto &builder = s.builder();
     auto &context = s.context();
 
     // Determine the scalar type of the vector arguments.
@@ -1129,6 +1128,8 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
+        auto &builder = s.builder();
+
         // NOTE: for __float128 we cannot use the intrinsic, we need
         // to call an external function.
 
