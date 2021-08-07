@@ -6,21 +6,38 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
 
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -90,6 +107,90 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     // decomposed atan2).
     return u_vars_defs.size() - 1u;
 }
+
+namespace
+{
+
+// Derivative of atan2(number, number).
+template <typename T, typename U, typename V,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &, const U &num0, const V &num1,
+                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    if (order == 0u) {
+        // Do the number codegen.
+        auto y = taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size);
+        auto x = taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size);
+
+        // Compute and return the atan2.
+        return llvm_atan2(s, y, x);
+    } else {
+        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+    }
+}
+
+// All the other cases.
+template <typename T, typename U, typename V, typename... Args>
+llvm::Value *taylor_diff_atan2_impl(llvm_state &, const std::vector<std::uint32_t> &, const U &, const V &,
+                                    const std::vector<llvm::Value *> &, llvm::Value *, std::uint32_t, std::uint32_t,
+                                    std::uint32_t, std::uint32_t, const Args &...)
+{
+    throw std::invalid_argument(
+        "An invalid argument type was encountered while trying to build the Taylor derivative of atan2()");
+}
+
+template <typename T>
+llvm::Value *taylor_diff_atan2(llvm_state &s, const atan2_impl &f, const std::vector<std::uint32_t> &deps,
+                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                               std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+{
+    assert(f.args().size() == 2u);
+
+    if (deps.size() != 1u) {
+        throw std::invalid_argument("A hidden dependency vector of size 1 is expected in order to compute the Taylor "
+                                    "derivative of atan2(), but a vector of size {} was passed "
+                                    "instead"_format(deps.size()));
+    }
+
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return taylor_diff_atan2_impl<T>(s, deps, v1, v2, arr, par_ptr, n_uvars, order, idx, batch_size);
+        },
+        f.args()[0].value(), f.args()[1].value());
+}
+
+} // namespace
+
+llvm::Value *atan2_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                         std::uint32_t batch_size) const
+{
+    return taylor_diff_atan2<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+}
+
+llvm::Value *atan2_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                          std::uint32_t batch_size) const
+{
+    return taylor_diff_atan2<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *atan2_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                          std::uint32_t batch_size) const
+{
+    return taylor_diff_atan2<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
+}
+
+#endif
 
 } // namespace detail
 

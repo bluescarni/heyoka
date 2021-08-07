@@ -9,9 +9,20 @@
 #ifndef HEYOKA_MATH_ATAN2_HPP
 #define HEYOKA_MATH_ATAN2_HPP
 
+#include <heyoka/config.hpp>
+
+#include <cstdint>
 #include <string>
+#include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
 
@@ -30,6 +41,18 @@ public:
     expression diff(const std::string &) const;
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+
+    llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                 llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                 std::uint32_t) const;
+    llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                  std::uint32_t) const;
+#if defined(HEYOKA_HAVE_REAL128)
+    llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
+                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
+                                  std::uint32_t) const;
+#endif
 };
 
 } // namespace detail
