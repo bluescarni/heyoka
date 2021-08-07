@@ -24,13 +24,17 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/atan2.hpp>
+#include <heyoka/math/cos.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
 
 TEST_CASE("atan2 def ctor")
 {
@@ -145,6 +149,19 @@ TEST_CASE("atan2 cse")
     auto dc = taylor_add_jet<double>(s, "jet", {atan2(y, x) + (x * x + y * y), x}, 1, 1, false, false);
 
     REQUIRE(dc.size() == 9u);
+}
+
+TEST_CASE("atan2 integration")
+{
+    auto x = "x"_var;
+
+    // NOTE: the solution of this ODE is exp(t).
+    auto ta = taylor_adaptive<double>{{prime(x) = atan2(sin(x), cos(x))}, {1.}};
+
+    ta.propagate_until(1.5);
+
+    // Check the value of e**1.5.
+    REQUIRE(ta.get_state()[0] == approximately(4.4816890703380645));
 }
 
 TEST_CASE("atan2 s11n")
