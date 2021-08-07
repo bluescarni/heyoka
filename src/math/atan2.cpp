@@ -45,7 +45,9 @@
 #include <heyoka/math/atan2.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -938,3 +940,5 @@ expression atan2(expression y, expression x)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::atan2_impl)

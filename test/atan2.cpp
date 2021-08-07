@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <sstream>
 #include <vector>
 
 #include <heyoka/expression.hpp>
@@ -17,6 +18,15 @@
 #include "catch.hpp"
 
 using namespace heyoka;
+
+TEST_CASE("atan2 def ctor")
+{
+    detail::atan2_impl a;
+
+    REQUIRE(a.args().size() == 2u);
+    REQUIRE(a.args()[0] == 0_dbl);
+    REQUIRE(a.args()[1] == 1_dbl);
+}
 
 TEST_CASE("atan2 diff")
 {
@@ -80,4 +90,40 @@ TEST_CASE("atan2 decompose")
         REQUIRE(dec[7].first == atan2("u_2"_var, "u_3"_var));
         REQUIRE(dec[7].second == std::vector<std::uint32_t>{6});
     }
+}
+
+TEST_CASE("atan2 cse")
+{
+    auto x = "x"_var, y = "y"_var;
+
+    llvm_state s;
+
+    auto dc = taylor_add_jet<double>(s, "jet", {atan2(y, x) + (x * x + y * y), x}, 1, 1, false, false);
+
+    REQUIRE(dc.size() == 9u);
+}
+
+TEST_CASE("atan2 s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = atan2(x, y);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == atan2(x, y));
 }
