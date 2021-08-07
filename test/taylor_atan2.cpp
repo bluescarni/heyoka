@@ -98,7 +98,7 @@ TEST_CASE("taylor atan2")
 
         const auto a = fp_t{1} / 3;
         const auto b = 1 + fp_t{3} / fp_t{7};
-        // const auto c = fp_t{2} / 7;
+        const auto c = fp_t{2} / 7;
 
         // Number-number tests.
         {
@@ -543,12 +543,11 @@ TEST_CASE("taylor atan2")
         compare_batch_scalar<fp_t>({atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, opt_level,
                                    high_accuracy, compact_mode);
 
-#if 0
         // Number-variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 1, 1,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 1, 1,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -562,14 +561,14 @@ TEST_CASE("taylor atan2")
 
             REQUIRE(jet[0] == fp_t{.2});
             REQUIRE(jet[1] == fp_t{.3});
-            REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
-            REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
+            REQUIRE(jet[2] == approximately(atan2(a, jet[1])));
+            REQUIRE(jet[3] == approximately(atan2(c, jet[0])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(par[0], y), kepE(expression{number{c}}, x)}, 1, 1, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(par[0], y), atan2(expression{number{c}}, x)}, 1, 1, high_accuracy,
                                  compact_mode);
 
             s.compile();
@@ -585,14 +584,14 @@ TEST_CASE("taylor atan2")
 
             REQUIRE(jet[0] == fp_t{.2});
             REQUIRE(jet[1] == fp_t{.3});
-            REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
-            REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
+            REQUIRE(jet[2] == approximately(atan2(a, jet[1])));
+            REQUIRE(jet[3] == approximately(atan2(c, jet[0])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 1, 2,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 1, 2,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -610,17 +609,17 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[2] == .3);
             REQUIRE(jet[3] == .4);
 
-            REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
-            REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
+            REQUIRE(jet[4] == approximately(atan2(a, jet[2])));
+            REQUIRE(jet[5] == approximately(atan2(a, jet[3])));
 
-            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(c, jet[0])));
-            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(c, jet[1])));
+            REQUIRE(jet[6] == approximately(atan2(c, jet[0])));
+            REQUIRE(jet[7] == approximately(atan2(c, jet[1])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(par[1], x)}, 1, 2, high_accuracy,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(par[1], x)}, 1, 2, high_accuracy,
                                  compact_mode);
 
             s.compile();
@@ -640,17 +639,17 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[2] == .3);
             REQUIRE(jet[3] == .4);
 
-            REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
-            REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
+            REQUIRE(jet[4] == approximately(atan2(a, jet[2])));
+            REQUIRE(jet[5] == approximately(atan2(a, jet[3])));
 
-            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(c, jet[0])));
-            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(c, jet[1])));
+            REQUIRE(jet[6] == approximately(atan2(c, jet[0])));
+            REQUIRE(jet[7] == approximately(atan2(c, jet[1])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 2, 1,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 2, 1,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -664,16 +663,16 @@ TEST_CASE("taylor atan2")
 
             REQUIRE(jet[0] == .2);
             REQUIRE(jet[1] == .3);
-            REQUIRE(jet[2] == approximately(bmt_inv_kep_E(a, jet[1])));
-            REQUIRE(jet[3] == approximately(bmt_inv_kep_E(c, jet[0])));
-            REQUIRE(jet[4] == approximately(fp_t{1} / 2 * jet[3] / (1 - a * cos(jet[2]))));
-            REQUIRE(jet[5] == approximately(fp_t{1} / 2 * jet[2] / (1 - c * cos(jet[3]))));
+            REQUIRE(jet[2] == approximately(atan2(a, jet[1])));
+            REQUIRE(jet[3] == approximately(atan2(c, jet[0])));
+            REQUIRE(jet[4] == approximately(-fp_t{1} / 2 * a * jet[3] / (jet[1] * jet[1] + a * a)));
+            REQUIRE(jet[5] == approximately(-fp_t{1} / 2 * c * jet[2] / (jet[0] * jet[0] + c * c)));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 2, 2,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 2, 2,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -691,23 +690,23 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[2] == .3);
             REQUIRE(jet[3] == .4);
 
-            REQUIRE(jet[4] == approximately(bmt_inv_kep_E(a, jet[2])));
-            REQUIRE(jet[5] == approximately(bmt_inv_kep_E(a, jet[3])));
+            REQUIRE(jet[4] == approximately(atan2(a, jet[2])));
+            REQUIRE(jet[5] == approximately(atan2(a, jet[3])));
 
-            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(c, jet[0])));
-            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(c, jet[1])));
+            REQUIRE(jet[6] == approximately(atan2(c, jet[0])));
+            REQUIRE(jet[7] == approximately(atan2(c, jet[1])));
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[6] / (1 - a * cos(jet[4]))));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[7] / (1 - a * cos(jet[5]))));
+            REQUIRE(jet[8] == approximately(-fp_t{1} / 2 * a * jet[6] / (jet[2] * jet[2] + a * a)));
+            REQUIRE(jet[9] == approximately(-fp_t{1} / 2 * a * jet[7] / (jet[3] * jet[3] + a * a)));
 
-            REQUIRE(jet[10] == approximately(fp_t{1} / 2 * jet[4] / (1 - c * cos(jet[6]))));
-            REQUIRE(jet[11] == approximately(fp_t{1} / 2 * jet[5] / (1 - c * cos(jet[7]))));
+            REQUIRE(jet[10] == approximately(-fp_t{1} / 2 * c * jet[4] / (jet[0] * jet[0] + c * c)));
+            REQUIRE(jet[11] == approximately(-fp_t{1} / 2 * c * jet[5] / (jet[1] * jet[1] + c * c)));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, 3, 3,
+            taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 3, 3,
                                  high_accuracy, compact_mode);
 
             s.compile();
@@ -727,53 +726,56 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[4] == .4);
             REQUIRE(jet[5] == .6);
 
-            REQUIRE(jet[6] == approximately(bmt_inv_kep_E(a, jet[3])));
-            REQUIRE(jet[7] == approximately(bmt_inv_kep_E(a, jet[4])));
-            REQUIRE(jet[8] == approximately(bmt_inv_kep_E(a, jet[5])));
+            REQUIRE(jet[6] == approximately(atan2(a, jet[3])));
+            REQUIRE(jet[7] == approximately(atan2(a, jet[4])));
+            REQUIRE(jet[8] == approximately(atan2(a, jet[5])));
 
-            REQUIRE(jet[9] == approximately(bmt_inv_kep_E(c, jet[0])));
-            REQUIRE(jet[10] == approximately(bmt_inv_kep_E(c, jet[1])));
-            REQUIRE(jet[11] == approximately(bmt_inv_kep_E(c, jet[2])));
+            REQUIRE(jet[9] == approximately(atan2(c, jet[0])));
+            REQUIRE(jet[10] == approximately(atan2(c, jet[1])));
+            REQUIRE(jet[11] == approximately(atan2(c, jet[2])));
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[9] / (1 - a * cos(jet[6]))));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[10] / (1 - a * cos(jet[7]))));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[11] / (1 - a * cos(jet[8]))));
+            REQUIRE(jet[12] == approximately(-fp_t{1} / 2 * a * jet[9] / (jet[3] * jet[3] + a * a)));
+            REQUIRE(jet[13] == approximately(-fp_t{1} / 2 * a * jet[10] / (jet[4] * jet[4] + a * a)));
+            REQUIRE(jet[14] == approximately(-fp_t{1} / 2 * a * jet[11] / (jet[5] * jet[5] + a * a)));
 
-            REQUIRE(jet[15] == approximately(fp_t{1} / 2 * jet[6] / (1 - c * cos(jet[9]))));
-            REQUIRE(jet[16] == approximately(fp_t{1} / 2 * jet[7] / (1 - c * cos(jet[10]))));
-            REQUIRE(jet[17] == approximately(fp_t{1} / 2 * jet[8] / (1 - c * cos(jet[11]))));
+            REQUIRE(jet[15] == approximately(-fp_t{1} / 2 * c * jet[6] / (jet[0] * jet[0] + c * c)));
+            REQUIRE(jet[16] == approximately(-fp_t{1} / 2 * c * jet[7] / (jet[1] * jet[1] + c * c)));
+            REQUIRE(jet[17] == approximately(-fp_t{1} / 2 * c * jet[8] / (jet[2] * jet[2] + c * c)));
 
             REQUIRE(jet[18]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[15] * (1 - a * cos(jet[6])) - a * jet[9] * 2 * jet[12] * sin(jet[6]))
-                                     / ((1 - a * cos(jet[6])) * (1 - a * cos(jet[6])))));
-            REQUIRE(jet[19]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[16] * (1 - a * cos(jet[7])) - a * jet[10] * 2 * jet[13] * sin(jet[7]))
-                                     / ((1 - a * cos(jet[7])) * (1 - a * cos(jet[7])))));
-            REQUIRE(jet[20]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[17] * (1 - a * cos(jet[8])) - a * jet[11] * 2 * jet[14] * sin(jet[8]))
-                                     / ((1 - a * cos(jet[8])) * (1 - a * cos(jet[8])))));
+                    == approximately(-fp_t{1} / 6
+                                     * (a * 2 * jet[15] * (jet[3] * jet[3] + a * a) - a * jet[9] * 2 * jet[3] * jet[9])
+                                     / ((jet[3] * jet[3] + a * a) * (jet[3] * jet[3] + a * a))));
+            REQUIRE(
+                jet[19]
+                == approximately(-fp_t{1} / 6
+                                 * (a * 2 * jet[16] * (jet[4] * jet[4] + a * a) - a * jet[10] * 2 * jet[4] * jet[10])
+                                 / ((jet[4] * jet[4] + a * a) * (jet[4] * jet[4] + a * a))));
+            REQUIRE(
+                jet[20]
+                == approximately(-fp_t{1} / 6
+                                 * (a * 2 * jet[17] * (jet[5] * jet[5] + a * a) - a * jet[11] * 2 * jet[5] * jet[11])
+                                 / ((jet[5] * jet[5] + a * a) * (jet[5] * jet[5] + a * a))));
 
             REQUIRE(jet[21]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[12] * (1 - c * cos(jet[9])) - c * jet[6] * 2 * jet[15] * sin(jet[9]))
-                                     / ((1 - c * cos(jet[9])) * (1 - c * cos(jet[9])))));
+                    == approximately(-fp_t{1} / 6
+                                     * (c * 2 * jet[12] * (jet[0] * jet[0] + c * c) - c * jet[6] * 2 * jet[0] * jet[6])
+                                     / ((jet[0] * jet[0] + c * c) * (jet[0] * jet[0] + c * c))));
             REQUIRE(jet[22]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[13] * (1 - c * cos(jet[10])) - c * jet[7] * 2 * jet[16] * sin(jet[10]))
-                                     / ((1 - c * cos(jet[10])) * (1 - c * cos(jet[10])))));
+                    == approximately(-fp_t{1} / 6
+                                     * (c * 2 * jet[13] * (jet[1] * jet[1] + c * c) - c * jet[7] * 2 * jet[1] * jet[7])
+                                     / ((jet[1] * jet[1] + c * c) * (jet[1] * jet[1] + c * c))));
             REQUIRE(jet[23]
-                    == approximately(fp_t{1} / 6
-                                     * (2 * jet[14] * (1 - c * cos(jet[11])) - c * jet[8] * 2 * jet[17] * sin(jet[11]))
-                                     / ((1 - c * cos(jet[11])) * (1 - c * cos(jet[11])))));
+                    == approximately(-fp_t{1} / 6
+                                     * (c * 2 * jet[14] * (jet[2] * jet[2] + c * c) - c * jet[8] * 2 * jet[2] * jet[8])
+                                     / ((jet[2] * jet[2] + c * c) * (jet[2] * jet[2] + c * c))));
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({kepE(expression{number{a}}, y), kepE(expression{number{c}}, x)}, opt_level,
+        compare_batch_scalar<fp_t>({atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, opt_level,
                                    high_accuracy, compact_mode);
 
+#if 0
         // Variable-variable tests.
         {
             llvm_state s{kw::opt_level = opt_level};

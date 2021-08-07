@@ -112,6 +112,27 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 namespace
 {
 
+// Derivative of atan2(number, number).
+template <typename T, typename U, typename V,
+          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
+llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &, const U &num0, const V &num1,
+                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
+                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    if (order == 0u) {
+        // Do the number codegen.
+        auto y = taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size);
+        auto x = taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size);
+
+        // Compute and return the atan2.
+        return llvm_atan2(s, y, x);
+    } else {
+        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+    }
+}
+
 // Derivative of atan2(var, number).
 template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
 llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const variable &var,
@@ -168,25 +189,61 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
     return builder.CreateFDiv(dividend, divisor);
 }
 
-// Derivative of atan2(number, number).
-template <typename T, typename U, typename V,
-          std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &, const U &num0, const V &num1,
-                                    const std::vector<llvm::Value *> &, llvm::Value *par_ptr, std::uint32_t,
-                                    std::uint32_t order, std::uint32_t, std::uint32_t batch_size)
+// Derivative of atan2(number, var).
+template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const U &num,
+                                    const variable &var, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size)
 {
+    assert(deps.size() == 1u);
+
     auto &builder = s.builder();
 
-    if (order == 0u) {
-        // Do the number codegen.
-        auto y = taylor_codegen_numparam<T>(s, num0, par_ptr, batch_size);
-        auto x = taylor_codegen_numparam<T>(s, num1, par_ptr, batch_size);
+    // Fetch the index of the x variable argument.
+    const auto x_idx = uname_to_index(var.name());
 
+    // Do the codegen for the y number argument.
+    auto y = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+
+    if (order == 0u) {
         // Compute and return the atan2.
-        return llvm_atan2(s, y, x);
-    } else {
-        return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        return llvm_atan2(s, y, taylor_fetch_diff(arr, x_idx, 0, n_uvars));
     }
+
+    // Splat the order.
+    auto n = vector_splat(builder, codegen<T>(s, number{static_cast<T>(order)}), batch_size);
+
+    // Compute the divisor: n * d^[0].
+    const auto d_idx = deps[0];
+    auto divisor = builder.CreateFMul(n, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
+
+    // Compute the first part of the dividend: -n * b^[0] * c^[n].
+    auto dividend = builder.CreateFMul(builder.CreateFNeg(n),
+                                       builder.CreateFMul(y, taylor_fetch_diff(arr, x_idx, order, n_uvars)));
+
+    // Compute the second part of the dividend only for order > 1, in order to avoid
+    // an empty summation.
+    if (order > 1u) {
+        std::vector<llvm::Value *> sum;
+
+        // NOTE: iteration in the [1, order) range.
+        for (std::uint32_t j = 1; j < order; ++j) {
+            auto fac = vector_splat(builder, codegen<T>(s, number(-static_cast<T>(j))), batch_size);
+
+            auto dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+
+            auto tmp = builder.CreateFMul(dnj, aj);
+            tmp = builder.CreateFMul(fac, tmp);
+            sum.push_back(tmp);
+        }
+
+        // Update the dividend.
+        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+    }
+
+    return builder.CreateFDiv(dividend, divisor);
 }
 
 // All the other cases.
