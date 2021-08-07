@@ -513,7 +513,18 @@ expression sin_impl::diff(const std::string &s) const
 
 expression sin(expression e)
 {
-    return expression{func{detail::sin_impl(std::move(e))}};
+    // Simplify sin(number) to its value.
+    if (auto num_ptr = std::get_if<number>(&e.value())) {
+        return expression{std::visit(
+            [](const auto &x) {
+                using std::sin;
+
+                return number{sin(x)};
+            },
+            num_ptr->value())};
+    } else {
+        return expression{func{detail::sin_impl(std::move(e))}};
+    }
 }
 
 } // namespace heyoka

@@ -7,7 +7,7 @@ set -x
 set -e
 
 # Core deps.
-sudo apt-get install build-essential wget
+sudo apt-get install wget
 
 # Install conda+deps.
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh -O miniconda.sh
@@ -22,7 +22,7 @@ mkdir build
 cd build
 
 # GCC build.
-cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage -fsanitize=address" -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
+cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage" -DHEYOKA_ENABLE_IPO=yes -DBoost_NO_BOOST_CMAKE=ON
 make -j2 VERBOSE=1
 # Run the tests.
 ctest -V -j2

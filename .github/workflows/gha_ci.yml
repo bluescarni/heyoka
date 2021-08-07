@@ -37,3 +37,9 @@ jobs:
           cmake --build . --config Release
           copy Release\heyoka.dll test\Release\
           ctest -j4 -V -C Release
+  conda_release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: bash tools/gha_conda_release.sh

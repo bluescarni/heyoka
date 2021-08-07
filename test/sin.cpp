@@ -6,7 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
+#include <cmath>
 #include <sstream>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sin.hpp>
@@ -39,4 +48,21 @@ TEST_CASE("sin s11n")
     }
 
     REQUIRE(ex == sin(x));
+}
+
+TEST_CASE("sin number simpl")
+{
+    using std::sin;
+
+    auto [x] = make_vars("x");
+
+    REQUIRE(sin(x * 0.) == 0_dbl);
+    REQUIRE(sin(0.123_dbl) == expression{sin(0.123)});
+    REQUIRE(sin(-0.123_ldbl) == expression{sin(-0.123l)});
+
+#if defined(HEYOKA_HAVE_REAL128)
+    using namespace mppp::literals;
+
+    REQUIRE(sin(-0.123_f128) == expression{sin(-0.123_rq)});
+#endif
 }
