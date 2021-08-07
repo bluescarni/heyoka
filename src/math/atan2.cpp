@@ -32,6 +32,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -110,6 +111,62 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 
 namespace
 {
+
+// Derivative of atan2(var, number).
+template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
+llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32_t> &deps, const variable &var,
+                                    const U &num, const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr,
+                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
+                                    std::uint32_t batch_size)
+{
+    assert(deps.size() == 1u);
+
+    auto &builder = s.builder();
+
+    // Fetch the index of the y variable argument.
+    const auto y_idx = uname_to_index(var.name());
+
+    // Do the codegen for the x number argument.
+    auto x = taylor_codegen_numparam<T>(s, num, par_ptr, batch_size);
+
+    if (order == 0u) {
+        // Compute and return the atan2.
+        return llvm_atan2(s, taylor_fetch_diff(arr, y_idx, 0, n_uvars), x);
+    }
+
+    // Splat the order.
+    auto n = vector_splat(builder, codegen<T>(s, number{static_cast<T>(order)}), batch_size);
+
+    // Compute the divisor: n * d^[0].
+    const auto d_idx = deps[0];
+    auto divisor = builder.CreateFMul(n, taylor_fetch_diff(arr, d_idx, 0, n_uvars));
+
+    // Compute the first part of the dividend: n * c^[0] * b^[n].
+    auto dividend = builder.CreateFMul(n, builder.CreateFMul(x, taylor_fetch_diff(arr, y_idx, order, n_uvars)));
+
+    // Compute the second part of the dividend only for order > 1, in order to avoid
+    // an empty summation.
+    if (order > 1u) {
+        std::vector<llvm::Value *> sum;
+
+        // NOTE: iteration in the [1, order) range.
+        for (std::uint32_t j = 1; j < order; ++j) {
+            auto fac = vector_splat(builder, codegen<T>(s, number(-static_cast<T>(j))), batch_size);
+
+            auto dnj = taylor_fetch_diff(arr, d_idx, order - j, n_uvars);
+            auto aj = taylor_fetch_diff(arr, idx, j, n_uvars);
+
+            auto tmp = builder.CreateFMul(dnj, aj);
+            tmp = builder.CreateFMul(fac, tmp);
+            sum.push_back(tmp);
+        }
+
+        // Update the dividend.
+        dividend = builder.CreateFAdd(dividend, pairwise_sum(builder, sum));
+    }
+
+    return builder.CreateFDiv(dividend, divisor);
+}
 
 // Derivative of atan2(number, number).
 template <typename T, typename U, typename V,
