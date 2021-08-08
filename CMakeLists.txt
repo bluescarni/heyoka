@@ -260,6 +260,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cosh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sinh.cpp"

@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <sstream>
 #include <variant>
 #include <vector>

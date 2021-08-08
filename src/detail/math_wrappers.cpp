@@ -79,6 +79,11 @@ extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atanl(long double x) noexcept
     return std::atan(x);
 }
 
+extern "C" HEYOKA_DLL_PUBLIC long double heyoka_atan2l(long double y, long double x) noexcept
+{
+    return std::atan2(y, x);
+}
+
 extern "C" HEYOKA_DLL_PUBLIC long double heyoka_coshl(long double x) noexcept
 {
     return std::cosh(x);
