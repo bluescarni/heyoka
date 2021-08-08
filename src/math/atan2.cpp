@@ -148,7 +148,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
-    assert(deps.size() == 1u);
+    assert(deps.size() == 1u); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
@@ -204,7 +204,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
-    assert(deps.size() == 1u);
+    assert(deps.size() == 1u); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
@@ -261,7 +261,7 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size)
 {
-    assert(deps.size() == 1u);
+    assert(deps.size() == 1u); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
@@ -322,6 +322,8 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &s, const std::vector<std::uint32
     return builder.CreateFDiv(dividend, divisor);
 }
 
+// LCOV_EXCL_START
+
 // All the other cases.
 template <typename T, typename U, typename V, typename... Args>
 llvm::Value *taylor_diff_atan2_impl(llvm_state &, const std::vector<std::uint32_t> &, const U &, const V &,
@@ -332,11 +334,14 @@ llvm::Value *taylor_diff_atan2_impl(llvm_state &, const std::vector<std::uint32_
         "An invalid argument type was encountered while trying to build the Taylor derivative of atan2()");
 }
 
+// LCOV_EXCL_STOP
+
 template <typename T>
 llvm::Value *taylor_diff_atan2(llvm_state &s, const atan2_impl &f, const std::vector<std::uint32_t> &deps,
                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
+    // LCOV_EXCL_START
     assert(f.args().size() == 2u);
 
     if (deps.size() != 1u) {
@@ -344,6 +349,7 @@ llvm::Value *taylor_diff_atan2(llvm_state &s, const atan2_impl &f, const std::ve
                                     "derivative of atan2(), but a vector of size {} was passed "
                                     "instead"_format(deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
@@ -433,7 +439,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const 
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
@@ -469,6 +475,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const 
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+        // LCOV_EXCL_START
     } else {
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
@@ -479,6 +486,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const 
                 "Inconsistent function signature for the Taylor derivative of atan2() in compact mode detected");
         }
     }
+    // LCOV_EXCL_STOP
 
     return f;
 }
@@ -530,7 +538,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
@@ -601,6 +609,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+        // LCOV_EXCL_START
     } else {
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
@@ -611,6 +620,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
                 "Inconsistent function signatures for the Taylor derivative of atan2() in compact mode detected");
         }
     }
+    // LCOV_EXCL_STOP
 
     return f;
 }
@@ -662,7 +672,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
@@ -733,6 +743,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+        // LCOV_EXCL_START
     } else {
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
@@ -743,6 +754,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
                 "Inconsistent function signatures for the Taylor derivative of atan2() in compact mode detected");
         }
     }
+    // LCOV_EXCL_STOP
 
     return f;
 }
@@ -793,7 +805,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
         auto *ft = llvm::FunctionType::get(val_t, fargs, false);
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
-        assert(f != nullptr);
+        assert(f != nullptr); // LCOV_EXCL_LINE
 
         // Fetch the necessary function arguments.
         auto ord = f->args().begin();
@@ -875,6 +887,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
 
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
+        // LCOV_EXCL_START
     } else {
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
@@ -885,9 +898,12 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
                 "Inconsistent function signatures for the Taylor derivative of atan2() in compact mode detected");
         }
     }
+    // LCOV_EXCL_STOP
 
     return f;
 }
+
+// LCOV_EXCL_START
 
 // All the other cases.
 template <typename T, typename U, typename V, typename... Args>
@@ -898,11 +914,13 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, const U &, const V &
                                 "of atan2() in compact mode");
 }
 
+// LCOV_EXCL_STOP
+
 template <typename T>
 llvm::Function *taylor_c_diff_func_atan2(llvm_state &s, const atan2_impl &fn, std::uint32_t n_uvars,
                                          std::uint32_t batch_size)
 {
-    assert(fn.args().size() == 2u);
+    assert(fn.args().size() == 2u); // LCOV_EXCL_LINE
 
     return std::visit([&](const auto &v1,
                           const auto &v2) { return taylor_c_diff_func_atan2_impl<T>(s, v1, v2, n_uvars, batch_size); },
