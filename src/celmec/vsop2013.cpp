@@ -46,9 +46,13 @@
 #include <heyoka/detail/vsop2013/vsop2013_8.hpp>
 #include <heyoka/detail/vsop2013/vsop2013_9.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/math/atan2.hpp>
 #include <heyoka/math/cos.hpp>
+#include <heyoka/math/kepE.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/sqrt.hpp>
+#include <heyoka/math/square.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -191,7 +195,8 @@ const std::array<std::array<double, 2>, 17> lam_l_data = {{{4.402608631669, 2608
 
 } // namespace
 
-// Implementation of the function constructing the VSOP2013 elliptic series as heyoka expressions.
+// Implementation of the function constructing the VSOP2013 elliptic series as heyoka expressions. The elements
+// are referred to the Dynamical Frame J2000.
 expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, expression t_expr, double thresh)
 {
     // Check the input values.
@@ -265,6 +270,84 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
 
     // Sum the chunks and return them.
     return pairwise_sum(std::move(parts));
+}
+
+// Implementation of the function constructing the VSOP2013 cartesian series as heyoka expressions. The coordinates
+// are referred to the Dynamical Frame J2000.
+std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
+{
+    // Get the elliptic orbital elements.
+    const auto a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh);
+    const auto lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh);
+    const auto k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh);
+    const auto h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh);
+    const auto q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh);
+    const auto p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh);
+
+    // e.
+    const auto e = sqrt(square(k) + square(h));
+
+    // sqrt(1 - e**2).
+    const auto sqrt_1me2 = sqrt(1_dbl - (square(k) + square(h)));
+
+    // cos(i)/sin(i).
+    const auto ci = 1_dbl - 2_dbl * (square(q) + square(p));
+    const auto si = sqrt(1_dbl - square(ci));
+
+    // cos(Om)/sin(Om).
+    const auto cOm = q / sqrt(square(q) + square(p));
+    const auto sOm = p / sqrt(square(q) + square(p));
+
+    // cos(om)/sin(om).
+    const auto com = (k * cOm + h * sOm) / e;
+    const auto som = (h * cOm - k * sOm) / e;
+
+    // M.
+    const auto M = lam - atan2(h, k);
+
+    // E.
+    const auto E = kepE(e, M);
+
+    // q1/a and q2/a.
+    const auto q1_a = cos(E) - e;
+    const auto q2_a = sqrt_1me2 * sin(E);
+
+    // Prepare the return value.
+    std::vector<expression> retval;
+
+    // x.
+    retval.push_back(a * (q1_a * (cOm * com - sOm * ci * som) - q2_a * (cOm * som + sOm * ci * com)));
+
+    // y.
+    retval.push_back(a * (q1_a * (sOm * com + cOm * ci * som) - q2_a * (sOm * som - cOm * ci * com)));
+
+    // z.
+    retval.push_back(a * (q1_a * (si * som) + q2_a * (si * com)));
+
+    // G*M values for the planets.
+    constexpr double gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
+                                9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
+                                1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
+
+    // G*M value for the Sun.
+    constexpr double gm_sun = 2.9591220836841438269e-04;
+
+    // Compute the gravitational parameter for pl_idx.
+    assert(pl_idx >= 1u && pl_idx <= 9u);
+    const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
+
+    // vx.
+    retval.push_back(mu * (-sin(E) * (cOm * com - sOm * ci * som) - sqrt_1me2 * cos(E) * (cOm * som + sOm * ci * com))
+                     / (sqrt(a) * (1_dbl - e * cos(E))));
+
+    // vy.
+    retval.push_back(mu * (-sin(E) * (sOm * com + cOm * ci * som) - sqrt_1me2 * cos(E) * (sOm * som - cOm * ci * com))
+                     / (sqrt(a) * (1_dbl - e * cos(E))));
+
+    // vz.
+    retval.push_back(mu * (-sin(E) * (si * som) + sqrt_1me2 * cos(E) * (si * com)) / (sqrt(a) * (1_dbl - e * cos(E))));
+
+    return retval;
 }
 
 } // namespace heyoka::detail
