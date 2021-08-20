@@ -272,7 +272,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     return pairwise_sum(std::move(parts));
 }
 
-// Implementation of the function constructing the VSOP2013 cartesian series as heyoka expressions. The coordinates
+// Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates
 // are referred to the Dynamical Frame J2000.
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
@@ -346,6 +346,36 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
 
     // vz.
     retval.push_back(mu * (-sin(E) * (si * som) + sqrt_1me2 * cos(E) * (si * com)) / (sqrt(a) * (1_dbl - e * cos(E))));
+
+    return retval;
+}
+
+// Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates
+// are referred to ICRF frame.
+std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
+{
+    // Compute the Cartesian coordinates in the Dynamical Frame J2000.
+    const auto cart_dfj2000 = vsop2013_cartesian_impl(pl_idx, std::move(t_expr), thresh);
+
+    // The two rotation angles for the transition Dynamical Frame J2000 -> ICRF.
+    const auto eps = 0.4090926265865962;
+    const auto phi = -2.5152133775962285e-07;
+
+    // Perform the rotation.
+    const auto &xe = cart_dfj2000[0];
+    const auto &ye = cart_dfj2000[1];
+    const auto &ze = cart_dfj2000[2];
+    const auto &vxe = cart_dfj2000[3];
+    const auto &vye = cart_dfj2000[4];
+    const auto &vze = cart_dfj2000[5];
+
+    std::vector<expression> retval;
+    retval.push_back(std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze);
+    retval.push_back(std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze);
+    retval.push_back(std::sin(eps) * ye + std::cos(eps) * ze);
+    retval.push_back(std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze);
+    retval.push_back(std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze);
+    retval.push_back(std::sin(eps) * vye + std::cos(eps) * vze);
 
     return retval;
 }

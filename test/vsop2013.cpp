@@ -685,3 +685,78 @@ TEST_CASE("cartesian")
         }
     }
 }
+
+// Test the conversion to ICRF Cartesian coordinates.
+TEST_CASE("cartesian icrf")
+{
+    std::cout << "Checking cartesian ICRF...\n";
+
+    {
+        auto [x, y, z] = make_vars("x", "y", "z");
+
+        auto cart_merc = vsop2013_cartesian_icrf(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+
+        auto ta = taylor_adaptive<double>{{prime(x) = cart_merc[0], prime(y) = cart_merc[1], prime(z) = cart_merc[2]},
+                                          {0., 0., 0.},
+                                          kw::compact_mode = true};
+
+        const std::vector x_values
+            = {0.3493878714, -0.3953232726, 0.2950960118,  -0.3676232407, 0.2077238019, -0.2846205184,
+               0.1004920218, -0.1477140412, -0.0153852754, 0.0231249166,  -0.1300936046};
+        const std::vector y_values
+            = {-0.1302077267, -0.0832703775, -0.2441772970, 0.0409400626, -0.3312635001, 0.1582302603,
+               -0.3870987319, 0.2442561947,  -0.4101850758, 0.2719576619, -0.4005937206};
+        const std::vector z_values
+            = {-0.1058730361, -0.0033538163, -0.1610737357, 0.0600717273, -0.1984945320, 0.1140691451,
+               -0.2171791680, 0.1457920872,  -0.2174925982, 0.1428649538, -0.2004893069};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = 0;
+            ta.get_state_data()[2] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - x_values[i]) < 1e-7);
+            REQUIRE(std::abs(ta.get_state()[1] - y_values[i]) < 1e-7);
+            REQUIRE(std::abs(ta.get_state()[2] - z_values[i]) < 1e-7);
+        }
+    }
+
+    {
+        auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
+
+        auto cart_merc = vsop2013_cartesian_icrf(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+
+        auto ta
+            = taylor_adaptive<double>{{prime(vx) = cart_merc[3], prime(vy) = cart_merc[4], prime(vz) = cart_merc[5]},
+                                      {0., 0., 0.},
+                                      kw::compact_mode = true};
+
+        const std::vector vx_values
+            = {0.0063187222, -0.0004137515, 0.0140821134, -0.0104752454, 0.0191072998, -0.0214017967,
+               0.0217935214, -0.0305814219, 0.0224772853, -0.0336968838, 0.0213663956};
+        const std::vector vy_values
+            = {0.0239787530, -0.0233605978, 0.0195256530, -0.0238602869, 0.0138205377, -0.0204272138,
+               0.0076037784, -0.0117158797, 0.0012750334, 0.0015587153,  -0.0049262997};
+        const std::vector vz_values
+            = {0.0121467712, -0.0124313977, 0.0089629060,  -0.0116534457, 0.0053956028, -0.0086865541,
+               0.0017980946, -0.0030829557, -0.0016515776, 0.0043284695,  -0.0048474330};
+
+        for (auto i = 0u; i < 11u; ++i) {
+            ta.set_time(0);
+            ta.get_state_data()[0] = 0;
+            ta.get_state_data()[1] = 0;
+            ta.get_state_data()[2] = 0;
+
+            ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
+            ta.propagate_until(1);
+
+            REQUIRE(std::abs(ta.get_state()[0] - vx_values[i]) < 1e-7);
+            REQUIRE(std::abs(ta.get_state()[1] - vy_values[i]) < 1e-7);
+            REQUIRE(std::abs(ta.get_state()[2] - vz_values[i]) < 1e-7);
+        }
+    }
+}
