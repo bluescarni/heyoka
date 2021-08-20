@@ -51,7 +51,7 @@ TEST_CASE("error handling")
 
 TEST_CASE("mercury")
 {
-    std::cout << "Testing Mercury...\n";
+    std::cout << "Testing Mercury..." << std::endl;
 
     auto x = "x"_var;
 
@@ -113,7 +113,7 @@ TEST_CASE("mercury")
 
 TEST_CASE("venus")
 {
-    std::cout << "Testing Venus...\n";
+    std::cout << "Testing Venus..." << std::endl;
 
     auto x = "x"_var;
 
@@ -175,7 +175,7 @@ TEST_CASE("venus")
 
 TEST_CASE("emb")
 {
-    std::cout << "Testing EMB...\n";
+    std::cout << "Testing EMB..." << std::endl;
 
     auto x = "x"_var;
 
@@ -237,7 +237,7 @@ TEST_CASE("emb")
 
 TEST_CASE("mars")
 {
-    std::cout << "Testing Mars...\n";
+    std::cout << "Testing Mars..." << std::endl;
 
     auto x = "x"_var;
 
@@ -299,7 +299,7 @@ TEST_CASE("mars")
 
 TEST_CASE("jupiter")
 {
-    std::cout << "Testing Jupiter...\n";
+    std::cout << "Testing Jupiter..." << std::endl;
 
     auto x = "x"_var;
 
@@ -361,7 +361,7 @@ TEST_CASE("jupiter")
 
 TEST_CASE("saturn")
 {
-    std::cout << "Testing Saturn...\n";
+    std::cout << "Testing Saturn..." << std::endl;
 
     auto x = "x"_var;
 
@@ -423,7 +423,7 @@ TEST_CASE("saturn")
 
 TEST_CASE("uranus")
 {
-    std::cout << "Testing Uranus...\n";
+    std::cout << "Testing Uranus..." << std::endl;
 
     auto x = "x"_var;
 
@@ -486,7 +486,7 @@ TEST_CASE("uranus")
 
 TEST_CASE("neptune")
 {
-    std::cout << "Testing Neptune...\n";
+    std::cout << "Testing Neptune..." << std::endl;
 
     auto x = "x"_var;
 
@@ -549,7 +549,7 @@ TEST_CASE("neptune")
 
 TEST_CASE("pluto")
 {
-    std::cout << "Testing Pluto...\n";
+    std::cout << "Testing Pluto..." << std::endl;
 
     auto x = "x"_var;
 
@@ -614,7 +614,7 @@ TEST_CASE("pluto")
 // Test the conversion to Cartesian coordinates.
 TEST_CASE("cartesian")
 {
-    std::cout << "Checking cartesian...\n";
+    std::cout << "Checking cartesian..." << std::endl;
 
     {
         auto [x, y, z] = make_vars("x", "y", "z");
@@ -689,7 +689,7 @@ TEST_CASE("cartesian")
 // Test the conversion to ICRF Cartesian coordinates.
 TEST_CASE("cartesian icrf")
 {
-    std::cout << "Checking cartesian ICRF...\n";
+    std::cout << "Checking cartesian ICRF..." << std::endl;
 
     {
         auto [x, y, z] = make_vars("x", "y", "z");
