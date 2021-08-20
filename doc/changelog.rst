@@ -7,13 +7,14 @@ Changelog
 New
 ~~~
 
-- Add the two-argument inverse tangent function ``atan2()``
-  to the expression system
-  (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
 - Add an implementation of the VSOP2013 analytical solution
   for the motion of the planets of the Solar System, usable
   in the definition of differential equations
-  (`#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
+  (`#183 <https://github.com/bluescarni/heyoka/pull/183>`__,
+  `#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
+- Add the two-argument inverse tangent function ``atan2()``
+  to the expression system
+  (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
 - Implement additional automatic simplifications for sin/cos
   (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
 
