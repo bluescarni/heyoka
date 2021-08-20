@@ -174,25 +174,6 @@ auto build_vsop2103_data()
     return retval;
 }
 
-// The lambda_l values (constant + linear term).
-const std::array<std::array<double, 2>, 17> lam_l_data = {{{4.402608631669, 26087.90314068555},
-                                                           {3.176134461576, 10213.28554743445},
-                                                           {1.753470369433, 6283.075850353215},
-                                                           {6.203500014141, 3340.612434145457},
-                                                           {4.091360003050, 1731.170452721855},
-                                                           {1.713740719173, 1704.450855027201},
-                                                           {5.598641292287, 1428.948917844273},
-                                                           {2.805136360408, 1364.756513629990},
-                                                           {2.326989734620, 1361.923207632842},
-                                                           {0.599546107035, 529.6909615623250},
-                                                           {0.874018510107, 213.2990861084880},
-                                                           {5.481225395663, 74.78165903077800},
-                                                           {5.311897933164, 38.13297222612500},
-                                                           {0, 0.3595362285049309},
-                                                           {5.198466400630, 77713.7714481804},
-                                                           {1.627905136020, 84334.6615717837},
-                                                           {2.355555638750, 83286.9142477147}}};
-
 } // namespace
 
 // Implementation of the function constructing the VSOP2013 elliptic series as heyoka expressions. The elements
@@ -215,12 +196,31 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                                     "the value must be finite and non-negative, but it is {} instead"_format(thresh));
     }
 
+    // The lambda_l values (constant + linear term).
+    constexpr std::array<std::array<double, 2>, 17> lam_l_data = {{{4.402608631669, 26087.90314068555},
+                                                                   {3.176134461576, 10213.28554743445},
+                                                                   {1.753470369433, 6283.075850353215},
+                                                                   {6.203500014141, 3340.612434145457},
+                                                                   {4.091360003050, 1731.170452721855},
+                                                                   {1.713740719173, 1704.450855027201},
+                                                                   {5.598641292287, 1428.948917844273},
+                                                                   {2.805136360408, 1364.756513629990},
+                                                                   {2.326989734620, 1361.923207632842},
+                                                                   {0.599546107035, 529.6909615623250},
+                                                                   {0.874018510107, 213.2990861084880},
+                                                                   {5.481225395663, 74.78165903077800},
+                                                                   {5.311897933164, 38.13297222612500},
+                                                                   {0, 0.3595362285049309},
+                                                                   {5.198466400630, 77713.7714481804},
+                                                                   {1.627905136020, 84334.6615717837},
+                                                                   {2.355555638750, 83286.9142477147}}};
+
     // Fetch the data.
     static const auto data = build_vsop2103_data();
 
     // Locate the data entry for the current planet and variable.
     const auto data_it = data.find({pl_idx, var_idx});
-    assert(data_it != data.end());
+    assert(data_it != data.end()); // LCOV_EXCL_LINE
     const auto [n_alpha, sizes_ptr, val_ptr] = data_it->second;
 
     // This vector will contain the chunks of the series
@@ -333,7 +333,7 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     constexpr double gm_sun = 2.9591220836841438269e-04;
 
     // Compute the gravitational parameter for pl_idx.
-    assert(pl_idx >= 1u && pl_idx <= 9u);
+    assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
     const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
 
     // vx.
