@@ -360,32 +360,32 @@ v^\prime = -9.8 \sin x
 <div class="math notranslate nohighlight">
 \[v = 0.\]</div>
 <p>We begin, as usual, with the definition of the symbolic variables:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
-    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Next, we create a vector into which we will log the times at which <span class="math notranslate nohighlight">\(v = 0\)</span>:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create a vector to store the times</span>
-    <span class="c1">// at which v goes to zero.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">zero_vel_times</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create a vector to store the times</span>
+<span class="w">    </span><span class="c1">// at which v goes to zero.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <p>We can now proceed to create a non-terminal event:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the event object for the detection</span>
-    <span class="c1">// of &#39;v == 0&#39;.</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev</span><span class="p">(</span>
-        <span class="c1">// The left-hand side of the event equation</span>
-        <span class="n">v</span><span class="p">,</span>
-        <span class="c1">// The callback.</span>
-        <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-            <span class="c1">// Compute the state of the system when the</span>
-            <span class="c1">// event triggered and print the value of x.</span>
-            <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
-            <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Value of x when v is zero: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the event object for the detection</span>
+<span class="w">    </span><span class="c1">// of &#39;v == 0&#39;.</span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The left-hand side of the event equation</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Compute the state of the system when the</span>
+<span class="w">            </span><span class="c1">// event triggered and print the value of x.</span>
+<span class="w">            </span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Value of x when v is zero: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 
-            <span class="c1">// Add the event time to zero_vel_times.</span>
-            <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
-        <span class="p">});</span>
+<span class="w">            </span><span class="c1">// Add the event time to zero_vel_times.</span>
+<span class="w">            </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Non-terminal events are represented in heyoka by the <code class="docutils literal notranslate"><span class="pre">nt_event</span></code> class. Like the <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">adaptive integrator</span></a>
@@ -395,7 +395,7 @@ side of the event equation, which in this case is simply <span class="math notra
 <p>The second mandatory construction argument is a callback function that will be invoked when the event is detected.
 The callback function can be a lambda, a regular function, or a function object - the only requirement is that the
 callback is a callable object with the following signature:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span> <span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span><span class="p">,</span> <span class="kt">int</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>The first argument is a mutable reference to the integrator object, the second argument is the absolute time
@@ -421,17 +421,17 @@ the value of the <code class="docutils literal notranslate"><span class="pre">x<
 <li><p>second, we append to <code class="docutils literal notranslate"><span class="pre">zero_vel_times</span></code> the trigger time.</p></li>
 </ul>
 <p>We are now ready to create our first event-detecting integrator:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the integrator object</span>
-    <span class="c1">// in double precision.</span>
-    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-                                      <span class="c1">// x&#39; = v</span>
-                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
-                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-                                      <span class="c1">// Initial conditions</span>
-                                      <span class="c1">// for x and v.</span>
-                                      <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
-                                      <span class="c1">// Non-terminal events.</span>
-                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Non-terminal events.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>The list of non-terminal events is passed to the constructor of the
@@ -439,8 +439,8 @@ integrator via the <code class="docutils literal notranslate"><span class="pre">
 set up the initial conditions so that the bob is at rest at an
 angle of amplitude <span class="math notranslate nohighlight">\(0.05\)</span>.</p>
 <p>Let us now integrate for a few time units and observe the screen output:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Value of x when v is zero: -0.05</span>
@@ -454,10 +454,10 @@ angle of amplitude <span class="math notranslate nohighlight">\(0.05\)</span>.</
 the absolute value the <span class="math notranslate nohighlight">\(x\)</span> angle corresponds to the
 initial amplitude of <span class="math notranslate nohighlight">\(0.05\)</span>.</p>
 <p>Let us now print the event times:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Print the event times.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">}</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print the event times.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">t</span> <span class="p">:</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event detection time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event detection time: 0</span>
@@ -487,28 +487,28 @@ in heyoka by the <code class="docutils literal notranslate"><span class="pre">ev
 <li><p><code class="docutils literal notranslate"><span class="pre">event_direction::negative</span></code> (derivative &lt; 0).</p></li>
 </ul>
 <p>Event direction can be specified upon construction via the <code class="docutils literal notranslate"><span class="pre">kw::direction</span></code> keyword:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Redefine ev to detect only events</span>
-    <span class="c1">// in the positive direction.</span>
-    <span class="n">ev</span> <span class="o">=</span> <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span>
-        <span class="n">v</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span> <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span> <span class="p">},</span>
-        <span class="c1">// Specify the direction.</span>
-        <span class="n">kw</span><span class="o">::</span><span class="n">direction</span> <span class="o">=</span> <span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Redefine ev to detect only events</span>
+<span class="w">    </span><span class="c1">// in the positive direction.</span>
+<span class="w">    </span><span class="n">ev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Specify the direction.</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">direction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Reset zero_vel_times and the integrator.</span>
-    <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Reset zero_vel_times and the integrator.</span>
+<span class="w">    </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>In this specific case, constraining the event direction to be positive is equivalent
 to detecting <span class="math notranslate nohighlight">\(v = 0\)</span> only when the pendulum reaches the maximum amplitude on the left.
 Let us take a look at the event times:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Print the event times.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Print the event times.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">t</span> <span class="p">:</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event detection time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event detection time: 0</span>
@@ -537,23 +537,23 @@ the time at which the absolute value of the angular velocity is small but not ze
 of the closeness of these events, we can expect both events to be detected during the same timestep,
 with the second event triggering twice.</p>
 <p>Let’s begin by defining the two events:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Define two close non-terminal events.</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev0</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 0 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">});</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev1</span><span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 1 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">});</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Define two close non-terminal events.</span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev0</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event 0 triggering at t=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev1</span><span class="p">(</span><span class="n">v</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1e-12</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event 1 triggering at t=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
 </pre></div>
 </div>
 <p>This time the events’ callbacks just print the event time to screen, without
 modifying the <code class="docutils literal notranslate"><span class="pre">zero_vel_times</span></code> list.</p>
 <p>We can then reset the integrator, propagate for a few time units and check the screen output:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the integrator.</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev0</span><span class="p">,</span> <span class="n">ev1</span><span class="p">}};</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset the integrator.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev0</span><span class="p">,</span><span class="w"> </span><span class="n">ev1</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Event 0 triggering at t=0</span>
@@ -617,25 +617,25 @@ v^\prime = - 9.8\sin x - \alpha v
 \end{cases},\end{split}\]</div>
 <p>and the terminal event equation is, again, simply <span class="math notranslate nohighlight">\(v = 0\)</span>.</p>
 <p>Let us begin with the definition of the terminal event:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Define a terminal event that turns air drag on/off</span>
-    <span class="c1">// whenever the velocity goes to zero.</span>
-    <span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">t_ev</span><span class="p">(</span>
-        <span class="c1">// The event equation.</span>
-        <span class="n">v</span><span class="p">,</span>
-        <span class="c1">// The callback.</span>
-        <span class="n">kw</span><span class="o">::</span><span class="n">callback</span> <span class="o">=</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span> <span class="kt">bool</span> <span class="n">mr</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-            <span class="c1">// NOTE: the value of the drag coefficient</span>
-            <span class="c1">// is stored as the first (and only) runtime parameter</span>
-            <span class="c1">// of the integrator.</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
-            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-            <span class="p">}</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Define a terminal event that turns air drag on/off</span>
+<span class="w">    </span><span class="c1">// whenever the velocity goes to zero.</span>
+<span class="w">    </span><span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">t_ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The event equation.</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">mr</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// NOTE: the value of the drag coefficient</span>
+<span class="w">            </span><span class="c1">// is stored as the first (and only) runtime parameter</span>
+<span class="w">            </span><span class="c1">// of the integrator.</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
 
-            <span class="c1">// Do not stop the integration.</span>
-            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
-        <span class="p">});</span>
+<span class="w">            </span><span class="c1">// Do not stop the integration.</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Like in the case of non-terminal events, we specified as first construction argument
@@ -668,30 +668,30 @@ of the event equation at the event trigger time.</p>
 (which is stored within the <a class="reference internal" href="tut_param.html#tut-param"><span class="std std-ref">runtime parameters</span></a> of the integrator): if <span class="math notranslate nohighlight">\(\alpha\)</span>
 is currently 0, we set it to 1, otherwise we set it to 0.</p>
 <p>Let us proceed to the construction of the integrator:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Construct the damped pendulum integrator.</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span>
-                                  <span class="c1">// NOTE: alpha is represented as</span>
-                                  <span class="c1">// the first (and only) runtime</span>
-                                  <span class="c1">// parameter: par[0].</span>
-                                  <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
-                                 <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
-                                 <span class="c1">// The list of terminal events.</span>
-                                 <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Construct the damped pendulum integrator.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="c1">// NOTE: alpha is represented as</span>
+<span class="w">                                  </span><span class="c1">// the first (and only) runtime</span>
+<span class="w">                                  </span><span class="c1">// parameter: par[0].</span>
+<span class="w">                                  </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                 </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                 </span><span class="c1">// The list of terminal events.</span>
+<span class="w">                                 </span><span class="n">kw</span><span class="o">::</span><span class="n">t_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Similarly to the non-terminal events case, the list of terminal events
 is specified when constructing an integrator via the <code class="docutils literal notranslate"><span class="pre">kw::t_events</span></code> keyword argument.</p>
 <p>If a terminal event triggers within the single-step functions (<code class="docutils literal notranslate"><span class="pre">step()</span></code> and <code class="docutils literal notranslate"><span class="pre">step_backward()</span></code>),
 the outcome of the integration will contain the index of the event that triggered. Let us see a simple example:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Propagate step-by-step until the event triggers.</span>
-    <span class="n">taylor_outcome</span> <span class="n">oc</span><span class="p">;</span>
-    <span class="k">do</span> <span class="p">{</span>
-        <span class="n">oc</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span>
-    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">oc</span> <span class="o">==</span> <span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate step-by-step until the event triggers.</span>
+<span class="w">    </span><span class="n">taylor_outcome</span><span class="w"> </span><span class="n">oc</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">oc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">oc</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Print the outcome to screen.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Integration outcome: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event index        : &quot;</span> <span class="o">&lt;&lt;</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Print the outcome to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Integration outcome: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">oc</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event index        : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Integration outcome: taylor_outcome::terminal_event_0 (continuing)</span>
@@ -704,16 +704,16 @@ the numerical value of the outcome is the opposite of the event index minus one.
 function, even if the event’s callback returned <code class="docutils literal notranslate"><span class="pre">true</span></code> the integration was stopped in correspondence of the
 event. Let us now use the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function instead, so that the integration resumes after the
 execution of the callback:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate over a time grid.</span>
-    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">4.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">,</span> <span class="mf">6.</span><span class="p">,</span> <span class="mf">7.</span><span class="p">,</span> <span class="mf">8.</span><span class="p">,</span> <span class="mf">9.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">});</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Integrate over a time grid.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">2.</span><span class="p">,</span><span class="w"> </span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">4.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">6.</span><span class="p">,</span><span class="w"> </span><span class="mf">7.</span><span class="p">,</span><span class="w"> </span><span class="mf">8.</span><span class="p">,</span><span class="w"> </span><span class="mf">9.</span><span class="p">,</span><span class="w"> </span><span class="mf">10.</span><span class="p">});</span><span class="w"></span>
 
-    <span class="c1">// Let&#39;s print the values of the state vector</span>
-    <span class="c1">// over the time grid.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">10u</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;[&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2u</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2u</span> <span class="o">+</span> <span class="mi">1u</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Let&#39;s print the values of the state vector</span>
+<span class="w">    </span><span class="c1">// over the time grid.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0u</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10u</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;[&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2u</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2u</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1u</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">Final time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Final time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[-0.02976504606251412, -0.02063006479837935]</span>
@@ -800,144 +800,144 @@ will inevitably slow down also the propagation of the ODEs.</p>
 </section>
 <section id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
-<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
 
-<span class="k">using</span> <span class="k">namespace</span> <span class="nn">heyoka</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span><span class="w"></span>
 
-<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
-<span class="p">{</span>
-    <span class="c1">// Create the symbolic variables x and v.</span>
-    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Create a vector to store the times</span>
-    <span class="c1">// at which v goes to zero.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">zero_vel_times</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Create a vector to store the times</span>
+<span class="w">    </span><span class="c1">// at which v goes to zero.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">;</span><span class="w"></span>
 
-    <span class="c1">// Create the event object for the detection</span>
-    <span class="c1">// of &#39;v == 0&#39;.</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev</span><span class="p">(</span>
-        <span class="c1">// The left-hand side of the event equation</span>
-        <span class="n">v</span><span class="p">,</span>
-        <span class="c1">// The callback.</span>
-        <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-            <span class="c1">// Compute the state of the system when the</span>
-            <span class="c1">// event triggered and print the value of x.</span>
-            <span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
-            <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Value of x when v is zero: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Create the event object for the detection</span>
+<span class="w">    </span><span class="c1">// of &#39;v == 0&#39;.</span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The left-hand side of the event equation</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Compute the state of the system when the</span>
+<span class="w">            </span><span class="c1">// event triggered and print the value of x.</span>
+<span class="w">            </span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Value of x when v is zero: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 
-            <span class="c1">// Add the event time to zero_vel_times.</span>
-            <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span>
-        <span class="p">});</span>
+<span class="w">            </span><span class="c1">// Add the event time to zero_vel_times.</span>
+<span class="w">            </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
 
-    <span class="c1">// Create the integrator object</span>
-    <span class="c1">// in double precision.</span>
-    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-                                      <span class="c1">// x&#39; = v</span>
-                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
-                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-                                      <span class="c1">// Initial conditions</span>
-                                      <span class="c1">// for x and v.</span>
-                                      <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
-                                      <span class="c1">// Non-terminal events.</span>
-                                      <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Non-terminal events.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Enable full precision printing.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="p">.</span><span class="n">precision</span><span class="p">(</span><span class="mi">16</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Enable full precision printing.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="p">.</span><span class="n">precision</span><span class="p">(</span><span class="mi">16</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Print the event times.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Print the event times.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">t</span> <span class="p">:</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event detection time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="c1">// Redefine ev to detect only events</span>
-    <span class="c1">// in the positive direction.</span>
-    <span class="n">ev</span> <span class="o">=</span> <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span>
-        <span class="n">v</span><span class="p">,</span> <span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span> <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span> <span class="p">},</span>
-        <span class="c1">// Specify the direction.</span>
-        <span class="n">kw</span><span class="o">::</span><span class="n">direction</span> <span class="o">=</span> <span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Redefine ev to detect only events</span>
+<span class="w">    </span><span class="c1">// in the positive direction.</span>
+<span class="w">    </span><span class="n">ev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="n">zero_vel_times</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">time</span><span class="p">);</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Specify the direction.</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">direction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event_direction</span><span class="o">::</span><span class="n">positive</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Reset zero_vel_times and the integrator.</span>
-    <span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Reset zero_vel_times and the integrator.</span>
+<span class="w">    </span><span class="n">zero_vel_times</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Print the event times.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">t</span> <span class="p">:</span> <span class="n">zero_vel_times</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event detection time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">t</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Print the event times.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">t</span> <span class="p">:</span><span class="w"> </span><span class="n">zero_vel_times</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event detection time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="c1">// Define two close non-terminal events.</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev0</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 0 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">});</span>
-    <span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">ev1</span><span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">v</span> <span class="o">-</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="p">,</span> <span class="kt">double</span> <span class="n">time</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event 1 triggering at t=&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">time</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="p">});</span>
+<span class="w">    </span><span class="c1">// Define two close non-terminal events.</span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev0</span><span class="p">(</span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event 0 triggering at t=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
+<span class="w">    </span><span class="n">nt_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev1</span><span class="p">(</span><span class="n">v</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1e-12</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event 1 triggering at t=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
 
-    <span class="c1">// Reset the integrator.</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span> <span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span> <span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">ev0</span><span class="p">,</span> <span class="n">ev1</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Reset the integrator.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"> </span><span class="p">{</span><span class="mf">-0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev0</span><span class="p">,</span><span class="w"> </span><span class="n">ev1</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Propagate for a few time units.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Propagate for a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Define a terminal event that turns air drag on/off</span>
-    <span class="c1">// whenever the velocity goes to zero.</span>
-    <span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="n">t_ev</span><span class="p">(</span>
-        <span class="c1">// The event equation.</span>
-        <span class="n">v</span><span class="p">,</span>
-        <span class="c1">// The callback.</span>
-        <span class="n">kw</span><span class="o">::</span><span class="n">callback</span> <span class="o">=</span> <span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span> <span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span> <span class="kt">bool</span> <span class="n">mr</span><span class="p">,</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
-            <span class="c1">// NOTE: the value of the drag coefficient</span>
-            <span class="c1">// is stored as the first (and only) runtime parameter</span>
-            <span class="c1">// of the integrator.</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
-            <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-                <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-            <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Define a terminal event that turns air drag on/off</span>
+<span class="w">    </span><span class="c1">// whenever the velocity goes to zero.</span>
+<span class="w">    </span><span class="n">t_event</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">t_ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The event equation.</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="n">kw</span><span class="o">::</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="p">[[</span><span class="n">maybe_unused</span><span class="p">]]</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">mr</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// NOTE: the value of the drag coefficient</span>
+<span class="w">            </span><span class="c1">// is stored as the first (and only) runtime parameter</span>
+<span class="w">            </span><span class="c1">// of the integrator.</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
 
-            <span class="c1">// Do not stop the integration.</span>
-            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
-        <span class="p">});</span>
+<span class="w">            </span><span class="c1">// Do not stop the integration.</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
 
-    <span class="c1">// Construct the damped pendulum integrator.</span>
-    <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span>
-                                  <span class="c1">// NOTE: alpha is represented as</span>
-                                  <span class="c1">// the first (and only) runtime</span>
-                                  <span class="c1">// parameter: par[0].</span>
-                                  <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-</span> <span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">v</span><span class="p">},</span>
-                                 <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
-                                 <span class="c1">// The list of terminal events.</span>
-                                 <span class="n">kw</span><span class="o">::</span><span class="n">t_events</span> <span class="o">=</span> <span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Construct the damped pendulum integrator.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="c1">// NOTE: alpha is represented as</span>
+<span class="w">                                  </span><span class="c1">// the first (and only) runtime</span>
+<span class="w">                                  </span><span class="c1">// parameter: par[0].</span>
+<span class="w">                                  </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                 </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                 </span><span class="c1">// The list of terminal events.</span>
+<span class="w">                                 </span><span class="n">kw</span><span class="o">::</span><span class="n">t_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">t_ev</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Propagate step-by-step until the event triggers.</span>
-    <span class="n">taylor_outcome</span> <span class="n">oc</span><span class="p">;</span>
-    <span class="k">do</span> <span class="p">{</span>
-        <span class="n">oc</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span>
-    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="n">oc</span> <span class="o">==</span> <span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Propagate step-by-step until the event triggers.</span>
+<span class="w">    </span><span class="n">taylor_outcome</span><span class="w"> </span><span class="n">oc</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">oc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">());</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">oc</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">taylor_outcome</span><span class="o">::</span><span class="n">success</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Print the outcome to screen.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Integration outcome: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">oc</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Event index        : &quot;</span> <span class="o">&lt;&lt;</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Print the outcome to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Integration outcome: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">oc</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Event index        : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="n">oc</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 
-    <span class="c1">// Integrate over a time grid.</span>
-    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">4.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">,</span> <span class="mf">6.</span><span class="p">,</span> <span class="mf">7.</span><span class="p">,</span> <span class="mf">8.</span><span class="p">,</span> <span class="mf">9.</span><span class="p">,</span> <span class="mf">10.</span><span class="p">});</span>
+<span class="w">    </span><span class="c1">// Integrate over a time grid.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_grid</span><span class="p">({</span><span class="mf">1.</span><span class="p">,</span><span class="w"> </span><span class="mf">2.</span><span class="p">,</span><span class="w"> </span><span class="mf">3.</span><span class="p">,</span><span class="w"> </span><span class="mf">4.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">6.</span><span class="p">,</span><span class="w"> </span><span class="mf">7.</span><span class="p">,</span><span class="w"> </span><span class="mf">8.</span><span class="p">,</span><span class="w"> </span><span class="mf">9.</span><span class="p">,</span><span class="w"> </span><span class="mf">10.</span><span class="p">});</span><span class="w"></span>
 
-    <span class="c1">// Let&#39;s print the values of the state vector</span>
-    <span class="c1">// over the time grid.</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0u</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">10u</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;[&quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2u</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;, &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span> <span class="o">*</span> <span class="mi">2u</span> <span class="o">+</span> <span class="mi">1u</span><span class="p">]</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="w">    </span><span class="c1">// Let&#39;s print the values of the state vector</span>
+<span class="w">    </span><span class="c1">// over the time grid.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0u</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10u</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;[&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2u</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">out</span><span class="p">)[</span><span class="n">i</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2u</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1u</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">Final time: &quot;</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-<span class="p">}</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Final time: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_time</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 </section>

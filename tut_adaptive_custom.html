@@ -303,24 +303,24 @@ less than 1, while relative error control mode is activated when at least one
 element of the state vector has a magnitude greater than 1.</p>
 <p>In order to specify a non-default tolerance, the keyword argument
 <code class="docutils literal notranslate"><span class="pre">tol</span></code> can be used when constructing an integrator object:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
-    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Create the integrator object</span>
-    <span class="c1">// in double precision, specifying</span>
-    <span class="c1">// a non-default tolerance.</span>
-    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-                                      <span class="c1">// x&#39; = v</span>
-                                      <span class="c1">// v&#39; = -9.8 * sin(x)</span>
-                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="mf">-9.8</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-                                      <span class="c1">// Initial conditions</span>
-                                      <span class="c1">// for x and v.</span>
-                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.025</span><span class="p">},</span>
-                                      <span class="c1">// Set the tolerance to 1e-9.</span>
-                                      <span class="n">kw</span><span class="o">::</span><span class="n">tol</span> <span class="o">=</span> <span class="mf">1e-9</span><span class="p">};</span>
+<span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision, specifying</span>
+<span class="w">    </span><span class="c1">// a non-default tolerance.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Set the tolerance to 1e-9.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">tol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1e-9</span><span class="p">};</span><span class="w"></span>
 
-    <span class="c1">// Print the integrator object to screen.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Print the integrator object to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 1.0000000000000001e-09</span>
@@ -335,11 +335,11 @@ is now 12 (instead of 20 for a tolerance
 of <span class="math notranslate nohighlight">\(\sim 2.2\times 10^{-16}\)</span>).</p>
 <p>Integrating the system back and forth shows how the accuracy of the
 integration is reduced with respect to the default tolerance value:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate forth to t = 10 and then back to t = 0.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">10.</span><span class="p">);</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Integrate forth to t = 10 and then back to t = 0.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">10.</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 1.0000000000000001e-09</span>
@@ -370,26 +370,26 @@ of thousands of terms.</p>
 In this example, we first construct the ODE system corresponding
 to an N-body problem with 6 particles via the <code class="docutils literal notranslate"><span class="pre">make_nbody_sys()</span></code>
 utility function:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create an nbody system with 6 particles.</span>
-    <span class="k">auto</span> <span class="n">sys</span> <span class="o">=</span> <span class="n">make_nbody_sys</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create an nbody system with 6 particles.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">sys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_nbody_sys</span><span class="p">(</span><span class="mi">6</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Next, we create an initial state vector for our system.
 The contents of the vector do not matter at this stage:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create an initial state vector (6 values per body).</span>
-    <span class="k">auto</span> <span class="n">sv</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">36</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create an initial state vector (6 values per body).</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">sv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">36</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Next, we time the creation of an integrator object in default
 code generation mode:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Take the current time.</span>
-    <span class="k">auto</span> <span class="n">start</span> <span class="o">=</span> <span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">();</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Take the current time.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">();</span><span class="w"></span>
 
-    <span class="c1">// Construct an integrator in default mode.</span>
-    <span class="k">auto</span> <span class="n">ta_default</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="n">sys</span><span class="p">,</span> <span class="n">sv</span><span class="p">};</span>
+<span class="w">    </span><span class="c1">// Construct an integrator in default mode.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta_default</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="n">sys</span><span class="p">,</span><span class="w"> </span><span class="n">sv</span><span class="p">};</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Default mode timing: &quot;</span>
-              <span class="o">&lt;&lt;</span> <span class="n">chrono</span><span class="o">::</span><span class="n">duration_cast</span><span class="o">&lt;</span><span class="n">chrono</span><span class="o">::</span><span class="n">milliseconds</span><span class="o">&gt;</span><span class="p">(</span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">).</span><span class="n">count</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ms</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Default mode timing: &quot;</span><span class="w"></span>
+<span class="w">              </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">chrono</span><span class="o">::</span><span class="n">duration_cast</span><span class="o">&lt;</span><span class="n">chrono</span><span class="o">::</span><span class="n">milliseconds</span><span class="o">&gt;</span><span class="p">(</span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">).</span><span class="n">count</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ms</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Default mode timing: 3807ms</span>
@@ -398,14 +398,14 @@ code generation mode:</p>
 <p>Finally, we time the creation of the same integrator object
 in compact mode (which can be activated via the <code class="docutils literal notranslate"><span class="pre">compact_mode</span></code>
 keyword argument):</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the start time.</span>
-    <span class="n">start</span> <span class="o">=</span> <span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">();</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset the start time.</span>
+<span class="w">    </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">();</span><span class="w"></span>
 
-    <span class="c1">// Construct an integrator in compact mode.</span>
-    <span class="k">auto</span> <span class="n">ta_compact</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="n">sys</span><span class="p">,</span> <span class="n">sv</span><span class="p">,</span> <span class="n">kw</span><span class="o">::</span><span class="n">compact_mode</span> <span class="o">=</span> <span class="nb">true</span><span class="p">};</span>
+<span class="w">    </span><span class="c1">// Construct an integrator in compact mode.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta_compact</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="n">sys</span><span class="p">,</span><span class="w"> </span><span class="n">sv</span><span class="p">,</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">compact_mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">};</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;Compact mode timing: &quot;</span>
-              <span class="o">&lt;&lt;</span> <span class="n">chrono</span><span class="o">::</span><span class="n">duration_cast</span><span class="o">&lt;</span><span class="n">chrono</span><span class="o">::</span><span class="n">milliseconds</span><span class="o">&gt;</span><span class="p">(</span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">).</span><span class="n">count</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&quot;ms</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Compact mode timing: &quot;</span><span class="w"></span>
+<span class="w">              </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">chrono</span><span class="o">::</span><span class="n">duration_cast</span><span class="o">&lt;</span><span class="n">chrono</span><span class="o">::</span><span class="n">milliseconds</span><span class="o">&gt;</span><span class="p">(</span><span class="n">chrono</span><span class="o">::</span><span class="n">steady_clock</span><span class="o">::</span><span class="n">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">).</span><span class="n">count</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ms</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Compact mode timing: 269ms</span>

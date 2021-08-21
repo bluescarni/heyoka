@@ -300,23 +300,23 @@ x^\prime = v \\
 v^\prime = -\frac{g}{l} \sin x
 \end{cases}.\end{split}\]</div>
 <p>Let’s start with the construction of the integrator:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Create the symbolic variables x and v.</span>
-    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Create the integrator object</span>
-    <span class="c1">// in double precision.</span>
-    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-                                      <span class="c1">// x&#39; = v</span>
-                                      <span class="c1">// v&#39; = -g/l * sin(x)</span>
-                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-                                      <span class="c1">// Initial conditions</span>
-                                      <span class="c1">// for x and v.</span>
-                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
-                                      <span class="c1">// Values of the runtime parameters</span>
-                                      <span class="c1">// g and l. If not provided,</span>
-                                      <span class="c1">// all parameters will be inited</span>
-                                      <span class="c1">// to zero.</span>
-                                      <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="p">{</span><span class="mf">9.8</span><span class="p">,</span> <span class="mf">1.</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -g/l * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Values of the runtime parameters</span>
+<span class="w">                                      </span><span class="c1">// g and l. If not provided,</span>
+<span class="w">                                      </span><span class="c1">// all parameters will be inited</span>
+<span class="w">                                      </span><span class="c1">// to zero.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">pars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">9.8</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">}};</span><span class="w"></span>
 </pre></div>
 </div>
 <p>With respect to the previous examples, where <span class="math notranslate nohighlight">\(g/l\)</span> had been
@@ -344,9 +344,9 @@ is stored as a data member in the integrator object.</p>
 <p>The period of a pendulum of length <span class="math notranslate nohighlight">\(1\,\mathrm{m}\)</span> on Earth is <span class="math notranslate nohighlight">\(\sim 2\,\mathrm{s}\)</span>
 in the small-angle approximation,
 as it can be confirmed via numerical integration:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for ~1 period.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Integrate for ~1 period.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
@@ -362,14 +362,14 @@ as it can be confirmed via numerical integration:</p>
 is <span class="math notranslate nohighlight">\(\sim 3.72\,\mathrm{m}/\mathrm{s}^2\)</span> (instead of Earth’s
 <span class="math notranslate nohighlight">\(\sim 9.8\,\mathrm{m}/\mathrm{s}^2\)</span>). First we reset the time
 coordinate:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Reset the time coordinate.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset the time coordinate.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Then we change the value of the gravitational constant <span class="math notranslate nohighlight">\(g\)</span>, which,
 as explained above, is stored at index 0 in the array of parameter values:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Change the value of g.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.72</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Change the value of g.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3.72</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <p>Note that, like the for the state data, the <code class="docutils literal notranslate"><span class="pre">get_pars_data()</span></code>
@@ -380,9 +380,9 @@ returns a const reference to the <code class="docutils literal notranslate"><spa
 holding the parameter values.</p>
 <p>Because gravity is weaker on Mars, the period of a <span class="math notranslate nohighlight">\(1\,\mathrm{m}\)</span> pendulum increases to
 <span class="math notranslate nohighlight">\(\sim 3.26\,\mathrm{s}\)</span>. We can confirm this via numerical integration:</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span>    <span class="c1">// Integrate for ~1 period on Mars.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Integrate for ~1 period on Mars.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
@@ -395,49 +395,49 @@ holding the parameter values.</p>
 </div>
 <section id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
-<span class="cp">#include</span> <span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;heyoka/heyoka.hpp&gt;</span><span class="cp"></span>
 
-<span class="k">using</span> <span class="k">namespace</span> <span class="nn">heyoka</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span><span class="w"></span>
 
-<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
-<span class="p">{</span>
-    <span class="c1">// Create the symbolic variables x and v.</span>
-    <span class="k">auto</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span> <span class="s">&quot;v&quot;</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Create the integrator object</span>
-    <span class="c1">// in double precision.</span>
-    <span class="k">auto</span> <span class="n">ta</span> <span class="o">=</span> <span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
-                                      <span class="c1">// x&#39; = v</span>
-                                      <span class="c1">// v&#39; = -g/l * sin(x)</span>
-                                      <span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span><span class="p">,</span> <span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">=</span> <span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span>
-                                      <span class="c1">// Initial conditions</span>
-                                      <span class="c1">// for x and v.</span>
-                                      <span class="p">{</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.</span><span class="p">},</span>
-                                      <span class="c1">// Values of the runtime parameters</span>
-                                      <span class="c1">// g and l. If not provided,</span>
-                                      <span class="c1">// all parameters will be inited</span>
-                                      <span class="c1">// to zero.</span>
-                                      <span class="n">kw</span><span class="o">::</span><span class="n">pars</span> <span class="o">=</span> <span class="p">{</span><span class="mf">9.8</span><span class="p">,</span> <span class="mf">1.</span><span class="p">}};</span>
+<span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -g/l * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">-</span><span class="n">par</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">par</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Values of the runtime parameters</span>
+<span class="w">                                      </span><span class="c1">// g and l. If not provided,</span>
+<span class="w">                                      </span><span class="c1">// all parameters will be inited</span>
+<span class="w">                                      </span><span class="c1">// to zero.</span>
+<span class="w">                                      </span><span class="n">kw</span><span class="o">::</span><span class="n">pars</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">9.8</span><span class="p">,</span><span class="w"> </span><span class="mf">1.</span><span class="p">}};</span><span class="w"></span>
 
-    <span class="c1">// Let&#39;s print to screen the integrator object.</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Let&#39;s print to screen the integrator object.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 
-    <span class="c1">// Integrate for ~1 period.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Integrate for ~1 period.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">2.0074035758801299</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 
-    <span class="c1">// Reset the time coordinate.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Reset the time coordinate.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span><span class="w"></span>
 
-    <span class="c1">// Change the value of g.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.72</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Change the value of g.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_pars_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3.72</span><span class="p">;</span><span class="w"></span>
 
-    <span class="c1">// Integrate for ~1 period on Mars.</span>
-    <span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">ta</span> <span class="o">&lt;&lt;</span> <span class="sc">&#39;\n&#39;</span><span class="p">;</span>
-<span class="p">}</span>
+<span class="w">    </span><span class="c1">// Integrate for ~1 period on Mars.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">3.2581889116828258</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
