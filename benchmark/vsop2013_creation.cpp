@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto series = vsop2013_elliptic(pl_idx, var_idx, kw::vsop2013_thresh = thresh, kw::vsop2013_time = par[0]);
+    auto series = vsop2013_elliptic(pl_idx, var_idx, kw::thresh = thresh, kw::time = par[0]);
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
