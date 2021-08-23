@@ -23,14 +23,13 @@ int main(int argc, char *argv[])
     namespace po = boost::program_options;
 
     double thresh;
-    std::uint32_t pl_idx, var_idx;
+    std::uint32_t pl_idx;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("thresh", po::value<double>(&thresh)->default_value(1e-9),
                                                        "threshold value")(
-        "pl_idx", po::value<std::uint32_t>(&pl_idx)->default_value(1),
-        "planet index")("var_idx", po::value<std::uint32_t>(&var_idx)->default_value(1), "variable index");
+        "pl_idx", po::value<std::uint32_t>(&pl_idx)->default_value(1), "planet index");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -41,11 +40,11 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    auto [x] = make_vars("x");
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto series = vsop2013_elliptic(pl_idx, var_idx, kw::vsop2013_thresh = thresh, kw::vsop2013_time = par[0]);
+    auto series = vsop2013_cartesian(pl_idx, kw::thresh = thresh, kw::time = par[0]);
 
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -55,7 +54,8 @@ int main(int argc, char *argv[])
 
     start = std::chrono::high_resolution_clock::now();
 
-    auto ta = taylor_adaptive<double>{{prime(x) = series}, {0.}, kw::compact_mode = true};
+    auto ta = taylor_adaptive<double>{
+        {prime(x) = series[0], prime(y) = series[1], prime(z) = series[2]}, {0., 0., 0.}, kw::compact_mode = true};
 
     elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -63,5 +63,5 @@ int main(int argc, char *argv[])
 
     std::cout << "Integrator creation time: " << elapsed << "ms\n";
 
-    std::cout << "Number of terms in the Taylor decomposition: " << ta.get_decomposition().size() - 2u << '\n';
+    std::cout << "Number of terms in the Taylor decomposition: " << ta.get_decomposition().size() - 6u << '\n';
 }

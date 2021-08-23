@@ -40,12 +40,12 @@ TEST_CASE("error handling")
     REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 7), std::invalid_argument,
                            Message("Invalid variable index passed to vsop2013_elliptic(): "
                                    "the index must be in the [1, 6] range, but it is 7 instead"));
-    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = -1.), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(vsop2013_elliptic(1, 1, kw::thresh = -1.), std::invalid_argument,
                            Message("Invalid threshold value passed to vsop2013_elliptic(): "
                                    "the value must be finite and non-negative, but it is -1 instead"));
-    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = std::numeric_limits<double>::infinity()),
+    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::thresh = std::numeric_limits<double>::infinity()),
                       std::invalid_argument);
-    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::vsop2013_thresh = std::numeric_limits<double>::quiet_NaN()),
+    REQUIRE_THROWS_AS(vsop2013_elliptic(1, 1, kw::thresh = std::numeric_limits<double>::quiet_NaN()),
                       std::invalid_argument);
 }
 
@@ -56,7 +56,7 @@ TEST_CASE("mercury")
     auto x = "x"_var;
 
     {
-        auto merc_a = vsop2013_elliptic(1, 1, kw::vsop2013_time = par[0]);
+        auto merc_a = vsop2013_elliptic(1, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_a}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.3870979635, 0.3870966235, 0.3870965607, 0.3870975307, 0.3870971271, 0.3870990120,
@@ -74,7 +74,7 @@ TEST_CASE("mercury")
     }
 
     {
-        auto merc_lam = vsop2013_elliptic(1, 2, kw::vsop2013_time = par[0]);
+        auto merc_lam = vsop2013_elliptic(1, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_lam}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {6.2605163414, 2.9331298264, 5.8889006181, 2.5615070697, 5.5172901512, 2.1899138863,
@@ -93,7 +93,7 @@ TEST_CASE("mercury")
     }
 
     {
-        auto merc_k = vsop2013_elliptic(1, 3, kw::vsop2013_time = par[0]);
+        auto merc_k = vsop2013_elliptic(1, 3, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = merc_k}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0452614144, 0.0452099977, 0.0451485382, 0.0450934263, 0.0450275900, 0.0449601649,
@@ -118,7 +118,7 @@ TEST_CASE("venus")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(2, 1, kw::vsop2013_time = par[0]);
+        auto a_sol = vsop2013_elliptic(2, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.7233268460, 0.7233324174, 0.7233307847, 0.7233242646, 0.7233283654, 0.7233426547,
@@ -136,7 +136,7 @@ TEST_CASE("venus")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(2, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(2, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {3.0850544129, 1.8375355480, 0.5899962012, 5.6256196213, 4.3780843283, 3.1306248680,
@@ -155,7 +155,7 @@ TEST_CASE("venus")
     }
 
     {
-        auto h_sol = vsop2013_elliptic(2, 4, kw::vsop2013_time = par[0]);
+        auto h_sol = vsop2013_elliptic(2, 4, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = h_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0051297811, 0.0050926797, 0.0050804051, 0.0050923304, 0.0051193425, 0.0050791039,
@@ -180,7 +180,7 @@ TEST_CASE("emb")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(3, 1, kw::vsop2013_time = par[0]);
+        auto a_sol = vsop2013_elliptic(3, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {1.0000096358, 1.0000051435, 1.0000073760, 1.0000152008, 1.0000198307, 1.0000114829,
@@ -198,7 +198,7 @@ TEST_CASE("emb")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(3, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(3, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {4.8188777642, 4.5123365638, 4.2058195207, 3.8992626620, 3.5927069396, 3.2861200052,
@@ -217,7 +217,7 @@ TEST_CASE("emb")
     }
 
     {
-        auto q_sol = vsop2013_elliptic(3, 5, kw::vsop2013_time = par[0]);
+        auto q_sol = vsop2013_elliptic(3, 5, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = q_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0001248730, 0.0001127412, 0.0000987436, 0.0000866254, 0.0000744490, 0.0000620847,
@@ -242,7 +242,7 @@ TEST_CASE("mars")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(4, 1, kw::vsop2013_time = par[0]);
+        auto a_sol = vsop2013_elliptic(4, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {1.5236841626, 1.5236124046, 1.5236050441, 1.5236700442, 1.5236699766, 1.5236472115,
@@ -260,7 +260,7 @@ TEST_CASE("mars")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(4, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(4, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {4.7846953863, 3.6698641019, 2.5549157614, 1.4402987476, 0.3256326851, 5.4940145108,
@@ -279,7 +279,7 @@ TEST_CASE("mars")
     }
 
     {
-        auto p_sol = vsop2013_elliptic(4, 6, kw::vsop2013_time = par[0]);
+        auto p_sol = vsop2013_elliptic(4, 6, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = p_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0124027403, 0.0123912341, 0.0123796421, 0.0123681256, 0.0123558641, 0.0123428097,
@@ -304,7 +304,7 @@ TEST_CASE("jupiter")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(5, 1, kw::vsop2013_time = par[0]);
+        auto a_sol = vsop2013_elliptic(5, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {5.2027787025, 5.2038176826, 5.2031571728, 5.2036777563, 5.2028498329, 5.2019289799,
@@ -322,7 +322,7 @@ TEST_CASE("jupiter")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(5, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(5, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {5.4273729856, 4.9451607529, 4.4623167354, 3.9785888270, 3.4960804302, 3.0133520898,
@@ -341,7 +341,7 @@ TEST_CASE("jupiter")
     }
 
     {
-        auto k_sol = vsop2013_elliptic(5, 3, kw::vsop2013_time = par[0]);
+        auto k_sol = vsop2013_elliptic(5, 3, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = k_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0474307493, 0.0471559767, 0.0466623835, 0.0463956959, 0.0467350940, 0.0474068314,
@@ -366,7 +366,7 @@ TEST_CASE("saturn")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(6, 1, kw::vsop2013_time = par[0]);
+        auto a_sol = vsop2013_elliptic(6, 1, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {9.5223420509, 9.5804354890, 9.5168564262, 9.5761016066, 9.5333198276, 9.5707010600,
@@ -384,7 +384,7 @@ TEST_CASE("saturn")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(6, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(6, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {2.6372558976, 4.9717748287, 1.0254146612, 3.3661620553, 5.7000637562, 1.7571326506,
@@ -403,7 +403,7 @@ TEST_CASE("saturn")
     }
 
     {
-        auto h_sol = vsop2013_elliptic(6, 4, kw::vsop2013_time = par[0]);
+        auto h_sol = vsop2013_elliptic(6, 4, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = h_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0534078734, 0.0511811007, 0.0532426486, 0.0519988373, 0.0533175060, 0.0564567139,
@@ -428,7 +428,7 @@ TEST_CASE("uranus")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(7, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto a_sol = vsop2013_elliptic(7, 1, kw::time = par[0], kw::thresh = 1e-8);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values
@@ -447,7 +447,7 @@ TEST_CASE("uranus")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(7, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(7, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {3.5628257887, 4.3814332273, 5.1965156941, 6.0140255405, 0.5528437584, 1.3757063112,
@@ -466,7 +466,7 @@ TEST_CASE("uranus")
     }
 
     {
-        auto q_sol = vsop2013_elliptic(7, 5, kw::vsop2013_time = par[0]);
+        auto q_sol = vsop2013_elliptic(7, 5, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = q_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0018734886, 0.0018655719, 0.0018626230, 0.0018640142, 0.0018604021, 0.0018638623,
@@ -491,7 +491,7 @@ TEST_CASE("neptune")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(8, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto a_sol = vsop2013_elliptic(8, 1, kw::time = par[0], kw::thresh = 1e-8);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values
@@ -510,7 +510,7 @@ TEST_CASE("neptune")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(8, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(8, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {1.1425611229, 1.5621276309, 1.9826291995, 2.4032479642, 2.8186551969, 3.2313775475,
@@ -529,7 +529,7 @@ TEST_CASE("neptune")
     }
 
     {
-        auto p_sol = vsop2013_elliptic(8, 6, kw::vsop2013_time = par[0]);
+        auto p_sol = vsop2013_elliptic(8, 6, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = p_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {0.0115258164, 0.0115145041, 0.0115137290, 0.0115053819, 0.0115078692, 0.0115165839,
@@ -554,7 +554,7 @@ TEST_CASE("pluto")
     auto x = "x"_var;
 
     {
-        auto a_sol = vsop2013_elliptic(9, 1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto a_sol = vsop2013_elliptic(9, 1, kw::time = par[0], kw::thresh = 1e-8);
         auto ta = taylor_adaptive<double>{{prime(x) = a_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values
@@ -573,7 +573,7 @@ TEST_CASE("pluto")
     }
 
     {
-        auto lam_sol = vsop2013_elliptic(9, 2, kw::vsop2013_time = par[0]);
+        auto lam_sol = vsop2013_elliptic(9, 2, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = lam_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values = {1.3910260961, 1.6701997041, 1.9513031849, 2.2334191944, 2.5096847076, 2.7848046342,
@@ -592,7 +592,7 @@ TEST_CASE("pluto")
     }
 
     {
-        auto k_sol = vsop2013_elliptic(9, 3, kw::vsop2013_time = par[0]);
+        auto k_sol = vsop2013_elliptic(9, 3, kw::time = par[0]);
         auto ta = taylor_adaptive<double>{{prime(x) = k_sol}, {0.}, kw::compact_mode = true};
 
         const std::vector values
@@ -619,7 +619,7 @@ TEST_CASE("cartesian")
     {
         auto [x, y, z] = make_vars("x", "y", "z");
 
-        auto cart_merc = vsop2013_cartesian(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto cart_merc = vsop2013_cartesian(1, kw::time = par[0], kw::thresh = 1e-8);
 
         auto ta = taylor_adaptive<double>{{prime(x) = cart_merc[0], prime(y) = cart_merc[1], prime(z) = cart_merc[2]},
                                           {0., 0., 0.},
@@ -653,7 +653,7 @@ TEST_CASE("cartesian")
     {
         auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-        auto cart_merc = vsop2013_cartesian(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto cart_merc = vsop2013_cartesian(1, kw::time = par[0], kw::thresh = 1e-8);
 
         auto ta
             = taylor_adaptive<double>{{prime(vx) = cart_merc[3], prime(vy) = cart_merc[4], prime(vz) = cart_merc[5]},
@@ -694,7 +694,7 @@ TEST_CASE("cartesian icrf")
     {
         auto [x, y, z] = make_vars("x", "y", "z");
 
-        auto cart_merc = vsop2013_cartesian_icrf(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto cart_merc = vsop2013_cartesian_icrf(1, kw::time = par[0], kw::thresh = 1e-8);
 
         auto ta = taylor_adaptive<double>{{prime(x) = cart_merc[0], prime(y) = cart_merc[1], prime(z) = cart_merc[2]},
                                           {0., 0., 0.},
@@ -728,7 +728,7 @@ TEST_CASE("cartesian icrf")
     {
         auto [vx, vy, vz] = make_vars("vx", "vy", "vz");
 
-        auto cart_merc = vsop2013_cartesian_icrf(1, kw::vsop2013_time = par[0], kw::vsop2013_thresh = 1e-8);
+        auto cart_merc = vsop2013_cartesian_icrf(1, kw::time = par[0], kw::thresh = 1e-8);
 
         auto ta
             = taylor_adaptive<double>{{prime(vx) = cart_merc[3], prime(vy) = cart_merc[4], prime(vz) = cart_merc[5]},

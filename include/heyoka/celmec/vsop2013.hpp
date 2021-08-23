@@ -16,6 +16,7 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/math/time.hpp>
 
 namespace heyoka
@@ -24,8 +25,7 @@ namespace heyoka
 namespace kw
 {
 
-IGOR_MAKE_NAMED_ARGUMENT(vsop2013_time);
-IGOR_MAKE_NAMED_ARGUMENT(vsop2013_thresh);
+IGOR_MAKE_NAMED_ARGUMENT(thresh);
 
 } // namespace kw
 
@@ -40,8 +40,8 @@ inline auto vsop2013_common_opts(KwArgs &&...kw_args)
 
     // Time expression (defaults to heyoka::time).
     auto time_expr = [&p]() -> expression {
-        if constexpr (p.has(kw::vsop2013_time)) {
-            return std::forward<decltype(p(kw::vsop2013_time))>(p(kw::vsop2013_time));
+        if constexpr (p.has(kw::time)) {
+            return std::forward<decltype(p(kw::time))>(p(kw::time));
         } else {
             return heyoka::time;
         }
@@ -49,8 +49,8 @@ inline auto vsop2013_common_opts(KwArgs &&...kw_args)
 
     // Threshold value (defaults to 1e-9).
     auto thresh = [&p]() -> double {
-        if constexpr (p.has(kw::vsop2013_thresh)) {
-            return std::forward<decltype(p(kw::vsop2013_thresh))>(p(kw::vsop2013_thresh));
+        if constexpr (p.has(kw::thresh)) {
+            return std::forward<decltype(p(kw::thresh))>(p(kw::thresh));
         } else {
             return 1e-9;
         }
