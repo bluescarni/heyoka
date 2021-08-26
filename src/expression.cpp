@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <numeric>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -792,19 +791,6 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
     return std::move(list[0]);
 }
 
-// Parallel reduction of a vector of expressions.
-template <typename F>
-expression parallel_pairwise_reduce(F func, expression init, std::vector<expression> list)
-{
-    constexpr std::size_t grain_size = 2;
-    return tbb::parallel_deterministic_reduce(
-        tbb::blocked_range(list.data(), list.data() + list.size(), grain_size), std::move(init),
-        [func](const auto &r, expression value) -> expression {
-            return std::accumulate(r.begin(), r.end(), std::move(value), func);
-        },
-        func);
-}
-
 } // namespace
 
 } // namespace detail
@@ -813,8 +799,6 @@ expression parallel_pairwise_reduce(F func, expression init, std::vector<express
 // https://en.wikipedia.org/wiki/Pairwise_summation
 expression pairwise_sum(std::vector<expression> sum)
 {
-    // return detail::parallel_pairwise_reduce(std::plus<>{}, 0_dbl, std::move(sum));
-
     if (sum.empty()) {
         return expression{0.};
     }
