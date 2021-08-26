@@ -15,6 +15,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,6 +33,9 @@
 #include <boost/functional/hash.hpp>
 
 #endif
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 #include <fmt/format.h>
 
@@ -225,48 +229,54 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
 
     // This vector will contain the chunks of the series
     // for different values of alpha.
-    std::vector<expression> parts;
-    for (std::size_t alpha = 0; alpha < n_alpha; ++alpha) {
-        // This vector will contain the terms of the chunk
-        // for the current value of alpha.
-        std::vector<expression> cur;
+    std::vector<expression> parts(boost::numeric_cast<std::vector<expression>::size_type>(n_alpha));
 
-        // Fetch the number of terms for this chunk.
-        const auto cur_size = sizes_ptr[alpha];
+    tbb::parallel_for(tbb::blocked_range(std::size_t(0), n_alpha), [&](const auto &r) {
+        for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
+            // Fetch the number of terms for this chunk.
+            const auto cur_size = sizes_ptr[alpha];
 
-        for (std::size_t i = 0; i < cur_size; ++i) {
-            // Load the C/S values from the table.
-            const auto Sval = val_ptr[alpha][i * 19u + 17u];
-            const auto Cval = val_ptr[alpha][i * 19u + 18u];
+            // This vector will contain the terms of the chunk
+            // for the current value of alpha.
+            std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
 
-            // Check if we have reached a term which is too small.
-            if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
-                break;
-            }
+            tbb::parallel_for(tbb::blocked_range(std::size_t(0), cur_size), [&](const auto &r_in) {
+                // trig will contain the components of the
+                // sin/cos trigonometric argument.
+                auto trig = std::vector<expression>(17u);
 
-            // tmp will contain the components of the
-            // sin/cos trigonometric argument.
-            std::vector<expression> tmp;
+                for (auto i = r_in.begin(); i != r_in.end(); ++i) {
+                    // Load the C/S values from the table.
+                    const auto Sval = val_ptr[alpha][i * 19u + 17u];
+                    const auto Cval = val_ptr[alpha][i * 19u + 18u];
 
-            for (std::size_t j = 0; j < 17u; ++j) {
-                // Compute lambda_l for the current element
-                // of the trigonometric argument.
-                auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
+                    // Check if we have reached a term which is too small.
+                    if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
+                        break;
+                    }
 
-                // Multiply it by the current value in the table.
-                tmp.push_back(std::move(cur_lam) * val_ptr[alpha][i * 19u + j]);
-            }
+                    for (std::size_t j = 0; j < 17u; ++j) {
+                        // Compute lambda_l for the current element
+                        // of the trigonometric argument.
+                        auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
 
-            // Compute the trig arg.
-            const auto trig_arg = pairwise_sum(std::move(tmp));
+                        // Multiply it by the current value in the table.
+                        trig[j] = std::move(cur_lam) * val_ptr[alpha][i * 19u + j];
+                    }
 
-            // Add the term to the chunk.
-            cur.push_back(Sval * sin(trig_arg) + Cval * cos(trig_arg));
+                    // Compute the trig arg.
+                    auto trig_arg = pairwise_sum(trig);
+
+                    // Add the term to the chunk.
+                    auto tmp = Sval * sin(trig_arg);
+                    cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
+                }
+            });
+
+            // Sum the terms in the chunk and multiply them by t**alpha.
+            parts[alpha] = powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur));
         }
-
-        // Sum the terms in the chunk and multiply them by t**alpha.
-        parts.push_back(powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur)));
-    }
+    });
 
     // Sum the chunks and return them.
     return pairwise_sum(std::move(parts));
