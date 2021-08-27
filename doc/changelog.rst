@@ -18,6 +18,13 @@ New
 - Implement additional automatic simplifications for sin/cos
   (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
 
+Fix
+~~~
+
+- Fix an issue in ``kepE()`` arising from an automatic simplification
+  that would lead to an invalid decomposition for zero eccentricity
+  (`#185 <https://github.com/bluescarni/heyoka/pull/185>`__).
+
 0.14.0 (2021-08-03)
 -------------------
 
