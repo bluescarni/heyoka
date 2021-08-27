@@ -37,6 +37,7 @@
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
 
@@ -303,52 +304,49 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
     // Get the elliptic orbital elements.
-    const auto a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh);
-    const auto lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh);
-    const auto k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh);
-    const auto h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh);
-    const auto q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh);
-    const auto p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh);
+    expression a, lam, k, h, q, p;
 
-    // e.
-    const auto e = sqrt(square(k) + square(h));
+    tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
+                         [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
+                         [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
+                         [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
+                         [&]() { q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                         [&]() { p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
-    // sqrt(1 - e**2).
-    const auto sqrt_1me2 = sqrt(1_dbl - (square(k) + square(h)));
+    // M, k**2 + h**2, q**2 + p**2, sqrt(q**2 + p**2).
+    expression M, kh_2, qp_2, qp;
+    tbb::parallel_invoke([&]() { M = lam - atan2(h, k); }, [&]() { kh_2 = square(k) + square(h); },
+                         [&]() {
+                             qp_2 = square(q) + square(p);
+                             qp = sqrt(qp_2);
+                         });
 
-    // cos(i)/sin(i).
-    const auto ci = 1_dbl - 2_dbl * (square(q) + square(p));
-    const auto si = sqrt(1_dbl - square(ci));
+    // E, e, sqrt(1 - e**2), cos(i), sin(i), cos(Om), sin(Om), sin(E), cos(E)
+    expression E, e, sqrt_1me2, ci, si, cOm, sOm, sin_E, cos_E;
+    tbb::parallel_invoke(
+        [&]() {
+            e = sqrt(kh_2);
+            E = kepE(e, M);
+            tbb::parallel_invoke([&]() { sin_E = sin(E); }, [&]() { cos_E = cos(E); });
+        },
+        [&]() { sqrt_1me2 = sqrt(1_dbl - kh_2); },
+        [&]() {
+            ci = 1_dbl - 2_dbl * qp_2;
+            si = sqrt(1_dbl - square(ci));
+        },
+        [&]() { cOm = q / qp; }, [&]() { sOm = p / qp; });
 
-    // cos(Om)/sin(Om).
-    const auto cOm = q / sqrt(square(q) + square(p));
-    const auto sOm = p / sqrt(square(q) + square(p));
+    // cos(om), sin(om), q1/a, q2/a.
+    expression com, som, q1_a, q2_a;
+    tbb::parallel_invoke([&]() { com = (k * cOm + h * sOm) / e; }, [&]() { som = (h * cOm - k * sOm) / e; },
+                         [&]() { q1_a = cos_E - e; }, [&]() { q2_a = sqrt_1me2 * sin_E; });
 
-    // cos(om)/sin(om).
-    const auto com = (k * cOm + h * sOm) / e;
-    const auto som = (h * cOm - k * sOm) / e;
-
-    // M.
-    const auto M = lam - atan2(h, k);
-
-    // E.
-    const auto E = kepE(e, M);
-
-    // q1/a and q2/a.
-    const auto q1_a = cos(E) - e;
-    const auto q2_a = sqrt_1me2 * sin(E);
-
-    // Prepare the return value.
-    std::vector<expression> retval;
-
-    // x.
-    retval.push_back(a * (q1_a * (cOm * com - sOm * ci * som) - q2_a * (cOm * som + sOm * ci * com)));
-
-    // y.
-    retval.push_back(a * (q1_a * (sOm * com + cOm * ci * som) - q2_a * (sOm * som - cOm * ci * com)));
-
-    // z.
-    retval.push_back(a * (q1_a * (si * som) + q2_a * (si * com)));
+    // Prepare the entries of the rotation matrix, and a few auxiliary quantities.
+    expression R00, R01, R10, R11, R20, R21, v_num, v_den;
+    tbb::parallel_invoke([&]() { R00 = cOm * com - sOm * ci * som; }, [&]() { R01 = cOm * som + sOm * ci * com; },
+                         [&]() { R10 = sOm * com + cOm * ci * som; }, [&]() { R11 = sOm * som - cOm * ci * com; },
+                         [&]() { R20 = si * som; }, [&]() { R21 = si * com; }, [&]() { v_num = sqrt_1me2 * cos_E; },
+                         [&]() { v_den = sqrt(a) * (1_dbl - e * cos_E); });
 
     // G*M values for the planets.
     constexpr double gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
@@ -362,16 +360,15 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
     const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
 
-    // vx.
-    retval.push_back(mu * (-sin(E) * (cOm * com - sOm * ci * som) - sqrt_1me2 * cos(E) * (cOm * som + sOm * ci * com))
-                     / (sqrt(a) * (1_dbl - e * cos(E))));
+    // Prepare the return value.
+    std::vector<expression> retval(6u);
 
-    // vy.
-    retval.push_back(mu * (-sin(E) * (sOm * com + cOm * ci * som) - sqrt_1me2 * cos(E) * (sOm * som - cOm * ci * com))
-                     / (sqrt(a) * (1_dbl - e * cos(E))));
-
-    // vz.
-    retval.push_back(mu * (-sin(E) * (si * som) + sqrt_1me2 * cos(E) * (si * com)) / (sqrt(a) * (1_dbl - e * cos(E))));
+    tbb::parallel_invoke([&]() { retval[0] = a * (q1_a * R00 - q2_a * R01); },
+                         [&]() { retval[1] = a * (q1_a * R10 - q2_a * R11); },
+                         [&]() { retval[2] = a * (q1_a * R20 + q2_a * R21); },
+                         [&]() { retval[3] = mu * (-sin_E * R00 - v_num * R01) / v_den; },
+                         [&]() { retval[4] = mu * (-sin_E * R10 - v_num * R11) / v_den; },
+                         [&]() { retval[5] = mu * (-sin_E * R20 + v_num * R21) / v_den; });
 
     return retval;
 }
@@ -395,13 +392,23 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
     const auto &vye = cart_dfj2000[4];
     const auto &vze = cart_dfj2000[5];
 
-    std::vector<expression> retval;
-    retval.push_back(std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze);
-    retval.push_back(std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze);
-    retval.push_back(std::sin(eps) * ye + std::cos(eps) * ze);
-    retval.push_back(std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze);
-    retval.push_back(std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze);
-    retval.push_back(std::sin(eps) * vye + std::cos(eps) * vze);
+    std::vector<expression> retval(6u);
+
+    tbb::parallel_invoke(
+        [&]() {
+            retval[0] = std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze;
+        },
+        [&]() {
+            retval[1] = std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze;
+        },
+        [&]() { retval[2] = std::sin(eps) * ye + std::cos(eps) * ze; },
+        [&]() {
+            retval[3] = std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze;
+        },
+        [&]() {
+            retval[4] = std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze;
+        },
+        [&]() { retval[5] = std::sin(eps) * vye + std::cos(eps) * vze; });
 
     return retval;
 }
