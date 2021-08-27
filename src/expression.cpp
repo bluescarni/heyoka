@@ -22,7 +22,7 @@
 #include <vector>
 
 #include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <tbb/parallel_for.h>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
@@ -772,18 +772,25 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
     // LCOV_EXCL_STOP
 
     while (list.size() != 1u) {
-        std::vector<expression> new_list;
+        const auto cur_size = list.size();
 
-        for (decltype(list.size()) i = 0; i < list.size(); i += 2u) {
-            if (i + 1u == list.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing value.
-                new_list.push_back(std::move(list[i]));
-            } else {
-                new_list.push_back(func(std::move(list[i]), std::move(list[i + 1u])));
-            }
-        }
+        // Init the new list. The size will be halved, +1 if the
+        // current size is odd.
+        const auto next_size = cur_size / 2u + cur_size % 2u;
+        std::vector<expression> new_list(next_size);
+
+        tbb::parallel_for(tbb::blocked_range<decltype(new_list.size())>(0, new_list.size()),
+                          [&list, &new_list, cur_size, &func](const auto &r) {
+                              for (auto i = r.begin(); i != r.end(); ++i) {
+                                  if (i * 2u == cur_size - 1u) {
+                                      // list has an odd size, and we are at the last element of list.
+                                      // Just move it to new_list.
+                                      new_list[i] = std::move(list.back());
+                                  } else {
+                                      new_list[i] = func(std::move(list[i * 2u]), std::move(list[i * 2u + 1u]));
+                                  }
+                              }
+                          });
 
         new_list.swap(list);
     }

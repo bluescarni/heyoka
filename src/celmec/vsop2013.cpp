@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -17,6 +18,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -56,6 +58,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/number.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -249,9 +252,9 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                     const auto Sval = val_ptr[alpha][i * 19u + 17u];
                     const auto Cval = val_ptr[alpha][i * 19u + 18u];
 
-                    // Check if we have reached a term which is too small.
+                    // Check if the term is too small.
                     if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
-                        break;
+                        continue;
                     }
 
                     for (std::size_t j = 0; j < 17u; ++j) {
@@ -271,6 +274,20 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                     cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
                 }
             });
+
+            // Partition cur so that all zero expressions (i.e., VSOP2013 terms which have
+            // been skipped) are at the end. Use stable_partition so that the original ordering
+            // is preserved.
+            const auto new_end = std::stable_partition(cur.begin(), cur.end(), [](const expression &e) {
+                if (auto num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
+                    return false;
+                } else {
+                    return true;
+                }
+            });
+
+            // Erase the skipped terms.
+            cur.erase(new_end, cur.end());
 
             // Sum the terms in the chunk and multiply them by t**alpha.
             parts[alpha] = powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur));
