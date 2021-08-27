@@ -89,6 +89,18 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+// Potential issue in the decomposition when x = 0,
+// in the presence of square() automatic simplification (not
+// currently the case).
+TEST_CASE("taylor erf decompose bug 00")
+{
+    llvm_state s;
+
+    auto x = "x"_var;
+
+    taylor_add_jet<double>(s, "jet", {erf(0_dbl) - x}, 1, 1, false, false);
+}
+
 TEST_CASE("ode test")
 {
     using std::abs;
