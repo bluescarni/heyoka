@@ -85,6 +85,18 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+// Potential issue in the decomposition when x = 0,
+// in the presence of square() automatic simplification (not
+// currently the case).
+TEST_CASE("taylor atan2 decompose bug 00")
+{
+    llvm_state s;
+
+    auto x = "x"_var;
+
+    taylor_add_jet<double>(s, "jet", {atan2(0_dbl, x) + atan2(x, 0_dbl) + atan2(0_dbl, 0_dbl) - x}, 1, 1, false, false);
+}
+
 TEST_CASE("taylor atan2")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {

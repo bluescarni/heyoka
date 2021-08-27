@@ -85,6 +85,17 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+// Potential issue in the decomposition when x = 0 (not
+// currently the case).
+TEST_CASE("taylor sincos decompose bug 00")
+{
+    llvm_state s;
+
+    auto x = "x"_var;
+
+    taylor_add_jet<double>(s, "jet", {sin(0_dbl) + cos(0_dbl) - x}, 1, 1, false, false);
+}
+
 TEST_CASE("taylor sincos")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
