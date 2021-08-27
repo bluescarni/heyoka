@@ -109,6 +109,16 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
+// Issue in the decomposition when e = 0.
+TEST_CASE("taylor kepE decompose bug 00")
+{
+    llvm_state s;
+
+    auto M = "M"_var;
+
+    taylor_add_jet<double>(s, "jet", {kepE(0_dbl, M)}, 1, 1, false, false);
+}
+
 TEST_CASE("taylor kepE")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
