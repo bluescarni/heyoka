@@ -19,6 +19,12 @@ New
 - Implement additional automatic simplifications for sin/cos
   (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
 
+Changes
+~~~~~~~
+
+- heyoka now depends on the `TBB <https://github.com/oneapi-src/oneTBB>`__ library
+  (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__).
+
 Fix
 ~~~
 
