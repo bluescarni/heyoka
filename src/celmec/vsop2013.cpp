@@ -228,7 +228,11 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     // Locate the data entry for the current planet and variable.
     const auto data_it = data.find({pl_idx, var_idx});
     assert(data_it != data.end()); // LCOV_EXCL_LINE
-    const auto [n_alpha, sizes_ptr, val_ptr] = data_it->second;
+    // NOTE: avoid structured bindings due to the usual
+    // issues with lambda capture.
+    const auto n_alpha = std::get<0>(data_it->second);
+    const auto sizes_ptr = std::get<1>(data_it->second);
+    const auto val_ptr = std::get<2>(data_it->second);
 
     // This vector will contain the chunks of the series
     // for different values of alpha.
@@ -243,7 +247,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             // for the current value of alpha.
             std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
 
-            tbb::parallel_for(tbb::blocked_range(std::size_t(0), cur_size), [&](const auto &r_in) {
+            tbb::parallel_for(tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
                 // trig will contain the components of the
                 // sin/cos trigonometric argument.
                 auto trig = std::vector<expression>(17u);
