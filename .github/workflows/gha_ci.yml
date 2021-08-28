@@ -29,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           conda config --set always_yes yes
-          conda create --name heyoka cmake llvmdev boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef
+          conda create --name heyoka cmake llvmdev tbb-devel tbb boost-cpp xtensor xtensor-blas blas blas-devel fmt spdlog sleef
           conda activate heyoka
           mkdir build
           cd build
@@ -43,3 +43,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build
         run: bash tools/gha_conda_release.sh
+  conda_coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: bash tools/gha_conda_coverage.sh

@@ -10,13 +10,20 @@ New
 - Add an implementation of the VSOP2013 analytical solution
   for the motion of the planets of the Solar System, usable
   in the definition of differential equations
-  (`#183 <https://github.com/bluescarni/heyoka/pull/183>`__,
+  (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__,
+  `#183 <https://github.com/bluescarni/heyoka/pull/183>`__,
   `#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
 - Add the two-argument inverse tangent function ``atan2()``
   to the expression system
   (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
 - Implement additional automatic simplifications for sin/cos
   (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
+
+Changes
+~~~~~~~
+
+- heyoka now depends on the `TBB <https://github.com/oneapi-src/oneTBB>`__ library
+  (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__).
 
 Fix
 ~~~

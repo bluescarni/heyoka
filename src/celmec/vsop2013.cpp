@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -17,6 +18,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -32,6 +34,10 @@
 #include <boost/functional/hash.hpp>
 
 #endif
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
 
@@ -53,6 +59,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/number.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -221,52 +228,76 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     // Locate the data entry for the current planet and variable.
     const auto data_it = data.find({pl_idx, var_idx});
     assert(data_it != data.end()); // LCOV_EXCL_LINE
-    const auto [n_alpha, sizes_ptr, val_ptr] = data_it->second;
+    // NOTE: avoid structured bindings due to the usual
+    // issues with lambda capture.
+    const auto n_alpha = std::get<0>(data_it->second);
+    const auto sizes_ptr = std::get<1>(data_it->second);
+    const auto val_ptr = std::get<2>(data_it->second);
 
     // This vector will contain the chunks of the series
     // for different values of alpha.
-    std::vector<expression> parts;
-    for (std::size_t alpha = 0; alpha < n_alpha; ++alpha) {
-        // This vector will contain the terms of the chunk
-        // for the current value of alpha.
-        std::vector<expression> cur;
+    std::vector<expression> parts(boost::numeric_cast<std::vector<expression>::size_type>(n_alpha));
 
-        // Fetch the number of terms for this chunk.
-        const auto cur_size = sizes_ptr[alpha];
+    tbb::parallel_for(tbb::blocked_range(std::size_t(0), n_alpha), [&](const auto &r) {
+        for (auto alpha = r.begin(); alpha != r.end(); ++alpha) {
+            // Fetch the number of terms for this chunk.
+            const auto cur_size = sizes_ptr[alpha];
 
-        for (std::size_t i = 0; i < cur_size; ++i) {
-            // Load the C/S values from the table.
-            const auto Sval = val_ptr[alpha][i * 19u + 17u];
-            const auto Cval = val_ptr[alpha][i * 19u + 18u];
+            // This vector will contain the terms of the chunk
+            // for the current value of alpha.
+            std::vector<expression> cur(boost::numeric_cast<std::vector<expression>::size_type>(cur_size));
 
-            // Check if we have reached a term which is too small.
-            if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
-                break;
-            }
+            tbb::parallel_for(tbb::blocked_range(0ul, cur_size), [&](const auto &r_in) {
+                // trig will contain the components of the
+                // sin/cos trigonometric argument.
+                auto trig = std::vector<expression>(17u);
 
-            // tmp will contain the components of the
-            // sin/cos trigonometric argument.
-            std::vector<expression> tmp;
+                for (auto i = r_in.begin(); i != r_in.end(); ++i) {
+                    // Load the C/S values from the table.
+                    const auto Sval = val_ptr[alpha][i * 19u + 17u];
+                    const auto Cval = val_ptr[alpha][i * 19u + 18u];
 
-            for (std::size_t j = 0; j < 17u; ++j) {
-                // Compute lambda_l for the current element
-                // of the trigonometric argument.
-                auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
+                    // Check if the term is too small.
+                    if (std::sqrt(Cval * Cval + Sval * Sval) < thresh) {
+                        continue;
+                    }
 
-                // Multiply it by the current value in the table.
-                tmp.push_back(std::move(cur_lam) * val_ptr[alpha][i * 19u + j]);
-            }
+                    for (std::size_t j = 0; j < 17u; ++j) {
+                        // Compute lambda_l for the current element
+                        // of the trigonometric argument.
+                        auto cur_lam = lam_l_data[j][0] + t_expr * lam_l_data[j][1];
 
-            // Compute the trig arg.
-            const auto trig_arg = pairwise_sum(std::move(tmp));
+                        // Multiply it by the current value in the table.
+                        trig[j] = std::move(cur_lam) * val_ptr[alpha][i * 19u + j];
+                    }
 
-            // Add the term to the chunk.
-            cur.push_back(Sval * sin(trig_arg) + Cval * cos(trig_arg));
+                    // Compute the trig arg.
+                    auto trig_arg = pairwise_sum(trig);
+
+                    // Add the term to the chunk.
+                    auto tmp = Sval * sin(trig_arg);
+                    cur[i] = std::move(tmp) + Cval * cos(std::move(trig_arg));
+                }
+            });
+
+            // Partition cur so that all zero expressions (i.e., VSOP2013 terms which have
+            // been skipped) are at the end. Use stable_partition so that the original ordering
+            // is preserved.
+            const auto new_end = std::stable_partition(cur.begin(), cur.end(), [](const expression &e) {
+                if (auto num_ptr = std::get_if<number>(&e.value()); num_ptr != nullptr && is_zero(*num_ptr)) {
+                    return false;
+                } else {
+                    return true;
+                }
+            });
+
+            // Erase the skipped terms.
+            cur.erase(new_end, cur.end());
+
+            // Sum the terms in the chunk and multiply them by t**alpha.
+            parts[alpha] = powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur));
         }
-
-        // Sum the terms in the chunk and multiply them by t**alpha.
-        parts.push_back(powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur)));
-    }
+    });
 
     // Sum the chunks and return them.
     return pairwise_sum(std::move(parts));
@@ -277,52 +308,49 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
 {
     // Get the elliptic orbital elements.
-    const auto a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh);
-    const auto lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh);
-    const auto k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh);
-    const auto h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh);
-    const auto q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh);
-    const auto p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh);
+    expression a, lam, k, h, q, p;
 
-    // e.
-    const auto e = sqrt(square(k) + square(h));
+    tbb::parallel_invoke([&]() { a = vsop2013_elliptic_impl(pl_idx, 1, t_expr, thresh); },
+                         [&]() { lam = vsop2013_elliptic_impl(pl_idx, 2, t_expr, thresh); },
+                         [&]() { k = vsop2013_elliptic_impl(pl_idx, 3, t_expr, thresh); },
+                         [&]() { h = vsop2013_elliptic_impl(pl_idx, 4, t_expr, thresh); },
+                         [&]() { q = vsop2013_elliptic_impl(pl_idx, 5, t_expr, thresh); },
+                         [&]() { p = vsop2013_elliptic_impl(pl_idx, 6, t_expr, thresh); });
 
-    // sqrt(1 - e**2).
-    const auto sqrt_1me2 = sqrt(1_dbl - (square(k) + square(h)));
+    // M, k**2 + h**2, q**2 + p**2, sqrt(q**2 + p**2).
+    expression M, kh_2, qp_2, qp;
+    tbb::parallel_invoke([&]() { M = lam - atan2(h, k); }, [&]() { kh_2 = square(k) + square(h); },
+                         [&]() {
+                             qp_2 = square(q) + square(p);
+                             qp = sqrt(qp_2);
+                         });
 
-    // cos(i)/sin(i).
-    const auto ci = 1_dbl - 2_dbl * (square(q) + square(p));
-    const auto si = sqrt(1_dbl - square(ci));
+    // E, e, sqrt(1 - e**2), cos(i), sin(i), cos(Om), sin(Om), sin(E), cos(E)
+    expression E, e, sqrt_1me2, ci, si, cOm, sOm, sin_E, cos_E;
+    tbb::parallel_invoke(
+        [&]() {
+            e = sqrt(kh_2);
+            E = kepE(e, M);
+            tbb::parallel_invoke([&]() { sin_E = sin(E); }, [&]() { cos_E = cos(E); });
+        },
+        [&]() { sqrt_1me2 = sqrt(1_dbl - kh_2); },
+        [&]() {
+            ci = 1_dbl - 2_dbl * qp_2;
+            si = sqrt(1_dbl - square(ci));
+        },
+        [&]() { cOm = q / qp; }, [&]() { sOm = p / qp; });
 
-    // cos(Om)/sin(Om).
-    const auto cOm = q / sqrt(square(q) + square(p));
-    const auto sOm = p / sqrt(square(q) + square(p));
+    // cos(om), sin(om), q1/a, q2/a.
+    expression com, som, q1_a, q2_a;
+    tbb::parallel_invoke([&]() { com = (k * cOm + h * sOm) / e; }, [&]() { som = (h * cOm - k * sOm) / e; },
+                         [&]() { q1_a = cos_E - e; }, [&]() { q2_a = sqrt_1me2 * sin_E; });
 
-    // cos(om)/sin(om).
-    const auto com = (k * cOm + h * sOm) / e;
-    const auto som = (h * cOm - k * sOm) / e;
-
-    // M.
-    const auto M = lam - atan2(h, k);
-
-    // E.
-    const auto E = kepE(e, M);
-
-    // q1/a and q2/a.
-    const auto q1_a = cos(E) - e;
-    const auto q2_a = sqrt_1me2 * sin(E);
-
-    // Prepare the return value.
-    std::vector<expression> retval;
-
-    // x.
-    retval.push_back(a * (q1_a * (cOm * com - sOm * ci * som) - q2_a * (cOm * som + sOm * ci * com)));
-
-    // y.
-    retval.push_back(a * (q1_a * (sOm * com + cOm * ci * som) - q2_a * (sOm * som - cOm * ci * com)));
-
-    // z.
-    retval.push_back(a * (q1_a * (si * som) + q2_a * (si * com)));
+    // Prepare the entries of the rotation matrix, and a few auxiliary quantities.
+    expression R00, R01, R10, R11, R20, R21, v_num, v_den;
+    tbb::parallel_invoke([&]() { R00 = cOm * com - sOm * ci * som; }, [&]() { R01 = cOm * som + sOm * ci * com; },
+                         [&]() { R10 = sOm * com + cOm * ci * som; }, [&]() { R11 = sOm * som - cOm * ci * com; },
+                         [&]() { R20 = si * som; }, [&]() { R21 = si * com; }, [&]() { v_num = sqrt_1me2 * cos_E; },
+                         [&]() { v_den = sqrt(a) * (1_dbl - e * cos_E); });
 
     // G*M values for the planets.
     constexpr double gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
@@ -336,16 +364,15 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
     const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
 
-    // vx.
-    retval.push_back(mu * (-sin(E) * (cOm * com - sOm * ci * som) - sqrt_1me2 * cos(E) * (cOm * som + sOm * ci * com))
-                     / (sqrt(a) * (1_dbl - e * cos(E))));
+    // Prepare the return value.
+    std::vector<expression> retval(6u);
 
-    // vy.
-    retval.push_back(mu * (-sin(E) * (sOm * com + cOm * ci * som) - sqrt_1me2 * cos(E) * (sOm * som - cOm * ci * com))
-                     / (sqrt(a) * (1_dbl - e * cos(E))));
-
-    // vz.
-    retval.push_back(mu * (-sin(E) * (si * som) + sqrt_1me2 * cos(E) * (si * com)) / (sqrt(a) * (1_dbl - e * cos(E))));
+    tbb::parallel_invoke([&]() { retval[0] = a * (q1_a * R00 - q2_a * R01); },
+                         [&]() { retval[1] = a * (q1_a * R10 - q2_a * R11); },
+                         [&]() { retval[2] = a * (q1_a * R20 + q2_a * R21); },
+                         [&]() { retval[3] = mu * (-sin_E * R00 - v_num * R01) / v_den; },
+                         [&]() { retval[4] = mu * (-sin_E * R10 - v_num * R11) / v_den; },
+                         [&]() { retval[5] = mu * (-sin_E * R20 + v_num * R21) / v_den; });
 
     return retval;
 }
@@ -369,13 +396,23 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
     const auto &vye = cart_dfj2000[4];
     const auto &vze = cart_dfj2000[5];
 
-    std::vector<expression> retval;
-    retval.push_back(std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze);
-    retval.push_back(std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze);
-    retval.push_back(std::sin(eps) * ye + std::cos(eps) * ze);
-    retval.push_back(std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze);
-    retval.push_back(std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze);
-    retval.push_back(std::sin(eps) * vye + std::cos(eps) * vze);
+    std::vector<expression> retval(6u);
+
+    tbb::parallel_invoke(
+        [&]() {
+            retval[0] = std::cos(phi) * xe - std::sin(phi) * std::cos(eps) * ye + std::sin(phi) * std::sin(eps) * ze;
+        },
+        [&]() {
+            retval[1] = std::sin(phi) * xe + std::cos(phi) * std::cos(eps) * ye - std::cos(phi) * std::sin(eps) * ze;
+        },
+        [&]() { retval[2] = std::sin(eps) * ye + std::cos(eps) * ze; },
+        [&]() {
+            retval[3] = std::cos(phi) * vxe - std::sin(phi) * std::cos(eps) * vye + std::sin(phi) * std::sin(eps) * vze;
+        },
+        [&]() {
+            retval[4] = std::sin(phi) * vxe + std::cos(phi) * std::cos(eps) * vye - std::cos(phi) * std::sin(eps) * vze;
+        },
+        [&]() { retval[5] = std::sin(eps) * vye + std::cos(eps) * vze; });
 
     return retval;
 }

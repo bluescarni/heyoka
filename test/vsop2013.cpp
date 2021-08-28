@@ -149,8 +149,8 @@ TEST_CASE("venus")
             ta.get_pars_data()[0] = (dates[i] - 2451545.0) / 365250;
             ta.propagate_until(1);
 
-            REQUIRE(std::abs(std::sin(ta.get_state()[0]) - std::sin(values[i])) < 2e-8);
-            REQUIRE(std::abs(std::cos(ta.get_state()[0]) - std::cos(values[i])) < 2e-8);
+            REQUIRE(std::abs(std::sin(ta.get_state()[0]) - std::sin(values[i])) < 3e-8);
+            REQUIRE(std::abs(std::cos(ta.get_state()[0]) - std::cos(values[i])) < 3e-8);
         }
     }
 

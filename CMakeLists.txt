@@ -382,6 +382,10 @@ target_link_libraries(heyoka PRIVATE fmt::fmt)
 find_package(spdlog REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE spdlog::spdlog)
 
+# Mandatory dependency on TBB.
+find_package(TBB REQUIRED CONFIG)
+target_link_libraries(heyoka PRIVATE TBB::tbb)
+
 # Mandatory dependency on Boost.
 find_package(Boost 1.60 REQUIRED serialization)
 target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
