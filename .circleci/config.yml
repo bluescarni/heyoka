@@ -10,14 +10,6 @@ jobs:
     - run:
         name: Build and test
         command: bash ./tools/circleci_focal_gcc9_conda_asan.sh
-  focal_gcc9_conda_coverage:
-    docker:
-    - image: circleci/buildpack-deps:focal
-    steps:
-    - checkout
-    - run:
-        name: Build and test
-        command: bash ./tools/circleci_focal_gcc9_conda_coverage.sh
   focal_gcc9_llvm10_conda_asan:
     docker:
     - image: circleci/buildpack-deps:focal
@@ -49,7 +41,6 @@ workflows:
   all_builds:
     jobs:
     - focal_gcc9_conda_asan
-    - focal_gcc9_conda_coverage
     - focal_gcc9_llvm10_conda_asan
     - focal_gcc9_llvm11_conda_asan
     - ubuntu_arm64
