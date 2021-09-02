@@ -44,7 +44,7 @@ TEST_CASE("cos number simpl")
 
     REQUIRE(cos(x * 0.) == 1_dbl);
     REQUIRE(cos(0.123_dbl) == expression{cos(0.123)});
-    REQUIRE(cos(-0.123_ldbl) == expression{cos(0.123l)});
+    REQUIRE(cos(-0.123_ldbl) == expression{cos(-0.123l)});
 
 #if defined(HEYOKA_HAVE_REAL128)
     using namespace mppp::literals;

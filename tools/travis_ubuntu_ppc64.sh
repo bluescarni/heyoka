@@ -27,8 +27,5 @@ make -j2 VERBOSE=1
 # Run the tests.
 ctest -V -j2 -E vsop2013
 
-# Upload coverage data.
-#bash <(curl -s https://codecov.io/bash) -x gcov-9
-
 set +e
 set +x
