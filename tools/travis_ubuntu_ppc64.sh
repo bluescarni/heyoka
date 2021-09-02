@@ -7,8 +7,8 @@ set -x
 set -e
 
 # Core deps.
-apt-get update
-apt-get -y install wget
+#apt-get update
+#apt-get -y install wget
 
 # Install conda+deps.
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-ppc64le.sh -O miniconda.sh
