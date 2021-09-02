@@ -6,9 +6,7 @@ set -x
 # Exit on error.
 set -e
 
-# Core deps.
-#apt-get update
-#apt-get -y install wget
+# Install wget.
 sudo yum -y install wget
 
 # Install conda+deps.
@@ -20,13 +18,11 @@ conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev tbb-devel 
 source activate $deps_dir
 
 # Create the build dir and cd into it.
-sudo chown -R conda $HOME/heyoka
-cd $HOME/heyoka
 mkdir build
 cd build
 
 # GCC build.
-cmake ../ -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage" -DBoost_NO_BOOST_CMAKE=ON
+cmake ../heyoka -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DCMAKE_CXX_FLAGS="--coverage" -DBoost_NO_BOOST_CMAKE=ON
 make -j2 VERBOSE=1
 # Run the tests.
 ctest -V -j2 -E vsop2013
