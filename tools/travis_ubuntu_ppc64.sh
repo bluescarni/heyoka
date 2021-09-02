@@ -9,7 +9,6 @@ set -e
 # Core deps.
 #apt-get update
 #apt-get -y install wget
-sudo su
 sudo yum -y install wget
 
 # Install conda+deps.
@@ -21,7 +20,7 @@ conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev tbb-devel 
 source activate $deps_dir
 
 # Create the build dir and cd into it.
-cd /heyoka
+cd $HOME/heyoka
 mkdir build
 cd build
 
