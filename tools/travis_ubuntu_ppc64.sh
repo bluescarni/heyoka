@@ -9,7 +9,8 @@ set -e
 # Core deps.
 #apt-get update
 #apt-get -y install wget
-yum -y install wget
+sudo su
+sudo yum -y install wget
 
 # Install conda+deps.
 wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-ppc64le.sh -O miniconda.sh
