@@ -22,13 +22,13 @@ mkdir build
 cd build
 
 # GCC build.
-cmake ../heyoka -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DHEYOKA_SETUP_DOCS=no -DCMAKE_CXX_FLAGS="--coverage" -DBoost_NO_BOOST_CMAKE=ON
+cmake ../heyoka -DCMAKE_PREFIX_PATH=$deps_dir -DCMAKE_BUILD_TYPE=Debug -DHEYOKA_BUILD_TESTS=yes -DHEYOKA_BUILD_TUTORIALS=ON -DHEYOKA_WITH_SLEEF=yes -DHEYOKA_SETUP_DOCS=no -DBoost_NO_BOOST_CMAKE=ON
 make -j2 VERBOSE=1
 # Run the tests.
 ctest -V -j2 -E vsop2013
 
 # Upload coverage data.
-bash <(curl -s https://codecov.io/bash) -x gcov-9
+#bash <(curl -s https://codecov.io/bash) -x gcov-9
 
 set +e
 set +x
