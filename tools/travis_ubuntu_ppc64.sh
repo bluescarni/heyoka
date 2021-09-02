@@ -20,6 +20,7 @@ conda create -y -q -p $deps_dir cxx-compiler c-compiler cmake llvmdev tbb-devel 
 source activate $deps_dir
 
 # Create the build dir and cd into it.
+sudo chown -R conda $HOME/heyoka
 cd $HOME/heyoka
 mkdir build
 cd build
