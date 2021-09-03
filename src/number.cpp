@@ -189,6 +189,27 @@ template <typename T, typename U = T>
 using is_addable = std::conjunction<is_detected<add_t, T, U>, is_detected<add_t, U, T>,
                                     std::is_same<detected_t<add_t, T, U>, detected_t<add_t, U, T>>>;
 
+template <typename T, typename U>
+using sub_t = decltype(std::declval<T>() - std::declval<U>());
+
+template <typename T, typename U = T>
+using is_subtractable = std::conjunction<is_detected<sub_t, T, U>, is_detected<sub_t, U, T>,
+                                         std::is_same<detected_t<sub_t, T, U>, detected_t<sub_t, U, T>>>;
+
+template <typename T, typename U>
+using mul_t = decltype(std::declval<T>() * std::declval<U>());
+
+template <typename T, typename U = T>
+using is_multipliable = std::conjunction<is_detected<mul_t, T, U>, is_detected<mul_t, U, T>,
+                                         std::is_same<detected_t<mul_t, T, U>, detected_t<mul_t, U, T>>>;
+
+template <typename T, typename U>
+using div_t = decltype(std::declval<T>() / std::declval<U>());
+
+template <typename T, typename U = T>
+using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
+                                      std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
+
 } // namespace
 
 } // namespace detail
@@ -211,7 +232,12 @@ number operator-(number n1, number n2)
 {
     return std::visit(
         [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
+            if constexpr (detail::is_subtractable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
+            } else {
+                throw std::invalid_argument("Cannot subtract an object of type {} from an object of type {}"_format(
+                    boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -220,7 +246,12 @@ number operator*(number n1, number n2)
 {
     return std::visit(
         [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
+            if constexpr (detail::is_multipliable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
+            } else {
+                throw std::invalid_argument("Cannot multiply an object of type {} by an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -229,7 +260,12 @@ number operator/(number n1, number n2)
 {
     return std::visit(
         [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
+            if constexpr (detail::is_divisible<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
+            } else {
+                throw std::invalid_argument("Cannot divide an object of type {} by an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
