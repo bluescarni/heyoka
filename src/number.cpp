@@ -16,6 +16,7 @@
 #include <locale>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -410,24 +411,30 @@ llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
 {
     return std::visit(
-        [&s](const auto &v) {
-            // NOTE: the idea here is that we first fetch the FP
-            // semantics of the LLVM type long double corresponds
-            // to. Then we use them to construct a FP constant from
-            // the string representation of v.
-            // NOTE: v must be cast to long double so that we ensure
-            // that fmt produces a string representation
-            // of v in long double precision accurate to the
-            // last digit.
-            // NOTE: regarding the format string: we use the general format
-            // 'g' and a precision of max_digits10, which should guarantee
-            // round trip behaviour. Note that when using 'g', the precision
-            // argument represents the total number of significant digits
-            // printed (before and after the decimal point).
-            const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(
-                s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
-                                                                 std::numeric_limits<long double>::max_digits10)));
+        [&s](const auto &v) -> llvm::Value * {
+            if constexpr (std::is_constructible_v<long double, decltype(v)>) {
+                // NOTE: the idea here is that we first fetch the FP
+                // semantics of the LLVM type long double corresponds
+                // to. Then we use them to construct a FP constant from
+                // the string representation of v.
+                // NOTE: v must be cast to long double so that we ensure
+                // that fmt produces a string representation
+                // of v in long double precision accurate to the
+                // last digit.
+                // NOTE: regarding the format string: we use the general format
+                // 'g' and a precision of max_digits10, which should guarantee
+                // round trip behaviour. Note that when using 'g', the precision
+                // argument represents the total number of significant digits
+                // printed (before and after the decimal point).
+                const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
+                return llvm::ConstantFP::get(
+                    s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
+                                                                     std::numeric_limits<long double>::max_digits10)));
+            } else {
+                throw std::invalid_argument(
+                    "Cannot perform long double codegen for the type {} on this platform"_format(
+                        boost::core::demangle(typeid(decltype(v)).name())));
+            }
         },
         n.value());
 }
