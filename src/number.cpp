@@ -18,10 +18,13 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/core/demangle.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constants.h>
@@ -173,11 +176,33 @@ number operator-(number n)
     return std::visit([](auto &&arg) { return number{-std::forward<decltype(arg)>(arg)}; }, std::move(n.value()));
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename T, typename U>
+using add_t = decltype(std::declval<T>() + std::declval<U>());
+
+template <typename T, typename U = T>
+using is_addable = std::conjunction<is_detected<add_t, T, U>, is_detected<add_t, U, T>,
+                                    std::is_same<detected_t<add_t, T, U>, detected_t<add_t, U, T>>>;
+
+} // namespace
+
+} // namespace detail
+
 number operator+(number n1, number n2)
 {
     return std::visit(
         [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
+            if constexpr (is_addable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
+            } else {
+                throw std::invalid_argument("Cannot add an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
