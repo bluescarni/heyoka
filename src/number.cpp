@@ -319,23 +319,50 @@ expression diff(const number &n, const std::string &)
     return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+template <typename To>
+To number_eval_impl(const number &n)
+{
+    return std::visit(
+        [](const auto &v) -> To {
+            if constexpr (std::is_constructible_v<To, decltype(v)>) {
+                return static_cast<To>(v);
+            } else {
+                throw std::invalid_argument("Cannot convert an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
+            }
+        },
+        n.value());
+}
+
+} // namespace
+
+} // namespace detail
+
 double eval_dbl(const number &n, const std::unordered_map<std::string, double> &, const std::vector<double> &)
 {
-    return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
+    return detail::number_eval_impl<double>(n);
 }
 
 long double eval_ldbl(const number &n, const std::unordered_map<std::string, long double> &,
                       const std::vector<long double> &)
 {
-    return std::visit([](const auto &v) { return static_cast<long double>(v); }, n.value());
+    return detail::number_eval_impl<long double>(n);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 eval_f128(const number &n, const std::unordered_map<std::string, mppp::real128> &,
                         const std::vector<mppp::real128> &)
 {
-    return std::visit([](const auto &v) { return static_cast<mppp::real128>(v); }, n.value());
+    return detail::number_eval_impl<mppp::real128>(n);
 }
+
 #endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const number &n,
