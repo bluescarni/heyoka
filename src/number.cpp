@@ -210,6 +210,14 @@ template <typename T, typename U = T>
 using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
                                       std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
 
+template <typename T, typename U>
+using eq_t = decltype(std::declval<T>() == std::declval<U>());
+
+template <typename T, typename U = T>
+using is_equality_comparable = std::conjunction<is_detected<eq_t, T, U>, is_detected<eq_t, U, T>,
+                                                std::is_same<detected_t<eq_t, T, U>, detected_t<eq_t, U, T>>,
+                                                std::is_convertible<detected_t<eq_t, U, T>, bool>>;
+
 } // namespace
 
 } // namespace detail
@@ -273,19 +281,24 @@ number operator/(number n1, number n2)
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
-        [](const auto &v1, const auto &v2) {
-            using std::isnan;
+        [](const auto &v1, const auto &v2) -> bool {
+            if constexpr (detail::is_equality_comparable<decltype(v1), decltype(v2)>::value) {
+                using std::isnan;
 
-            if (isnan(v1) && isnan(v2)) {
-                // NOTE: make nan compare equal, for consistency
-                // with hashing.
-                return true;
+                if (isnan(v1) && isnan(v2)) {
+                    // NOTE: make nan compare equal, for consistency
+                    // with hashing.
+                    return true;
+                } else {
+                    // NOTE: this covers the following cases:
+                    // - neither v1 nor v2 is nan,
+                    // - v1 is nan and v2 is not,
+                    // - v2 is nan and v1 is not.
+                    return v1 == v2;
+                }
             } else {
-                // NOTE: this covers the following cases:
-                // - neither v1 nor v2 is nan,
-                // - v1 is nan and v2 is not,
-                // - v2 is nan and v1 is not.
-                return v1 == v2;
+                throw std::invalid_argument("Cannot compare an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
             }
         },
         n1.value(), n2.value());
