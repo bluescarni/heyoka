@@ -231,7 +231,7 @@ number operator+(number n1, number n2)
 number operator-(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
+        [](auto &&arg1, auto &&arg2) -> number {
             if constexpr (detail::is_subtractable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
             } else {
@@ -245,7 +245,7 @@ number operator-(number n1, number n2)
 number operator*(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
+        [](auto &&arg1, auto &&arg2) -> number {
             if constexpr (detail::is_multipliable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
             } else {
@@ -259,7 +259,7 @@ number operator*(number n1, number n2)
 number operator/(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
+        [](auto &&arg1, auto &&arg2) -> number {
             if constexpr (detail::is_divisible<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
             } else {
