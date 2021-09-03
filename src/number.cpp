@@ -196,8 +196,8 @@ using is_addable = std::conjunction<is_detected<add_t, T, U>, is_detected<add_t,
 number operator+(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
-            if constexpr (is_addable<decltype(arg1), decltype(arg2)>::value) {
+        [](auto &&arg1, auto &&arg2) -> number {
+            if constexpr (detail::is_addable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
             } else {
                 throw std::invalid_argument("Cannot add an object of type {} to an object of type {}"_format(
