@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Quadruple precision is now correctly supported on PPC64
+  (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__).
 - Add an implementation of the VSOP2013 analytical solution
   for the motion of the planets of the Solar System, usable
   in the definition of differential equations
@@ -28,6 +30,9 @@ Changes
 Fix
 ~~~
 
+- Various fixes to the PPC64 support
+  (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__,
+  `#187 <https://github.com/bluescarni/heyoka/pull/187>`__).
 - Fix an issue in ``kepE()`` arising from an automatic simplification
   that would lead to an invalid decomposition for zero eccentricity
   (`#185 <https://github.com/bluescarni/heyoka/pull/185>`__).
