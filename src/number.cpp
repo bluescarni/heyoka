@@ -183,6 +183,9 @@ namespace detail
 namespace
 {
 
+// Type-traits to detect arithmetic and comparison capabilities
+// in a type. Used in the implementation of the corresponding operations
+// for the number class.
 template <typename T, typename U>
 using add_t = decltype(std::declval<T>() + std::declval<U>());
 
@@ -230,8 +233,10 @@ number operator+(number n1, number n2)
             if constexpr (detail::is_addable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot add an object of type {} to an object of type {}"_format(
                     boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
             }
         },
         std::move(n1.value()), std::move(n2.value()));
@@ -244,8 +249,10 @@ number operator-(number n1, number n2)
             if constexpr (detail::is_subtractable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot subtract an object of type {} from an object of type {}"_format(
                     boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
+                // LCOV_EXCL_STOP
             }
         },
         std::move(n1.value()), std::move(n2.value()));
@@ -258,8 +265,10 @@ number operator*(number n1, number n2)
             if constexpr (detail::is_multipliable<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot multiply an object of type {} by an object of type {}"_format(
                     boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
             }
         },
         std::move(n1.value()), std::move(n2.value()));
@@ -272,8 +281,10 @@ number operator/(number n1, number n2)
             if constexpr (detail::is_divisible<decltype(arg1), decltype(arg2)>::value) {
                 return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot divide an object of type {} by an object of type {}"_format(
                     boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
             }
         },
         std::move(n1.value()), std::move(n2.value()));
@@ -298,8 +309,10 @@ bool operator==(const number &n1, const number &n2)
                     return v1 == v2;
                 }
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot compare an object of type {} to an object of type {}"_format(
                     boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
+                // LCOV_EXCL_STOP
             }
         },
         n1.value(), n2.value());
@@ -334,8 +347,10 @@ To number_eval_impl(const number &n)
             if constexpr (std::is_constructible_v<To, decltype(v)>) {
                 return static_cast<To>(v);
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument("Cannot convert an object of type {} to an object of type {}"_format(
                     boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
+                // LCOV_EXCL_STOP
             }
         },
         n.value());
@@ -431,9 +446,11 @@ llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
                     s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
                                                                      std::numeric_limits<long double>::max_digits10)));
             } else {
+                // LCOV_EXCL_START
                 throw std::invalid_argument(
                     "Cannot perform long double codegen for the type {} on this platform"_format(
                         boost::core::demangle(typeid(decltype(v)).name())));
+                // LCOV_EXCL_STOP
             }
         },
         n.value());

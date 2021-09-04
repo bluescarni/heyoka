@@ -8,6 +8,8 @@
 
 #include <heyoka/config.hpp>
 
+// LCOV_EXCL_START
+
 #if defined(HEYOKA_WITH_SLEEF)
 
 #include <cstddef>
@@ -434,3 +436,5 @@ std::string sleef_function_name(llvm::LLVMContext &, const std::string &, llvm::
 } // namespace heyoka::detail
 
 #endif
+
+// LCOV_EXCL_STOP
