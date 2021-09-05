@@ -727,6 +727,25 @@ bool operator!=(const expression &e1, const expression &e2)
     return !(e1 == e2);
 }
 
+std::size_t get_n_nodes(const expression &e)
+{
+    return std::visit(
+        [](const auto &arg) -> std::size_t {
+            if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
+                std::size_t retval = 1;
+
+                for (const auto &ex : arg.args()) {
+                    retval += get_n_nodes(ex);
+                }
+
+                return retval;
+            } else {
+                return 1;
+            }
+        },
+        e.value());
+}
+
 expression diff(const expression &e, const std::string &s)
 {
     return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
