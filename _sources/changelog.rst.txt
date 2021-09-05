@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add a function to compute the size of an expression
+  (`#189 <https://github.com/bluescarni/heyoka/pull/189>`__).
 - Quadruple precision is now correctly supported on PPC64
   (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__).
 - Add an implementation of the VSOP2013 analytical solution
