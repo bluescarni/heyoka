@@ -716,3 +716,20 @@ TEST_CASE("s11n")
 
     REQUIRE(x == 0.1_ldbl);
 }
+
+TEST_CASE("get_n_nodes")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(get_n_nodes(expression{}) == 1u);
+    REQUIRE(get_n_nodes(1_dbl) == 1u);
+    REQUIRE(get_n_nodes(par[0]) == 1u);
+    REQUIRE(get_n_nodes(x) == 1u);
+
+    REQUIRE(get_n_nodes(x + y) == 3u);
+    REQUIRE(get_n_nodes(x - y) == 3u);
+    REQUIRE(get_n_nodes(-z) == 2u);
+    REQUIRE(get_n_nodes(heyoka::time) == 1u);
+    REQUIRE(get_n_nodes(x + (y * z)) == 5u);
+    REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);
+}
