@@ -935,9 +935,11 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 // NOTE: this will render ex unusable.
 taylor_dc_t::size_type taylor_decompose_in_place(expression &&ex, taylor_dc_t &u_vars_defs)
 {
-    return std::visit(
-        [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
-        std::move(ex.value()));
+    if (auto fptr = std::get_if<func>(&ex.value())) {
+        return taylor_decompose_in_place(std::move(*fptr), u_vars_defs);
+    } else {
+        return 0;
+    }
 }
 
 namespace detail

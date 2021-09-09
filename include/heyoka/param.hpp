@@ -102,8 +102,6 @@ HEYOKA_DLL_PUBLIC void update_connections(std::vector<std::vector<std::size_t>> 
                                                     const std::vector<std::vector<std::size_t>> &, std::size_t &,
                                                     double);
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(param &&, taylor_dc_t &);
-
 } // namespace heyoka
 
 #endif

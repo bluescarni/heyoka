@@ -19,7 +19,6 @@
 
 #include <fmt/format.h>
 
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/param.hpp>
@@ -175,12 +174,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
                      const std::vector<std::vector<std::size_t>> &, std::size_t &, double)
 {
     throw not_implemented_error("update_grad_dbl() not implemented for param");
-}
-
-taylor_dc_t::size_type taylor_decompose_in_place(param &&, taylor_dc_t &)
-{
-    // NOTE: params do not require decomposition.
-    return 0;
 }
 
 } // namespace heyoka
