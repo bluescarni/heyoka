@@ -52,6 +52,12 @@ int main(int argc, char *argv[])
 
     std::cout << "Expression creation time: " << elapsed << "ms\n";
 
+    std::cout << "Expression sizes: [ ";
+    for (const auto &ex : series) {
+        std::cout << get_n_nodes(ex) << " ";
+    }
+    std::cout << "]\n";
+
     start = std::chrono::high_resolution_clock::now();
 
     auto ta = taylor_adaptive<double>{
