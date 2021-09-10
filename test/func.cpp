@@ -109,11 +109,6 @@ TEST_CASE("func minimal")
     f = std::move(f3);
     REQUIRE(f.get_ptr() == orig_ptr);
 
-    f = func{func_00{{"x"_var, "y"_var}}};
-    auto [b, e] = f.get_mutable_args_it();
-    *b = "z"_var;
-    REQUIRE(f.args() == std::vector{"z"_var, "y"_var});
-
     auto a = 0;
     auto fake_ptr = reinterpret_cast<llvm::Value *>(&a);
     REQUIRE_THROWS_MATCHES(f.taylor_diff_dbl(s, {}, {nullptr, nullptr}, nullptr, nullptr, 2, 2, 2, 0),
