@@ -13,7 +13,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
-#include <heyoka/gp.hpp>
+// #include <heyoka/gp.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
