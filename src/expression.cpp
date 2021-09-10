@@ -211,9 +211,8 @@ expression operator-(expression e)
     } else {
         if (auto fptr = detail::is_neg(e)) {
             // Simplify -(-x) to x.
-            auto rng = fptr->get_mutable_args_it();
-            assert(rng.first != rng.second);
-            return std::move(*rng.first);
+            assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+            return fptr->args()[0];
         } else {
             return neg(std::move(e));
         }
@@ -224,9 +223,8 @@ expression operator+(expression e1, expression e2)
 {
     // Simplify x + neg(y) to x - y.
     if (auto fptr = detail::is_neg(e2)) {
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return std::move(e1) - std::move(*rng.first);
+        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+        return std::move(e1) - fptr->args()[0];
     }
 
     auto visitor = [](auto &&v1, auto &&v2) {
@@ -247,10 +245,7 @@ expression operator+(expression e1, expression e2)
                     pbop != nullptr && pbop->op() == detail::binary_op::type::add
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
-                    auto rng2 = pbop->get_mutable_args_it();
-
-                    return expression{std::forward<decltype(v1)>(v1)} + std::move(*rng2.first)
-                           + std::move(*(rng2.first + 1));
+                    return expression{std::forward<decltype(v1)>(v1)} + pbop->args()[0] + pbop->args()[1];
                 }
             }
 
@@ -271,9 +266,8 @@ expression operator-(expression e1, expression e2)
 {
     // Simplify x - (-y) to x + y.
     if (auto fptr = detail::is_neg(e2)) {
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return std::move(e1) + std::move(*rng.first);
+        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+        return std::move(e1) + fptr->args()[0];
     }
 
     auto visitor = [](auto &&v1, auto &&v2) {
@@ -310,13 +304,9 @@ expression operator*(expression e1, expression e2)
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) * (-y) into x*y.
-        auto rng1 = fptr1->get_mutable_args_it();
-        auto rng2 = fptr2->get_mutable_args_it();
-
-        assert(rng1.first != rng1.second);
-        assert(rng2.first != rng2.second);
-
-        return std::move(*rng1.first) * std::move(*rng2.first);
+        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+        return fptr1->args()[0] * fptr2->args()[0];
     }
 
     // Simplify x*x -> square(x) if x is not a number (otherwise,
@@ -344,20 +334,15 @@ expression operator*(expression e1, expression e2)
             }
             if (fptr2 != nullptr) {
                 // a * (-x) = (-a) * x.
-                auto rng2 = fptr2->get_mutable_args_it();
-                assert(rng2.first != rng2.second);
-
-                return expression{-std::forward<decltype(v1)>(v1)} * std::move(*rng2.first);
+                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+                return expression{-std::forward<decltype(v1)>(v1)} * fptr2->args()[0];
             }
             if constexpr (std::is_same_v<func, type2>) {
                 if (auto pbop = v2.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::mul
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
-                    auto rng2 = pbop->get_mutable_args_it();
-
-                    return expression{std::forward<decltype(v1)>(v1)} * std::move(*rng2.first)
-                           * std::move(*(rng2.first + 1));
+                    return expression{std::forward<decltype(v1)>(v1)} * pbop->args()[0] * pbop->args()[1];
                 }
             }
 
@@ -381,13 +366,9 @@ expression operator/(expression e1, expression e2)
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) / (-y) into x/y.
-        auto rng1 = fptr1->get_mutable_args_it();
-        auto rng2 = fptr2->get_mutable_args_it();
-
-        assert(rng1.first != rng1.second);
-        assert(rng2.first != rng2.second);
-
-        return std::move(*rng1.first) / std::move(*rng2.first);
+        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+        return fptr1->args()[0] / fptr2->args()[0];
     }
 
     auto visitor = [fptr1, fptr2](auto &&v1, auto &&v2) {
@@ -416,20 +397,15 @@ expression operator/(expression e1, expression e2)
             }
             if (fptr1 != nullptr) {
                 // (-e1) / a = e1 / (-a).
-                auto rng1 = fptr1->get_mutable_args_it();
-                assert(rng1.first != rng1.second);
-
-                return std::move(*rng1.first) / expression{-std::forward<decltype(v2)>(v2)};
+                assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+                return fptr1->args()[0] / expression{-std::forward<decltype(v2)>(v2)};
             }
             if constexpr (std::is_same_v<func, type1>) {
                 if (auto pbop = v1.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::div
                     && std::holds_alternative<number>(pbop->args()[1].value())) {
                     // e1 = x / a, where a is a number. Simplify (x / a) / b -> x / (a * b).
-                    auto rng1 = pbop->get_mutable_args_it();
-
-                    return std::move(*rng1.first)
-                           / (std::move(*(rng1.first + 1)) * expression{std::forward<decltype(v2)>(v2)});
+                    return pbop->args()[0] / (pbop->args()[1] * expression{std::forward<decltype(v2)>(v2)});
                 }
             }
 
@@ -442,10 +418,8 @@ expression operator/(expression e1, expression e2)
             }
             if (fptr2 != nullptr) {
                 // a / (-e2) = (-a) / e2.
-                auto rng2 = fptr2->get_mutable_args_it();
-                assert(rng2.first != rng2.second);
-
-                return expression{-std::forward<decltype(v1)>(v1)} / std::move(*rng2.first);
+                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+                return expression{-std::forward<decltype(v1)>(v1)} / fptr2->args()[0];
             }
 
             // NOTE: fall through to the standard case.
@@ -935,9 +909,11 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 // NOTE: this will render ex unusable.
 taylor_dc_t::size_type taylor_decompose_in_place(expression &&ex, taylor_dc_t &u_vars_defs)
 {
-    return std::visit(
-        [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
-        std::move(ex.value()));
+    if (auto fptr = std::get_if<func>(&ex.value())) {
+        return taylor_decompose_in_place(std::move(*fptr), u_vars_defs);
+    } else {
+        return 0;
+    }
 }
 
 namespace detail

@@ -18,11 +18,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/numeric/conversion/cast.hpp>
-
 #include <fmt/format.h>
-
-#include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -30,12 +26,7 @@
 
 #endif
 
-#include <heyoka/detail/fwd_decl.hpp>
-#include <heyoka/detail/llvm_fwd.hpp>
-#include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
-#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
 
@@ -145,6 +136,7 @@ long double eval_ldbl(const variable &var, const std::unordered_map<std::string,
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::string, mppp::real128> &map,
                         const std::vector<mppp::real128> &)
 {
@@ -156,6 +148,7 @@ mppp::real128 eval_f128(const variable &var, const std::unordered_map<std::strin
             "Cannot evaluate the variable '{}' because it is missing from the evaluation map"_format(var.name()));
     }
 }
+
 #endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const variable &var,
@@ -195,12 +188,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const variab
 {
     grad[var.name()] = grad[var.name()] + acc;
     node_counter++;
-}
-
-taylor_dc_t::size_type taylor_decompose_in_place(variable &&, taylor_dc_t &)
-{
-    // NOTE: variables do not require decomposition.
-    return 0;
 }
 
 } // namespace heyoka

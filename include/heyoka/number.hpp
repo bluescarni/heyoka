@@ -147,8 +147,6 @@ inline llvm::Value *codegen(llvm_state &s, const number &n)
     }
 }
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &);
-
 } // namespace heyoka
 
 #endif

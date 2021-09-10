@@ -40,7 +40,6 @@
 
 #endif
 
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -471,11 +470,5 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
 }
 
 #endif
-
-taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &)
-{
-    // NOTE: numbers do not require decomposition.
-    return 0;
-}
 
 } // namespace heyoka
