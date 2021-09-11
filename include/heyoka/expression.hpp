@@ -20,6 +20,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -169,6 +170,13 @@ HEYOKA_DLL_PUBLIC void swap(expression &, expression &) noexcept;
 HEYOKA_DLL_PUBLIC std::size_t hash(const expression &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const expression &);
+
+namespace detail
+{
+
+std::vector<std::string> get_variables(std::unordered_set<const void *> &, const expression &);
+
+}
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);

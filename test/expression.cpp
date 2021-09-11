@@ -11,6 +11,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -732,4 +733,32 @@ TEST_CASE("get_n_nodes")
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
     REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);
+}
+
+TEST_CASE("equality")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(x == x);
+    REQUIRE(x != y);
+
+    REQUIRE(x + y == x + y);
+
+    auto foo = (x + y) * z, bar = foo;
+
+    REQUIRE(foo == bar);
+    REQUIRE(x + foo == x + bar);
+}
+
+TEST_CASE("get_variables")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(get_variables(x) == std::vector<std::string>{"x"});
+    REQUIRE(get_variables(1_dbl) == std::vector<std::string>{});
+    REQUIRE(get_variables(par[0]) == std::vector<std::string>{});
+    REQUIRE(get_variables(y + x * z) == std::vector<std::string>{"x", "y", "z"});
+
+    auto tmp = x * z, foo = x - z - 5_dbl;
+    REQUIRE(get_variables((y + tmp) / foo * tmp - foo) == std::vector<std::string>{"x", "y", "z"});
 }

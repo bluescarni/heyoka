@@ -16,6 +16,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -95,7 +96,7 @@ TEST_CASE("func minimal")
     REQUIRE(orig_ptr == static_cast<const func &>(f).get_ptr());
 
     auto f2(f);
-    REQUIRE(orig_ptr != f2.get_ptr());
+    REQUIRE(orig_ptr == f2.get_ptr());
     REQUIRE(f2.get_type_index() == typeid(func_00));
     REQUIRE(f2.get_name() == "f");
     REQUIRE(f2.args() == std::vector{"x"_var, "y"_var});
@@ -104,7 +105,7 @@ TEST_CASE("func minimal")
     REQUIRE(orig_ptr == f3.get_ptr());
 
     f = f3;
-    REQUIRE(f.get_ptr() != f3.get_ptr());
+    REQUIRE(f.get_ptr() == f3.get_ptr());
 
     f = std::move(f3);
     REQUIRE(f.get_ptr() == orig_ptr);
@@ -598,18 +599,18 @@ TEST_CASE("func eq ineq")
 TEST_CASE("func get_variables")
 {
     auto f1 = func(func_10{{}});
-    REQUIRE(get_variables(f1).empty());
+    REQUIRE(get_variables(expression{f1}).empty());
 
     f1 = func(func_10{{0_dbl}});
-    REQUIRE(get_variables(f1).empty());
+    REQUIRE(get_variables(expression{f1}).empty());
 
     f1 = func(func_10{{0_dbl, "x"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x"});
 
     f1 = func(func_10{{0_dbl, "y"_var, "x"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x", "y"});
     f1 = func(func_10{{0_dbl, "y"_var, "x"_var, 1_dbl, "x"_var, "y"_var, "z"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y", "z"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x", "y", "z"});
 }
 
 TEST_CASE("func rename_variables")
@@ -625,15 +626,15 @@ TEST_CASE("func rename_variables")
     REQUIRE(f2 == f1);
 
     rename_variables(f1, {{"x", "y"}});
-    REQUIRE(f2 != f1);
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+    REQUIRE(f2 == f1);
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
     rename_variables(f1, {{"x", "y"}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
 
     f1 = func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}});
     rename_variables(f1, {{"x", "y"}});
     REQUIRE(f2 != f1);
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y", "z"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y", "z"});
 }
 
 TEST_CASE("func diff free func")
@@ -803,4 +804,18 @@ TEST_CASE("func s11n")
     REQUIRE(f.get_name() == "pluto");
     REQUIRE(f.args().size() == 1u);
     REQUIRE(f.args()[0] == "x"_var);
+}
+
+TEST_CASE("ref semantics")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = (x + y) * z, bar = foo;
+
+    REQUIRE(std::get<func>(foo.value()).get_id() == std::get<func>(bar.value()).get_id());
+
+    foo = x - y;
+    bar = foo;
+
+    REQUIRE(std::get<func>(foo.value()).get_id() == std::get<func>(bar.value()).get_id());
 }

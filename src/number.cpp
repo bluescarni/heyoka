@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -149,10 +150,15 @@ std::ostream &operator<<(std::ostream &os, const number &n)
     return os << oss.str();
 }
 
-std::vector<std::string> get_variables(const number &)
+namespace detail
+{
+
+std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const number &)
 {
     return {};
 }
+
+} // namespace detail
 
 void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
 

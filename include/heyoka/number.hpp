@@ -16,6 +16,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -79,7 +80,13 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
+namespace detail
+{
+
+std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const number &);
+
+}
+
 HEYOKA_DLL_PUBLIC void rename_variables(number &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);

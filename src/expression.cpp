@@ -17,6 +17,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -174,9 +175,21 @@ detail::prime_wrapper operator""_p(const char *s, std::size_t n)
 
 } // namespace literals
 
+namespace detail
+{
+
+std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const expression &e)
+{
+    return std::visit([&func_set](const auto &arg) { return get_variables(func_set, arg); }, e.value());
+}
+
+} // namespace detail
+
 std::vector<std::string> get_variables(const expression &e)
 {
-    return std::visit([](const auto &arg) { return get_variables(arg); }, e.value());
+    std::unordered_set<const void *> func_set;
+
+    return detail::get_variables(func_set, e);
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)

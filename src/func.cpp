@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <typeindex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -156,18 +157,11 @@ struct null_func : func_base {
 
 func::func() : func(detail::null_func{}) {}
 
-func::func(const func &f) : m_ptr(f.ptr()->clone()) {}
+func::func(const func &) = default;
 
 func::func(func &&) noexcept = default;
 
-func &func::operator=(const func &f)
-{
-    if (this != &f) {
-        *this = func(f);
-    }
-
-    return *this;
-}
+func &func::operator=(const func &) = default;
 
 func &func::operator=(func &&) noexcept = default;
 
@@ -200,6 +194,11 @@ const void *func::get_ptr() const
 void *func::get_ptr()
 {
     return ptr()->get_ptr();
+}
+
+const void *func::get_id() const
+{
+    return m_ptr.get();
 }
 
 const std::string &func::get_name() const
@@ -608,6 +607,11 @@ std::size_t hash(const func &f)
 
 bool operator==(const func &a, const func &b)
 {
+    // Check if the underlying object is the same.
+    if (a.m_ptr == b.m_ptr) {
+        return true;
+    }
+
     // NOTE: the initial comparison considers:
     // - the function name,
     // - the function inner type index,
@@ -626,19 +630,37 @@ bool operator!=(const func &a, const func &b)
     return !(a == b);
 }
 
-std::vector<std::string> get_variables(const func &f)
+namespace detail
 {
+
+std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const func &f)
+{
+    const auto f_id = f.get_id();
+
+    if (func_set.find(f_id) != func_set.end()) {
+        // We already determined the list of variables for the current function,
+        // return an empty value.
+        return {};
+    }
+
     std::vector<std::string> ret;
 
     for (const auto &arg : f.args()) {
-        auto tmp = get_variables(arg);
+        auto tmp = get_variables(func_set, arg);
         ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
         std::sort(ret.begin(), ret.end());
         ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
     }
 
+    // Add the id of f to the set.
+    [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+    // NOTE: an expression cannot contain itself.
+    assert(flag);
+
     return ret;
 }
+
+} // namespace detail
 
 void rename_variables(func &f, const std::unordered_map<std::string, std::string> &repl_map)
 {
@@ -676,11 +698,13 @@ long double eval_ldbl(const func &f, const std::unordered_map<std::string, long 
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map,
                         const std::vector<mppp::real128> &pars)
 {
     return f.eval_f128(map, pars);
 }
+
 #endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const func &f,

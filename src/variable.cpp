@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -72,10 +73,15 @@ std::ostream &operator<<(std::ostream &os, const variable &var)
     return os << var.name();
 }
 
-std::vector<std::string> get_variables(const variable &var)
+namespace detail
+{
+
+std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const variable &var)
 {
     return {var.name()};
 }
+
+} // namespace detail
 
 void rename_variables(variable &var, const std::unordered_map<std::string, std::string> &repl_map)
 {

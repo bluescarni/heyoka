@@ -20,6 +20,7 @@
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -225,8 +226,8 @@ template <typename T>
 inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
 
 template <typename T>
-using func_eval_num_dbl_t = decltype(
-    std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(std::declval<const std::vector<double> &>()));
+using func_eval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(
+    std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
@@ -593,7 +594,7 @@ class HEYOKA_DLL_PUBLIC func
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 
     // Pointer to the inner base.
-    std::unique_ptr<detail::func_inner_base> m_ptr;
+    std::shared_ptr<detail::func_inner_base> m_ptr;
 
     // Serialization.
     friend class boost::serialization::access;
@@ -654,6 +655,7 @@ public:
     std::type_index get_type_index() const;
     const void *get_ptr() const;
     void *get_ptr();
+    const void *get_id() const;
 
     const std::string &get_name() const;
 
@@ -699,7 +701,13 @@ public:
 #endif
 };
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const func &);
+namespace detail
+{
+
+std::vector<std::string> get_variables(std::unordered_set<const void *> &, const func &);
+
+}
+
 HEYOKA_DLL_PUBLIC void rename_variables(func &, const std::unordered_map<std::string, std::string> &);
 
 HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::string, expression> &);
@@ -815,31 +823,6 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const func &f, std::uin
 }
 
 } // namespace heyoka
-
-// Disable Boost.Serialization tracking for the implementation
-// details of func.
-BOOST_CLASS_TRACKING(heyoka::detail::func_inner_base, boost::serialization::track_never)
-
-// NOTE: these bits are taken verbatim from the BOOST_CLASS_TRACKING macro, which does not support
-// class templates.
-namespace boost
-{
-
-namespace serialization
-{
-
-template <typename T>
-struct tracking_level<heyoka::detail::func_inner<T>> {
-    typedef mpl::integral_c_tag tag;
-    typedef mpl::int_<track_never> type;
-    BOOST_STATIC_CONSTANT(int, value = tracking_level::type::value);
-    BOOST_STATIC_ASSERT(
-        (mpl::greater<implementation_level<heyoka::detail::func_inner<T>>, mpl::int_<primitive_type>>::value));
-};
-
-} // namespace serialization
-
-} // namespace boost
 
 // Macros for the registration of s11n for concrete functions.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
