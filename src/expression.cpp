@@ -747,16 +747,32 @@ bool operator!=(const expression &e1, const expression &e2)
     return !(e1 == e2);
 }
 
-std::size_t get_n_nodes(const expression &e)
+namespace detail
+{
+
+std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map, const expression &e)
 {
     return std::visit(
-        [](const auto &arg) -> std::size_t {
+        [&func_map](const auto &arg) -> std::size_t {
             if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
-                std::size_t retval = 1;
+                const auto f_id = arg.get_id();
 
-                for (const auto &ex : arg.args()) {
-                    retval += get_n_nodes(ex);
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the number of nodes for the current
+                    // function, return it.
+                    return it->second;
                 }
+
+                std::size_t retval = 1;
+                for (const auto &ex : arg.args()) {
+                    retval += get_n_nodes(func_map, ex);
+                }
+
+                // Store the number of nodes for the current function
+                // in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, retval});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
 
                 return retval;
             } else {
@@ -764,6 +780,15 @@ std::size_t get_n_nodes(const expression &e)
             }
         },
         e.value());
+}
+
+} // namespace detail
+
+std::size_t get_n_nodes(const expression &e)
+{
+    std::unordered_map<const void *, std::size_t> func_map;
+
+    return detail::get_n_nodes(func_map, e);
 }
 
 expression diff(const expression &e, const std::string &s)

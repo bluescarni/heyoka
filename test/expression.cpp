@@ -734,6 +734,13 @@ TEST_CASE("get_n_nodes")
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
     REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);
+
+    // Try with subexpressions repeating in the tree.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo),
+         bar2 = (copy(foo) - x) / (2. * copy(foo));
+
+    REQUIRE(get_n_nodes(bar) == 35u);
+    REQUIRE(get_n_nodes(bar2) == 35u);
 }
 
 TEST_CASE("equality")
