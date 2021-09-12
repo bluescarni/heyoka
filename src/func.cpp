@@ -580,42 +580,6 @@ llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uva
 
 #endif
 
-namespace detail
-{
-
-expression copy(std::unordered_map<const void *, expression> &func_map, const func &f)
-{
-    const auto f_id = f.get_ptr();
-
-    if (auto it = func_map.find(f_id); it != func_map.end()) {
-        // We already copied the current function, fetch the copy
-        // from the cache.
-        return it->second;
-    }
-
-    // Perform a copy of f. Note that this does
-    // a shallow copy of the arguments (i.e., the arguments
-    // will be copied via the copy ctor).
-    auto f_copy = f.copy();
-
-    // Perform a copy of the arguments.
-    assert(f.args().size() == f_copy.args().size());
-    auto b1 = f.args().begin();
-    for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
-        *b2 = copy(func_map, *b1);
-    }
-
-    // Construct the return value and put it into the cache.
-    auto ex = expression{std::move(f_copy)};
-    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
-    // NOTE: an expression cannot contain itself.
-    assert(flag);
-
-    return ex;
-}
-
-} // namespace detail
-
 void swap(func &a, func &b) noexcept
 {
     std::swap(a.m_ptr, b.m_ptr);

@@ -712,8 +712,6 @@ public:
 namespace detail
 {
 
-expression copy(std::unordered_map<const void *, expression> &, const func &);
-
 std::vector<std::string> get_variables(std::unordered_set<const void *> &, const func &);
 void rename_variables(std::unordered_set<const void *> &, func &, const std::unordered_map<std::string, std::string> &);
 
