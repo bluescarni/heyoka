@@ -88,6 +88,15 @@ public:
     const value_type &value() const;
 };
 
+namespace detail
+{
+
+expression copy(std::unordered_map<const void *, expression> &, const expression &);
+
+}
+
+HEYOKA_DLL_PUBLIC expression copy(const expression &);
+
 inline namespace literals
 {
 

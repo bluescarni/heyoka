@@ -15,6 +15,7 @@
 #include <functional>
 #include <initializer_list>
 #include <iterator>
+#include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -155,6 +156,8 @@ struct null_func : func_base {
 
 } // namespace detail
 
+func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
+
 func::func() : func(detail::null_func{}) {}
 
 func::func(const func &) = default;
@@ -166,6 +169,15 @@ func &func::operator=(const func &) = default;
 func &func::operator=(func &&) noexcept = default;
 
 func::~func() = default;
+
+// NOTE: this creates a new func containing
+// a copy of the inner object: this means that
+// the function arguments are shallow-copied and
+// NOT deep-copied.
+func func::copy() const
+{
+    return func{m_ptr->clone()};
+}
 
 // Just two small helpers to make sure that whenever we require
 // access to the pointer it actually points to something.
@@ -572,6 +584,42 @@ llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uva
 }
 
 #endif
+
+namespace detail
+{
+
+expression copy(std::unordered_map<const void *, expression> &func_map, const func &f)
+{
+    const auto f_id = f.get_id();
+
+    if (auto it = func_map.find(f_id); it != func_map.end()) {
+        // We already copied the current function, fetch the copy
+        // from the cache.
+        return it->second;
+    }
+
+    // Perform a copy of f. Note that this does
+    // a shallow copy of the arguments (i.e., the arguments
+    // will be copied via the copy ctor).
+    auto f_copy = f.copy();
+
+    // Perform a copy of the arguments.
+    assert(f.args().size() == f_copy.args().size());
+    auto b1 = f.args().begin();
+    for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
+        *b2 = copy(func_map, *b1);
+    }
+
+    // Construct the return value and put it into the cache.
+    auto ex = expression{std::move(f_copy)};
+    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
+    // NOTE: an expression cannot contain itself.
+    assert(flag);
+
+    return ex;
+}
+
+} // namespace detail
 
 void swap(func &a, func &b) noexcept
 {

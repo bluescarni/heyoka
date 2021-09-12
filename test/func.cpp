@@ -819,3 +819,35 @@ TEST_CASE("ref semantics")
 
     REQUIRE(std::get<func>(foo.value()).get_id() == std::get<func>(bar.value()).get_id());
 }
+
+TEST_CASE("copy")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+
+    auto foo_copy = expression{std::get<func>(foo.value()).copy()};
+
+    // Copy creates a new obejct...
+    REQUIRE(std::get<func>(foo_copy.value()).get_id() != std::get<func>(foo.value()).get_id());
+
+    // ... but it does not deep copy the arguments.
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).get_id()
+            == std::get<func>(std::get<func>(foo.value()).args()[0].value()).get_id());
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).get_id()
+            == std::get<func>(std::get<func>(foo.value()).args()[1].value()).get_id());
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[0].value()).get_id()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[0].value()).get_id());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[1].value()).get_id()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[1].value()).get_id());
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[0].value()).get_id()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[0].value()).get_id());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_id()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_id());
+}

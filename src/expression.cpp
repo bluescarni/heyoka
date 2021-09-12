@@ -97,6 +97,31 @@ const expression::value_type &expression::value() const
     return m_value;
 }
 
+namespace detail
+{
+
+expression copy(std::unordered_map<const void *, expression> &func_map, const expression &e)
+{
+    return std::visit(
+        [&func_map](const auto &arg) {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(arg)>, func>) {
+                return copy(func_map, arg);
+            } else {
+                return expression{arg};
+            }
+        },
+        e.value());
+}
+
+} // namespace detail
+
+expression copy(const expression &e)
+{
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::copy(func_map, e);
+}
+
 inline namespace literals
 {
 

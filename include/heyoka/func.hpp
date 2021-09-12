@@ -609,6 +609,9 @@ class HEYOKA_DLL_PUBLIC func
     const detail::func_inner_base *ptr() const;
     detail::func_inner_base *ptr();
 
+    // Private constructor used in the copy() function.
+    explicit func(std::unique_ptr<detail::func_inner_base>);
+
     template <typename T>
     using generic_ctor_enabler
         = std::enable_if_t<std::conjunction_v<std::negation<std::is_same<func, detail::uncvref_t<T>>>,
@@ -630,6 +633,12 @@ public:
     func &operator=(func &&) noexcept;
 
     ~func();
+
+    // NOTE: this creates a new func containing
+    // a copy of the inner object: this means that
+    // the function arguments are shallow-copied and
+    // NOT deep-copied.
+    func copy() const;
 
     // NOTE: like in pagmo, this may fail if invoked
     // from different DLLs in certain situations (e.g.,
@@ -703,6 +712,8 @@ public:
 
 namespace detail
 {
+
+expression copy(std::unordered_map<const void *, expression> &, const func &);
 
 std::vector<std::string> get_variables(std::unordered_set<const void *> &, const func &);
 void rename_variables(std::unordered_set<const void *> &, func &, const std::unordered_map<std::string, std::string> &);

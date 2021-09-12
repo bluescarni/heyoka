@@ -18,6 +18,7 @@
 #include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
@@ -787,4 +788,48 @@ TEST_CASE("rename_variables")
     ex = (y + tmp) / foo * tmp - foo;
     rename_variables(ex, {{"x", "a"}, {"y", "b"}});
     REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+}
+
+TEST_CASE("copy")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    auto bar_copy = copy(bar);
+
+    // Copy created a new object.
+    REQUIRE(std::get<func>(bar_copy.value()).get_id() != std::get<func>(bar.value()).get_id());
+
+    // foo was deep-copied into bar_copy.
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_id()
+            == std::get<func>(foo.value()).get_id());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value()).get_id()
+        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_id());
+
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_id()
+            == std::get<func>(foo.value()).get_id());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_id()
+        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_id());
+
+    // The foo appearing in bar_copy is the same object, not two separate copies.
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_id()
+        == std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value())
+               .get_id());
+
+    // A test in which a function has the same argument twice.
+    bar = foo + foo;
+    bar_copy = copy(bar);
+
+    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_id()
+            == std::get<func>(foo.value()).get_id());
+    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_id()
+            == std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_id());
+    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_id()
+            == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_id());
+    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_id()
+            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_id());
 }
