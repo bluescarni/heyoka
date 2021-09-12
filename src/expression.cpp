@@ -755,7 +755,7 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
     return std::visit(
         [&func_map](const auto &arg) -> std::size_t {
             if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
-                const auto f_id = arg.get_id();
+                const auto f_id = arg.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already computed the number of nodes for the current

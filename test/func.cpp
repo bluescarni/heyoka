@@ -812,12 +812,12 @@ TEST_CASE("ref semantics")
 
     auto foo = (x + y) * z, bar = foo;
 
-    REQUIRE(std::get<func>(foo.value()).get_id() == std::get<func>(bar.value()).get_id());
+    REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 
     foo = x - y;
     bar = foo;
 
-    REQUIRE(std::get<func>(foo.value()).get_id() == std::get<func>(bar.value()).get_id());
+    REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
 }
 
 TEST_CASE("copy")
@@ -829,25 +829,25 @@ TEST_CASE("copy")
     auto foo_copy = expression{std::get<func>(foo.value()).copy()};
 
     // Copy creates a new obejct...
-    REQUIRE(std::get<func>(foo_copy.value()).get_id() != std::get<func>(foo.value()).get_id());
+    REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
 
     // ... but it does not deep copy the arguments.
-    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).get_id()
-            == std::get<func>(std::get<func>(foo.value()).args()[0].value()).get_id());
-    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).get_id()
-            == std::get<func>(std::get<func>(foo.value()).args()[1].value()).get_id());
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(foo.value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).get_ptr()
+            == std::get<func>(std::get<func>(foo.value()).args()[1].value()).get_ptr());
 
     REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[0].value()).get_id()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[0].value()).get_id());
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[0].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[0].value()).get_ptr());
     REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[1].value()).get_id()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[1].value()).get_id());
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[1].value()).get_ptr());
 
     REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[0].value()).get_id()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[0].value()).get_id());
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[0].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[0].value()).get_ptr());
     REQUIRE(
-        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_id()
-        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_id());
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_ptr());
 }

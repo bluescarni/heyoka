@@ -664,7 +664,6 @@ public:
     std::type_index get_type_index() const;
     const void *get_ptr() const;
     void *get_ptr();
-    const void *get_id() const;
 
     const std::string &get_name() const;
 

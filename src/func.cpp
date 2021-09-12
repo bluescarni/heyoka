@@ -208,11 +208,6 @@ void *func::get_ptr()
     return ptr()->get_ptr();
 }
 
-const void *func::get_id() const
-{
-    return m_ptr.get();
-}
-
 const std::string &func::get_name() const
 {
     return ptr()->get_name();
@@ -590,7 +585,7 @@ namespace detail
 
 expression copy(std::unordered_map<const void *, expression> &func_map, const func &f)
 {
-    const auto f_id = f.get_id();
+    const auto f_id = f.get_ptr();
 
     if (auto it = func_map.find(f_id); it != func_map.end()) {
         // We already copied the current function, fetch the copy
@@ -683,7 +678,7 @@ namespace detail
 
 std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const func &f)
 {
-    const auto f_id = f.get_id();
+    const auto f_id = f.get_ptr();
 
     if (func_set.find(f_id) != func_set.end()) {
         // We already determined the list of variables for the current function,
@@ -711,7 +706,7 @@ std::vector<std::string> get_variables(std::unordered_set<const void *> &func_se
 void rename_variables(std::unordered_set<const void *> &func_set, func &f,
                       const std::unordered_map<std::string, std::string> &repl_map)
 {
-    const auto f_id = f.get_id();
+    const auto f_id = f.get_ptr();
 
     if (func_set.find(f_id) != func_set.end()) {
         // We already renamed variables for the current function,
