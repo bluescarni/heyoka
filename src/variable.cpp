@@ -81,14 +81,15 @@ std::vector<std::string> get_variables(const std::unordered_set<const void *> &,
     return {var.name()};
 }
 
-} // namespace detail
-
-void rename_variables(variable &var, const std::unordered_map<std::string, std::string> &repl_map)
+void rename_variables(const std::unordered_set<const void *> &, variable &var,
+                      const std::unordered_map<std::string, std::string> &repl_map)
 {
     if (auto it = repl_map.find(var.name()); it != repl_map.end()) {
         var.name() = it->second;
     }
 }
+
+} // namespace detail
 
 bool operator==(const variable &v1, const variable &v2)
 {

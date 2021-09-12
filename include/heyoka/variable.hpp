@@ -67,10 +67,10 @@ namespace detail
 {
 
 std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const variable &);
+void rename_variables(const std::unordered_set<const void *> &, variable &,
+                      const std::unordered_map<std::string, std::string> &);
 
-}
-
-HEYOKA_DLL_PUBLIC void rename_variables(variable &, const std::unordered_map<std::string, std::string> &);
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
 HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);

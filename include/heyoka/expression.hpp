@@ -175,8 +175,10 @@ namespace detail
 {
 
 std::vector<std::string> get_variables(std::unordered_set<const void *> &, const expression &);
+void rename_variables(std::unordered_set<const void *> &, expression &,
+                      const std::unordered_map<std::string, std::string> &);
 
-}
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const expression &);
 HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<std::string, std::string> &);

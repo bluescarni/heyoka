@@ -76,9 +76,12 @@ std::vector<std::string> get_variables(const std::unordered_set<const void *> &,
     return {};
 }
 
-} // namespace detail
+void rename_variables(const std::unordered_set<const void *> &, param &,
+                      const std::unordered_map<std::string, std::string> &)
+{
+}
 
-void rename_variables(param &, const std::unordered_map<std::string, std::string> &) {}
+} // namespace detail
 
 bool operator==(const param &p0, const param &p1)
 {

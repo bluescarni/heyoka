@@ -158,9 +158,12 @@ std::vector<std::string> get_variables(const std::unordered_set<const void *> &,
     return {};
 }
 
-} // namespace detail
+void rename_variables(const std::unordered_set<const void *> &, number &,
+                      const std::unordered_map<std::string, std::string> &)
+{
+}
 
-void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
+} // namespace detail
 
 bool is_zero(const number &n)
 {

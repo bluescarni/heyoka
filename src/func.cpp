@@ -660,14 +660,28 @@ std::vector<std::string> get_variables(std::unordered_set<const void *> &func_se
     return ret;
 }
 
-} // namespace detail
-
-void rename_variables(func &f, const std::unordered_map<std::string, std::string> &repl_map)
+void rename_variables(std::unordered_set<const void *> &func_set, func &f,
+                      const std::unordered_map<std::string, std::string> &repl_map)
 {
-    for (auto [b, e] = f.get_mutable_args_it(); b != e; ++b) {
-        rename_variables(*b, repl_map);
+    const auto f_id = f.get_id();
+
+    if (func_set.find(f_id) != func_set.end()) {
+        // We already renamed variables for the current function,
+        // just return.
+        return;
     }
+
+    for (auto [b, e] = f.get_mutable_args_it(); b != e; ++b) {
+        rename_variables(func_set, *b, repl_map);
+    }
+
+    // Add the id of f to the set.
+    [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+    // NOTE: an expression cannot contain itself.
+    assert(flag);
 }
+
+} // namespace detail
 
 // NOTE: implementing this in-place would perform better.
 expression subs(const func &f, const std::unordered_map<std::string, expression> &smap)

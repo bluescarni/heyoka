@@ -615,12 +615,12 @@ TEST_CASE("func get_variables")
 
 TEST_CASE("func rename_variables")
 {
-    auto f1 = func(func_10{{}});
+    auto f1 = expression{func(func_10{{}})};
     auto f2 = f1;
     rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
 
-    f1 = func(func_10{{0_dbl, "x"_var}});
+    f1 = expression{func(func_10{{0_dbl, "x"_var}})};
     f2 = f1;
     rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
@@ -631,7 +631,7 @@ TEST_CASE("func rename_variables")
     rename_variables(f1, {{"x", "y"}});
     REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
 
-    f1 = func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}});
+    f1 = expression{func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}})};
     rename_variables(f1, {{"x", "y"}});
     REQUIRE(f2 != f1);
     REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y", "z"});

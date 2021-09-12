@@ -183,6 +183,12 @@ std::vector<std::string> get_variables(std::unordered_set<const void *> &func_se
     return std::visit([&func_set](const auto &arg) { return get_variables(func_set, arg); }, e.value());
 }
 
+void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
+                      const std::unordered_map<std::string, std::string> &repl_map)
+{
+    std::visit([&func_set, &repl_map](auto &arg) { rename_variables(func_set, arg, repl_map); }, e.value());
+}
+
 } // namespace detail
 
 std::vector<std::string> get_variables(const expression &e)
@@ -194,7 +200,9 @@ std::vector<std::string> get_variables(const expression &e)
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::visit([&repl_map](auto &arg) { rename_variables(arg, repl_map); }, e.value());
+    std::unordered_set<const void *> func_set;
+
+    detail::rename_variables(func_set, e, repl_map);
 }
 
 void swap(expression &ex0, expression &ex1) noexcept
