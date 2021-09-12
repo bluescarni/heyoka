@@ -24,18 +24,13 @@
 
 #if defined(__GNUC__) && __GNUC__ >= 7 && __cplusplus >= 201703L
 
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 struct U {
 };
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 #endif
 
