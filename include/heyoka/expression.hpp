@@ -88,13 +88,6 @@ public:
     const value_type &value() const;
 };
 
-namespace detail
-{
-
-expression copy(std::unordered_map<const void *, expression> &, const expression &);
-
-}
-
 HEYOKA_DLL_PUBLIC expression copy(const expression &);
 
 inline namespace literals
@@ -273,13 +266,6 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
-
-namespace detail
-{
-
-std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &, const expression &);
-
-}
 
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 

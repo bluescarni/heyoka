@@ -100,6 +100,9 @@ const expression::value_type &expression::value() const
 namespace detail
 {
 
+namespace
+{
+
 expression copy(std::unordered_map<const void *, expression> &func_map, const expression &e)
 {
     return std::visit(
@@ -138,6 +141,8 @@ expression copy(std::unordered_map<const void *, expression> &func_map, const ex
         },
         e.value());
 }
+
+} // namespace
 
 } // namespace detail
 
@@ -776,6 +781,9 @@ bool operator!=(const expression &e1, const expression &e2)
 namespace detail
 {
 
+namespace
+{
+
 std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map, const expression &e)
 {
     return std::visit(
@@ -807,6 +815,8 @@ std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map,
         },
         e.value());
 }
+
+} // namespace
 
 } // namespace detail
 
