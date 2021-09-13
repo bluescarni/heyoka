@@ -717,8 +717,6 @@ void rename_variables(std::unordered_set<const void *> &, func &, const std::uno
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::string, expression> &);
-
 HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,

@@ -103,8 +103,6 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
 
-HEYOKA_DLL_PUBLIC expression subs(const number &, const std::unordered_map<std::string, expression> &);
-
 HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,

@@ -848,9 +848,66 @@ expression diff(const expression &e, const expression &x)
         x.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: an in-place API would perform better.
+expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
+                const std::unordered_map<std::string, expression> &smap)
+{
+    return std::visit(
+        [&func_map, &smap](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
+                return expression{arg};
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (auto it = smap.find(arg.name()); it == smap.end()) {
+                    return expression{arg};
+                } else {
+                    return it->second;
+                }
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed substitution on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                // NOTE: this creates a separate instance of arg, but its
+                // arguments are shallow-copied.
+                auto tmp = arg.copy();
+
+                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
+                    *b = subs(func_map, *b, smap);
+                }
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::subs(func_map, e, smap);
 }
 
 namespace detail

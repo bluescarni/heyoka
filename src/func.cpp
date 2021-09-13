@@ -690,18 +690,6 @@ void rename_variables(std::unordered_set<const void *> &func_set, func &f,
 
 } // namespace detail
 
-// NOTE: implementing this in-place would perform better.
-expression subs(const func &f, const std::unordered_map<std::string, expression> &smap)
-{
-    auto tmp = f;
-
-    for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-        *b = subs(*b, smap);
-    }
-
-    return expression{std::move(tmp)};
-}
-
 expression diff(const func &f, const std::string &s)
 {
     return f.diff(s);

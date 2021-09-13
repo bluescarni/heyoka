@@ -101,15 +101,6 @@ bool operator!=(const variable &v1, const variable &v2)
     return !(v1 == v2);
 }
 
-expression subs(const variable &var, const std::unordered_map<std::string, expression> &smap)
-{
-    if (auto it = smap.find(var.name()); it == smap.end()) {
-        return expression{var};
-    } else {
-        return it->second;
-    }
-}
-
 expression diff(const variable &var, const std::string &s)
 {
     if (s == var.name()) {
