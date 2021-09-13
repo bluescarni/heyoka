@@ -199,14 +199,8 @@ taylor_dc_t::size_type sin_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_{}"_format(dres)}};
-    }
-
     // Append the cosine decomposition.
-    u_vars_defs.emplace_back(cos(arg), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(cos(args()[0]), std::vector<std::uint32_t>{});
 
     // Append the sine decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});

@@ -90,19 +90,8 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Decompose the arguments.
-    auto &e = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(e), u_vars_defs)) {
-        e = expression{variable{"u_{}"_format(dres)}};
-    }
-
-    auto &M = *(get_mutable_args_it().first + 1);
-    if (const auto dres = taylor_decompose_in_place(std::move(M), u_vars_defs)) {
-        M = expression{variable{"u_{}"_format(dres)}};
-    }
-
     // Make a copy of e.
-    auto e_copy = e;
+    auto e_copy = args()[0];
 
     // Append the kepE decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
