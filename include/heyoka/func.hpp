@@ -225,8 +225,8 @@ template <typename T>
 inline constexpr bool func_has_eval_batch_dbl_v = std::is_same_v<detected_t<func_eval_batch_dbl_t, T>, void>;
 
 template <typename T>
-using func_eval_num_dbl_t = decltype(
-    std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(std::declval<const std::vector<double> &>()));
+using func_eval_num_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_num_dbl(
+    std::declval<const std::vector<double> &>()));
 
 template <typename T>
 inline constexpr bool func_has_eval_num_dbl_v = std::is_same_v<detected_t<func_eval_num_dbl_t, T>, double>;
@@ -313,7 +313,7 @@ inline constexpr bool func_has_taylor_c_diff_func_f128_v
 
 #endif
 
-HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &, taylor_dc_t &);
+HEYOKA_DLL_PUBLIC void func_td_args(func_base &, taylor_dc_t &);
 
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostream &, const func_base &);
 

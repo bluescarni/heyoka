@@ -22,6 +22,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/version.hpp>
@@ -51,6 +52,8 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -115,13 +118,20 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 
 } // namespace
 
-// Default implementation of Taylor decomposition for a function.
-void func_default_td_impl(func_base &fb, taylor_dc_t &u_vars_defs)
+// Perform the decomposition of the arguments of a function. After this operation,
+// each argument will be either:
+// - a variable,
+// - a number,
+// - a param.
+void func_td_args(func_base &fb, taylor_dc_t &u_vars_defs)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
         if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
             *r.first = expression{variable{"u_{}"_format(dres)}};
         }
+
+        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
+               || std::holds_alternative<param>(r.first->value()));
     }
 }
 

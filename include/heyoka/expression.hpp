@@ -132,7 +132,7 @@ inline taylor_dc_t::size_type func_inner<T>::taylor_decompose(taylor_dc_t &u_var
     if constexpr (func_has_taylor_decompose_v<T>) {
         return std::move(m_value).taylor_decompose(u_vars_defs);
     } else {
-        func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
+        func_td_args(static_cast<func_base &>(m_value), u_vars_defs);
 
         u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
 
