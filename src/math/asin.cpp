@@ -165,14 +165,8 @@ taylor_dc_t::size_type asin_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{"u_{}"_format(dres)};
-    }
-
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(arg), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
 
     // Append 1 - arg * arg.
     u_vars_defs.emplace_back(1_dbl - expression{"u_{}"_format(u_vars_defs.size() - 1u)}, std::vector<std::uint32_t>{});
