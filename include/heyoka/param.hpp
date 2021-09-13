@@ -80,8 +80,6 @@ void rename_variables(const std::unordered_set<const void *> &, param &,
 HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &);
 HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &);
 
-HEYOKA_DLL_PUBLIC expression diff(const param &, const std::string &);
-
 HEYOKA_DLL_PUBLIC double eval_dbl(const param &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const param &, const std::unordered_map<std::string, long double> &,

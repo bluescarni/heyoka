@@ -101,15 +101,6 @@ bool operator!=(const variable &v1, const variable &v2)
     return !(v1 == v2);
 }
 
-expression diff(const variable &var, const std::string &s)
-{
-    if (s == var.name()) {
-        return expression{number{1.}};
-    } else {
-        return expression{number{0.}};
-    }
-}
-
 double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)
 {
     using namespace fmt::literals;

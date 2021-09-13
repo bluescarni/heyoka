@@ -381,13 +381,24 @@ TEST_CASE("compute_grad_dbl")
 
 #endif
 
+// TODO finish testing.
 TEST_CASE("diff")
 {
-    // We test that the derivative of x is one
-    {
-        expression ex = "x"_var;
-        REQUIRE(diff(ex, "x") == 1_dbl);
-    }
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(diff(x, "x") == 1_dbl);
+    REQUIRE(diff(y, "x") == 0_dbl);
+
+    REQUIRE(diff(1_dbl, "x") == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff(1_dbl, "x").value()).value()));
+    REQUIRE(std::holds_alternative<long double>(std::get<number>(diff(1_ldbl, "x").value()).value()));
+
+    REQUIRE(diff(par[42], "x") == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
+
+    auto foo = z * (x + y), bar = (foo - x) + (2. * foo);
+    auto foo_diff = diff(bar, "x");
+
     // We test that the derivative of sin is cos
     {
         expression ex = sin("x"_var);

@@ -827,9 +827,66 @@ std::size_t get_n_nodes(const expression &e)
     return detail::get_n_nodes(func_map, e);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// TODO fix for API change.
+expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const std::string &s)
+{
+    return std::visit(
+        [&func_map, &s](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
+                                  arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                // NOTE: if we ever implement single-precision support,
+                // this should be probably changed into 0_flt (i.e., the lowest
+                // precision numerical type), so that it does not trigger
+                // type promotions in numerical constants. Other similar
+                // occurrences as well (e.g., diff for variable).
+                return 0_dbl;
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (s == arg.name()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(s);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression diff(const expression &e, const std::string &s)
 {
-    return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::diff(func_map, e, s);
 }
 
 expression diff(const expression &e, const expression &x)

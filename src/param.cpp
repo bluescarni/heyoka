@@ -93,16 +93,6 @@ bool operator!=(const param &p0, const param &p1)
     return !(p0 == p1);
 }
 
-expression diff(const param &, const std::string &)
-{
-    // NOTE: if we ever implement single-precision support,
-    // this should be probably changed into 0_flt (i.e., the lowest
-    // precision numerical type), so that it does not trigger
-    // type promotions in numerical constants. Other similar
-    // occurrences as well.
-    return 0_dbl;
-}
-
 double eval_dbl(const param &p, const std::unordered_map<std::string, double> &, const std::vector<double> &pars)
 {
     if (p.idx() >= pars.size()) {

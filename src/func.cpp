@@ -690,11 +690,6 @@ void rename_variables(std::unordered_set<const void *> &func_set, func &f,
 
 } // namespace detail
 
-expression diff(const func &f, const std::string &s)
-{
-    return f.diff(s);
-}
-
 double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)
 {
     return f.eval_dbl(map, pars);
