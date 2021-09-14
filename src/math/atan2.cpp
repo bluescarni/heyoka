@@ -87,19 +87,9 @@ taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Decompose the arguments.
-    auto &y = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(y), u_vars_defs)) {
-        y = expression{"u_{}"_format(dres)};
-    }
-    auto &x = *(get_mutable_args_it().first + 1);
-    if (const auto dres = taylor_decompose_in_place(std::move(x), u_vars_defs)) {
-        x = expression{"u_{}"_format(dres)};
-    }
-
     // Append x * x and y * y.
-    u_vars_defs.emplace_back(square(x), std::vector<std::uint32_t>{});
-    u_vars_defs.emplace_back(square(y), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(args()[1]), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
 
     // Append x*x + y*y.
     u_vars_defs.emplace_back(expression{"u_{}"_format(u_vars_defs.size() - 2u)}

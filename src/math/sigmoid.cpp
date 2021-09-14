@@ -215,12 +215,6 @@ taylor_dc_t::size_type sigmoid_impl::taylor_decompose(taylor_dc_t &u_vars_defs) 
 {
     assert(args().size() == 1u);
 
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{"u_{}"_format(dres)};
-    }
-
     // Append the sigmoid decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
 

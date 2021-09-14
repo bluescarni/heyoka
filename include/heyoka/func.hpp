@@ -314,7 +314,7 @@ inline constexpr bool func_has_taylor_c_diff_func_f128_v
 
 #endif
 
-HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &, taylor_dc_t &);
+HEYOKA_DLL_PUBLIC void func_td_args(func_base &, taylor_dc_t &);
 
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostream &, const func_base &);
 
