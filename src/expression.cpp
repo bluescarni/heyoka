@@ -1122,19 +1122,29 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
         e.value());
 }
 
-// Transform in-place ex by decomposition, appending the
-// result of the decomposition to u_vars_defs.
-// The return value is the index, in u_vars_defs,
-// which corresponds to the decomposed version of ex.
-// If the return value is zero, ex was not decomposed.
-// NOTE: this will render ex unusable.
-taylor_dc_t::size_type taylor_decompose_in_place(expression &&ex, taylor_dc_t &u_vars_defs)
+namespace detail
+{
+
+taylor_dc_t::size_type taylor_decompose_in_place(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+                                                 const expression &ex, taylor_dc_t &dc)
 {
     if (auto fptr = std::get_if<func>(&ex.value())) {
-        return taylor_decompose_in_place(std::move(*fptr), u_vars_defs);
+        return fptr->taylor_decompose(func_map, dc);
     } else {
         return 0;
     }
+}
+
+} // namespace detail
+
+// Decompose ex into dc. The return value is the index, in dc,
+// which corresponds to the decomposed version of ex.
+// If the return value is zero, ex was not decomposed.
+taylor_dc_t::size_type taylor_decompose_in_place(const expression &ex, taylor_dc_t &dc)
+{
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+
+    return detail::taylor_decompose_in_place(func_map, ex, dc);
 }
 
 namespace detail

@@ -91,6 +91,8 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 2u);
 
     // Make a copy of e.
+    // NOTE: the arguments here have already been decomposed, thus
+    // args()[0] is a non-function value that will be deep-copied.
     auto e_copy = args()[0];
 
     // Append the kepE decomposition.

@@ -120,23 +120,6 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 
 } // namespace
 
-// Perform the decomposition of the arguments of a function. After this operation,
-// each argument will be either:
-// - a variable,
-// - a number,
-// - a param.
-void func_td_args(func_base &fb, taylor_dc_t &u_vars_defs)
-{
-    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
-        if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
-            *r.first = expression{variable{"u_{}"_format(dres)}};
-        }
-
-        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
-               || std::holds_alternative<param>(r.first->value()));
-    }
-}
-
 // Default implementation of to_stream() for func.
 void func_default_to_stream_impl(std::ostream &os, const func_base &f)
 {
@@ -366,9 +349,63 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-taylor_dc_t::size_type func::taylor_decompose(taylor_dc_t &u_vars_defs) &&
+namespace detail
 {
-    auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
+
+namespace
+{
+
+// Perform the decomposition of the arguments of a function. After this operation,
+// each argument will be either:
+// - a variable,
+// - a number,
+// - a param.
+void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+{
+    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
+        if (const auto dres = taylor_decompose_in_place(func_map, *r.first, dc)) {
+            *r.first = expression{variable{"u_{}"_format(dres)}};
+        }
+
+        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
+               || std::holds_alternative<param>(r.first->value()));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+                                              taylor_dc_t &dc) const
+{
+    const auto f_id = get_ptr();
+
+    if (auto it = func_map.find(f_id); it != func_map.end()) {
+        // We already decomposed the current function, fetch the result
+        // from the cache.
+        return it->second;
+    }
+
+    // Make a shallow copy: this will be a new function,
+    // but its arguments will be shallow-copied from this.
+    auto f_copy = copy();
+
+    // Decompose the arguments. This will overwrite
+    // the arguments in f_copy with their decomposition.
+    detail::func_td_args(f_copy, func_map, dc);
+
+    // Run the decomposition.
+    taylor_dc_t::size_type ret = 0;
+    if (f_copy.ptr()->has_taylor_decompose()) {
+        // Custom implementation.
+        ret = f_copy.ptr()->taylor_decompose(dc);
+    } else {
+        // Default implementation: append f_copy and return the index
+        // at which it was appended.
+        dc.emplace_back(expression{std::move(f_copy)}, std::vector<std::uint32_t>{});
+        ret = dc.size() - 1u;
+    }
 
     if (ret == 0u) {
         throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
@@ -380,6 +417,10 @@ taylor_dc_t::size_type func::taylor_decompose(taylor_dc_t &u_vars_defs) &&
             "the return value is {}, which is not less than the current size of the decomposition "
             "({})"_format(get_name(), ret, dc.size()));
     }
+
+    // Update the cache before exiting.
+    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+    assert(flag);
 
     return ret;
 }
@@ -758,11 +799,6 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
         node_connections[node_id][i] = node_counter;
         update_connections(node_connections, f.args()[i], node_counter);
     };
-}
-
-taylor_dc_t::size_type taylor_decompose_in_place(func &&f, taylor_dc_t &dc)
-{
-    return std::move(f).taylor_decompose(dc);
 }
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,

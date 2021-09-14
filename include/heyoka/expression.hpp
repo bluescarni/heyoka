@@ -129,21 +129,6 @@ inline expression func_inner<T>::diff(const std::string &s) const
     }
 }
 
-template <typename T>
-inline taylor_dc_t::size_type func_inner<T>::taylor_decompose(taylor_dc_t &u_vars_defs) &&
-{
-    // Decompose the arguments.
-    func_td_args(static_cast<func_base &>(m_value), u_vars_defs);
-
-    if constexpr (func_has_taylor_decompose_v<T>) {
-        return std::move(m_value).taylor_decompose(u_vars_defs);
-    } else {
-        u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
-
-        return u_vars_defs.size() - 1u;
-    }
-}
-
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
     std::string m_str;
 
@@ -329,7 +314,15 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(expression &&, taylor_dc_t &);
+namespace detail
+{
+
+taylor_dc_t::size_type taylor_decompose_in_place(std::unordered_map<const void *, taylor_dc_t::size_type> &,
+                                                 const expression &, taylor_dc_t &);
+
+}
+
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(const expression &, taylor_dc_t &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)
