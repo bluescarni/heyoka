@@ -235,8 +235,6 @@ std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> 
 
 llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -261,8 +259,6 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
 
 llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -289,8 +285,6 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
 
 llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -347,8 +341,6 @@ void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std
 double func::eval_num_dbl(const std::vector<double> &v) const
 {
     if (v.size() != args().size()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_name(), args().size(), v.size()));
@@ -359,8 +351,6 @@ double func::eval_num_dbl(const std::vector<double> &v) const
 
 double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -384,13 +374,11 @@ taylor_dc_t::size_type func::taylor_decompose(taylor_dc_t &u_vars_defs) &&
         throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
     }
 
-    if (ret >= u_vars_defs.size()) {
-        using namespace fmt::literals;
-
+    if (ret >= dc.size()) {
         throw std::invalid_argument(
             "Invalid value returned by the Taylor decomposition function for the function '{}': "
             "the return value is {}, which is not less than the current size of the decomposition "
-            "({})"_format(get_name(), ret, u_vars_defs.size()));
+            "({})"_format(get_name(), ret, dc.size()));
     }
 
     return ret;
@@ -401,8 +389,6 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                    std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
@@ -438,8 +424,6 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
@@ -477,8 +461,6 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
@@ -513,8 +495,6 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
 
 llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(get_name()));
@@ -538,8 +518,6 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
 
 llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(get_name()));
@@ -565,8 +543,6 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
 
 llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(get_name()));
