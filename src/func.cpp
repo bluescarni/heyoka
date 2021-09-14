@@ -399,11 +399,11 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
     taylor_dc_t::size_type ret = 0;
     if (f_copy.ptr()->has_taylor_decompose()) {
         // Custom implementation.
-        ret = f_copy.ptr()->taylor_decompose(dc);
+        ret = std::move(*f_copy.ptr()).taylor_decompose(dc);
     } else {
         // Default implementation: append f_copy and return the index
         // at which it was appended.
-        dc.emplace_back(expression{std::move(f_copy)}, std::vector<std::uint32_t>{});
+        dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
         ret = dc.size() - 1u;
     }
 

@@ -113,7 +113,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual double eval_num_dbl(const std::vector<double> &) const = 0;
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
-    virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) const = 0;
+    virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
     virtual bool has_taylor_decompose() const = 0;
     virtual llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &,
                                          const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
@@ -242,7 +242,7 @@ inline constexpr bool func_has_deval_num_dbl_v = std::is_same_v<detected_t<func_
 
 template <typename T>
 using func_taylor_decompose_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().taylor_decompose(std::declval<taylor_dc_t &>()));
+    = decltype(std::declval<std::add_rvalue_reference_t<T>>().taylor_decompose(std::declval<taylor_dc_t &>()));
 
 template <typename T>
 inline constexpr bool func_has_taylor_decompose_v
@@ -486,10 +486,10 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
 
     // Taylor.
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) const final
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
     {
         if constexpr (func_has_taylor_decompose_v<T>) {
-            return m_value.taylor_decompose(dc);
+            return std::move(m_value).taylor_decompose(dc);
         }
 
         // LCOV_EXCL_START
