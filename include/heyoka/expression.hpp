@@ -317,12 +317,12 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose_in_place(std::unordered_map<const void *, taylor_dc_t::size_type> &,
-                                                 const expression &, taylor_dc_t &);
+taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &, const expression &,
+                                        taylor_dc_t &);
 
 }
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(const expression &, taylor_dc_t &);
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose(const expression &, taylor_dc_t &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)

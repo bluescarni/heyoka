@@ -1002,7 +1002,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     // Run the decomposition on each equation.
     for (decltype(v_ex.size()) i = 0; i < v_ex.size(); ++i) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose_in_place(v_ex[i], u_vars_defs)) {
+        if (const auto dres = taylor_decompose(v_ex[i], u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
@@ -1024,7 +1024,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
         if (const auto *var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(sv_ex, u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose(sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
@@ -1205,7 +1205,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     // Run the decomposition on each equation.
     for (decltype(sys.size()) i = 0; i < sys.size(); ++i) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose_in_place(sys[i].second, u_vars_defs)) {
+        if (const auto dres = taylor_decompose(sys[i].second, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
@@ -1227,7 +1227,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         if (auto *const var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(sv_ex, u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose(sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.

@@ -64,7 +64,7 @@ TEST_CASE("atan2 decompose")
         taylor_dc_t dec;
         dec.emplace_back("y"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("x"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(atan2(u0, u1), dec);
+        taylor_decompose(atan2(u0, u1), dec);
 
         REQUIRE(dec.size() == 6u);
 
@@ -85,7 +85,7 @@ TEST_CASE("atan2 decompose")
         taylor_dc_t dec;
         dec.emplace_back("y"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("x"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(atan2(u0 + u1, u1 - u0), dec);
+        taylor_decompose(atan2(u0 + u1, u1 - u0), dec);
 
         REQUIRE(dec.size() == 8u);
 

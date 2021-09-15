@@ -363,7 +363,7 @@ namespace
 void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
 {
     for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
-        if (const auto dres = taylor_decompose_in_place(func_map, *r.first, dc)) {
+        if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
             *r.first = expression{variable{"u_{}"_format(dres)}};
         }
 

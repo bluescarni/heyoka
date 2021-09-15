@@ -82,7 +82,7 @@ TEST_CASE("kepE decompose")
         taylor_dc_t dec;
         dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(kepE(u0, u1), dec);
+        taylor_decompose(kepE(u0, u1), dec);
 
         REQUIRE(dec.size() == 6u);
 
@@ -105,7 +105,7 @@ TEST_CASE("kepE decompose")
         taylor_dc_t dec;
         dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(kepE(u0 + u1, u1 - u0), dec);
+        taylor_decompose(kepE(u0 + u1, u1 - u0), dec);
 
         REQUIRE(dec.size() == 8u);
 

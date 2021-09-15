@@ -1125,8 +1125,8 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
 namespace detail
 {
 
-taylor_dc_t::size_type taylor_decompose_in_place(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
-                                                 const expression &ex, taylor_dc_t &dc)
+taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+                                        const expression &ex, taylor_dc_t &dc)
 {
     if (auto fptr = std::get_if<func>(&ex.value())) {
         return fptr->taylor_decompose(func_map, dc);
@@ -1140,11 +1140,11 @@ taylor_dc_t::size_type taylor_decompose_in_place(std::unordered_map<const void *
 // Decompose ex into dc. The return value is the index, in dc,
 // which corresponds to the decomposed version of ex.
 // If the return value is zero, ex was not decomposed.
-taylor_dc_t::size_type taylor_decompose_in_place(const expression &ex, taylor_dc_t &dc)
+taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
 {
     std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
 
-    return detail::taylor_decompose_in_place(func_map, ex, dc);
+    return detail::taylor_decompose(func_map, ex, dc);
 }
 
 namespace detail
