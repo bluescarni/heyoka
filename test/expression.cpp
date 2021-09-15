@@ -672,7 +672,7 @@ TEST_CASE("s11n")
 {
     std::stringstream ss;
 
-    auto x = "x"_var;
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -729,6 +729,35 @@ TEST_CASE("s11n")
     }
 
     REQUIRE(x == 0.1_ldbl);
+
+    ss.str("");
+
+    x = "x"_var;
+
+    // Test shallow copies in subexpressions.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << bar;
+    }
+
+    bar = "x"_var;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> bar;
+    }
+
+    // Make sure multiple instances of 'foo' in bar point to the same
+    // underlying object.
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+            != std::get<func>(foo.value()).get_ptr());
 }
 
 TEST_CASE("get_n_nodes")
