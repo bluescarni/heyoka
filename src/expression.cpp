@@ -1384,15 +1384,18 @@ expression par_impl::operator[](std::uint32_t idx) const
 
 } // namespace detail
 
-// Determine the size of the parameter vector from the highest
-// param index appearing in an expression. If the return value
-// is zero, no params appear in the expression.
-std::uint32_t get_param_size(const expression &ex)
+namespace detail
+{
+
+namespace
+{
+
+std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
 
     std::visit(
-        [&retval](const auto &v) {
+        [&retval, &func_set](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, param>) {
@@ -1402,14 +1405,41 @@ std::uint32_t get_param_size(const expression &ex)
 
                 retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
             } else if constexpr (std::is_same_v<type, func>) {
-                for (const auto &a : v.args()) {
-                    retval = std::max(get_param_size(a), retval);
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already computed the number of params for the current
+                    // function, exit.
+                    return;
                 }
+
+                for (const auto &a : v.args()) {
+                    retval = std::max(get_param_size(func_set, a), retval);
+                }
+
+                // Update the cache.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
             }
         },
         ex.value());
 
     return retval;
+}
+
+} // namespace
+
+} // namespace detail
+
+// Determine the size of the parameter vector from the highest
+// param index appearing in an expression. If the return value
+// is zero, no params appear in the expression.
+std::uint32_t get_param_size(const expression &ex)
+{
+    std::unordered_set<const void *> func_set;
+
+    return detail::get_param_size(func_set, ex);
 }
 
 // Determine if an expression is time-dependent.

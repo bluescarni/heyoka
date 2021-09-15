@@ -472,6 +472,28 @@ TEST_CASE("get_param_size")
     REQUIRE(get_param_size(par[123] + par[122]) == 124u);
     REQUIRE(get_param_size(par[122] + par[123]) == 124u);
     REQUIRE(get_param_size(par[500] - sin(cos(par[1] + "y"_var) + par[4])) == 501u);
+
+    // Test with repeated subexpressions.
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    REQUIRE(get_param_size(bar) == 0u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[23] + (foo - x) / (2. * foo) + par[32];
+
+    REQUIRE(get_param_size(bar) == 43u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[83] + (foo - x) / (2. * foo) + par[32];
+
+    REQUIRE(get_param_size(bar) == 84u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[23] + (foo - x) / (2. * foo) + par[92];
+
+    REQUIRE(get_param_size(bar) == 93u);
 }
 
 TEST_CASE("binary simpls")
