@@ -133,18 +133,6 @@ const expression &binary_op::rhs() const
     return args()[1];
 }
 
-expression &binary_op::lhs()
-{
-    assert(args().size() == 2u);
-    return *(get_mutable_args_it().first);
-}
-
-expression &binary_op::rhs()
-{
-    assert(args().size() == 2u);
-    return *(get_mutable_args_it().first + 1);
-}
-
 expression binary_op::diff(const std::string &s) const
 {
     assert(args().size() == 2u);

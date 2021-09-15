@@ -65,8 +65,6 @@ public:
     type op() const;
     const expression &lhs() const;
     const expression &rhs() const;
-    expression &lhs();
-    expression &rhs();
 
     expression diff(const std::string &) const;
 

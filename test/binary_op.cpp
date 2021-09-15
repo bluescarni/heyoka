@@ -35,16 +35,6 @@ TEST_CASE("basic")
         REQUIRE(op.lhs() == "x"_var);
         REQUIRE(op.rhs() == 2_dbl);
     }
-
-    {
-        binary_op op{binary_op::type::div, "x"_var, 2_dbl};
-
-        op.lhs() = 1_dbl;
-        op.rhs() = "y"_var;
-
-        REQUIRE(op.lhs() == 1_dbl);
-        REQUIRE(op.rhs() == "y"_var);
-    }
 }
 
 TEST_CASE("stream")
