@@ -1701,6 +1701,8 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 // that do not represent state variables) into parallelisable segments. Within a segment,
 // the definition of a u variable does not depend on any u variable defined within that segment.
 // NOTE: the hidden deps are not considered as dependencies.
+// NOTE: the segments in the return value will contain shallow copies of the
+// expressions in dc.
 std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t n_eq)
 {
     // Helper that takes in input the definition ex of a u variable, and returns

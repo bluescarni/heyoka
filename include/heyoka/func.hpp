@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
@@ -612,8 +613,14 @@ class HEYOKA_DLL_PUBLIC func
     // Serialization.
     friend class boost::serialization::access;
     template <typename Archive>
-    void serialize(Archive &ar, unsigned)
+    void serialize(Archive &ar, unsigned version)
     {
+        // LCOV_EXCL_START
+        if (version == 0u) {
+            throw std::invalid_argument("Cannot load a function instance from an older archive");
+        }
+        // LCOV_EXCL_STOP
+
         ar &m_ptr;
     }
 
@@ -838,6 +845,9 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const func &f, std::uin
 }
 
 } // namespace heyoka
+
+// Current archive version is 1.
+BOOST_CLASS_VERSION(heyoka::func, 1)
 
 // Macros for the registration of s11n for concrete functions.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
