@@ -68,21 +68,6 @@ std::ostream &operator<<(std::ostream &os, const param &p)
     return os << "p{}"_format(p.idx());
 }
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const param &)
-{
-    return {};
-}
-
-void rename_variables(const std::unordered_set<const void *> &, param &,
-                      const std::unordered_map<std::string, std::string> &)
-{
-}
-
-} // namespace detail
-
 bool operator==(const param &p0, const param &p1)
 {
     return p0.idx() == p1.idx();

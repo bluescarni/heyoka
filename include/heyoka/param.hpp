@@ -68,15 +68,6 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const param &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const param &);
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const param &);
-void rename_variables(const std::unordered_set<const void *> &, param &,
-                      const std::unordered_map<std::string, std::string> &);
-
-} // namespace detail
-
 HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &);
 HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &);
 

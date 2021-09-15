@@ -73,24 +73,6 @@ std::ostream &operator<<(std::ostream &os, const variable &var)
     return os << var.name();
 }
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const variable &var)
-{
-    return {var.name()};
-}
-
-void rename_variables(const std::unordered_set<const void *> &, variable &var,
-                      const std::unordered_map<std::string, std::string> &repl_map)
-{
-    if (auto it = repl_map.find(var.name()); it != repl_map.end()) {
-        var.name() = it->second;
-    }
-}
-
-} // namespace detail
-
 bool operator==(const variable &v1, const variable &v2)
 {
     return v1.name() == v2.name();

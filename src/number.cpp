@@ -150,21 +150,6 @@ std::ostream &operator<<(std::ostream &os, const number &n)
     return os << oss.str();
 }
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const number &)
-{
-    return {};
-}
-
-void rename_variables(const std::unordered_set<const void *> &, number &,
-                      const std::unordered_map<std::string, std::string> &)
-{
-}
-
-} // namespace detail
-
 bool is_zero(const number &n)
 {
     return std::visit([](const auto &arg) { return arg == 0; }, n.value());

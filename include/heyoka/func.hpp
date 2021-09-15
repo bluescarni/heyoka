@@ -730,14 +730,6 @@ public:
 #endif
 };
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(std::unordered_set<const void *> &, const func &);
-void rename_variables(std::unordered_set<const void *> &, func &, const std::unordered_map<std::string, std::string> &);
-
-} // namespace detail
-
 HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
 HEYOKA_DLL_PUBLIC long double eval_ldbl(const func &, const std::unordered_map<std::string, long double> &,

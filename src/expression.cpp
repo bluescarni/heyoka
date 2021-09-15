@@ -8,9 +8,11 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <ostream>
 #include <stdexcept>
@@ -234,16 +236,82 @@ detail::prime_wrapper operator""_p(const char *s, std::size_t n)
 namespace detail
 {
 
+namespace
+{
+
 std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const expression &e)
 {
-    return std::visit([&func_set](const auto &arg) { return get_variables(func_set, arg); }, e.value());
+    return std::visit(
+        [&func_set](const auto &arg) -> std::vector<std::string> {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (func_set.find(f_id) != func_set.end()) {
+                    // We already determined the list of variables for the current function,
+                    // return an empty value.
+                    return {};
+                }
+
+                std::vector<std::string> ret;
+
+                for (const auto &arg : arg.args()) {
+                    auto tmp = get_variables(func_set, arg);
+                    ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
+                    std::sort(ret.begin(), ret.end());
+                    ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+                }
+
+                // Add the id of f to the set.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else if constexpr (std::is_same_v<type, variable>) {
+                return {arg.name()};
+            } else {
+                return {};
+            }
+        },
+        e.value());
 }
 
 void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
                       const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::visit([&func_set, &repl_map](auto &arg) { rename_variables(func_set, arg, repl_map); }, e.value());
+    std::visit(
+        [&func_set, &repl_map](auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (func_set.find(f_id) != func_set.end()) {
+                    // We already renamed variables for the current function,
+                    // just return.
+                    return;
+                }
+
+                for (auto [b, e] = arg.get_mutable_args_it(); b != e; ++b) {
+                    rename_variables(func_set, *b, repl_map);
+                }
+
+                // Add the id of f to the set.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
+                    arg.name() = it->second;
+                }
+            }
+        },
+        e.value());
 }
+
+} // namespace
 
 } // namespace detail
 

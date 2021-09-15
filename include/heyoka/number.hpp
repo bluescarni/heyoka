@@ -80,15 +80,6 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
-namespace detail
-{
-
-std::vector<std::string> get_variables(const std::unordered_set<const void *> &, const number &);
-void rename_variables(const std::unordered_set<const void *> &, number &,
-                      const std::unordered_map<std::string, std::string> &);
-
-} // namespace detail
-
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);

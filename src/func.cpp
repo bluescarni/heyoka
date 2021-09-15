@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <iterator>
 #include <memory>
 #include <ostream>
 #include <stdexcept>
@@ -663,59 +662,6 @@ bool operator!=(const func &a, const func &b)
 {
     return !(a == b);
 }
-
-namespace detail
-{
-
-std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const func &f)
-{
-    const auto f_id = f.get_ptr();
-
-    if (func_set.find(f_id) != func_set.end()) {
-        // We already determined the list of variables for the current function,
-        // return an empty value.
-        return {};
-    }
-
-    std::vector<std::string> ret;
-
-    for (const auto &arg : f.args()) {
-        auto tmp = get_variables(func_set, arg);
-        ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
-        std::sort(ret.begin(), ret.end());
-        ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
-    }
-
-    // Add the id of f to the set.
-    [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-    // NOTE: an expression cannot contain itself.
-    assert(flag);
-
-    return ret;
-}
-
-void rename_variables(std::unordered_set<const void *> &func_set, func &f,
-                      const std::unordered_map<std::string, std::string> &repl_map)
-{
-    const auto f_id = f.get_ptr();
-
-    if (func_set.find(f_id) != func_set.end()) {
-        // We already renamed variables for the current function,
-        // just return.
-        return;
-    }
-
-    for (auto [b, e] = f.get_mutable_args_it(); b != e; ++b) {
-        rename_variables(func_set, *b, repl_map);
-    }
-
-    // Add the id of f to the set.
-    [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
-    // NOTE: an expression cannot contain itself.
-    assert(flag);
-}
-
-} // namespace detail
 
 double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)
 {
