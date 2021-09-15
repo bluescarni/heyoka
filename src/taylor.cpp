@@ -995,25 +995,21 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
-    // Create a copy of the original equations in terms of u variables.
-    // We will be reusing this below.
-    auto v_ex_copy = v_ex;
-
     // Run the decomposition on each equation.
-    for (decltype(v_ex.size()) i = 0; i < v_ex.size(); ++i) {
+    for (auto &ex : v_ex) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose(v_ex[i], u_vars_defs)) {
+        if (const auto dres = taylor_decompose(ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
-            // of the equation in v_ex_copy
+            // of the equation in v_ex
             // so that it points to the u variable
             // that now represents it.
             // NOTE: all functions are forced to return dres != 0
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            v_ex_copy[i] = expression{"u_{}"_format(dres)};
+            ex = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -1039,7 +1035,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
 
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
-    for (auto &ex : v_ex_copy) {
+    for (auto &ex : v_ex) {
         u_vars_defs.emplace_back(std::move(ex), std::vector<std::uint32_t>{});
     }
 
@@ -1198,25 +1194,21 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
-    // Create a copy of the original equations in terms of u variables.
-    // We will be reusing this below.
-    auto sys_copy = sys;
-
     // Run the decomposition on each equation.
-    for (decltype(sys.size()) i = 0; i < sys.size(); ++i) {
+    for (auto &[_, ex] : sys) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose(sys[i].second, u_vars_defs)) {
+        if (const auto dres = taylor_decompose(ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
-            // of the equation in sys_copy
+            // of the equation in sys
             // so that it points to the u variable
             // that now represents it.
             // NOTE: all functions are forced to return dres != 0
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            sys_copy[i].second = expression{"u_{}"_format(dres)};
+            ex = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -1242,7 +1234,7 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
 
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
-    for (auto &[_, rhs] : sys_copy) {
+    for (auto &[_, rhs] : sys) {
         u_vars_defs.emplace_back(std::move(rhs), std::vector<std::uint32_t>{});
     }
 
