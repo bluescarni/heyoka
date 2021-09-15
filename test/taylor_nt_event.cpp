@@ -73,7 +73,7 @@ TEST_CASE("deep copy semantics")
 
     // Self assignment.
     auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
-    ev2 = ev2;
+    ev2 = *&ev2;
     REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
 
     // Deep copy assignment.
