@@ -190,7 +190,8 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::move(f).taylor_decompose(dec);
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    f.taylor_decompose(func_map, dec);
 }
 
 struct func_02 : func_base {
@@ -414,20 +415,23 @@ TEST_CASE("func taylor_decompose")
     auto f = func(func_10{{"x"_var}});
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 1u);
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
+
+    func_map = {};
 
     f = func(func_10a{{"x"_var}});
 
     REQUIRE_THROWS_MATCHES(
-        std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+        f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
         Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
                 "the return value is 3, which is not less than the current size of the decomposition "
                 "(3)"));
 
     f = func(func_10b{{"x"_var}});
 
-    REQUIRE_THROWS_MATCHES(std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
                            Message("The return value for the Taylor decomposition of a function can never be zero"));
 }
 
@@ -643,10 +647,10 @@ TEST_CASE("func diff free func")
 
     auto f1 = func(func_05{{}});
 
-    REQUIRE(diff(f1, "x") == 42_dbl);
+    REQUIRE(diff(expression{f1}, "x") == 42_dbl);
 
     f1 = func(func_00{});
-    REQUIRE_THROWS_MATCHES(diff(f1, ""), not_implemented_error,
+    REQUIRE_THROWS_MATCHES(diff(expression{f1}, ""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
 }
 
