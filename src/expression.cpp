@@ -266,6 +266,10 @@ void swap(expression &ex0, expression &ex1) noexcept
     std::swap(ex0.value(), ex1.value());
 }
 
+// NOTE: this implementation does not take advantage of potentially
+// repeating subexpressions. This is not currently a problem because
+// hashing is needed only in the CSE for the decomposition, which involves
+// only trivial expressions.
 std::size_t hash(const expression &ex)
 {
     return std::visit([](const auto &v) { return hash(v); }, ex.value());
