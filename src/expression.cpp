@@ -834,10 +834,6 @@ std::size_t get_n_nodes(const expression &e)
 namespace detail
 {
 
-namespace
-{
-
-// TODO fix for API change.
 expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const std::string &s)
 {
     return std::visit(
@@ -869,7 +865,7 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
                     return it->second;
                 }
 
-                auto ret = arg.diff(s);
+                auto ret = arg.diff(func_map, s);
 
                 // Put the return value in the cache.
                 [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
@@ -881,8 +877,6 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
         },
         e.value());
 }
-
-} // namespace
 
 } // namespace detail
 

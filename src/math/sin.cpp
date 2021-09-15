@@ -496,11 +496,11 @@ llvm::Function *sin_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression sin_impl::diff(const std::string &s) const
+expression sin_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return cos(args()[0]) * heyoka::diff(args()[0], s);
+    return cos(args()[0]) * detail::diff(func_map, args()[0], s);
 }
 
 } // namespace detail

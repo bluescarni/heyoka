@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_ASINH_HPP
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -38,7 +39,7 @@ public:
     asinh_impl();
     explicit asinh_impl(expression);
 
-    expression diff(const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;

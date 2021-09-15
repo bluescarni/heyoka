@@ -67,7 +67,8 @@ TEST_CASE("func minimal")
         f.codegen_f128(s, {nullptr, nullptr}), std::invalid_argument,
         Message("Null pointer detected in the array of values passed to func::codegen_f128() for the function 'f'"));
 #endif
-    REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
+    std::unordered_map<const void *, expression> func_map;
+    REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
                            Message("The derivative is not implemented for the function 'f'"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
                            Message("double eval is not implemented for the function 'f'"));
@@ -190,8 +191,8 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
-    f.taylor_decompose(func_map, dec);
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map2;
+    f.taylor_decompose(func_map2, dec);
 }
 
 struct func_02 : func_base {
@@ -279,7 +280,7 @@ struct func_05 : func_base {
     func_05() : func_base("f", {}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(const std::string &) const
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const
     {
         return 42_dbl;
     }
@@ -289,7 +290,8 @@ TEST_CASE("func diff")
 {
     auto f = func(func_05{});
 
-    REQUIRE(f.diff("x") == 42_dbl);
+    std::unordered_map<const void *, expression> func_map;
+    REQUIRE(f.diff(func_map, "x") == 42_dbl);
 }
 
 struct func_06 : func_base {

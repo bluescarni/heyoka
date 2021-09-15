@@ -99,7 +99,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
 #endif
 
-    virtual expression diff(const std::string &) const = 0;
+    virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
 
     virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
     virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
@@ -188,8 +188,8 @@ inline constexpr bool func_has_codegen_f128_v = std::is_same_v<detected_t<func_c
 #endif
 
 template <typename T>
-using func_diff_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(std::declval<const std::string &>()));
+using func_diff_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
+    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const std::string &>()));
 
 template <typename T>
 inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T>, expression>;
@@ -427,7 +427,7 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #endif
 
     // diff.
-    expression diff(const std::string &) const final;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
 
     // eval.
     double eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const final
@@ -696,7 +696,7 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
-    expression diff(const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;

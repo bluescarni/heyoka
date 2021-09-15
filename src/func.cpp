@@ -292,9 +292,9 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
 #endif
 
-expression func::diff(const std::string &s) const
+expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
-    return ptr()->diff(s);
+    return ptr()->diff(func_map, s);
 }
 
 double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const

@@ -381,7 +381,6 @@ TEST_CASE("compute_grad_dbl")
 
 #endif
 
-// TODO finish testing.
 TEST_CASE("diff")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
@@ -396,14 +395,14 @@ TEST_CASE("diff")
     REQUIRE(diff(par[42], "x") == 0_dbl);
     REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
 
-    auto foo = z * (x + y), bar = (foo - x) + (2. * foo);
-    auto foo_diff = diff(bar, "x");
+    // Test the caching of derivatives.
+    auto foo = x * (x + y), bar = (foo - x) + (2. * foo);
+    auto bar_diff = diff(bar, "x");
 
-    // We test that the derivative of sin is cos
-    {
-        expression ex = sin("x"_var);
-        REQUIRE(diff(ex, "x") == cos("x"_var));
-    }
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[1].value()).args()[1].value())
+               .get_ptr());
 }
 
 TEST_CASE("is_integral")

@@ -483,7 +483,7 @@ llvm::Function *erf_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression erf_impl::diff(const std::string &s) const
+expression erf_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -491,7 +491,7 @@ expression erf_impl::diff(const std::string &s) const
 #else
     auto coeff = heyoka::expression(heyoka::number(1. / sqrt_pi_2<long double>));
 #endif
-    return coeff * exp(-args()[0] * args()[0]) * heyoka::diff(args()[0], s);
+    return coeff * exp(-args()[0] * args()[0]) * detail::diff(func_map, args()[0], s);
 }
 
 } // namespace detail

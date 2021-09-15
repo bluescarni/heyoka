@@ -119,10 +119,11 @@ namespace detail
 // NOTE: this needs to go here because
 // the definition of expression must be available.
 template <typename T>
-inline expression func_inner<T>::diff(const std::string &s) const
+inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map,
+                                      const std::string &s) const
 {
     if constexpr (func_has_diff_v<T>) {
-        return m_value.diff(s);
+        return m_value.diff(func_map, s);
     } else {
         throw not_implemented_error("The derivative is not implemented for the function '" + get_name() + "'");
     }
@@ -255,6 +256,14 @@ HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
 
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
+
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &,
+                                  const std::string &);
+
+}
 
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);

@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -71,7 +72,7 @@ atan2_impl::atan2_impl(expression y, expression x) : func_base("atan2", std::vec
 
 atan2_impl::atan2_impl() : atan2_impl(0_dbl, 1_dbl) {}
 
-expression atan2_impl::diff(const std::string &s) const
+expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
 
@@ -80,7 +81,7 @@ expression atan2_impl::diff(const std::string &s) const
 
     auto den = square(x) + square(y);
 
-    return (x * heyoka::diff(y, s) - y * heyoka::diff(x, s)) / std::move(den);
+    return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / std::move(den);
 }
 
 taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&

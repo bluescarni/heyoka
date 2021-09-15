@@ -468,11 +468,11 @@ llvm::Function *exp_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression exp_impl::diff(const std::string &s) const
+expression exp_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return exp(args()[0]) * heyoka::diff(args()[0], s);
+    return exp(args()[0]) * detail::diff(func_map, args()[0], s);
 }
 
 } // namespace detail

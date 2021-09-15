@@ -654,12 +654,12 @@ llvm::Function *pow_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression pow_impl::diff(const std::string &s) const
+expression pow_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
 
-    return args()[1] * pow(args()[0], args()[1] - 1_dbl) * heyoka::diff(args()[0], s)
-           + pow(args()[0], args()[1]) * log(args()[0]) * heyoka::diff(args()[1], s);
+    return args()[1] * pow(args()[0], args()[1] - 1_dbl) * detail::diff(func_map, args()[0], s)
+           + pow(args()[0], args()[1]) * log(args()[0]) * detail::diff(func_map, args()[1], s);
 }
 
 namespace

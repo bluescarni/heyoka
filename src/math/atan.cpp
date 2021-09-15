@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -76,11 +77,11 @@ atan_impl::atan_impl(expression e) : func_base("atan", std::vector{std::move(e)}
 
 atan_impl::atan_impl() : atan_impl(0_dbl) {}
 
-expression atan_impl::diff(const std::string &s) const
+expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return 1_dbl / (1_dbl + square(args()[0])) * heyoka::diff(args()[0], s);
+    return 1_dbl / (1_dbl + square(args()[0])) * detail::diff(func_map, args()[0], s);
 }
 
 llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
