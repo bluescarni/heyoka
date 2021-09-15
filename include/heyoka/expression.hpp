@@ -116,9 +116,8 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: these need to go here because
-// the definition of expression must be visible
-// in order for these to be well-formed.
+// NOTE: this needs to go here because
+// the definition of expression must be available.
 template <typename T>
 inline expression func_inner<T>::diff(const std::string &s) const
 {
