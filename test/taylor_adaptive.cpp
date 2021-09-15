@@ -19,6 +19,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -36,6 +37,7 @@
 #include <heyoka/callable.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/s11n.hpp>
@@ -71,6 +73,20 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+TEST_CASE("dc deep copy")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, std::vector<double>(2u, 0.)};
+
+    auto ta2 = ta;
+
+    for (unsigned i = 2; i < ta.get_decomposition().size() - 2u; ++i) {
+        REQUIRE(std::get<func>(ta.get_decomposition()[i].first.value()).get_ptr()
+                != std::get<func>(ta2.get_decomposition()[i].first.value()).get_ptr());
+    }
+}
 
 TEST_CASE("batch init outcome")
 {

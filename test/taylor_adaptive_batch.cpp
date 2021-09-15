@@ -59,6 +59,21 @@ const auto fp_types = std::tuple<double
 #endif
                                  >{};
 
+TEST_CASE("dc deep copy")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta
+        = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, std::vector<double>(46u, 0.), 23u};
+
+    auto ta2 = ta;
+
+    for (unsigned i = 2; i < ta.get_decomposition().size() - 2u; ++i) {
+        REQUIRE(std::get<func>(ta.get_decomposition()[i].first.value()).get_ptr()
+                != std::get<func>(ta2.get_decomposition()[i].first.value()).get_ptr());
+    }
+}
+
 TEST_CASE("batch consistency")
 {
     auto [x, v] = make_vars("x", "v");

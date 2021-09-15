@@ -3526,11 +3526,16 @@ template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers
     // and the vectors of detected events.
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h),
-      m_d_out(other.m_d_out), m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet),
-      m_te_cooldowns(other.m_te_cooldowns)
+    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
+      m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
+      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
 {
+    // NOTE: make explicit deep copy of the decomposition.
+    m_dc.reserve(other.m_dc.size());
+    for (const auto &[ex, deps] : other.m_dc) {
+        m_dc.emplace_back(copy(ex), deps);
+    }
+
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     } else {
@@ -4717,13 +4722,19 @@ template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_tol(other.m_tol),
-      m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf),
-      m_minf(other.m_minf), m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_pars(other.m_pars),
+      m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
+      m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
 {
+    // NOTE: make explicit deep copy of the decomposition.
+    m_dc.reserve(other.m_dc.size());
+    for (const auto &[ex, deps] : other.m_dc) {
+        m_dc.emplace_back(copy(ex), deps);
+    }
+
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
