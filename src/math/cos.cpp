@@ -509,9 +509,8 @@ expression cos(expression e)
 {
     if (auto fptr = detail::is_neg(e)) {
         // Simplify cos(-x) to cos(x).
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return cos(std::move(*rng.first));
+        assert(fptr->args().size() == 1u);
+        return cos(fptr->args()[0]);
     } else {
         // Simplify cos(number) to its value.
         if (auto num_ptr = std::get_if<number>(&e.value())) {
