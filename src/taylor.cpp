@@ -4312,13 +4312,22 @@ void nt_event_impl<T>::finalise_ctor(event_direction d)
 }
 
 template <typename T>
-nt_event_impl<T>::nt_event_impl(const nt_event_impl &) = default;
+nt_event_impl<T>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
+{
+}
 
 template <typename T>
 nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
 
 template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &) = default;
+nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = nt_event_impl(o);
+    }
+
+    return *this;
+}
 
 template <typename T>
 nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
@@ -4405,13 +4414,23 @@ void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
 }
 
 template <typename T>
-t_event_impl<T>::t_event_impl(const t_event_impl &) = default;
+t_event_impl<T>::t_event_impl(const t_event_impl &o)
+    : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
+{
+}
 
 template <typename T>
 t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
 
 template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &) = default;
+t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = t_event_impl(o);
+    }
+
+    return *this;
+}
 
 template <typename T>
 t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;

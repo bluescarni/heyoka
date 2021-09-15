@@ -377,7 +377,8 @@ public:
     nt_event_impl();
 
     template <typename... KwArgs>
-    explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
+    explicit nt_event_impl(const expression &e, callback_t cb, KwArgs &&...kw_args)
+        : eq(copy(e)), callback(std::move(cb))
     {
         igor::parser p{kw_args...};
 
@@ -465,7 +466,7 @@ public:
     t_event_impl();
 
     template <typename... KwArgs>
-    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    explicit t_event_impl(const expression &e, KwArgs &&...kw_args) : eq(copy(e))
     {
         igor::parser p{kw_args...};
 

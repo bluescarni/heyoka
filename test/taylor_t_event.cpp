@@ -16,6 +16,7 @@
 #include <tuple>
 #include <typeinfo>
 #include <utility>
+#include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -27,6 +28,7 @@
 
 #include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/s11n.hpp>
@@ -48,6 +50,34 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+TEST_CASE("deep copy semantics")
+{
+    using ev_t = taylor_adaptive<double>::t_event_t;
+
+    auto [v] = make_vars("v");
+
+    auto ex = v + 3_dbl;
+
+    // Expression is copied on construction.
+    ev_t ev(ex);
+    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+
+    // Deep copy ctor.
+    auto ev2 = ev;
+
+    REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
+            != std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Self assignment.
+    auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
+    ev2 = ev2;
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Deep copy assignment.
+    ev2 = ev;
+    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+}
 
 TEST_CASE("taylor te")
 {
