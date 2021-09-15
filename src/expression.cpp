@@ -256,8 +256,8 @@ std::vector<std::string> get_variables(std::unordered_set<const void *> &func_se
 
                 std::vector<std::string> ret;
 
-                for (const auto &arg : arg.args()) {
-                    auto tmp = get_variables(func_set, arg);
+                for (const auto &farg : arg.args()) {
+                    auto tmp = get_variables(func_set, farg);
                     ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
                     std::sort(ret.begin(), ret.end());
                     ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
