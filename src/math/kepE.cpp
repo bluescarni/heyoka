@@ -94,6 +94,7 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     // Make a copy of e.
     // NOTE: the arguments here have already been decomposed, thus
     // args()[0] is a non-function value that will be deep-copied.
+    assert(!std::holds_alternative<func>(args()[0].value()));
     auto e_copy = args()[0];
 
     // Append the kepE decomposition.
