@@ -1442,8 +1442,13 @@ std::uint32_t get_param_size(const expression &ex)
     return detail::get_param_size(func_set, ex);
 }
 
-// Determine if an expression is time-dependent.
-bool has_time(const expression &ex)
+namespace detail
+{
+
+namespace
+{
+
+bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
 {
     // If the expression itself is a time function or a tpoly,
     // return true.
@@ -1456,12 +1461,27 @@ bool has_time(const expression &ex)
     //   is time-dependent,
     // - otherwise, return false.
     return std::visit(
-        [](const auto &v) {
+        [&func_set](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already determined if this function contains time,
+                    // return false (if the function does contain time, the first
+                    // time it was encountered we returned true and we could not
+                    // possibly end up here).
+                    return false;
+                }
+
+                // Update the cache.
+                // NOTE: do it earlier than usual in order to avoid having
+                // to repeat this code twice for the two paths below.
+                func_set.insert(f_id);
+
                 for (const auto &a : v.args()) {
-                    if (has_time(a)) {
+                    if (has_time(func_set, a)) {
                         return true;
                     }
                 }
@@ -1470,6 +1490,18 @@ bool has_time(const expression &ex)
             return false;
         },
         ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+// Determine if an expression is time-dependent.
+bool has_time(const expression &ex)
+{
+    std::unordered_set<const void *> func_set;
+
+    return detail::has_time(func_set, ex);
 }
 
 } // namespace heyoka

@@ -647,7 +647,7 @@ TEST_CASE("has time")
 {
     namespace hy = heyoka;
 
-    auto [x, y] = make_vars("x", "y");
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     REQUIRE(!has_time(x));
     REQUIRE(!has_time(y));
@@ -661,6 +661,41 @@ TEST_CASE("has time")
     REQUIRE(has_time(par[42] + hy::time));
     REQUIRE(has_time((x + y) * (hy::time + 1_dbl)));
     REQUIRE(has_time((x + y) * (par[0] * hy::time + 1_dbl)));
+
+    // With common subexpressions.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    REQUIRE(!has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = hy::time + (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = hy::time + (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
 }
 
 TEST_CASE("pairwise_sum")
