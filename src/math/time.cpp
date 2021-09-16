@@ -61,7 +61,7 @@ namespace heyoka
 namespace detail
 {
 
-time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
+time_impl::time_impl() : func_base("time", {}) {}
 
 void time_impl::to_stream(std::ostream &os) const
 {
