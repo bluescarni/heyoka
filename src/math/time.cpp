@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <initializer_list>
 #include <ostream>
 #include <stdexcept>
 #include <string>
