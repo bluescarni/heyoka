@@ -22,7 +22,7 @@
 // support for std::shared_ptr:
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84075
 
-#if defined(__GNUC__) && __GNUC__ >= 7 && __cplusplus >= 201703L
+#if defined(__GNUC__) && __GNUC__ >= 7
 
 namespace boost::serialization
 {
