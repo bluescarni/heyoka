@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Add a way to define symbolic constants in the expression
+  system, and implement :math:`\pi` on top of it
+  (`#192 <https://github.com/bluescarni/heyoka/pull/192>`__).
 - Add a function to compute the size of an expression
   (`#189 <https://github.com/bluescarni/heyoka/pull/189>`__).
 - Quadruple precision is now correctly supported on PPC64
@@ -26,6 +29,11 @@ New
 Changes
 ~~~~~~~
 
+- **BREAKING**: the function class now uses reference
+  semantics. This means that copy operations on
+  non-trivial expressions now result in shallow copies,
+  not deep copies. This is a :ref:`breaking change <bchanges_0_15_0>`
+  (`#192 <https://github.com/bluescarni/heyoka/pull/192>`__).
 - heyoka now depends on the `TBB <https://github.com/oneapi-src/oneTBB>`__ library
   (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__).
 

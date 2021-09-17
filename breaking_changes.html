@@ -251,6 +251,11 @@
         <nav id="bd-toc-nav">
             <ul class="nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#bchanges-0-15-0">
+   0.15.0
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#bchanges-0-10-0">
    0.10.0
   </a>
@@ -274,8 +279,20 @@
                 
   <section id="breaking-changes">
 <span id="id1"></span><h1>Breaking changes<a class="headerlink" href="#breaking-changes" title="Permalink to this headline">¶</a></h1>
+<section id="bchanges-0-15-0">
+<span id="id2"></span><h2>0.15.0<a class="headerlink" href="#bchanges-0-15-0" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>The function class now uses reference
+semantics. This means that copy operations on
+non-trivial expressions now result in shallow copies,
+not deep copies (as it was previously the case).
+This change does not have repercussions on the
+integrators’ API, but user code manipulating expressions
+may need to be adapted.</p></li>
+</ul>
+</section>
 <section id="bchanges-0-10-0">
-<span id="id2"></span><h2>0.10.0<a class="headerlink" href="#bchanges-0-10-0" title="Permalink to this headline">¶</a></h2>
+<span id="id3"></span><h2>0.10.0<a class="headerlink" href="#bchanges-0-10-0" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p>The callback that can (optionally) be passed to
 the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions must now return
@@ -284,7 +301,7 @@ continue or not. The callback used to return <code class="docutils literal notra
 </ul>
 </section>
 <section id="bchanges-0-8-0">
-<span id="id3"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
+<span id="id4"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p>The direction of a non-terminal event is now specified
 with the (optional) keyword argument <code class="docutils literal notranslate"><span class="pre">direction</span></code> for

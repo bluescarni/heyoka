@@ -36,6 +36,7 @@
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Breaking changes" href="breaking_changes.html" />
@@ -554,6 +555,9 @@
 <section id="new">
 <h3>New<a class="headerlink" href="#new" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>Add a way to define symbolic constants in the expression
+system, and implement <span class="math notranslate nohighlight">\(\pi\)</span> on top of it
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/192">#192</a>).</p></li>
 <li><p>Add a function to compute the size of an expression
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/189">#189</a>).</p></li>
 <li><p>Quadruple precision is now correctly supported on PPC64
@@ -574,6 +578,11 @@ to the expression system
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p><strong>BREAKING</strong>: the function class now uses reference
+semantics. This means that copy operations on
+non-trivial expressions now result in shallow copies,
+not deep copies. This is a <a class="reference internal" href="breaking_changes.html#bchanges-0-15-0"><span class="std std-ref">breaking change</span></a>
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/192">#192</a>).</p></li>
 <li><p>heyoka now depends on the <a class="reference external" href="https://github.com/oneapi-src/oneTBB">TBB</a> library
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/186">#186</a>).</p></li>
 </ul>

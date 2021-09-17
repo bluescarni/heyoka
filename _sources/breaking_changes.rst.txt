@@ -3,6 +3,19 @@
 Breaking changes
 ================
 
+.. _bchanges_0_15_0:
+
+0.15.0
+------
+
+- The function class now uses reference
+  semantics. This means that copy operations on
+  non-trivial expressions now result in shallow copies,
+  not deep copies (as it was previously the case).
+  This change does not have repercussions on the
+  integrators' API, but user code manipulating expressions
+  may need to be adapted.
+
 .. _bchanges_0_10_0:
 
 0.10.0
