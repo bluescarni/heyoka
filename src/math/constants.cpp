@@ -88,6 +88,8 @@ constant_impl::constant_impl(std::string name, number val) : func_base(std::move
     }
 }
 
+constant_impl::~constant_impl() = default;
+
 const number &constant_impl::get_value() const
 {
     return m_value;
@@ -274,6 +276,11 @@ pi_impl::pi_impl()
 #endif
                               ))
 {
+}
+
+void pi_impl::to_stream(std::ostream &os) const
+{
+    os << u8"π";
 }
 
 } // namespace detail

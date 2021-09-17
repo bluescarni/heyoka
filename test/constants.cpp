@@ -54,7 +54,7 @@ TEST_CASE("pi stream")
 
     oss << heyoka::pi;
 
-    REQUIRE(oss.str() == "pi");
+    REQUIRE(oss.str() == u8"π");
 }
 
 TEST_CASE("pi diff")
