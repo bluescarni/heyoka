@@ -45,6 +45,7 @@ class HEYOKA_DLL_PUBLIC constant_impl : public func_base
 public:
     constant_impl();
     explicit constant_impl(std::string, number);
+    constant_impl(const constant_impl &);
     virtual ~constant_impl();
 
     const number &get_value() const;
