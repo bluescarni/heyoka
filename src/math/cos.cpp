@@ -496,11 +496,11 @@ llvm::Function *cos_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression cos_impl::diff(const std::string &s) const
+expression cos_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return -sin(args()[0]) * heyoka::diff(args()[0], s);
+    return -sin(args()[0]) * detail::diff(func_map, args()[0], s);
 }
 
 } // namespace detail
@@ -509,9 +509,8 @@ expression cos(expression e)
 {
     if (auto fptr = detail::is_neg(e)) {
         // Simplify cos(-x) to cos(x).
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return cos(std::move(*rng.first));
+        assert(fptr->args().size() == 1u);
+        return cos(fptr->args()[0]);
     } else {
         // Simplify cos(number) to its value.
         if (auto num_ptr = std::get_if<number>(&e.value())) {

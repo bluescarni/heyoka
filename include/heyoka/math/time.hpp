@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -42,7 +43,7 @@ public:
 
     void to_stream(std::ostream &) const;
 
-    expression diff(const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,

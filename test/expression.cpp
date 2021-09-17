@@ -11,12 +11,15 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/number.hpp>
@@ -380,16 +383,26 @@ TEST_CASE("compute_grad_dbl")
 
 TEST_CASE("diff")
 {
-    // We test that the derivative of x is one
-    {
-        expression ex = "x"_var;
-        REQUIRE(diff(ex, "x") == 1_dbl);
-    }
-    // We test that the derivative of sin is cos
-    {
-        expression ex = sin("x"_var);
-        REQUIRE(diff(ex, "x") == cos("x"_var));
-    }
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(diff(x, "x") == 1_dbl);
+    REQUIRE(diff(y, "x") == 0_dbl);
+
+    REQUIRE(diff(1_dbl, "x") == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff(1_dbl, "x").value()).value()));
+    REQUIRE(std::holds_alternative<long double>(std::get<number>(diff(1_ldbl, "x").value()).value()));
+
+    REQUIRE(diff(par[42], "x") == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff(par[42], "x").value()).value()));
+
+    // Test the caching of derivatives.
+    auto foo = x * (x + y), bar = (foo - x) + (2. * foo);
+    auto bar_diff = diff(bar, "x");
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[1].value()).args()[1].value())
+               .get_ptr());
 }
 
 TEST_CASE("is_integral")
@@ -459,6 +472,28 @@ TEST_CASE("get_param_size")
     REQUIRE(get_param_size(par[123] + par[122]) == 124u);
     REQUIRE(get_param_size(par[122] + par[123]) == 124u);
     REQUIRE(get_param_size(par[500] - sin(cos(par[1] + "y"_var) + par[4])) == 501u);
+
+    // Test with repeated subexpressions.
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    REQUIRE(get_param_size(bar) == 0u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[23] + (foo - x) / (2. * foo) + par[32];
+
+    REQUIRE(get_param_size(bar) == 43u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[83] + (foo - x) / (2. * foo) + par[32];
+
+    REQUIRE(get_param_size(bar) == 84u);
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + par[42];
+    bar = par[23] + (foo - x) / (2. * foo) + par[92];
+
+    REQUIRE(get_param_size(bar) == 93u);
 }
 
 TEST_CASE("binary simpls")
@@ -612,7 +647,7 @@ TEST_CASE("has time")
 {
     namespace hy = heyoka;
 
-    auto [x, y] = make_vars("x", "y");
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     REQUIRE(!has_time(x));
     REQUIRE(!has_time(y));
@@ -626,6 +661,41 @@ TEST_CASE("has time")
     REQUIRE(has_time(par[42] + hy::time));
     REQUIRE(has_time((x + y) * (hy::time + 1_dbl)));
     REQUIRE(has_time((x + y) * (par[0] * hy::time + 1_dbl)));
+
+    // With common subexpressions.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    REQUIRE(!has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = hy::time + ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = hy::time + (foo - x) / (2. * foo);
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+    bar = (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
+
+    foo = ((x + y) * (z + x)) * ((z - x) * (y + x)) + hy::time;
+    bar = hy::time + (foo - x) / (2. * foo) + hy::time;
+
+    REQUIRE(has_time(bar));
 }
 
 TEST_CASE("pairwise_sum")
@@ -658,7 +728,7 @@ TEST_CASE("s11n")
 {
     std::stringstream ss;
 
-    auto x = "x"_var;
+    auto [x, y, z] = make_vars("x", "y", "z");
 
     {
         boost::archive::binary_oarchive oa(ss);
@@ -715,6 +785,35 @@ TEST_CASE("s11n")
     }
 
     REQUIRE(x == 0.1_ldbl);
+
+    ss.str("");
+
+    x = "x"_var;
+
+    // Test shallow copies in subexpressions.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << bar;
+    }
+
+    bar = "x"_var;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> bar;
+    }
+
+    // Make sure multiple instances of 'foo' in bar point to the same
+    // underlying object.
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+            != std::get<func>(foo.value()).get_ptr());
 }
 
 TEST_CASE("get_n_nodes")
@@ -732,4 +831,141 @@ TEST_CASE("get_n_nodes")
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
     REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);
+
+    // Try with subexpressions repeating in the tree.
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo),
+         bar2 = (copy(foo) - x) / (2. * copy(foo));
+
+    REQUIRE(get_n_nodes(bar) == 35u);
+    REQUIRE(get_n_nodes(bar2) == 35u);
+}
+
+TEST_CASE("equality")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(x == x);
+    REQUIRE(x != y);
+
+    REQUIRE(x + y == x + y);
+
+    auto foo = (x + y) * z, bar = foo;
+
+    REQUIRE(foo == bar);
+    REQUIRE(x + foo == x + bar);
+}
+
+TEST_CASE("get_variables")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE(get_variables(x) == std::vector<std::string>{"x"});
+    REQUIRE(get_variables(1_dbl) == std::vector<std::string>{});
+    REQUIRE(get_variables(par[0]) == std::vector<std::string>{});
+    REQUIRE(get_variables(y + x * z) == std::vector<std::string>{"x", "y", "z"});
+
+    auto tmp = x * z, foo = x - z - 5_dbl;
+    REQUIRE(get_variables((y + tmp) / foo * tmp - foo) == std::vector<std::string>{"x", "y", "z"});
+}
+
+TEST_CASE("rename_variables")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto ex = 1_dbl;
+    rename_variables(ex, {{"x", "a"}});
+    REQUIRE(ex == 1_dbl);
+
+    ex = par[0];
+    rename_variables(ex, {{"x", "a"}});
+    REQUIRE(ex == par[0]);
+
+    ex = x;
+    rename_variables(ex, {{"x", "a"}});
+    REQUIRE(ex == "a"_var);
+
+    ex = x + y;
+    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    REQUIRE(ex == "a"_var + "b"_var);
+
+    auto tmp = x * z, foo = x - z - 5_dbl;
+    ex = (y + tmp) / foo * tmp - foo;
+    rename_variables(ex, {{"x", "a"}, {"y", "b"}});
+    REQUIRE(ex == ("b"_var + "a"_var * z) / ("a"_var - z - 5_dbl) * ("a"_var * z) - ("a"_var - z - 5_dbl));
+}
+
+TEST_CASE("copy")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+
+    auto bar_copy = copy(bar);
+
+    // Copy created a new object.
+    REQUIRE(std::get<func>(bar_copy.value()).get_ptr() != std::get<func>(bar.value()).get_ptr());
+
+    // foo was deep-copied into bar_copy.
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr()
+            == std::get<func>(foo.value()).get_ptr());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value()).get_ptr()
+        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr());
+
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+            == std::get<func>(foo.value()).get_ptr());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
+        != std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr());
+
+    // The foo appearing in bar_copy is the same object, not two separate copies.
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).args()[0].value())
+               .get_ptr());
+
+    // A test in which a function has the same argument twice.
+    bar = foo + foo;
+    bar_copy = copy(bar);
+
+    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
+            == std::get<func>(foo.value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(bar_copy.value()).args()[1].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(bar_copy.value()).args()[0].value()).get_ptr()
+            != std::get<func>(std::get<func>(bar.value()).args()[1].value()).get_ptr());
+}
+
+TEST_CASE("subs")
+{
+    auto [x, y, z, a] = make_vars("x", "y", "z", "a");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x)), bar = (foo - x) / (2. * foo);
+    const auto foo_id = std::get<func>(foo.value()).get_ptr();
+    const auto bar_id = std::get<func>(bar.value()).get_ptr();
+
+    auto foo_a = ((a + y) * (z + a)) * ((z - a) * (y + a)), bar_a = (foo_a - a) / (2. * foo_a);
+
+    auto bar_subs = subs(bar, {{"x", a}});
+
+    // Ensure foo/bar were not modified.
+    REQUIRE(foo == ((x + y) * (z + x)) * ((z - x) * (y + x)));
+    REQUIRE(bar == (foo - x) / (2. * foo));
+    REQUIRE(std::get<func>(foo.value()).get_ptr() == foo_id);
+    REQUIRE(std::get<func>(bar.value()).get_ptr() == bar_id);
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[0].value()).args()[0].value()).get_ptr()
+            == foo_id);
+    REQUIRE(std::get<func>(std::get<func>(std::get<func>(bar.value()).args()[1].value()).args()[1].value()).get_ptr()
+            == foo_id);
+
+    // Check the substitution.
+    REQUIRE(bar_subs == bar_a);
+
+    // Check that after substitution, what used to be foo in bar is a shared subexpression in bar_subs.
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[0].value()).args()[0].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
+               .get_ptr());
 }

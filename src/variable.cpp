@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -72,18 +73,6 @@ std::ostream &operator<<(std::ostream &os, const variable &var)
     return os << var.name();
 }
 
-std::vector<std::string> get_variables(const variable &var)
-{
-    return {var.name()};
-}
-
-void rename_variables(variable &var, const std::unordered_map<std::string, std::string> &repl_map)
-{
-    if (auto it = repl_map.find(var.name()); it != repl_map.end()) {
-        var.name() = it->second;
-    }
-}
-
 bool operator==(const variable &v1, const variable &v2)
 {
     return v1.name() == v2.name();
@@ -92,24 +81,6 @@ bool operator==(const variable &v1, const variable &v2)
 bool operator!=(const variable &v1, const variable &v2)
 {
     return !(v1 == v2);
-}
-
-expression subs(const variable &var, const std::unordered_map<std::string, expression> &smap)
-{
-    if (auto it = smap.find(var.name()); it == smap.end()) {
-        return expression{var};
-    } else {
-        return it->second;
-    }
-}
-
-expression diff(const variable &var, const std::string &s)
-{
-    if (s == var.name()) {
-        return expression{number{1.}};
-    } else {
-        return expression{number{0.}};
-    }
 }
 
 double eval_dbl(const variable &var, const std::unordered_map<std::string, double> &map, const std::vector<double> &)

@@ -16,6 +16,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -79,9 +80,6 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
-HEYOKA_DLL_PUBLIC void rename_variables(number &, const std::unordered_map<std::string, std::string> &);
-
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
@@ -95,10 +93,6 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
-
-HEYOKA_DLL_PUBLIC expression subs(const number &, const std::unordered_map<std::string, expression> &);
-
-HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);

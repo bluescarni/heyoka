@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <ostream>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -63,11 +64,11 @@ void neg_impl::to_stream(std::ostream &os) const
 }
 
 // Derivative.
-expression neg_impl::diff(const std::string &s) const
+expression neg_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return -heyoka::diff(args()[0], s);
+    return -detail::diff(func_map, args()[0], s);
 }
 
 llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

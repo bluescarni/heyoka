@@ -495,11 +495,11 @@ llvm::Function *sqrt_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t 
 
 #endif
 
-expression sqrt_impl::diff(const std::string &s) const
+expression sqrt_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return heyoka::diff(args()[0], s) / (2_dbl * sqrt(args()[0]));
+    return detail::diff(func_map, args()[0], s) / (2_dbl * sqrt(args()[0]));
 }
 
 } // namespace detail

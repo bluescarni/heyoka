@@ -6,10 +6,12 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SINH_HPP
-#define HEYOKA_MATH_SINH_HPP
+#ifndef HEYOKA_MATH_CONSTANTS_HPP
+#define HEYOKA_MATH_CONSTANTS_HPP
 
 #include <cstdint>
+#include <ostream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -17,7 +19,9 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 
 namespace heyoka
@@ -26,21 +30,28 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC sinh_impl : public func_base
+class HEYOKA_DLL_PUBLIC constant_impl : public func_base
 {
+    number m_value;
+
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+        ar &m_value;
+    }
+
 public:
-    sinh_impl();
-    explicit sinh_impl(expression);
+    constant_impl();
+    explicit constant_impl(std::string, number);
+
+    const number &get_value() const;
+
+    void to_stream(std::ostream &) const;
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
 
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
@@ -59,12 +70,27 @@ public:
 #endif
 };
 
+class HEYOKA_DLL_PUBLIC pi_impl : public constant_impl
+{
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<constant_impl>(*this);
+    }
+
+public:
+    pi_impl();
+
+    void to_stream(std::ostream &) const;
+};
+
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression sinh(expression);
+HEYOKA_DLL_PUBLIC extern const expression pi;
 
 } // namespace heyoka
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sinh_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::pi_impl)
 
 #endif

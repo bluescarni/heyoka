@@ -21,6 +21,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -148,13 +149,6 @@ std::ostream &operator<<(std::ostream &os, const number &n)
 
     return os << oss.str();
 }
-
-std::vector<std::string> get_variables(const number &)
-{
-    return {};
-}
-
-void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
 
 bool is_zero(const number &n)
 {
@@ -320,16 +314,6 @@ bool operator==(const number &n1, const number &n2)
 bool operator!=(const number &n1, const number &n2)
 {
     return !(n1 == n2);
-}
-
-expression subs(const number &n, const std::unordered_map<std::string, expression> &)
-{
-    return expression{n};
-}
-
-expression diff(const number &n, const std::string &)
-{
-    return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
 }
 
 namespace detail

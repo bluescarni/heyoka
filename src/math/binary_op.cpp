@@ -133,32 +133,21 @@ const expression &binary_op::rhs() const
     return args()[1];
 }
 
-expression &binary_op::lhs()
-{
-    assert(args().size() == 2u);
-    return *(get_mutable_args_it().first);
-}
-
-expression &binary_op::rhs()
-{
-    assert(args().size() == 2u);
-    return *(get_mutable_args_it().first + 1);
-}
-
-expression binary_op::diff(const std::string &s) const
+expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
 
     switch (m_type) {
         case type::add:
-            return heyoka::diff(lhs(), s) + heyoka::diff(rhs(), s);
+            return detail::diff(func_map, lhs(), s) + detail::diff(func_map, rhs(), s);
         case type::sub:
-            return heyoka::diff(lhs(), s) - heyoka::diff(rhs(), s);
+            return detail::diff(func_map, lhs(), s) - detail::diff(func_map, rhs(), s);
         case type::mul:
-            return heyoka::diff(lhs(), s) * rhs() + lhs() * heyoka::diff(rhs(), s);
+            return detail::diff(func_map, lhs(), s) * rhs() + lhs() * detail::diff(func_map, rhs(), s);
         default:
-            return (heyoka::diff(lhs(), s) * rhs() - lhs() * heyoka::diff(rhs(), s)) / (rhs() * rhs());
+            return (detail::diff(func_map, lhs(), s) * rhs() - lhs() * detail::diff(func_map, rhs(), s))
+                   / (rhs() * rhs());
     }
 }
 

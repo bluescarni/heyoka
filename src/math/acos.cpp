@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -78,11 +79,11 @@ acos_impl::acos_impl(expression e) : func_base("acos", std::vector{std::move(e)}
 
 acos_impl::acos_impl() : acos_impl(0_dbl) {}
 
-expression acos_impl::diff(const std::string &s) const
+expression acos_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return -pow(1_dbl - square(args()[0]), -.5) * heyoka::diff(args()[0], s);
+    return -pow(1_dbl - square(args()[0]), -.5) * detail::diff(func_map, args()[0], s);
 }
 
 llvm::Value *acos_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

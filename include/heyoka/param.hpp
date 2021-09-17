@@ -16,6 +16,7 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -67,15 +68,8 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const param &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const param &);
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const param &);
-HEYOKA_DLL_PUBLIC void rename_variables(param &, const std::unordered_map<std::string, std::string> &);
-
 HEYOKA_DLL_PUBLIC bool operator==(const param &, const param &);
 HEYOKA_DLL_PUBLIC bool operator!=(const param &, const param &);
-
-HEYOKA_DLL_PUBLIC expression subs(const param &, const std::unordered_map<std::string, expression> &);
-
-HEYOKA_DLL_PUBLIC expression diff(const param &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const param &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);

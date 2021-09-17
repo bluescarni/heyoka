@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -74,7 +75,7 @@ kepE_impl::kepE_impl() : kepE_impl(0_dbl, 0_dbl) {}
 
 kepE_impl::kepE_impl(expression e, expression M) : func_base("kepE", std::vector{std::move(e), std::move(M)}) {}
 
-expression kepE_impl::diff(const std::string &s) const
+expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
 
@@ -83,7 +84,7 @@ expression kepE_impl::diff(const std::string &s) const
 
     expression E{func{*this}};
 
-    return (heyoka::diff(e, s) * sin(E) + heyoka::diff(M, s)) / (1_dbl - e * cos(E));
+    return (detail::diff(func_map, e, s) * sin(E) + detail::diff(func_map, M, s)) / (1_dbl - e * cos(E));
 }
 
 taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
@@ -91,6 +92,9 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
     assert(args().size() == 2u);
 
     // Make a copy of e.
+    // NOTE: the arguments here have already been decomposed, thus
+    // args()[0] is a non-function value that will be deep-copied.
+    assert(!std::holds_alternative<func>(args()[0].value()));
     auto e_copy = args()[0];
 
     // Append the kepE decomposition.

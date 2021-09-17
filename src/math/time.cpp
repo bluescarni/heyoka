@@ -10,9 +10,11 @@
 
 #include <cassert>
 #include <cstdint>
+#include <initializer_list>
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -60,14 +62,14 @@ namespace heyoka
 namespace detail
 {
 
-time_impl::time_impl() : func_base("time", std::vector<expression>{}) {}
+time_impl::time_impl() : func_base("time", {}) {}
 
 void time_impl::to_stream(std::ostream &os) const
 {
     os << 't';
 }
 
-expression time_impl::diff(const std::string &) const
+expression time_impl::diff(std::unordered_map<const void *, expression> &, const std::string &) const
 {
     assert(args().empty());
 

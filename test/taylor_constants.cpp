@@ -16,6 +16,8 @@
 #include <tuple>
 #include <vector>
 
+#include <boost/math/constants/constants.hpp>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -24,8 +26,8 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -47,6 +49,17 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+// Variable template for the pi constant at different levels of precision.
+template <typename T>
+const auto pi_const = boost::math::constants::pi<T>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+const mppp::real128 pi_const<mppp::real128> = mppp::pi_128;
+
+#endif
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
@@ -93,48 +106,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
     }
 }
 
-TEST_CASE("ode test")
-{
-    using std::cos;
-    using std::sin;
-
-    for (auto opt_level : {0u, 1u, 2u, 3u}) {
-        for (auto cm : {false, true}) {
-            for (auto ha : {false, true}) {
-                auto [x] = make_vars("x");
-
-                taylor_adaptive<double> ta({prime(x) = cos(hy::time)}, {.5}, kw::high_accuracy = ha,
-                                           kw::compact_mode = cm, kw::opt_level = opt_level);
-
-                ta.propagate_until(100.);
-
-                REQUIRE(ta.get_state()[0] == approximately(sin(100.) + .5, 10000.));
-
-                ta.propagate_until(0.);
-
-                REQUIRE(ta.get_state()[0] == approximately(.5, 1000.));
-            }
-        }
-    }
-}
-
-TEST_CASE("stream output")
-{
-    std::ostringstream oss;
-    oss << "x"_var + hy::time;
-
-    REQUIRE(oss.str() == "(x + t)");
-}
-
-TEST_CASE("is_time")
-{
-    REQUIRE(!detail::is_time(1_dbl));
-    REQUIRE(!detail::is_time("x"_var));
-    REQUIRE(!detail::is_time(1_dbl + hy::time));
-    REQUIRE(detail::is_time(hy::time));
-}
-
-TEST_CASE("taylor time")
+TEST_CASE("taylor constant")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
@@ -144,7 +116,7 @@ TEST_CASE("taylor time")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::time, x + y}, 1, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 1, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -159,14 +131,14 @@ TEST_CASE("taylor time")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == 4);
+            REQUIRE(jet[2] == pi_const<fp_t>);
             REQUIRE(jet[3] == 5);
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::time, x + y}, 1, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 1, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -185,8 +157,8 @@ TEST_CASE("taylor time")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == -5);
-            REQUIRE(jet[5] == 6);
+            REQUIRE(jet[4] == pi_const<fp_t>);
+            REQUIRE(jet[5] == pi_const<fp_t>);
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
@@ -195,7 +167,7 @@ TEST_CASE("taylor time")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::time, x + y}, 2, 1, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {hy::pi, x + y}, 2, 1, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -210,16 +182,16 @@ TEST_CASE("taylor time")
 
             REQUIRE(jet[0] == 2);
             REQUIRE(jet[1] == 3);
-            REQUIRE(jet[2] == -4);
+            REQUIRE(jet[2] == pi_const<fp_t>);
             REQUIRE(jet[3] == 5);
-            REQUIRE(jet[4] == fp_t{1} / 2);
+            REQUIRE(jet[4] == 0);
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[3] + jet[2])));
         }
 
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {hy::time + x, x + y}, 2, 2, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {hy::pi + x, x + y}, 2, 2, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -238,14 +210,14 @@ TEST_CASE("taylor time")
             REQUIRE(jet[2] == 3);
             REQUIRE(jet[3] == -3);
 
-            REQUIRE(jet[4] == -5 + jet[0]);
-            REQUIRE(jet[5] == 6 + jet[1]);
+            REQUIRE(jet[4] == pi_const<fp_t> + jet[0]);
+            REQUIRE(jet[5] == pi_const<fp_t> + jet[1]);
 
             REQUIRE(jet[6] == 5);
             REQUIRE(jet[7] == -5);
 
-            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * (1 + jet[4])));
-            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * (1 + jet[5])));
+            REQUIRE(jet[8] == approximately(fp_t{1} / 2 * jet[4]));
+            REQUIRE(jet[9] == approximately(fp_t{1} / 2 * jet[5]));
 
             REQUIRE(jet[10] == approximately(fp_t{1} / 2 * (jet[6] + jet[4])));
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[7] + jet[5])));
@@ -254,7 +226,7 @@ TEST_CASE("taylor time")
         {
             llvm_state s{kw::opt_level = opt_level};
 
-            taylor_add_jet<fp_t>(s, "jet", {x + hy::time, x + y}, 3, 3, high_accuracy, compact_mode);
+            taylor_add_jet<fp_t>(s, "jet", {x + hy::pi, x + y}, 3, 3, high_accuracy, compact_mode);
 
             s.compile();
 
@@ -275,17 +247,17 @@ TEST_CASE("taylor time")
             REQUIRE(jet[4] == -3);
             REQUIRE(jet[5] == 0);
 
-            REQUIRE(jet[6] == approximately(-5 + jet[0]));
-            REQUIRE(jet[7] == approximately(6 + jet[1]));
-            REQUIRE(jet[8] == approximately(-1 + jet[2]));
+            REQUIRE(jet[6] == approximately(pi_const<fp_t> + jet[0]));
+            REQUIRE(jet[7] == approximately(pi_const<fp_t> + jet[1]));
+            REQUIRE(jet[8] == approximately(pi_const<fp_t> + jet[2]));
 
             REQUIRE(jet[9] == 5);
             REQUIRE(jet[10] == -5);
             REQUIRE(jet[11] == 1);
 
-            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * (1 + jet[6])));
-            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * (1 + jet[7])));
-            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * (1 + jet[8])));
+            REQUIRE(jet[12] == approximately(fp_t{1} / 2 * jet[6]));
+            REQUIRE(jet[13] == approximately(fp_t{1} / 2 * jet[7]));
+            REQUIRE(jet[14] == approximately(fp_t{1} / 2 * jet[8]));
 
             REQUIRE(jet[15] == approximately(fp_t{1} / 2 * (jet[9] + jet[6])));
             REQUIRE(jet[16] == approximately(fp_t{1} / 2 * (jet[10] + jet[7])));
@@ -301,7 +273,7 @@ TEST_CASE("taylor time")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({x + hy::time, x + y}, opt_level, high_accuracy, compact_mode);
+        compare_batch_scalar<fp_t>({x + hy::pi, x + y}, opt_level, high_accuracy, compact_mode);
     };
 
     for (auto cm : {false, true}) {

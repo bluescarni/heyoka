@@ -18,9 +18,26 @@
 #include <utility>
 #include <variant>
 
+// NOTE: workaround for a GCC bug when including the Boost.Serialization
+// support for std::shared_ptr:
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84075
+
+#if defined(__GNUC__) && __GNUC__ >= 7
+
+namespace boost::serialization
+{
+
+struct U {
+};
+
+} // namespace boost::serialization
+
+#endif
+
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/export.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/split_free.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/string.hpp>
