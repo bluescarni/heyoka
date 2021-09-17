@@ -43,6 +43,12 @@ TEST_CASE("api test")
     REQUIRE(f00.get_name() == "null_constant");
     REQUIRE(f00.args().empty());
 
+    {
+        std::ostringstream ss;
+        ss << f00;
+        REQUIRE(ss.str() == "null_constant");
+    }
+
     REQUIRE_THROWS_MATCHES(
         func{nc01_impl{}}, std::invalid_argument,
         Message("A constant can be initialised only from a floating-point value with the maximum precision"));

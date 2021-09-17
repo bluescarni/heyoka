@@ -88,10 +88,6 @@ constant_impl::constant_impl(std::string name, number val) : func_base(std::move
     }
 }
 
-constant_impl::constant_impl(const constant_impl &) = default;
-
-constant_impl::~constant_impl() = default;
-
 const number &constant_impl::get_value() const
 {
     return m_value;

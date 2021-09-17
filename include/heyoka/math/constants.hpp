@@ -45,12 +45,10 @@ class HEYOKA_DLL_PUBLIC constant_impl : public func_base
 public:
     constant_impl();
     explicit constant_impl(std::string, number);
-    constant_impl(const constant_impl &);
-    virtual ~constant_impl();
 
     const number &get_value() const;
 
-    virtual void to_stream(std::ostream &) const;
+    void to_stream(std::ostream &) const;
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
 
@@ -72,7 +70,7 @@ public:
 #endif
 };
 
-class HEYOKA_DLL_PUBLIC pi_impl final : public constant_impl
+class HEYOKA_DLL_PUBLIC pi_impl : public constant_impl
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -84,7 +82,7 @@ class HEYOKA_DLL_PUBLIC pi_impl final : public constant_impl
 public:
     pi_impl();
 
-    void to_stream(std::ostream &) const final;
+    void to_stream(std::ostream &) const;
 };
 
 } // namespace detail
