@@ -7,16 +7,46 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <sstream>
+#include <stdexcept>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
+
+class nc00_impl : public detail::constant_impl
+{
+
+public:
+    nc00_impl() {}
+};
+
+class nc01_impl : public detail::constant_impl
+{
+
+public:
+    nc01_impl() : detail::constant_impl("foo", number{0.}) {}
+};
+
+TEST_CASE("api test")
+{
+    using Catch::Matchers::Message;
+
+    func f00{nc00_impl{}};
+
+    REQUIRE(f00.get_name() == "null_constant");
+    REQUIRE(f00.args().empty());
+
+    REQUIRE_THROWS_MATCHES(
+        func{nc01_impl{}}, std::invalid_argument,
+        Message("A constant can be initialised only from a floating-point value with the maximum precision"));
+}
 
 TEST_CASE("pi stream")
 {
