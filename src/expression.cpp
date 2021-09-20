@@ -337,7 +337,9 @@ void swap(expression &ex0, expression &ex1) noexcept
 // NOTE: this implementation does not take advantage of potentially
 // repeating subexpressions. This is not currently a problem because
 // hashing is needed only in the CSE for the decomposition, which involves
-// only trivial expressions.
+// only trivial expressions. However, this would likely be needed by a to_sympy()
+// implementation in heyoka.py which allows for a dictionary of custom
+// substitutions to be provided by the user.
 std::size_t hash(const expression &ex)
 {
     return std::visit([](const auto &v) { return hash(v); }, ex.value());
