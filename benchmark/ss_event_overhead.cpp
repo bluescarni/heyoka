@@ -115,7 +115,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
             auto diff_y = yj - yi;
             auto diff_z = zj - zi;
 
-            auto ev_eq = (square(diff_x) + square(diff_y) + square(diff_z) - 4 * jradius * jradius) * (1 / (T(70) * T(70)));
+            auto ev_eq = (square(diff_x) + square(diff_y) + square(diff_z) - 4 * jradius * jradius) * (1 / T(100));
 
             evs.emplace_back(std::move(ev_eq), cb);
         }
