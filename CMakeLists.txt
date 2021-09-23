@@ -375,7 +375,12 @@ else()
 endif()
 
 # Link to LLVM privately.
-target_link_libraries(heyoka PRIVATE heyoka_llvm_internal)
+# NOTE: the BUILD_INTERFACE bit is a workaround needed when building
+# heyoka as a static library: in this configuration, CMake would complain
+# that heyoka_llvm_internal needs to be in the export set, even if it is just
+# an interface library. See the discussion here:
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15415
+target_link_libraries(heyoka PRIVATE "$<BUILD_INTERFACE:heyoka_llvm_internal>")
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED CONFIG)
