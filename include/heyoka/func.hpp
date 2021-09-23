@@ -99,7 +99,10 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
 #endif
 
+    virtual bool has_diff() const = 0;
     virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
+    virtual bool has_gradient() const = 0;
+    virtual std::vector<expression> gradient() const = 0;
 
     virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
     virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
@@ -193,6 +196,12 @@ using func_diff_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>(
 
 template <typename T>
 inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T>, expression>;
+
+template <typename T>
+using func_gradient_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().gradient());
+
+template <typename T>
+inline constexpr bool func_has_gradient_v = std::is_same_v<detected_t<func_gradient_t, T>, std::vector<expression>>;
 
 template <typename T>
 using func_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_dbl(
@@ -427,7 +436,28 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #endif
 
     // diff.
+    bool has_diff() const final
+    {
+        return func_has_diff_v<T>;
+    }
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
+
+    // gradient.
+    bool has_gradient() const final
+    {
+        return func_has_gradient_v<T>;
+    }
+    std::vector<expression> gradient() const final
+    {
+        if constexpr (func_has_gradient_v<T>) {
+            return m_value.gradient();
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
 
     // eval.
     double eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const final

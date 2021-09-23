@@ -69,11 +69,10 @@ void time_impl::to_stream(std::ostream &os) const
     os << 't';
 }
 
-expression time_impl::diff(std::unordered_map<const void *, expression> &, const std::string &) const
+std::vector<expression> time_impl::gradient() const
 {
     assert(args().empty());
-
-    return 0_dbl;
+    return {};
 }
 
 namespace

@@ -7,6 +7,9 @@ Changelog
 New
 ~~~
 
+- Implement additional automatic simplifications in the
+  expression system
+  (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
 - Add a way to define symbolic constants in the expression
   system, and implement :math:`\pi` on top of it
   (`#192 <https://github.com/bluescarni/heyoka/pull/192>`__).
@@ -40,6 +43,8 @@ Changes
 Fix
 ~~~
 
+- Fix compilation as a static library
+  (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
 - Various fixes to the PPC64 support
   (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__,
   `#187 <https://github.com/bluescarni/heyoka/pull/187>`__).

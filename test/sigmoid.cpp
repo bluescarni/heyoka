@@ -16,6 +16,14 @@
 
 using namespace heyoka;
 
+TEST_CASE("sigmoid diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(sigmoid(x * x - y), x) == (1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y) * (2. * x));
+    REQUIRE(diff(sigmoid(x * x - y), y) == -((1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y)));
+}
+
 TEST_CASE("sigmoid s11n")
 {
     std::stringstream ss;

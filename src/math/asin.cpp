@@ -79,11 +79,10 @@ asin_impl::asin_impl(expression e) : func_base("asin", std::vector{std::move(e)}
 
 asin_impl::asin_impl() : asin_impl(0_dbl) {}
 
-expression asin_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> asin_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return pow(1_dbl - square(args()[0]), -.5) * detail::diff(func_map, args()[0], s);
+    return {pow(1_dbl - square(args()[0]), -.5)};
 }
 
 llvm::Value *asin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

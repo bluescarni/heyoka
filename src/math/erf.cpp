@@ -50,6 +50,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/constants.hpp>
 #include <heyoka/math/erf.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/math/sqrt.hpp>
@@ -483,15 +484,10 @@ llvm::Function *erf_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression erf_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> erf_impl::gradient() const
 {
     assert(args().size() == 1u);
-#if defined(HEYOKA_HAVE_REAL128)
-    auto coeff = heyoka::expression(heyoka::number(1. / sqrt_pi_2<mppp::real128>));
-#else
-    auto coeff = heyoka::expression(heyoka::number(1. / sqrt_pi_2<long double>));
-#endif
-    return coeff * exp(-args()[0] * args()[0]) * detail::diff(func_map, args()[0], s);
+    return {2_dbl / sqrt(pi) * exp(-args()[0] * args()[0])};
 }
 
 } // namespace detail

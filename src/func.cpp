@@ -51,6 +51,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/number.hpp>
@@ -293,7 +294,38 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
 expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
-    return ptr()->diff(func_map, s);
+    // Run the specialised diff implementation,
+    // if available.
+    if (ptr()->has_diff()) {
+        return ptr()->diff(func_map, s);
+    }
+
+    // Check if we have the gradient.
+    if (!ptr()->has_gradient()) {
+        throw not_implemented_error(
+            "Cannot compute the derivative of the function '{}', because it does not provide neither a diff() "
+            "nor a gradient() member function"_format(get_name()));
+    }
+
+    // Fetch the gradient.
+    auto grad = ptr()->gradient();
+
+    // Check it.
+    const auto arity = args().size();
+    if (grad.size() != arity) {
+        throw std::invalid_argument(
+            "Inconsistent gradient returned by the function '{}': a vector of {} elements was expected, but the number of elements is {} instead"_format(
+                get_name(), arity, grad.size()));
+    }
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], s));
+    }
+
+    return pairwise_sum(std::move(prod));
 }
 
 double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const

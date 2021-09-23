@@ -21,7 +21,7 @@ TEST_CASE("atan diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(atan(x * x - y), x) == 1. / (1. + square(square(x) - y)) * (2. * x));
+    REQUIRE(diff(atan(x * x - y), x) == (2. * x) / (1. + square(square(x) - y)));
     REQUIRE(diff(atan(x * x + y), y) == 1. / (1. + square(square(x) + y)));
 }
 

@@ -69,7 +69,8 @@ TEST_CASE("func minimal")
 #endif
     std::unordered_map<const void *, expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
-                           Message("The derivative is not implemented for the function 'f'"));
+                           Message("Cannot compute the derivative of the function 'f', because it does not provide "
+                                   "neither a diff() nor a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
                            Message("double eval is not implemented for the function 'f'"));
     std::vector<double> tmp;
@@ -286,12 +287,27 @@ struct func_05 : func_base {
     }
 };
 
+struct func_05a : func_base {
+    func_05a() : func_base("f", {}) {}
+    explicit func_05a(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    std::vector<expression> gradient() const
+    {
+        return {};
+    }
+};
+
 TEST_CASE("func diff")
 {
+    using Catch::Matchers::Message;
+
     auto f = func(func_05{});
 
     std::unordered_map<const void *, expression> func_map;
     REQUIRE(f.diff(func_map, "x") == 42_dbl);
+    REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
+                           Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
+                                   "expected, but the number of elements is 0 instead"));
 }
 
 struct func_06 : func_base {
@@ -653,7 +669,8 @@ TEST_CASE("func diff free func")
 
     f1 = func(func_00{});
     REQUIRE_THROWS_MATCHES(diff(expression{f1}, ""), not_implemented_error,
-                           Message("The derivative is not implemented for the function 'f'"));
+                           Message("Cannot compute the derivative of the function 'f', because it does not provide "
+                                   "neither a diff() nor a gradient() member function"));
 }
 
 struct func_15 : func_base {

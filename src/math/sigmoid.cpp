@@ -524,13 +524,12 @@ llvm::Function *sigmoid_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32
 
 #endif
 
-expression sigmoid_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> sigmoid_impl::gradient() const
 {
     assert(args().size() == 1u);
-
     // NOTE: if single-precision floats are implemented,
     // should 1_dbl become 1_flt?
-    return (1_dbl - sigmoid(args()[0])) * sigmoid(args()[0]) * detail::diff(func_map, args()[0], s);
+    return {(1_dbl - sigmoid(args()[0])) * sigmoid(args()[0])};
 }
 
 } // namespace detail

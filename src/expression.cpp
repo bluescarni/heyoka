@@ -483,6 +483,10 @@ expression operator*(expression e1, expression e2)
                 // 1 * e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
+            if (is_negative_one(v1)) {
+                // -1 * e2 = -e2.
+                return -expression{std::forward<decltype(v2)>(v2)};
+            }
             if (fptr2 != nullptr) {
                 // a * (-x) = (-a) * x.
                 assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
@@ -1089,7 +1093,7 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
 expression pairwise_sum(std::vector<expression> sum)
 {
     if (sum.empty()) {
-        return expression{0.};
+        return 0_dbl;
     }
 
     return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) + std::move(b); },
@@ -1100,7 +1104,7 @@ expression pairwise_sum(std::vector<expression> sum)
 expression pairwise_prod(std::vector<expression> prod)
 {
     if (prod.empty()) {
-        return expression{1.};
+        return 1_dbl;
     }
 
     return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },

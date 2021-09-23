@@ -40,7 +40,7 @@ public:
     tan_impl();
     explicit tan_impl(expression);
 
-    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    std::vector<expression> gradient() const;
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;

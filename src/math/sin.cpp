@@ -496,11 +496,10 @@ llvm::Function *sin_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression sin_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> sin_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return cos(args()[0]) * detail::diff(func_map, args()[0], s);
+    return {cos(args()[0])};
 }
 
 } // namespace detail

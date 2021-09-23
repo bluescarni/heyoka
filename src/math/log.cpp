@@ -489,8 +489,7 @@ llvm::Function *log_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 expression log_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
-
-    return 1_dbl / args()[0] * detail::diff(func_map, args()[0], s);
+    return detail::diff(func_map, args()[0], s) / args()[0];
 }
 
 } // namespace detail

@@ -583,6 +583,9 @@ TEST_CASE("mul simpls")
     REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>() != nullptr);
     REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->op() == detail::binary_op::type::mul);
     REQUIRE(std::get<func>((x * y).value()).extract<detail::binary_op>()->args() == std::vector{x, y});
+
+    REQUIRE(-1_dbl * (x + y) == -(x + y));
+    REQUIRE((x - y) * -1_dbl == -(x - y));
 }
 
 TEST_CASE("neg simpls")
