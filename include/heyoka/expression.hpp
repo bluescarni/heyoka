@@ -36,7 +36,6 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
