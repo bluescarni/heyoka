@@ -64,11 +64,10 @@ void neg_impl::to_stream(std::ostream &os) const
 }
 
 // Derivative.
-expression neg_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> neg_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return -detail::diff(func_map, args()[0], s);
+    return {-1_dbl};
 }
 
 llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

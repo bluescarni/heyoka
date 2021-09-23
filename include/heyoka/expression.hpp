@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -124,9 +125,12 @@ inline expression func_inner<T>::diff(std::unordered_map<const void *, expressio
 {
     if constexpr (func_has_diff_v<T>) {
         return m_value.diff(func_map, s);
-    } else {
-        throw not_implemented_error("The derivative is not implemented for the function '" + get_name() + "'");
     }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
 }
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {

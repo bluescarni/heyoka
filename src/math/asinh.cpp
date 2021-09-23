@@ -79,11 +79,10 @@ asinh_impl::asinh_impl(expression e) : func_base("asinh", std::vector{std::move(
 
 asinh_impl::asinh_impl() : asinh_impl(0_dbl) {}
 
-expression asinh_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> asinh_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return pow(square(args()[0]) + 1_dbl, -.5) * detail::diff(func_map, args()[0], s);
+    return {pow(square(args()[0]) + 1_dbl, -.5)};
 }
 
 llvm::Value *asinh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

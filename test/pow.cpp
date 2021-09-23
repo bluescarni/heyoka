@@ -17,6 +17,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/log.hpp>
 #include <heyoka/math/pow.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
@@ -200,6 +201,14 @@ TEST_CASE("powi")
     REQUIRE(powi(x + 1., 5) == square(x + 1.) * square(x + 1.) * (x + 1.));
     REQUIRE(powi(x + 1., 6) == square(x + 1.) * square(x + 1.) * square(x + 1.));
     REQUIRE(powi(x + 1., 7) == square(x + 1.) * square(x + 1.) * (square(x + 1.) * (x + 1.)));
+}
+
+TEST_CASE("pow diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(pow(3_dbl, x * x + y), "x") == (pow(3_dbl, x * x + y) * log(3_dbl)) * (2_dbl * x));
+    REQUIRE(diff(pow(x * x + y, 1.2345_dbl), "y") == 1.2345_dbl * pow(x * x + y, 1.2345_dbl - 1_dbl));
 }
 
 TEST_CASE("pow s11n")

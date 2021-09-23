@@ -77,11 +77,10 @@ cosh_impl::cosh_impl(expression e) : func_base("cosh", std::vector{std::move(e)}
 
 cosh_impl::cosh_impl() : cosh_impl(0_dbl) {}
 
-expression cosh_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> cosh_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return sinh(args()[0]) * detail::diff(func_map, args()[0], s);
+    return {sinh(args()[0])};
 }
 
 llvm::Value *cosh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

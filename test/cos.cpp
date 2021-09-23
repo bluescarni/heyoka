@@ -20,6 +20,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/neg.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
@@ -34,6 +35,14 @@ TEST_CASE("cos neg simpl")
     REQUIRE(cos(neg(x + y)) == cos(x + y));
     REQUIRE(cos(neg(neg(x + y))) == cos(x + y));
     REQUIRE(cos(neg(neg(par[0]))) == cos(par[0]));
+}
+
+TEST_CASE("cos diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(cos(x * x - y), x) == -sin(x * x - y) * (2. * x));
+    REQUIRE(diff(cos(x * x - y), y) == sin(x * x - y));
 }
 
 TEST_CASE("cos number simpl")

@@ -483,6 +483,10 @@ expression operator*(expression e1, expression e2)
                 // 1 * e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
+            if (is_negative_one(v1)) {
+                // -1 * e2 = -e2.
+                return -expression{std::forward<decltype(v2)>(v2)};
+            }
             if (fptr2 != nullptr) {
                 // a * (-x) = (-a) * x.
                 assert(!fptr2->args().empty()); // LCOV_EXCL_LINE

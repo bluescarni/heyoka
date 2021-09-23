@@ -40,3 +40,11 @@ TEST_CASE("log s11n")
 
     REQUIRE(ex == log(x));
 }
+
+TEST_CASE("log diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(log(x * x - y), x) == (2. * x) / (x * x - y));
+    REQUIRE(diff(log(x * x - y), y) == -1_dbl / (x * x - y));
+}

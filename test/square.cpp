@@ -16,6 +16,14 @@
 
 using namespace heyoka;
 
+TEST_CASE("square diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(square(x * x - y), "x") == 2_dbl * (x * x - y) * (2_dbl * x));
+    REQUIRE(diff(square(x * x - y), "y") == -(2_dbl * (x * x - y)));
+}
+
 TEST_CASE("square s11n")
 {
     std::stringstream ss;

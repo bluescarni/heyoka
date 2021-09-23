@@ -18,12 +18,21 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
+
+TEST_CASE("sin diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(sin(x * x - y), x) == cos(x * x - y) * (2. * x));
+    REQUIRE(diff(sin(x * x - y), y) == -cos(x * x - y));
+}
 
 TEST_CASE("sin s11n")
 {
