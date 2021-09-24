@@ -97,4 +97,5 @@ Dario Izzo (European Space Agency).
    ad_notes.rst
    changelog.rst
    breaking_changes.rst
+   acknowledgement.rst
    bibliography.rst
