@@ -39,8 +39,13 @@ TEST_CASE("erf")
 TEST_CASE("erf diff")
 {
     auto [x, y] = make_vars("x", "y");
+
     REQUIRE(diff(erf(x * x - y), x) == (2_dbl / sqrt(pi) * exp((-(x * x - y) * (x * x - y)))) * (2. * x));
     REQUIRE(diff(erf(x * x + y), y) == (2_dbl / sqrt(pi) * exp((-(x * x + y) * (x * x + y)))));
+
+    REQUIRE(diff(erf(par[0] * par[0] - y), par[0])
+            == (2_dbl / sqrt(pi) * exp((-(par[0] * par[0] - y) * (par[0] * par[0] - y)))) * (2. * par[0]));
+    REQUIRE(diff(erf(x * x + par[1]), par[1]) == (2_dbl / sqrt(pi) * exp((-(x * x + par[1]) * (x * x + par[1])))));
 }
 
 TEST_CASE("erf s11n")

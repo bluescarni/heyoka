@@ -292,19 +292,13 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
 #endif
 
-expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+std::vector<expression> func::fetch_gradient(const std::string &target) const
 {
-    // Run the specialised diff implementation,
-    // if available.
-    if (ptr()->has_diff()) {
-        return ptr()->diff(func_map, s);
-    }
-
     // Check if we have the gradient.
     if (!ptr()->has_gradient()) {
-        throw not_implemented_error(
-            "Cannot compute the derivative of the function '{}', because it does not provide neither a diff() "
-            "nor a gradient() member function"_format(get_name()));
+        throw not_implemented_error("Cannot compute the derivative of the function '{}' with respect to a {}, because "
+                                    "the function does not provide neither a diff() "
+                                    "nor a gradient() member function"_format(get_name(), target));
     }
 
     // Fetch the gradient.
@@ -318,11 +312,50 @@ expression func::diff(std::unordered_map<const void *, expression> &func_map, co
                 get_name(), arity, grad.size()));
     }
 
+    return grad;
+}
+
+expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (ptr()->has_diff_var()) {
+        return ptr()->diff(func_map, s);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = fetch_gradient("variable");
+
     // Compute the total derivative.
     std::vector<expression> prod;
     prod.reserve(arity);
     for (decltype(args().size()) i = 0; i < arity; ++i) {
         prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], s));
+    }
+
+    return pairwise_sum(std::move(prod));
+}
+
+expression func::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (ptr()->has_diff_par()) {
+        return ptr()->diff(func_map, p);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = fetch_gradient("parameter");
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], p));
     }
 
     return pairwise_sum(std::move(prod));

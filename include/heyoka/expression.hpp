@@ -116,14 +116,27 @@ HEYOKA_DLL_PUBLIC expression operator""_var(const char *, std::size_t);
 namespace detail
 {
 
-// NOTE: this needs to go here because
+// NOTE: these need to go here because
 // the definition of expression must be available.
 template <typename T>
 inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map,
                                       const std::string &s) const
 {
-    if constexpr (func_has_diff_v<T>) {
+    if constexpr (func_has_diff_var_v<T>) {
         return m_value.diff(func_map, s);
+    }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
+}
+
+template <typename T>
+inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    if constexpr (func_has_diff_par_v<T>) {
+        return m_value.diff(func_map, p);
     }
 
     // LCOV_EXCL_START
@@ -256,9 +269,11 @@ namespace detail
 
 HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &,
                                   const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &, const param &);
 
-}
+} // namespace detail
 
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 

@@ -66,11 +66,15 @@ TEST_CASE("pi stream")
 TEST_CASE("pi diff")
 {
     REQUIRE(diff(heyoka::pi, "x") == 0_dbl);
+    REQUIRE(diff(heyoka::pi, par[0]) == 0_dbl);
 
     auto x = "x"_var;
 
     REQUIRE(diff(heyoka::pi * cos(2. * x + 2. * heyoka::pi), "x")
             == heyoka::pi * (-2. * sin(2. * x + 2. * heyoka::pi)));
+
+    REQUIRE(diff(heyoka::pi * cos(2. * par[0] + 2. * heyoka::pi), par[0])
+            == heyoka::pi * (-2. * sin(2. * par[0] + 2. * heyoka::pi)));
 }
 
 TEST_CASE("pi s11n")

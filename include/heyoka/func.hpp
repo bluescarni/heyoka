@@ -99,8 +99,10 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
 #endif
 
-    virtual bool has_diff() const = 0;
+    virtual bool has_diff_var() const = 0;
     virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
+    virtual bool has_diff_par() const = 0;
+    virtual expression diff(std::unordered_map<const void *, expression> &, const param &) const = 0;
     virtual bool has_gradient() const = 0;
     virtual std::vector<expression> gradient() const = 0;
 
@@ -191,11 +193,18 @@ inline constexpr bool func_has_codegen_f128_v = std::is_same_v<detected_t<func_c
 #endif
 
 template <typename T>
-using func_diff_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
+using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
     std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const std::string &>()));
 
 template <typename T>
-inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T>, expression>;
+inline constexpr bool func_has_diff_var_v = std::is_same_v<detected_t<func_diff_var_t, T>, expression>;
+
+template <typename T>
+using func_diff_par_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
+    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const param &>()));
+
+template <typename T>
+inline constexpr bool func_has_diff_par_v = std::is_same_v<detected_t<func_diff_par_t, T>, expression>;
 
 template <typename T>
 using func_gradient_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().gradient());
@@ -436,11 +445,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #endif
 
     // diff.
-    bool has_diff() const final
+    bool has_diff_var() const final
     {
-        return func_has_diff_v<T>;
+        return func_has_diff_var_v<T>;
     }
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
+    bool has_diff_par() const final
+    {
+        return func_has_diff_par_v<T>;
+    }
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const final;
 
     // gradient.
     bool has_gradient() const final
@@ -660,7 +674,11 @@ class HEYOKA_DLL_PUBLIC func
     detail::func_inner_base *ptr();
 
     // Private constructor used in the copy() function.
-    explicit func(std::unique_ptr<detail::func_inner_base>);
+    HEYOKA_DLL_LOCAL explicit func(std::unique_ptr<detail::func_inner_base>);
+
+    // Private helper to extract and check the gradient in the
+    // diff() implementations.
+    HEYOKA_DLL_LOCAL std::vector<expression> fetch_gradient(const std::string &) const;
 
     template <typename T>
     using generic_ctor_enabler
@@ -727,6 +745,7 @@ public:
 #endif
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;

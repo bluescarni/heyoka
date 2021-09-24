@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Implement derivatives with respect to the parameters
+  (`#196 <https://github.com/bluescarni/heyoka/pull/196>`__).
 - Implement additional automatic simplifications in the
   expression system
   (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).

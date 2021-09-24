@@ -39,6 +39,7 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -85,6 +86,18 @@ expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_ma
     expression E{func{*this}};
 
     return (detail::diff(func_map, e, s) * sin(E) + detail::diff(func_map, M, s)) / (1_dbl - e * cos(E));
+}
+
+expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 2u);
+
+    const auto &e = args()[0];
+    const auto &M = args()[1];
+
+    expression E{func{*this}};
+
+    return (detail::diff(func_map, e, p) * sin(E) + detail::diff(func_map, M, p)) / (1_dbl - e * cos(E));
 }
 
 taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&

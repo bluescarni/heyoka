@@ -40,3 +40,14 @@ TEST_CASE("sqrt s11n")
 
     REQUIRE(ex == sqrt(x));
 }
+
+TEST_CASE("sqrt diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(sqrt(x * x - y), x) == (2. * x) / (2. * sqrt(x * x - y)));
+    REQUIRE(diff(sqrt(x * x - y), y) == -1. / (2. * sqrt(x * x - y)));
+
+    REQUIRE(diff(sqrt(par[0] * par[0] - y), par[0]) == (2. * par[0]) / (2. * sqrt(par[0] * par[0] - y)));
+    REQUIRE(diff(sqrt(x * x - par[1]), par[1]) == -1. / (2. * sqrt(x * x - par[1])));
+}

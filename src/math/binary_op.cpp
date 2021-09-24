@@ -40,6 +40,7 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
@@ -133,22 +134,33 @@ const expression &binary_op::rhs() const
     return args()[1];
 }
 
-expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+template <typename T>
+expression binary_op::diff_impl(std::unordered_map<const void *, expression> &func_map, const T &x) const
 {
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
 
     switch (m_type) {
         case type::add:
-            return detail::diff(func_map, lhs(), s) + detail::diff(func_map, rhs(), s);
+            return detail::diff(func_map, lhs(), x) + detail::diff(func_map, rhs(), x);
         case type::sub:
-            return detail::diff(func_map, lhs(), s) - detail::diff(func_map, rhs(), s);
+            return detail::diff(func_map, lhs(), x) - detail::diff(func_map, rhs(), x);
         case type::mul:
-            return detail::diff(func_map, lhs(), s) * rhs() + lhs() * detail::diff(func_map, rhs(), s);
+            return detail::diff(func_map, lhs(), x) * rhs() + lhs() * detail::diff(func_map, rhs(), x);
         default:
-            return (detail::diff(func_map, lhs(), s) * rhs() - lhs() * detail::diff(func_map, rhs(), s))
+            return (detail::diff(func_map, lhs(), x) * rhs() - lhs() * detail::diff(func_map, rhs(), x))
                    / (rhs() * rhs());
     }
+}
+
+expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+{
+    return diff_impl(func_map, s);
+}
+
+expression binary_op::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    return diff_impl(func_map, p);
 }
 
 namespace

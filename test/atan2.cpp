@@ -54,6 +54,13 @@ TEST_CASE("atan2 diff")
     REQUIRE(diff(atan2(y, x), "z") == 0_dbl);
     REQUIRE(diff(atan2(x * y, y / x), "x")
             == (y / x * y - (x * y) * (-y / (x * x))) / ((y / x) * (y / x) + (x * y) * (x * y)));
+
+    REQUIRE(diff(atan2(y, par[0]), par[0]) == (-y) / (par[0] * par[0] + y * y));
+    REQUIRE(diff(atan2(par[1], x), par[1]) == x / (x * x + par[1] * par[1]));
+    REQUIRE(diff(atan2(y, x), par[2]) == 0_dbl);
+    REQUIRE(diff(atan2(par[0] * par[1], par[1] / par[0]), par[0])
+            == (par[1] / par[0] * par[1] - (par[0] * par[1]) * (-par[1] / (par[0] * par[0])))
+                   / ((par[1] / par[0]) * (par[1] / par[0]) + (par[0] * par[1]) * (par[0] * par[1])));
 }
 
 TEST_CASE("atan2 decompose")

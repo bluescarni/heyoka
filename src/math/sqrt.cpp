@@ -34,6 +34,7 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -500,6 +501,13 @@ expression sqrt_impl::diff(std::unordered_map<const void *, expression> &func_ma
     assert(args().size() == 1u);
 
     return detail::diff(func_map, args()[0], s) / (2_dbl * sqrt(args()[0]));
+}
+
+expression sqrt_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 1u);
+
+    return detail::diff(func_map, args()[0], p) / (2_dbl * sqrt(args()[0]));
 }
 
 } // namespace detail

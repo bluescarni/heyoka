@@ -209,6 +209,10 @@ TEST_CASE("pow diff")
 
     REQUIRE(diff(pow(3_dbl, x * x + y), "x") == (pow(3_dbl, x * x + y) * log(3_dbl)) * (2_dbl * x));
     REQUIRE(diff(pow(x * x + y, 1.2345_dbl), "y") == 1.2345_dbl * pow(x * x + y, 1.2345_dbl - 1_dbl));
+
+    REQUIRE(diff(pow(3_dbl, par[0] * par[0] + y), par[0])
+            == (pow(3_dbl, par[0] * par[0] + y) * log(3_dbl)) * (2_dbl * par[0]));
+    REQUIRE(diff(pow(x * x + par[1], 1.2345_dbl), par[1]) == 1.2345_dbl * pow(x * x + par[1], 1.2345_dbl - 1_dbl));
 }
 
 TEST_CASE("pow s11n")
