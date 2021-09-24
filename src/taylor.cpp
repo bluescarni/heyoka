@@ -3709,7 +3709,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         T max_abs_state;
         std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
-        // Compute the maximum absolute error on the Taylor series the event equations, which we will use for
+        // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
         // in taylor_detect_events we skip event detection altogether.
         const auto g_eps = isfinite(max_abs_state) ? ((max_abs_state < 1) ? m_tol : (m_tol * max_abs_state))
