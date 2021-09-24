@@ -47,6 +47,7 @@ public:
 #endif
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;

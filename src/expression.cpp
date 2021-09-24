@@ -54,6 +54,18 @@
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
+
 namespace heyoka
 {
 
@@ -214,8 +226,6 @@ detail::prime_wrapper prime(expression e)
             if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
                 return detail::prime_wrapper{std::move(v.name())};
             } else {
-                using namespace fmt::literals;
-
                 throw std::invalid_argument(
                     "Cannot apply the prime() operator to the non-variable expression '{}'"_format(e));
             }
@@ -952,6 +962,45 @@ expression diff(std::unordered_map<const void *, expression> &func_map, const ex
         e.value());
 }
 
+expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const param &p)
+{
+    return std::visit(
+        [&func_map, &p](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
+                                  arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                if (p.idx() == arg.idx()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else if constexpr (std::is_same_v<type, variable>) {
+                return 0_dbl;
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(func_map, p);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
 } // namespace detail
 
 expression diff(const expression &e, const std::string &s)
@@ -961,17 +1010,24 @@ expression diff(const expression &e, const std::string &s)
     return detail::diff(func_map, e, s);
 }
 
+expression diff(const expression &e, const param &p)
+{
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::diff(func_map, e, p);
+}
+
 expression diff(const expression &e, const expression &x)
 {
     return std::visit(
         [&e](const auto &v) -> expression {
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                 return diff(e, v.name());
+            } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
+                return diff(e, v);
             } else {
-                using namespace fmt::literals;
-
                 throw std::invalid_argument(
-                    "Cannot differentiate an expression with respect to the non-variable expression '{}'"_format(e));
+                    "Derivatives are currently supported only with respect to variables and parameters");
             }
         },
         x.value());

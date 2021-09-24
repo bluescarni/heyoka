@@ -22,6 +22,9 @@ TEST_CASE("square diff")
 
     REQUIRE(diff(square(x * x - y), "x") == 2_dbl * (x * x - y) * (2_dbl * x));
     REQUIRE(diff(square(x * x - y), "y") == -(2_dbl * (x * x - y)));
+
+    REQUIRE(diff(square(par[0] * par[0] - y), par[0]) == 2_dbl * (par[0] * par[0] - y) * (2_dbl * par[0]));
+    REQUIRE(diff(square(x * x - par[1]), par[1]) == -(2_dbl * (x * x - par[1])));
 }
 
 TEST_CASE("square s11n")

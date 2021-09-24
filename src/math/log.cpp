@@ -492,6 +492,12 @@ expression log_impl::diff(std::unordered_map<const void *, expression> &func_map
     return detail::diff(func_map, args()[0], s) / args()[0];
 }
 
+expression log_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 1u);
+    return detail::diff(func_map, args()[0], p) / args()[0];
+}
+
 } // namespace detail
 
 expression log(expression e)

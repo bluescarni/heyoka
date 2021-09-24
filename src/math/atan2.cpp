@@ -84,6 +84,18 @@ expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_m
     return (x * detail::diff(func_map, y, s) - y * detail::diff(func_map, x, s)) / std::move(den);
 }
 
+expression atan2_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 2u);
+
+    const auto &y = args()[0];
+    const auto &x = args()[1];
+
+    auto den = square(x) + square(y);
+
+    return (x * detail::diff(func_map, y, p) - y * detail::diff(func_map, x, p)) / std::move(den);
+}
+
 taylor_dc_t::size_type atan2_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);

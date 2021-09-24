@@ -84,6 +84,13 @@ expression atan_impl::diff(std::unordered_map<const void *, expression> &func_ma
     return detail::diff(func_map, args()[0], s) / (1_dbl + square(args()[0]));
 }
 
+expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 1u);
+
+    return detail::diff(func_map, args()[0], p) / (1_dbl + square(args()[0]));
+}
+
 llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
     assert(args.size() == 1u);

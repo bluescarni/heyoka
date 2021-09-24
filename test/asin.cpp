@@ -18,12 +18,20 @@
 
 using namespace heyoka;
 
-TEST_CASE("asin diff")
+TEST_CASE("asin diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
     REQUIRE(diff(asin(x * x - y), x) == pow(1. - square(square(x) - y), -.5) * (2. * x));
     REQUIRE(diff(asin(x * x + y), y) == pow(1. - square(square(x) + y), -.5));
+}
+
+TEST_CASE("asin diff par")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(asin(par[0] * par[0] - y), par[0]) == pow(1. - square(square(par[0]) - y), -.5) * (2. * par[0]));
+    REQUIRE(diff(asin(x * x + par[1]), par[1]) == pow(1. - square(square(x) + par[1]), -.5));
 }
 
 TEST_CASE("asin s11n")

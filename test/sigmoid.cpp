@@ -22,6 +22,10 @@ TEST_CASE("sigmoid diff")
 
     REQUIRE(diff(sigmoid(x * x - y), x) == (1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y) * (2. * x));
     REQUIRE(diff(sigmoid(x * x - y), y) == -((1_dbl - sigmoid(x * x - y)) * sigmoid(x * x - y)));
+
+    REQUIRE(diff(sigmoid(par[0] * par[0] - y), par[0])
+            == (1_dbl - sigmoid(par[0] * par[0] - y)) * sigmoid(par[0] * par[0] - y) * (2. * par[0]));
+    REQUIRE(diff(sigmoid(x * x - par[1]), par[1]) == -((1_dbl - sigmoid(x * x - par[1])) * sigmoid(x * x - par[1])));
 }
 
 TEST_CASE("sigmoid s11n")

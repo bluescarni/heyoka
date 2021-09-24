@@ -48,6 +48,7 @@ public:
     explicit atan2_impl(expression, expression);
 
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
 

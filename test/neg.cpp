@@ -39,6 +39,10 @@ TEST_CASE("neg diff")
     REQUIRE(diff(neg(x + y), "x") == -1_dbl);
     REQUIRE(diff(-(x + y), "x") == -1_dbl);
     REQUIRE(diff(-(x * x + y * x), "x") == -(2. * x + y));
+
+    REQUIRE(diff(neg(par[0] + y), par[0]) == -1_dbl);
+    REQUIRE(diff(-(par[0] + y), par[0]) == -1_dbl);
+    REQUIRE(diff(-(x * x + par[1] * x), par[1]) == -x);
 }
 
 TEST_CASE("unary minus simpl")

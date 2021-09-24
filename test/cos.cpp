@@ -43,6 +43,9 @@ TEST_CASE("cos diff")
 
     REQUIRE(diff(cos(x * x - y), x) == -sin(x * x - y) * (2. * x));
     REQUIRE(diff(cos(x * x - y), y) == sin(x * x - y));
+
+    REQUIRE(diff(cos(par[0] * par[0] - y), par[0]) == -sin(par[0] * par[0] - y) * (2. * par[0]));
+    REQUIRE(diff(cos(x * x - par[1]), par[1]) == sin(x * x - par[1]));
 }
 
 TEST_CASE("cos number simpl")

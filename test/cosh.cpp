@@ -24,6 +24,9 @@ TEST_CASE("cosh diff")
 
     REQUIRE(diff(cosh(x * x - y), x) == sinh(square(x) - y) * (2. * x));
     REQUIRE(diff(cosh(x * x + y), y) == sinh(square(x) + y));
+
+    REQUIRE(diff(cosh(par[0] * par[0] - y), par[0]) == sinh(square(par[0]) - y) * (2. * par[0]));
+    REQUIRE(diff(cosh(x * x + par[1]), par[1]) == sinh(square(x) + par[1]));
 }
 
 TEST_CASE("cosh s11n")

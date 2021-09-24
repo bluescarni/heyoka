@@ -23,6 +23,9 @@ TEST_CASE("tanh diff")
 
     REQUIRE(diff(tanh(x * x - y), x) == (1. - square(tanh(square(x) - y))) * (2. * x));
     REQUIRE(diff(tanh(x * x + y), y) == (1. - square(tanh(square(x) + y))));
+
+    REQUIRE(diff(tanh(par[0] * par[0] - y), par[0]) == (1. - square(tanh(square(par[0]) - y))) * (2. * par[0]));
+    REQUIRE(diff(tanh(x * x + par[1]), par[1]) == (1. - square(tanh(square(x) + par[1]))));
 }
 
 TEST_CASE("tanh s11n")

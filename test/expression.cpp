@@ -381,7 +381,7 @@ TEST_CASE("compute_grad_dbl")
 
 #endif
 
-TEST_CASE("diff")
+TEST_CASE("diff var")
 {
     auto [x, y, z] = make_vars("x", "y", "z");
 
@@ -398,6 +398,37 @@ TEST_CASE("diff")
     // Test the caching of derivatives.
     auto foo = x * (x + y), bar = (foo - x) + (2. * foo);
     auto bar_diff = diff(bar, "x");
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[1].value()).args()[1].value())
+               .get_ptr());
+}
+
+TEST_CASE("diff par")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    REQUIRE_THROWS_MATCHES(
+        diff(x, 1_dbl), std::invalid_argument,
+        Message("Derivatives are currently supported only with respect to variables and parameters"));
+
+    REQUIRE(diff(x + par[0], par[0]) == 1_dbl);
+    REQUIRE(diff(y * par[1], par[1]) == y);
+    REQUIRE(diff(y * par[1], par[0]) == 0_dbl);
+
+    REQUIRE(diff(1_dbl, par[0]) == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff(1_dbl, par[0]).value()).value()));
+    REQUIRE(std::holds_alternative<long double>(std::get<number>(diff(1_ldbl, par[0]).value()).value()));
+
+    REQUIRE(diff("x"_var, par[42]) == 0_dbl);
+    REQUIRE(std::holds_alternative<double>(std::get<number>(diff("x"_var, par[42]).value()).value()));
+
+    // Test the caching of derivatives.
+    auto foo = par[0] * (par[0] + y), bar = (foo - par[0]) + (2. * foo);
+    auto bar_diff = diff(bar, par[0]);
 
     REQUIRE(
         std::get<func>(std::get<func>(std::get<func>(bar_diff.value()).args()[0].value()).args()[1].value()).get_ptr()

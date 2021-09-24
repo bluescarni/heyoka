@@ -69,7 +69,12 @@ TEST_CASE("func minimal")
 #endif
     std::unordered_map<const void *, expression> func_map;
     REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f', because it does not provide "
+                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
+    REQUIRE_THROWS_MATCHES(f.diff(func_map, std::get<param>(par[0].value())), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
+                                   "because the function does not provide "
                                    "neither a diff() nor a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
                            Message("double eval is not implemented for the function 'f'"));
@@ -297,6 +302,16 @@ struct func_05a : func_base {
     }
 };
 
+struct func_05b : func_base {
+    func_05b() : func_base("f", {}) {}
+    explicit func_05b(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const
+    {
+        return -42_dbl;
+    }
+};
+
 TEST_CASE("func diff")
 {
     using Catch::Matchers::Message;
@@ -308,6 +323,7 @@ TEST_CASE("func diff")
     REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
                            Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
                                    "expected, but the number of elements is 0 instead"));
+    REQUIRE(func(func_05b{{"x"_var}}).diff(func_map, std::get<param>(par[0].value())) == -42_dbl);
 }
 
 struct func_06 : func_base {
@@ -669,7 +685,12 @@ TEST_CASE("func diff free func")
 
     f1 = func(func_00{});
     REQUIRE_THROWS_MATCHES(diff(expression{f1}, ""), not_implemented_error,
-                           Message("Cannot compute the derivative of the function 'f', because it does not provide "
+                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
+    REQUIRE_THROWS_MATCHES(diff(expression{f1}, par[0]), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
+                                   "because the function does not provide "
                                    "neither a diff() nor a gradient() member function"));
 }
 
