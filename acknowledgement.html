@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>Breaking changes &#8212; heyoka 0.15.0 documentation</title>
+    <title>Acknowledgement &#8212; heyoka 0.15.0 documentation</title>
     
   <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
 
@@ -38,8 +38,8 @@
     <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Acknowledgement" href="acknowledgement.html" />
-    <link rel="prev" title="Changelog" href="changelog.html" />
+    <link rel="next" title="Bibliography" href="bibliography.html" />
+    <link rel="prev" title="Breaking changes" href="breaking_changes.html" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
@@ -153,13 +153,13 @@
    Changelog
   </a>
  </li>
- <li class="toctree-l1 current active">
-  <a class="current reference internal" href="#">
+ <li class="toctree-l1">
+  <a class="reference internal" href="breaking_changes.html">
    Breaking changes
   </a>
  </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="acknowledgement.html">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
    Acknowledgement
   </a>
  </li>
@@ -208,7 +208,7 @@
         <!-- ipynb file if we had a myst markdown file -->
         
         <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/breaking_changes.rst.txt"><button type="button"
+        <a class="dropdown-buttons" href="_sources/acknowledgement.rst.txt"><button type="button"
                 class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
                 data-placement="left">.rst</button></a>
         <!-- Download PDF via print -->
@@ -228,7 +228,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbreaking_changes.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Facknowledgement.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -249,31 +249,6 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#bchanges-0-15-0">
-   0.15.0
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#bchanges-0-10-0">
-   0.10.0
-  </a>
- </li>
- <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#bchanges-0-8-0">
-   0.8.0
-  </a>
- </li>
-</ul>
-
-        </nav>
-        
         </div>
     </div>
 </div>
@@ -282,43 +257,11 @@
         
               <div>
                 
-  <section id="breaking-changes">
-<span id="id1"></span><h1>Breaking changes<a class="headerlink" href="#breaking-changes" title="Permalink to this headline">¶</a></h1>
-<section id="bchanges-0-15-0">
-<span id="id2"></span><h2>0.15.0<a class="headerlink" href="#bchanges-0-15-0" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>The function class now uses reference
-semantics. This means that copy operations on
-non-trivial expressions now result in shallow copies,
-not deep copies (as it was previously the case).
-This change does not have repercussions on the
-integrators’ API, but user code manipulating expressions
-may need to be adapted.</p></li>
-</ul>
-</section>
-<section id="bchanges-0-10-0">
-<span id="id3"></span><h2>0.10.0<a class="headerlink" href="#bchanges-0-10-0" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>The callback that can (optionally) be passed to
-the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions must now return
-a <code class="docutils literal notranslate"><span class="pre">bool</span></code> indicating whether the integration should
-continue or not. The callback used to return <code class="docutils literal notranslate"><span class="pre">void</span></code>.</p></li>
-</ul>
-</section>
-<section id="bchanges-0-8-0">
-<span id="id4"></span><h2>0.8.0<a class="headerlink" href="#bchanges-0-8-0" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
-<li><p>The direction of a non-terminal event is now specified
-with the (optional) keyword argument <code class="docutils literal notranslate"><span class="pre">direction</span></code> for
-the event’s constructor (whereas before the direction
-could be specified via an unnamed argument).</p></li>
-<li><p>An <code class="docutils literal notranslate"><span class="pre">int</span></code> argument has been appended to the signature of
-the events’ callbacks. This new argument represents the sign
-of the derivative of the event equation at the event trigger
-time, and its value will be -1 for negative derivative,
-1 for positive derivative and 0 for zero derivative.</p></li>
-</ul>
-</section>
+  <section id="acknowledgement">
+<h1>Acknowledgement<a class="headerlink" href="#acknowledgement" title="Permalink to this headline">¶</a></h1>
+<p>We would like to thank the <a class="reference external" href="https://osuosl.org/services/powerdev/">OSU Open Source Lab</a>
+for providing remote access to a POWER server. Their support was crucial in ensuring that
+heyoka works correctly on POWER CPUs.</p>
 </section>
 
 
@@ -327,8 +270,8 @@ time, and its value will be -1 for negative derivative,
         
         <div class='prev-next-bottom'>
             
-    <a class='left-prev' id="prev-link" href="changelog.html" title="previous page">Changelog</a>
-    <a class='right-next' id="next-link" href="acknowledgement.html" title="next page">Acknowledgement</a>
+    <a class='left-prev' id="prev-link" href="breaking_changes.html" title="previous page">Breaking changes</a>
+    <a class='right-next' id="next-link" href="bibliography.html" title="next page">Bibliography</a>
 
         </div>
         
