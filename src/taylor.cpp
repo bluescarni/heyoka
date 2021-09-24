@@ -3712,8 +3712,30 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
         // in taylor_detect_events we skip event detection altogether.
-        const auto g_eps = isfinite(max_abs_state) ? ((max_abs_state < 1) ? m_tol : (m_tol * max_abs_state))
-                                                   : std::numeric_limits<T>::infinity();
+        T g_eps;
+        if (isfinite(max_abs_state)) {
+            // Are we in absolute or relative error control mode?
+            const auto abs_or_rel = max_abs_state < 1;
+
+            // Estimate the size of the largest remainder in the Taylor
+            // series of both the dynamical equations and the events.
+            const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+
+            // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+            // integration error cannot be too small due to floating-point truncation.
+            // This is the case for instance if we use sub-epsilon integration tolerances
+            // to achieve Brouwer's law. In such a case, we cap the value of g_eps.
+            // NOTE: the if condition in the next line is equivalent, in relative
+            // error control mode, to:
+            // if (m_tol < std::numeric_limits<T>::epsilon())
+            if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
+                g_eps = std::numeric_limits<T>::epsilon() * max_abs_state;
+            } else {
+                g_eps = max_r_size;
+            }
+        } else {
+            g_eps = std::numeric_limits<T>::infinity();
+        }
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
