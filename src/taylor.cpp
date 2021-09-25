@@ -3022,6 +3022,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     s.verify_function(f);
 
     // Run the optimisation pass.
+    // NOTE: this does nothing currently, as the optimisation
+    // level is set to zero from the outside.
     s.optimise();
 
     return std::tuple{std::move(dc), order};
@@ -3352,6 +3354,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     s.verify_function(f);
 
     // Run the optimisation pass.
+    // NOTE: this does nothing currently, as the optimisation
+    // level is set to zero from the outside.
     s.optimise();
 
     return std::tuple{std::move(dc), order};
