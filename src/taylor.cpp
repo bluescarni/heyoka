@@ -3724,7 +3724,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
             // integration error cannot be too small due to floating-point truncation.
             // This is the case for instance if we use sub-epsilon integration tolerances
-            // to achieve Brouwer's law. In such a case, we cap the value of g_eps.
+            // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+            // using eps * max_abs_state as an estimation of the smallest number
+            // that can be resolved with the current floating-point type.
             // NOTE: the if condition in the next line is equivalent, in relative
             // error control mode, to:
             // if (m_tol < std::numeric_limits<T>::epsilon())

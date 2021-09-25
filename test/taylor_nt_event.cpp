@@ -329,6 +329,67 @@ TEST_CASE("taylor nte multizero")
         counter = 0;
         cur_time = 0;
 
+        // Run the same test with sub-eps tolerance too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(0), fp_t(.25)},
+                                   kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::nt_events
+                                   = {ev_t(v * v - 1e-10,
+                                           [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                               using std::abs;
+
+                                               // Make sure the callbacks are called in order.
+                                               REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
+                                               REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
+
+                                               ta.update_d_output(t);
+
+                                               const auto v = ta.get_d_output()[1];
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                               ++counter;
+
+                                               cur_time = t;
+                                           }),
+                                      ev_t(v, [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                          using std::abs;
+
+                                          // Make sure the callbacks are called in order.
+                                          REQUIRE(t > cur_time);
+
+                                          // Ensure the state of ta has
+                                          // been propagated until after the
+                                          // event.
+                                          REQUIRE(ta.get_time() > t);
+
+                                          REQUIRE((counter % 3u == 1u));
+
+                                          ta.update_d_output(t);
+
+                                          const auto v = ta.get_d_output()[1];
+                                          REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                          ++counter;
+
+                                          cur_time = t;
+                                      })}};
+
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
+
+        REQUIRE(counter == 12u);
+
+        counter = 0;
+        cur_time = 0;
+
         // We re-run the test, but this time we want to detect
         // only when the velocity goes from positive to negative.
         // Thus the sequence of events will be:
@@ -338,6 +399,74 @@ TEST_CASE("taylor nte multizero")
         // - 0 0
         ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                    {fp_t(0), fp_t(.25)},
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::nt_events
+                                   = {ev_t(v * v - 1e-10,
+                                           [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                               using std::abs;
+
+                                               // Make sure the callbacks are called in order.
+                                               REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
+                                               REQUIRE((counter == 0u || (counter >= 2u && counter <= 6u)
+                                                        || (counter >= 7u && counter <= 9u)));
+
+                                               ta.update_d_output(t);
+
+                                               const auto v = ta.get_d_output()[1];
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                               ++counter;
+
+                                               cur_time = t;
+                                           }),
+                                      ev_t(
+                                          v,
+
+                                          [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int d_sgn) {
+                                              using std::abs;
+
+                                              REQUIRE(d_sgn == -1);
+
+                                              // Make sure the callbacks are called in order.
+                                              REQUIRE(t > cur_time);
+
+                                              // Ensure the state of ta has
+                                              // been propagated until after the
+                                              // event.
+                                              REQUIRE(ta.get_time() > t);
+
+                                              REQUIRE((counter == 1u || counter == 6u));
+
+                                              ta.update_d_output(t);
+
+                                              const auto v = ta.get_d_output()[1];
+                                              REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                              ++counter;
+
+                                              cur_time = t;
+                                          },
+                                          kw::direction = event_direction::negative)}};
+
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
+
+        REQUIRE(counter == 10u);
+
+        counter = 0;
+        cur_time = 0;
+
+        // Sub-eps tolerance too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(0), fp_t(.25)},
+                                   kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
                                    kw::opt_level = opt_level,
                                    kw::high_accuracy = high_accuracy,
                                    kw::compact_mode = compact_mode,
