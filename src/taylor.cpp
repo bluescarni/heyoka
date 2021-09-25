@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono> // NOTE: needed for the spdlog stopwatch.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +42,8 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+
+#include <spdlog/stopwatch.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -462,6 +465,9 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 {
     using idx_t = taylor_dc_t::size_type;
 
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Cache the original size for logging later.
     const auto orig_size = v_ex.size();
 
@@ -568,6 +574,7 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
     }
 
     get_logger()->debug("Taylor CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("Taylor CSE runtime: {}", sw);
 
     return retval;
 }
@@ -592,6 +599,9 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // n_eq variables at the end and possibly
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -758,6 +768,8 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     for (auto idx : v_idx) {
         retval.push_back(std::move(dc[idx]));
     }
+
+    get_logger()->trace("Taylor topological sort runtime: {}", sw);
 
     return retval;
 }
@@ -1001,6 +1013,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Run the decomposition on each equation.
     for (auto &ex : v_ex) {
         // Decompose the current equation.
@@ -1044,6 +1059,8 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::v
     for (auto &ex : v_ex) {
         u_vars_defs.emplace_back(std::move(ex), std::vector<std::uint32_t>{});
     }
+
+    detail::get_logger()->trace("Taylor decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
@@ -1192,6 +1209,9 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
         rename_variables(ex, repl_map);
     }
 
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     taylor_dc_t u_vars_defs;
@@ -1243,6 +1263,8 @@ taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, con
     for (auto &[_, rhs] : sys) {
         u_vars_defs.emplace_back(std::move(rhs), std::vector<std::uint32_t>{});
     }
+
+    detail::get_logger()->trace("Taylor decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
@@ -1711,6 +1733,9 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 // expressions in dc.
 std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t n_eq)
 {
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Helper that takes in input the definition ex of a u variable, and returns
     // in output the list of indices of the u variables on which ex depends.
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
@@ -1804,6 +1829,9 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
 
     assert(counter == dc.size() - n_eq * 2u);
 #endif
+
+    get_logger()->debug("Taylor N of segments: {}", s_dc.size());
+    get_logger()->trace("Taylor segment runtime: {}", sw);
 
     return s_dc;
 }
@@ -2308,6 +2336,9 @@ template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Init the return value.
     // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
     // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
@@ -2425,6 +2456,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         }
     }
 
+    get_logger()->trace("Taylor build function maps runtime: {}", sw);
+
     return retval;
 }
 
@@ -2443,6 +2476,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     // Generate the function maps.
     const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size);
+
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
 
     // Generate the global arrays for the computation of the derivatives
     // of the state variables.
@@ -2604,6 +2640,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         }
     }
 
+    get_logger()->trace("Taylor IR creation compact mode runtime: {}", sw);
+
     // Return the array of derivatives of the u variables.
     return diff_arr;
 }
@@ -2706,6 +2744,9 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
                                                   batch_size);
     } else {
+        // Log the runtime of IR construction in trace mode.
+        spdlog::stopwatch sw;
+
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
 
@@ -2777,6 +2818,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 retval.push_back(taylor_fetch_diff(diff_arr, idx, o, n_uvars));
             }
         }
+
+        get_logger()->trace("Taylor IR creation default mode runtime: {}", sw);
 
         return retval;
     }
@@ -3461,9 +3504,15 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
                 m_pars.size(), npars));
     }
 
+    // Log runtimes in trace mode.
+    spdlog::stopwatch sw;
+
     // Add the function for the computation of
     // the dense output.
     taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1, high_accuracy);
+
+    get_logger()->trace("Taylor dense output runtime: {}", sw);
+    sw.reset();
 
     // Restore the original optimisation level in s.
     od.reset();
@@ -3471,8 +3520,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
+    get_logger()->trace("Taylor global opt pass runtime: {}", sw);
+    sw.reset();
+
     // Run the jit.
     m_llvm.compile();
+
+    get_logger()->trace("Taylor LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
     if (with_events) {
