@@ -65,6 +65,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/llvm_vector_type.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -461,6 +462,9 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 {
     using idx_t = taylor_dc_t::size_type;
 
+    // Cache the original size for logging later.
+    const auto orig_size = v_ex.size();
+
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
     // n_eq variables at the end and possibly
@@ -562,6 +566,8 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         assert(it != uvars_rename.end());
         idx = uname_to_index(it->second);
     }
+
+    get_logger()->debug("Taylor CSE reduced decomposition size from {} to {}", orig_size, retval.size());
 
     return retval;
 }
