@@ -29,6 +29,7 @@
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/numeric/interval.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -684,16 +685,36 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
         using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
+            // Extract the pointer to the Taylor polynomial for the
+            // current event.
+            const auto ptr
+                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
+
+            if constexpr (std::is_same_v<T, double>) {
+                using I = boost::numeric::interval<T>;
+
+                // save and initialize the rounding mode
+                typename I::traits_type::rounding rnd;
+
+                // define the unprotected version of the interval type
+                typedef typename boost::numeric::interval_lib::unprotect<I>::type R;
+
+                R acc(ptr[order]), h_int(0, h);
+
+                for (std::uint32_t i = 1; i <= order; ++i) {
+                    acc = ptr[order - i] + acc * h_int;
+                }
+
+                if (sgn(lower(acc)) == sgn(upper(acc))) {
+                    continue;
+                }
+            }
+
             // Clear out the list of isolating intervals.
             isol.clear();
 
             // Reset the working list.
             wl.clear();
-
-            // Extract the pointer to the Taylor polynomial for the
-            // current event.
-            const auto ptr
-                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be already rescaled
