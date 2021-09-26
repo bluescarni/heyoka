@@ -721,10 +721,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
             if constexpr (std::is_same_v<T, double>) {
-                using I = boost::numeric::interval<T>;
+                // using I = boost::numeric::interval<T>;
 
                 // save and initialize the rounding mode
-                typename I::traits_type::rounding rnd;
+                // typename I::traits_type::rounding rnd;
 
                 // define the unprotected version of the interval type
                 // typedef typename boost::numeric::interval_lib::unprotect<I>::type R;
