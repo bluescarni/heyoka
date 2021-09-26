@@ -616,14 +616,16 @@ auto get_ed_jit_functions(std::uint32_t order)
     }
 }
 
+// Minimal interval class supporting a couple
+// of elementary operations.
 template <typename T>
 struct ival {
     T lower;
     T upper;
 
     ival() : ival(T(0)) {}
-    ival(T val) : lower(val), upper(val) {}
-    ival(T l, T u) : lower(l), upper(u) {}
+    explicit ival(T val) : lower(val), upper(val) {}
+    explicit ival(T l, T u) : lower(l), upper(u) {}
 };
 
 template <typename T>
@@ -720,20 +722,23 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             const auto ptr
                 = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
-            if constexpr (std::is_same_v<T, double>) {
-                // using I = boost::numeric::interval<T>;
-
-                // save and initialize the rounding mode
-                // typename I::traits_type::rounding rnd;
-
-                // define the unprotected version of the interval type
-                // typedef typename boost::numeric::interval_lib::unprotect<I>::type R;
-
+            if constexpr (std::is_same_v<T, double> || true) {
                 using R = ival<T>;
+
+                if (!isfinite(ptr[order])) {
+                    get_logger()->warn(
+                        "the Taylor series of an event equations contains a non-finite value, skipping the event");
+                    return;
+                }
 
                 R acc(ptr[order]), h_int(0, h);
 
                 for (std::uint32_t i = 1; i <= order; ++i) {
+                    if (!isfinite(ptr[order - i])) {
+                        get_logger()->warn(
+                            "the Taylor series of an event equations contains a non-finite value, skipping the event");
+                        return;
+                    }
                     acc = ival<T>(ptr[order - i]) + acc * h_int;
                 }
 
