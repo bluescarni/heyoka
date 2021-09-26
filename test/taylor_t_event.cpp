@@ -190,111 +190,115 @@ TEST_CASE("taylor te basic")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
         using nt_ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
-        auto counter_nt = 0u, counter_t = 0u;
-        fp_t cur_time(0);
-        bool direction = true;
+        // NOTE: test also sub-eps tolerance.
+        for (auto cur_tol : {std::numeric_limits<fp_t>::epsilon(), std::numeric_limits<fp_t>::epsilon() / 100}) {
+            auto counter_nt = 0u, counter_t = 0u;
+            fp_t cur_time(0);
+            bool direction = true;
 
-        auto ta = taylor_adaptive<fp_t>{
-            {prime(x) = v, prime(v) = -9.8 * sin(x)},
-            {fp_t(0.), fp_t(0.25)},
-            kw::opt_level = opt_level,
-            kw::high_accuracy = high_accuracy,
-            kw::compact_mode = compact_mode,
-            kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
-                                         // Make sure the callbacks are called in order.
-                                         if (direction) {
-                                             REQUIRE(t > cur_time);
-                                         } else {
-                                             REQUIRE(t < cur_time);
-                                         }
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                {fp_t(0.), fp_t(0.25)},
+                kw::tol = cur_tol,
+                kw::opt_level = opt_level,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::nt_events = {nt_ev_t(v * v - 1e-10,
+                                         [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                             // Make sure the callbacks are called in order.
+                                             if (direction) {
+                                                 REQUIRE(t > cur_time);
+                                             } else {
+                                                 REQUIRE(t < cur_time);
+                                             }
 
-                                         ta.update_d_output(t);
+                                             ta.update_d_output(t);
 
-                                         const auto v = ta.get_d_output()[1];
-                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                             const auto v = ta.get_d_output()[1];
+                                             REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
-                                         ++counter_nt;
+                                             ++counter_nt;
 
-                                         cur_time = t;
-                                     })},
-            kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
-                    const auto t = ta.get_time();
+                                             cur_time = t;
+                                         })},
+                kw::t_events = {t_ev_t(
+                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
+                        const auto t = ta.get_time();
 
-                    REQUIRE(!mr);
+                        REQUIRE(!mr);
 
-                    if (direction) {
-                        REQUIRE(t > cur_time);
-                    } else {
-                        REQUIRE(t < cur_time);
-                    }
+                        if (direction) {
+                            REQUIRE(t > cur_time);
+                        } else {
+                            REQUIRE(t < cur_time);
+                        }
 
-                    const auto v = ta.get_state()[1];
-                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                        const auto v = ta.get_state()[1];
+                        REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
 
-                    ++counter_t;
+                        ++counter_t;
 
-                    cur_time = t;
+                        cur_time = t;
 
-                    return true;
-                })}};
+                        return true;
+                    })}};
 
-        taylor_outcome oc;
-        while (true) {
-            oc = std::get<0>(ta.step());
-            if (oc > taylor_outcome::success) {
-                break;
+            taylor_outcome oc;
+            while (true) {
+                oc = std::get<0>(ta.step());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 1);
-        REQUIRE(counter_nt == 1u);
-        REQUIRE(counter_t == 1u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 1);
+            REQUIRE(counter_nt == 1u);
+            REQUIRE(counter_t == 1u);
 
-        while (true) {
-            oc = std::get<0>(ta.step());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() > 1);
-        REQUIRE(counter_nt == 3u);
-        REQUIRE(counter_t == 2u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() > 1);
+            REQUIRE(counter_nt == 3u);
+            REQUIRE(counter_t == 2u);
 
-        // Move backwards.
-        direction = false;
+            // Move backwards.
+            direction = false;
 
-        while (true) {
-            oc = std::get<0>(ta.step_backward());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step_backward());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 1);
-        REQUIRE(counter_nt == 5u);
-        REQUIRE(counter_t == 3u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 1);
+            REQUIRE(counter_nt == 5u);
+            REQUIRE(counter_t == 3u);
 
-        while (true) {
-            oc = std::get<0>(ta.step_backward());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step_backward());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 0);
-        REQUIRE(counter_nt == 7u);
-        REQUIRE(counter_t == 4u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 0);
+            REQUIRE(counter_nt == 7u);
+            REQUIRE(counter_t == 4u);
+        }
     };
 
     for (auto cm : {false, true}) {

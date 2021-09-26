@@ -106,23 +106,21 @@ namespace
 // Make sure our definition of ir_builder matches llvm::IRBuilder<>.
 static_assert(std::is_same_v<ir_builder, llvm::IRBuilder<>>, "Inconsistent definition of the ir_builder type.");
 
+// LCOV_EXCL_START
+
 // Helper function to detect specific features
 // on the host machine via LLVM's machinery.
 target_features get_target_features_impl()
 {
     auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();
-    // LCOV_EXCL_START
     if (!jtmb) {
         throw std::invalid_argument("Error creating a JITTargetMachineBuilder for the host system");
     }
-    // LCOV_EXCL_STOP
 
     auto tm = jtmb->createTargetMachine();
-    // LCOV_EXCL_START
     if (!tm) {
         throw std::invalid_argument("Error creating the target machine");
     }
-    // LCOV_EXCL_STOP
 
     target_features retval;
 
@@ -187,6 +185,8 @@ target_features get_target_features_impl()
 
     return retval;
 }
+
+// LCOV_EXCL_STOP
 
 } // namespace
 
