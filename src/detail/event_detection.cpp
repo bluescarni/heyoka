@@ -616,6 +616,36 @@ auto get_ed_jit_functions(std::uint32_t order)
     }
 }
 
+template <typename T>
+struct ival {
+    T lower;
+    T upper;
+
+    ival() : ival(T(0)) {}
+    ival(T val) : lower(val), upper(val) {}
+    ival(T l, T u) : lower(l), upper(u) {}
+};
+
+template <typename T>
+ival<T> operator+(ival<T> a, ival<T> b)
+{
+    return ival<T>(a.lower + b.lower, a.upper + b.upper);
+}
+
+template <typename T>
+ival<T> operator*(ival<T> a, ival<T> b)
+{
+    const auto tmp1 = a.lower * b.lower;
+    const auto tmp2 = a.lower * b.upper;
+    const auto tmp3 = a.upper * b.lower;
+    const auto tmp4 = a.upper * b.upper;
+
+    const auto l = std::min(std::min(tmp1, tmp2), std::min(tmp3, tmp4));
+    const auto u = std::max(std::max(tmp1, tmp2), std::max(tmp3, tmp4));
+
+    return ival<T>(l, u);
+}
+
 // Implementation of event detection.
 template <typename T>
 void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int, T>> &d_tes,
@@ -697,15 +727,17 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 typename I::traits_type::rounding rnd;
 
                 // define the unprotected version of the interval type
-                typedef typename boost::numeric::interval_lib::unprotect<I>::type R;
+                // typedef typename boost::numeric::interval_lib::unprotect<I>::type R;
+
+                using R = ival<T>;
 
                 R acc(ptr[order]), h_int(0, h);
 
                 for (std::uint32_t i = 1; i <= order; ++i) {
-                    acc = ptr[order - i] + acc * h_int;
+                    acc = ival<T>(ptr[order - i]) + acc * h_int;
                 }
 
-                if (sgn(lower(acc)) == sgn(upper(acc))) {
+                if (sgn(acc.lower) == sgn(acc.upper)) {
                     continue;
                 }
             }
