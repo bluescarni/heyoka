@@ -29,7 +29,6 @@
 #include <boost/math/policies/policy.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/numeric/interval.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -631,7 +630,7 @@ struct ival {
         using std::isnan;
 
         if (!isnan(lower) && !isnan(upper)) {
-            assert(upper >= lower);
+            assert(upper >= lower); // LCOV_EXCL_LINE
         }
 #endif
     }
@@ -719,7 +718,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
-    // Interval version of h, for use in the fast sign check.
+    // Interval version of h, for use in the fast exclusion check.
     const auto h_int = (h >= 0) ? ival<T>(0, h) : ival<T>(h, 0);
 
     // Helper to run event detection on a vector of events
@@ -735,7 +734,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             const auto ptr
                 = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
-            // Run the fast check to detect sign changes via
+            // Run the fast exclusion check to detect sign changes via
             // interval arithmetics.
             // NOTE: in case of non-finite values in the Taylor
             // coefficients of the event equation, the worst that
@@ -752,9 +751,15 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     acc = ival<T>(ptr[order - i]) + acc * h_int;
                 }
 
-                // Check it zero is contained within the
+                // Check if zero is contained within the
                 // resulting interval.
-                if (sgn(acc.lower) == sgn(acc.upper)) {
+                // NOTE: here we are checking the closed interval [0, h],
+                // even though throughout the event detection loop we are
+                // actually determining roots in the half-open interval
+                // [0, h). This is fine, as if there are no zeroes in
+                // [0, h], there are also no zeroes in [0, h).
+                const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
+                if (s_lower == s_upper && s_lower != 0) {
                     continue;
                 }
             }
