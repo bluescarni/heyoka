@@ -747,8 +747,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // arithmetic.
                 ival<T> acc(ptr[order]);
 
-                for (std::uint32_t i = 1; i <= order; ++i) {
-                    acc = ival<T>(ptr[order - i]) + acc * h_int;
+                for (std::uint32_t j = 1; j <= order; ++j) {
+                    acc = ival<T>(ptr[order - j]) + acc * h_int;
                 }
 
                 // Check if zero is contained within the
