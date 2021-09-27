@@ -272,18 +272,24 @@ public:
 };
 
 // Find the only existing root for the polynomial poly of the given order
-// existing in [lb, ub].
-// NOTE: we should probably resolve the ambiguity here between half-open
-// and closed intervals. In the real root isolation process we are using
-// half-open intervals, here we are assuming a closed interval. Perhaps
-// we can reconcile the two views using std::nextafter() and friends.
+// existing in [lb, ub).
 template <typename T>
 std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
 {
+    using std::isfinite;
+    using std::nextafter;
+
+    // NOTE: the Boost root finding routine searches in a closed interval,
+    // but the goal here is to find a root in [lb, ub). Thus, we move ub
+    // one position down so that it is not considered in the root finding routine.
+    if (isfinite(lb) && isfinite(ub) && ub > lb) {
+        ub = nextafter(ub, lb);
+    }
+
     // NOTE: perhaps this should depend on T? E.g., we could use the number
     // of binary digits in the significand.
     constexpr boost::uintmax_t iter_limit = 100;
-    boost::uintmax_t max_iter = iter_limit;
+    auto max_iter = iter_limit;
 
     // Ensure that root finding does not throw on error,
     // rather it will write something to errno instead.
