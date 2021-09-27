@@ -624,10 +624,20 @@ struct ival {
     T upper;
 
     ival() : ival(T(0)) {}
-    explicit ival(T val) : lower(val), upper(val) {}
-    explicit ival(T l, T u) : lower(l), upper(u) {}
+    explicit ival(T val) : ival(val, val) {}
+    explicit ival(T l, T u) : lower(l), upper(u)
+    {
+#if !defined(NDEBUG)
+        using std::isnan;
+
+        if (!isnan(lower) && !isnan(upper)) {
+            assert(upper >= lower);
+        }
+#endif
+    }
 };
 
+// NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
 template <typename T>
 ival<T> operator+(ival<T> a, ival<T> b)
 {
@@ -709,6 +719,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
+    // Interval version of h, for use in the fast sign check.
+    const auto h_int = (h >= 0) ? ival<T>(0, h) : ival<T>(h, 0);
+
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
@@ -722,26 +735,25 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             const auto ptr
                 = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
-            if constexpr (std::is_same_v<T, double> || true) {
-                using R = ival<T>;
-
-                if (!isfinite(ptr[order])) {
-                    get_logger()->warn(
-                        "the Taylor series of an event equations contains a non-finite value, skipping the event");
-                    return;
-                }
-
-                R acc(ptr[order]), h_int(0, h);
+            // Run the fast check to detect sign changes via
+            // interval arithmetics.
+            // NOTE: in case of non-finite values in the Taylor
+            // coefficients of the event equation, the worst that
+            // can happen here is that we end up skipping event
+            // detection altogether without a warning. This is ok,
+            // and non-finite Taylor coefficients will be caught in the
+            // step() implementations anyway.
+            {
+                // Run Horner's scheme using interval
+                // arithmetic.
+                ival<T> acc(ptr[order]);
 
                 for (std::uint32_t i = 1; i <= order; ++i) {
-                    if (!isfinite(ptr[order - i])) {
-                        get_logger()->warn(
-                            "the Taylor series of an event equations contains a non-finite value, skipping the event");
-                        return;
-                    }
                     acc = ival<T>(ptr[order - i]) + acc * h_int;
                 }
 
+                // Check it zero is contained within the
+                // resulting interval.
                 if (sgn(acc.lower) == sgn(acc.upper)) {
                     continue;
                 }
