@@ -155,27 +155,6 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
-# Explanation: on MSVC, when building static libraries, it is good practice to link
-# to the static runtime. CMake, however, is hard-coded to link to the dynamic runtime.
-# Hence we hackishly replace the /MD flag with /MT. This is the approach suggested
-# in the CMake FAQ:
-#
-# https://gitlab.kitware.com/cmake/community/wikis/FAQ#how-can-i-build-my-msvc-application-with-a-static-runtime
-#
-# Note that at one point CMake added the possiblity to set this as a target property,
-# so in the future we should definitely migrate to that approach:
-#
-# https://cmake.org/cmake/help/git-master/prop_tgt/MSVC_RUNTIME_LIBRARY.html
-if(YACMA_COMPILER_IS_MSVC AND HEYOKA_BUILD_STATIC_LIBRARY)
-    foreach(flag_var
-            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        if(${flag_var} MATCHES "/MD")
-            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        endif()
-    endforeach()
-endif()
-
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
