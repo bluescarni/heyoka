@@ -53,6 +53,36 @@ const auto fp_types = std::tuple<double
 #endif
                                  >{};
 
+// Test for an event triggering exactly at the end of a timestep.
+TEST_CASE("linear box")
+{
+    using ev_t = taylor_adaptive<double>::nt_event_t;
+
+    auto [x] = make_vars("x");
+
+    auto counter = 0u;
+
+    auto ta_ev = taylor_adaptive<double>{
+        {prime(x) = 1_dbl}, {0.}, kw::nt_events = {ev_t(x - 1., [&counter](taylor_adaptive<double> &, double tm, int) {
+                                      REQUIRE(tm == approximately(1.));
+                                      ++counter;
+                                  })}};
+
+    // Check that the event triggers at the beginning of the second step.
+    auto [oc, h] = ta_ev.step(1.);
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(h == 1.);
+    REQUIRE(counter == 0u);
+    REQUIRE(ta_ev.get_state()[0] == 1.);
+
+    std::tie(oc, h) = ta_ev.step(1.);
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(h == 1.);
+    REQUIRE(counter == 1u);
+    REQUIRE(ta_ev.get_state()[0] == 2.);
+}
+
 TEST_CASE("deep copy semantics")
 {
     using ev_t = taylor_adaptive<double>::nt_event_t;

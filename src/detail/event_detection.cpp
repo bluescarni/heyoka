@@ -272,18 +272,24 @@ public:
 };
 
 // Find the only existing root for the polynomial poly of the given order
-// existing in [lb, ub].
-// NOTE: we should probably resolve the ambiguity here between half-open
-// and closed intervals. In the real root isolation process we are using
-// half-open intervals, here we are assuming a closed interval. Perhaps
-// we can reconcile the two views using std::nextafter() and friends.
+// existing in [lb, ub).
 template <typename T>
 std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
 {
+    using std::isfinite;
+    using std::nextafter;
+
+    // NOTE: the Boost root finding routine searches in a closed interval,
+    // but the goal here is to find a root in [lb, ub). Thus, we move ub
+    // one position down so that it is not considered in the root finding routine.
+    if (isfinite(lb) && isfinite(ub) && ub > lb) {
+        ub = nextafter(ub, lb);
+    }
+
     // NOTE: perhaps this should depend on T? E.g., we could use the number
     // of binary digits in the significand.
     constexpr boost::uintmax_t iter_limit = 100;
-    boost::uintmax_t max_iter = iter_limit;
+    auto max_iter = iter_limit;
 
     // Ensure that root finding does not throw on error,
     // rather it will write something to errno instead.
@@ -615,6 +621,48 @@ auto get_ed_jit_functions(std::uint32_t order)
     }
 }
 
+// Minimal interval class supporting a couple
+// of elementary operations.
+template <typename T>
+struct ival {
+    T lower;
+    T upper;
+
+    ival() : ival(T(0)) {}
+    explicit ival(T val) : ival(val, val) {}
+    explicit ival(T l, T u) : lower(l), upper(u)
+    {
+#if !defined(NDEBUG)
+        using std::isnan;
+
+        if (!isnan(lower) && !isnan(upper)) {
+            assert(upper >= lower); // LCOV_EXCL_LINE
+        }
+#endif
+    }
+};
+
+// NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
+template <typename T>
+ival<T> operator+(ival<T> a, ival<T> b)
+{
+    return ival<T>(a.lower + b.lower, a.upper + b.upper);
+}
+
+template <typename T>
+ival<T> operator*(ival<T> a, ival<T> b)
+{
+    const auto tmp1 = a.lower * b.lower;
+    const auto tmp2 = a.lower * b.upper;
+    const auto tmp3 = a.upper * b.lower;
+    const auto tmp4 = a.upper * b.upper;
+
+    const auto l = std::min(std::min(tmp1, tmp2), std::min(tmp3, tmp4));
+    const auto u = std::max(std::max(tmp1, tmp2), std::max(tmp3, tmp4));
+
+    return ival<T>(l, u);
+}
+
 // Implementation of event detection.
 template <typename T>
 void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int, T>> &d_tes,
@@ -676,6 +724,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
+    // Interval version of h, for use in the fast exclusion check.
+    const auto h_int = (h >= 0) ? ival<T>(0, h) : ival<T>(h, 0);
+
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
     // events, 'ev_vec' the input vector of events to detect.
@@ -684,16 +735,46 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
         using ev_type = typename uncvref_t<decltype(ev_vec)>::value_type;
 
         for (std::uint32_t i = 0; i < ev_vec.size(); ++i) {
+            // Extract the pointer to the Taylor polynomial for the
+            // current event.
+            const auto ptr
+                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
+
+            // Run the fast exclusion check to detect sign changes via
+            // interval arithmetics.
+            // NOTE: in case of non-finite values in the Taylor
+            // coefficients of the event equation, the worst that
+            // can happen here is that we end up skipping event
+            // detection altogether without a warning. This is ok,
+            // and non-finite Taylor coefficients will be caught in the
+            // step() implementations anyway.
+            {
+                // Run Horner's scheme using interval
+                // arithmetic.
+                ival<T> acc(ptr[order]);
+
+                for (std::uint32_t j = 1; j <= order; ++j) {
+                    acc = ival<T>(ptr[order - j]) + acc * h_int;
+                }
+
+                // Check if zero is contained within the
+                // resulting interval.
+                // NOTE: here we are checking the closed interval [0, h],
+                // even though throughout the event detection loop we are
+                // actually determining roots in the half-open interval
+                // [0, h). This is fine, as if there are no zeroes in
+                // [0, h], there are also no zeroes in [0, h).
+                const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
+                if (s_lower == s_upper && s_lower != 0) {
+                    continue;
+                }
+            }
+
             // Clear out the list of isolating intervals.
             isol.clear();
 
             // Reset the working list.
             wl.clear();
-
-            // Extract the pointer to the Taylor polynomial for the
-            // current event.
-            const auto ptr
-                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be already rescaled
@@ -827,66 +908,6 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             assert(!tmp.v.empty());
             assert(tmp.v.size() - 1u == order);
             poly_rescale(tmp.v.data(), ptr, h, order);
-
-            // Determine the polynomial degree.
-            auto degree = order;
-            // NOTE: use < rather than <= in order to avoid
-            // wrapping degree around. I.e., degree will
-            // always be at least 0, even if the order 0
-            // coefficient is zero.
-            for (std::uint32_t o = 0; o < order; ++o) {
-                if (tmp.v[order - o] != 0) {
-                    break;
-                }
-                --degree;
-            }
-
-            // Optimise the cases in which the event polynomial
-            // is linear or quadratic.
-            switch (degree) {
-                case 1u: {
-                    // Linear case.
-                    const auto root = -tmp.v[0] / tmp.v[1];
-
-                    // Add the root only if it falls outside
-                    // the cooldown range and within the [0, 1)
-                    // range.
-                    if (root >= lb_offset && root < 1) {
-                        add_d_event(root * h);
-                    }
-
-                    continue;
-                }
-                case 2u: {
-                    // Quadratic case.
-                    using std::sqrt;
-
-                    const auto a = tmp.v[2], b = tmp.v[1], c = tmp.v[0];
-                    const auto delta = b * b - 4 * a * c;
-
-                    if (delta < 0) {
-                        // Negative discriminant, no real zeroes.
-                        // Move to the next event.
-                        continue;
-                    }
-
-                    const auto sqrt_delta = sqrt(delta);
-                    const auto root1 = (-b - sqrt_delta) / (2 * a);
-                    const auto root2 = (-b + sqrt_delta) / (2 * a);
-
-                    // Add the roots only if they fall outside
-                    // the cooldown range and within the [0, 1)
-                    // range.
-                    if (root1 >= lb_offset && root1 < 1) {
-                        add_d_event(root1 * h);
-                    }
-                    if (root2 >= lb_offset && root2 < 1) {
-                        add_d_event(root2 * h);
-                    }
-
-                    continue;
-                }
-            }
 
             // Place the first element in the working list.
             wl.emplace_back(0, 1, std::move(tmp));
