@@ -48,6 +48,9 @@ Changes
 Fix
 ~~~
 
+- Don't force the use of static MSVC runtime when
+  compiling heyoka as a static library
+  (`#198 <https://github.com/bluescarni/heyoka/pull/198>`__).
 - Fix compilation as a static library
   (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
 - Various fixes to the PPC64 support
