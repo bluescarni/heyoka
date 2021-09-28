@@ -34,6 +34,9 @@ New
 Changes
 ~~~~~~~
 
+- Implement a fast exclusion check for event detection which
+  improves performance when no event triggers in a timestep
+  (`#198 <https://github.com/bluescarni/heyoka/pull/198>`__).
 - **BREAKING**: the function class now uses reference
   semantics. This means that copy operations on
   non-trivial expressions now result in shallow copies,
@@ -45,6 +48,9 @@ Changes
 Fix
 ~~~
 
+- Don't force the use of static MSVC runtime when
+  compiling heyoka as a static library
+  (`#198 <https://github.com/bluescarni/heyoka/pull/198>`__).
 - Fix compilation as a static library
   (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
 - Various fixes to the PPC64 support

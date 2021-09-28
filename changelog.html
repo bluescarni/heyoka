@@ -588,6 +588,9 @@ to the expression system
 <section id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>Implement a fast exclusion check for event detection which
+improves performance when no event triggers in a timestep
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/198">#198</a>).</p></li>
 <li><p><strong>BREAKING</strong>: the function class now uses reference
 semantics. This means that copy operations on
 non-trivial expressions now result in shallow copies,
@@ -600,6 +603,9 @@ not deep copies. This is a <a class="reference internal" href="breaking_changes.
 <section id="fix">
 <h3>Fix<a class="headerlink" href="#fix" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>Don’t force the use of static MSVC runtime when
+compiling heyoka as a static library
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/198">#198</a>).</p></li>
 <li><p>Fix compilation as a static library
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/195">#195</a>).</p></li>
 <li><p>Various fixes to the PPC64 support
