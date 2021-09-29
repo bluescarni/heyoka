@@ -77,6 +77,7 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
             .count());
 
     std::cout << "Construction time: " << elapsed << "ms\n";
+    std::cout << "Decomposition size: " << ta.get_decomposition().size() << '\n';
 
     // Create xtensor views for ease of indexing.
     auto s_array = xt::adapt(ta.get_state_data(), {nplanets + 1u, 6u});
