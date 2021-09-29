@@ -140,9 +140,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                     z_acc[i].push_back(diff_z * fac_j);
 
                     // Acceleration exerted by i on j.
-                    x_acc[j].push_back(diff_x * fac_j * c_ij);
-                    y_acc[j].push_back(diff_y * fac_j * c_ij);
-                    z_acc[j].push_back(diff_z * fac_j * c_ij);
+                    x_acc[j].push_back(x_acc[i].back() * c_ij);
+                    y_acc[j].push_back(y_acc[i].back() * c_ij);
+                    z_acc[j].push_back(z_acc[i].back() * c_ij);
                 } else {
                     // Body j is massless, add the acceleration
                     // on it due to the massive body i.
@@ -212,9 +212,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                     z_acc[i].push_back(diff_z * fac_j);
 
                     // Acceleration exerted by i on j.
-                    x_acc[j].push_back(diff_x * fac_j * c_ij);
-                    y_acc[j].push_back(diff_y * fac_j * c_ij);
-                    z_acc[j].push_back(diff_z * fac_j * c_ij);
+                    x_acc[j].push_back(x_acc[i].back() * c_ij);
+                    y_acc[j].push_back(y_acc[i].back() * c_ij);
+                    z_acc[j].push_back(z_acc[i].back() * c_ij);
                 }
             }
 
@@ -298,9 +298,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
                 z_acc[i].push_back(diff_z * fac_j);
 
                 // Acceleration exerted by i on j.
-                x_acc[j].push_back(diff_x * fac_j * c_ij);
-                y_acc[j].push_back(diff_y * fac_j * c_ij);
-                z_acc[j].push_back(diff_z * fac_j * c_ij);
+                x_acc[j].push_back(x_acc[i].back() * c_ij);
+                y_acc[j].push_back(y_acc[i].back() * c_ij);
+                z_acc[j].push_back(z_acc[i].back() * c_ij);
             } else {
                 // Body j is massless, add the acceleration
                 // on it due to the massive body i.
