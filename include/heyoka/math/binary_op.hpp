@@ -28,6 +28,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -43,6 +44,17 @@ public:
 private:
     type m_type;
 
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+        ar &m_type;
+    }
+
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(std::unordered_map<const void *, expression> &, const T &) const;
+
 public:
     binary_op();
     explicit binary_op(type, expression, expression);
@@ -56,10 +68,9 @@ public:
     type op() const;
     const expression &lhs() const;
     const expression &rhs() const;
-    expression &lhs();
-    expression &rhs();
 
-    expression diff(const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
@@ -101,5 +112,7 @@ HEYOKA_DLL_PUBLIC expression mul(expression, expression);
 HEYOKA_DLL_PUBLIC expression div(expression, expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::binary_op)
 
 #endif

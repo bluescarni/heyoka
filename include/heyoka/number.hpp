@@ -16,6 +16,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -29,6 +30,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -46,7 +48,16 @@ public:
 private:
     value_type m_value;
 
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_value;
+    }
+
 public:
+    number();
     explicit number(double);
     explicit number(long double);
 #if defined(HEYOKA_HAVE_REAL128)
@@ -69,9 +80,6 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const number &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const number &);
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const number &);
-HEYOKA_DLL_PUBLIC void rename_variables(number &, const std::unordered_map<std::string, std::string> &);
-
 HEYOKA_DLL_PUBLIC bool is_zero(const number &);
 HEYOKA_DLL_PUBLIC bool is_one(const number &);
 HEYOKA_DLL_PUBLIC bool is_negative_one(const number &);
@@ -85,10 +93,6 @@ HEYOKA_DLL_PUBLIC number operator/(number, number);
 
 HEYOKA_DLL_PUBLIC bool operator==(const number &, const number &);
 HEYOKA_DLL_PUBLIC bool operator!=(const number &, const number &);
-
-HEYOKA_DLL_PUBLIC expression subs(const number &, const std::unordered_map<std::string, expression> &);
-
-HEYOKA_DLL_PUBLIC expression diff(const number &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const number &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
@@ -136,8 +140,6 @@ inline llvm::Value *codegen(llvm_state &s, const number &n)
         static_assert(detail::always_false_v<T>, "Unhandled type.");
     }
 }
-
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &);
 
 } // namespace heyoka
 

@@ -14,7 +14,9 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <typeinfo>
 #include <utility>
+#include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -24,9 +26,12 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -35,12 +40,76 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
 #endif
                                  >{};
+
+// Test for an event triggering exactly at the end of a timestep.
+TEST_CASE("linear box")
+{
+    using ev_t = taylor_adaptive<double>::t_event_t;
+
+    auto [x] = make_vars("x");
+
+    auto counter = 0u;
+
+    auto ta_ev = taylor_adaptive<double>{{prime(x) = 1_dbl},
+                                         {0.},
+                                         kw::t_events = {ev_t(
+                                             x - 1., kw::callback = [&counter](taylor_adaptive<double> &, bool, int) {
+                                                 ++counter;
+                                                 return true;
+                                             })}};
+
+    // Check that the event triggers at the beginning of the second step.
+    auto [oc, h] = ta_ev.step(1.);
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(h == 1.);
+    REQUIRE(counter == 0u);
+    REQUIRE(ta_ev.get_state()[0] == 1.);
+
+    std::tie(oc, h) = ta_ev.step(1.);
+    REQUIRE(oc == taylor_outcome{0});
+    REQUIRE(h == approximately(0.));
+    REQUIRE(counter == 1u);
+    REQUIRE(ta_ev.get_state()[0] == 1.);
+}
+
+TEST_CASE("deep copy semantics")
+{
+    using ev_t = taylor_adaptive<double>::t_event_t;
+
+    auto [v] = make_vars("v");
+
+    auto ex = v + 3_dbl;
+
+    // Expression is copied on construction.
+    ev_t ev(ex);
+    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+
+    // Deep copy ctor.
+    auto ev2 = ev;
+
+    REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
+            != std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Self assignment.
+    auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
+    ev2 = *&ev2;
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Deep copy assignment.
+    ev2 = ev;
+    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+}
 
 TEST_CASE("taylor te")
 {
@@ -153,111 +222,115 @@ TEST_CASE("taylor te basic")
         using t_ev_t = typename taylor_adaptive<fp_t>::t_event_t;
         using nt_ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
 
-        auto counter_nt = 0u, counter_t = 0u;
-        fp_t cur_time(0);
-        bool direction = true;
+        // NOTE: test also sub-eps tolerance.
+        for (auto cur_tol : {std::numeric_limits<fp_t>::epsilon(), std::numeric_limits<fp_t>::epsilon() / 100}) {
+            auto counter_nt = 0u, counter_t = 0u;
+            fp_t cur_time(0);
+            bool direction = true;
 
-        auto ta = taylor_adaptive<fp_t>{
-            {prime(x) = v, prime(v) = -9.8 * sin(x)},
-            {fp_t(0.), fp_t(0.25)},
-            kw::opt_level = opt_level,
-            kw::high_accuracy = high_accuracy,
-            kw::compact_mode = compact_mode,
-            kw::nt_events = {nt_ev_t(v * v - 1e-10,
-                                     [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
-                                         // Make sure the callbacks are called in order.
-                                         if (direction) {
-                                             REQUIRE(t > cur_time);
-                                         } else {
-                                             REQUIRE(t < cur_time);
-                                         }
+            auto ta = taylor_adaptive<fp_t>{
+                {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                {fp_t(0.), fp_t(0.25)},
+                kw::tol = cur_tol,
+                kw::opt_level = opt_level,
+                kw::high_accuracy = high_accuracy,
+                kw::compact_mode = compact_mode,
+                kw::nt_events = {nt_ev_t(v * v - 1e-10,
+                                         [&counter_nt, &cur_time, &direction](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                             // Make sure the callbacks are called in order.
+                                             if (direction) {
+                                                 REQUIRE(t > cur_time);
+                                             } else {
+                                                 REQUIRE(t < cur_time);
+                                             }
 
-                                         ta.update_d_output(t);
+                                             ta.update_d_output(t);
 
-                                         const auto v = ta.get_d_output()[1];
-                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+                                             const auto v = ta.get_d_output()[1];
+                                             REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
 
-                                         ++counter_nt;
+                                             ++counter_nt;
 
-                                         cur_time = t;
-                                     })},
-            kw::t_events = {t_ev_t(
-                v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
-                    const auto t = ta.get_time();
+                                             cur_time = t;
+                                         })},
+                kw::t_events = {t_ev_t(
+                    v, kw::callback = [&counter_t, &cur_time, &direction](taylor_adaptive<fp_t> &ta, bool mr, int) {
+                        const auto t = ta.get_time();
 
-                    REQUIRE(!mr);
+                        REQUIRE(!mr);
 
-                    if (direction) {
-                        REQUIRE(t > cur_time);
-                    } else {
-                        REQUIRE(t < cur_time);
-                    }
+                        if (direction) {
+                            REQUIRE(t > cur_time);
+                        } else {
+                            REQUIRE(t < cur_time);
+                        }
 
-                    const auto v = ta.get_state()[1];
-                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+                        const auto v = ta.get_state()[1];
+                        REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
 
-                    ++counter_t;
+                        ++counter_t;
 
-                    cur_time = t;
+                        cur_time = t;
 
-                    return true;
-                })}};
+                        return true;
+                    })}};
 
-        taylor_outcome oc;
-        while (true) {
-            oc = std::get<0>(ta.step());
-            if (oc > taylor_outcome::success) {
-                break;
+            taylor_outcome oc;
+            while (true) {
+                oc = std::get<0>(ta.step());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 1);
-        REQUIRE(counter_nt == 1u);
-        REQUIRE(counter_t == 1u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 1);
+            REQUIRE(counter_nt == 1u);
+            REQUIRE(counter_t == 1u);
 
-        while (true) {
-            oc = std::get<0>(ta.step());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() > 1);
-        REQUIRE(counter_nt == 3u);
-        REQUIRE(counter_t == 2u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() > 1);
+            REQUIRE(counter_nt == 3u);
+            REQUIRE(counter_t == 2u);
 
-        // Move backwards.
-        direction = false;
+            // Move backwards.
+            direction = false;
 
-        while (true) {
-            oc = std::get<0>(ta.step_backward());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step_backward());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 1);
-        REQUIRE(counter_nt == 5u);
-        REQUIRE(counter_t == 3u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 1);
+            REQUIRE(counter_nt == 5u);
+            REQUIRE(counter_t == 3u);
 
-        while (true) {
-            oc = std::get<0>(ta.step_backward());
-            if (oc > taylor_outcome::success) {
-                break;
+            while (true) {
+                oc = std::get<0>(ta.step_backward());
+                if (oc > taylor_outcome::success) {
+                    break;
+                }
+                REQUIRE(oc == taylor_outcome::success);
             }
-            REQUIRE(oc == taylor_outcome::success);
-        }
 
-        REQUIRE(static_cast<std::int64_t>(oc) == 0);
-        REQUIRE(ta.get_time() < 0);
-        REQUIRE(counter_nt == 7u);
-        REQUIRE(counter_t == 4u);
+            REQUIRE(static_cast<std::int64_t>(oc) == 0);
+            REQUIRE(ta.get_time() < 0);
+            REQUIRE(counter_nt == 7u);
+            REQUIRE(counter_t == 4u);
+        }
     };
 
     for (auto cm : {false, true}) {
@@ -989,4 +1062,73 @@ TEST_CASE("taylor zero cd mor bug")
     auto oc = std::get<0>(ta.propagate_until(10.));
 
     REQUIRE(static_cast<int>(oc) == -1);
+}
+
+struct s11n_callback {
+    template <typename T>
+    bool operator()(taylor_adaptive<T> &, bool, int) const
+    {
+        return true;
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<double> &, bool, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<long double> &, bool, int)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, bool, taylor_adaptive<mppp::real128> &, bool, int)
+
+#endif
+
+TEST_CASE("t s11n")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        t_event<fp_t> ev(v, kw::callback = s11n_callback{}, kw::direction = event_direction::positive,
+                         kw::cooldown = fp_t(100));
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << ev;
+        }
+
+        ev = t_event<fp_t>(v + x);
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> ev;
+        }
+
+        REQUIRE(ev.get_expression() == v);
+        REQUIRE(ev.get_direction() == event_direction::positive);
+        REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
+        REQUIRE(ev.get_cooldown() == fp_t(100));
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("te def ctor")
+{
+    t_event<double> te;
+
+    REQUIRE(te.get_expression() == 0_dbl);
+    REQUIRE(!te.get_callback());
+    REQUIRE(te.get_direction() == event_direction::any);
+    REQUIRE(te.get_cooldown() == -1.);
 }

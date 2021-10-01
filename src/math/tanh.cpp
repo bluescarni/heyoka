@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -40,6 +41,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -49,6 +51,7 @@
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -74,11 +77,10 @@ tanh_impl::tanh_impl(expression e) : func_base("tanh", std::vector{std::move(e)}
 
 tanh_impl::tanh_impl() : tanh_impl(0_dbl) {}
 
-expression tanh_impl::diff(const std::string &s) const
+std::vector<expression> tanh_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return (1_dbl - square(tanh(args()[0]))) * heyoka::diff(args()[0], s);
+    return {1_dbl - square(tanh(args()[0]))};
 }
 
 llvm::Value *tanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -86,7 +88,7 @@ llvm::Value *tanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "tanh", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -135,12 +137,6 @@ llvm::Value *tanh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
 taylor_dc_t::size_type tanh_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
-
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{"u_{}"_format(dres)};
-    }
 
     // Append the tanh decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -446,3 +442,5 @@ expression tanh(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tanh_impl)

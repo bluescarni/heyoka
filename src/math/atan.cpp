@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -39,7 +40,9 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -49,6 +52,7 @@
 #include <heyoka/math/atan.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -74,11 +78,18 @@ atan_impl::atan_impl(expression e) : func_base("atan", std::vector{std::move(e)}
 
 atan_impl::atan_impl() : atan_impl(0_dbl) {}
 
-expression atan_impl::diff(const std::string &s) const
+expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 1u);
 
-    return 1_dbl / (1_dbl + square(args()[0])) * heyoka::diff(args()[0], s);
+    return detail::diff(func_map, args()[0], s) / (1_dbl + square(args()[0]));
+}
+
+expression atan_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 1u);
+
+    return detail::diff(func_map, args()[0], p) / (1_dbl + square(args()[0]));
 }
 
 llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -86,7 +97,7 @@ llvm::Value *atan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "atan", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -161,14 +172,8 @@ taylor_dc_t::size_type atan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{"u_{}"_format(dres)};
-    }
-
     // Append arg * arg.
-    u_vars_defs.emplace_back(square(arg), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(square(args()[0]), std::vector<std::uint32_t>{});
 
     // Append the atan decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -509,3 +514,5 @@ expression atan(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::atan_impl)

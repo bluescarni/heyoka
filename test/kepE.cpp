@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <sstream>
 #include <variant>
 #include <vector>
@@ -32,6 +33,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -65,11 +67,21 @@ TEST_CASE("kepE diff")
 {
     auto [x, y] = make_vars("x", "y");
 
-    REQUIRE(diff(kepE(x, y), x) == sin(kepE(x, y)) / (1_dbl - x * cos(kepE(x, y))));
-    REQUIRE(diff(kepE(x, y), y) == 1_dbl / (1_dbl - x * cos(kepE(x, y))));
-    auto E = kepE(x * x, x * y);
-    REQUIRE(diff(E, x) == (2_dbl * x * sin(E) + y) / (1_dbl - x * x * cos(E)));
-    REQUIRE(diff(E, y) == x / (1_dbl - x * x * cos(E)));
+    {
+        REQUIRE(diff(kepE(x, y), x) == sin(kepE(x, y)) / (1_dbl - x * cos(kepE(x, y))));
+        REQUIRE(diff(kepE(x, y), y) == 1_dbl / (1_dbl - x * cos(kepE(x, y))));
+        auto E = kepE(x * x, x * y);
+        REQUIRE(diff(E, x) == (2_dbl * x * sin(E) + y) / (1_dbl - x * x * cos(E)));
+        REQUIRE(diff(E, y) == x / (1_dbl - x * x * cos(E)));
+    }
+
+    {
+        REQUIRE(diff(kepE(par[0], y), par[0]) == sin(kepE(par[0], y)) / (1_dbl - par[0] * cos(kepE(par[0], y))));
+        REQUIRE(diff(kepE(x, par[1]), par[1]) == 1_dbl / (1_dbl - x * cos(kepE(x, par[1]))));
+        auto E = kepE(par[0] * par[0], par[0] * par[1]);
+        REQUIRE(diff(E, par[0]) == (2_dbl * par[0] * sin(E) + par[1]) / (1_dbl - par[0] * par[0] * cos(E)));
+        REQUIRE(diff(E, par[1]) == par[0] / (1_dbl - par[0] * par[0] * cos(E)));
+    }
 }
 
 TEST_CASE("kepE decompose")
@@ -80,7 +92,7 @@ TEST_CASE("kepE decompose")
         taylor_dc_t dec;
         dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(kepE(u0, u1), dec);
+        taylor_decompose(kepE(u0, u1), dec);
 
         REQUIRE(dec.size() == 6u);
 
@@ -103,7 +115,7 @@ TEST_CASE("kepE decompose")
         taylor_dc_t dec;
         dec.emplace_back("e"_var, std::vector<std::uint32_t>{});
         dec.emplace_back("M"_var, std::vector<std::uint32_t>{});
-        taylor_decompose_in_place(kepE(u0 + u1, u1 - u0), dec);
+        taylor_decompose(kepE(u0 + u1, u1 - u0), dec);
 
         REQUIRE(dec.size() == 8u);
 
@@ -214,4 +226,29 @@ TEST_CASE("kepE stark")
     // NOTE: slightly less precise because we don't reduce the angle via callback here.
     REQUIRE(sin(ta.get_state()[3]) == approximately(sin(f_E - sqrt(1 - f_G * f_G / (f_L * f_L)) * sin(f_E)), 10000.));
     REQUIRE(cos(ta.get_state()[3]) == approximately(cos(f_E - sqrt(1 - f_G * f_G / (f_L * f_L)) * sin(f_E)), 10000.));
+}
+
+TEST_CASE("kepE s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = kepE(x, y);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == kepE(x, y));
 }

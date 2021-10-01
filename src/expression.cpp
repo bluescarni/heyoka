@@ -8,18 +8,24 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
@@ -48,6 +54,18 @@
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 namespace heyoka
 {
@@ -92,6 +110,62 @@ expression::value_type &expression::value()
 const expression::value_type &expression::value() const
 {
     return m_value;
+}
+
+namespace detail
+{
+
+namespace
+{
+
+expression copy(std::unordered_map<const void *, expression> &func_map, const expression &e)
+{
+    return std::visit(
+        [&func_map](const auto &arg) {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(arg)>, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already copied the current function, fetch the copy
+                    // from the cache.
+                    return it->second;
+                }
+
+                // Perform a copy of arg. Note that this does
+                // a shallow copy of the arguments (i.e., the arguments
+                // will be copied via the copy ctor).
+                auto f_copy = arg.copy();
+
+                // Perform a copy of the arguments.
+                assert(arg.args().size() == f_copy.args().size());
+                auto b1 = arg.args().begin();
+                for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
+                    *b2 = copy(func_map, *b1);
+                }
+
+                // Construct the return value and put it into the cache.
+                auto ex = expression{std::move(f_copy)};
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ex;
+            } else {
+                return expression{arg};
+            }
+        },
+        e.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+expression copy(const expression &e)
+{
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::copy(func_map, e);
 }
 
 inline namespace literals
@@ -153,8 +227,6 @@ detail::prime_wrapper prime(expression e)
             if constexpr (std::is_same_v<variable, detail::uncvref_t<decltype(v)>>) {
                 return detail::prime_wrapper{std::move(v.name())};
             } else {
-                using namespace fmt::literals;
-
                 throw std::invalid_argument(
                     "Cannot apply the prime() operator to the non-variable expression '{}'"_format(e));
             }
@@ -172,14 +244,100 @@ detail::prime_wrapper operator""_p(const char *s, std::size_t n)
 
 } // namespace literals
 
+namespace detail
+{
+
+namespace
+{
+
+std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const expression &e)
+{
+    return std::visit(
+        [&func_set](const auto &arg) -> std::vector<std::string> {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (func_set.find(f_id) != func_set.end()) {
+                    // We already determined the list of variables for the current function,
+                    // return an empty value.
+                    return {};
+                }
+
+                std::vector<std::string> ret;
+
+                for (const auto &farg : arg.args()) {
+                    auto tmp = get_variables(func_set, farg);
+                    ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
+                    std::sort(ret.begin(), ret.end());
+                    ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+                }
+
+                // Add the id of f to the set.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            } else if constexpr (std::is_same_v<type, variable>) {
+                return {arg.name()};
+            } else {
+                return {};
+            }
+        },
+        e.value());
+}
+
+void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
+                      const std::unordered_map<std::string, std::string> &repl_map)
+{
+    std::visit(
+        [&func_set, &repl_map](auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = arg.get_ptr();
+
+                if (func_set.find(f_id) != func_set.end()) {
+                    // We already renamed variables for the current function,
+                    // just return.
+                    return;
+                }
+
+                for (auto [b, e] = arg.get_mutable_args_it(); b != e; ++b) {
+                    rename_variables(func_set, *b, repl_map);
+                }
+
+                // Add the id of f to the set.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (auto it = repl_map.find(arg.name()); it != repl_map.end()) {
+                    arg.name() = it->second;
+                }
+            }
+        },
+        e.value());
+}
+
+} // namespace
+
+} // namespace detail
+
 std::vector<std::string> get_variables(const expression &e)
 {
-    return std::visit([](const auto &arg) { return get_variables(arg); }, e.value());
+    std::unordered_set<const void *> func_set;
+
+    return detail::get_variables(func_set, e);
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
 {
-    std::visit([&repl_map](auto &arg) { rename_variables(arg, repl_map); }, e.value());
+    std::unordered_set<const void *> func_set;
+
+    detail::rename_variables(func_set, e, repl_map);
 }
 
 void swap(expression &ex0, expression &ex1) noexcept
@@ -187,6 +345,12 @@ void swap(expression &ex0, expression &ex1) noexcept
     std::swap(ex0.value(), ex1.value());
 }
 
+// NOTE: this implementation does not take advantage of potentially
+// repeating subexpressions. This is not currently a problem because
+// hashing is needed only in the CSE for the decomposition, which involves
+// only trivial expressions. However, this would likely be needed by a to_sympy()
+// implementation in heyoka.py which allows for a dictionary of custom
+// substitutions to be provided by the user.
 std::size_t hash(const expression &ex)
 {
     return std::visit([](const auto &v) { return hash(v); }, ex.value());
@@ -209,9 +373,8 @@ expression operator-(expression e)
     } else {
         if (auto fptr = detail::is_neg(e)) {
             // Simplify -(-x) to x.
-            auto rng = fptr->get_mutable_args_it();
-            assert(rng.first != rng.second);
-            return std::move(*rng.first);
+            assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+            return fptr->args()[0];
         } else {
             return neg(std::move(e));
         }
@@ -222,9 +385,8 @@ expression operator+(expression e1, expression e2)
 {
     // Simplify x + neg(y) to x - y.
     if (auto fptr = detail::is_neg(e2)) {
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return std::move(e1) - std::move(*rng.first);
+        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+        return std::move(e1) - fptr->args()[0];
     }
 
     auto visitor = [](auto &&v1, auto &&v2) {
@@ -245,10 +407,7 @@ expression operator+(expression e1, expression e2)
                     pbop != nullptr && pbop->op() == detail::binary_op::type::add
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a + x, where a is a number. Simplify e1 + (a + x) -> c + x, where c = e1 + a.
-                    auto rng2 = pbop->get_mutable_args_it();
-
-                    return expression{std::forward<decltype(v1)>(v1)} + std::move(*rng2.first)
-                           + std::move(*(rng2.first + 1));
+                    return expression{std::forward<decltype(v1)>(v1)} + pbop->args()[0] + pbop->args()[1];
                 }
             }
 
@@ -269,9 +428,8 @@ expression operator-(expression e1, expression e2)
 {
     // Simplify x - (-y) to x + y.
     if (auto fptr = detail::is_neg(e2)) {
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return std::move(e1) + std::move(*rng.first);
+        assert(!fptr->args().empty()); // LCOV_EXCL_LINE
+        return std::move(e1) + fptr->args()[0];
     }
 
     auto visitor = [](auto &&v1, auto &&v2) {
@@ -308,13 +466,9 @@ expression operator*(expression e1, expression e2)
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) * (-y) into x*y.
-        auto rng1 = fptr1->get_mutable_args_it();
-        auto rng2 = fptr2->get_mutable_args_it();
-
-        assert(rng1.first != rng1.second);
-        assert(rng2.first != rng2.second);
-
-        return std::move(*rng1.first) * std::move(*rng2.first);
+        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+        return fptr1->args()[0] * fptr2->args()[0];
     }
 
     // Simplify x*x -> square(x) if x is not a number (otherwise,
@@ -340,22 +494,21 @@ expression operator*(expression e1, expression e2)
                 // 1 * e2 = e2.
                 return expression{std::forward<decltype(v2)>(v2)};
             }
+            if (is_negative_one(v1)) {
+                // -1 * e2 = -e2.
+                return -expression{std::forward<decltype(v2)>(v2)};
+            }
             if (fptr2 != nullptr) {
                 // a * (-x) = (-a) * x.
-                auto rng2 = fptr2->get_mutable_args_it();
-                assert(rng2.first != rng2.second);
-
-                return expression{-std::forward<decltype(v1)>(v1)} * std::move(*rng2.first);
+                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+                return expression{-std::forward<decltype(v1)>(v1)} * fptr2->args()[0];
             }
             if constexpr (std::is_same_v<func, type2>) {
                 if (auto pbop = v2.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::mul
                     && std::holds_alternative<number>(pbop->args()[0].value())) {
                     // e2 = a * x, where a is a number. Simplify e1 * (a * x) -> c * x, where c = e1 * a.
-                    auto rng2 = pbop->get_mutable_args_it();
-
-                    return expression{std::forward<decltype(v1)>(v1)} * std::move(*rng2.first)
-                           * std::move(*(rng2.first + 1));
+                    return expression{std::forward<decltype(v1)>(v1)} * pbop->args()[0] * pbop->args()[1];
                 }
             }
 
@@ -379,13 +532,9 @@ expression operator/(expression e1, expression e2)
 
     if (fptr1 != nullptr && fptr2 != nullptr) {
         // Simplify (-x) / (-y) into x/y.
-        auto rng1 = fptr1->get_mutable_args_it();
-        auto rng2 = fptr2->get_mutable_args_it();
-
-        assert(rng1.first != rng1.second);
-        assert(rng2.first != rng2.second);
-
-        return std::move(*rng1.first) / std::move(*rng2.first);
+        assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+        assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+        return fptr1->args()[0] / fptr2->args()[0];
     }
 
     auto visitor = [fptr1, fptr2](auto &&v1, auto &&v2) {
@@ -414,20 +563,15 @@ expression operator/(expression e1, expression e2)
             }
             if (fptr1 != nullptr) {
                 // (-e1) / a = e1 / (-a).
-                auto rng1 = fptr1->get_mutable_args_it();
-                assert(rng1.first != rng1.second);
-
-                return std::move(*rng1.first) / expression{-std::forward<decltype(v2)>(v2)};
+                assert(!fptr1->args().empty()); // LCOV_EXCL_LINE
+                return fptr1->args()[0] / expression{-std::forward<decltype(v2)>(v2)};
             }
             if constexpr (std::is_same_v<func, type1>) {
                 if (auto pbop = v1.template extract<detail::binary_op>();
                     pbop != nullptr && pbop->op() == detail::binary_op::type::div
                     && std::holds_alternative<number>(pbop->args()[1].value())) {
                     // e1 = x / a, where a is a number. Simplify (x / a) / b -> x / (a * b).
-                    auto rng1 = pbop->get_mutable_args_it();
-
-                    return std::move(*rng1.first)
-                           / (std::move(*(rng1.first + 1)) * expression{std::forward<decltype(v2)>(v2)});
+                    return pbop->args()[0] / (pbop->args()[1] * expression{std::forward<decltype(v2)>(v2)});
                 }
             }
 
@@ -440,10 +584,8 @@ expression operator/(expression e1, expression e2)
             }
             if (fptr2 != nullptr) {
                 // a / (-e2) = (-a) / e2.
-                auto rng2 = fptr2->get_mutable_args_it();
-                assert(rng2.first != rng2.second);
-
-                return expression{-std::forward<decltype(v1)>(v1)} / std::move(*rng2.first);
+                assert(!fptr2->args().empty()); // LCOV_EXCL_LINE
+                return expression{-std::forward<decltype(v1)>(v1)} / fptr2->args()[0];
             }
 
             // NOTE: fall through to the standard case.
@@ -725,9 +867,155 @@ bool operator!=(const expression &e1, const expression &e2)
     return !(e1 == e2);
 }
 
+namespace detail
+{
+
+namespace
+{
+
+std::size_t get_n_nodes(std::unordered_map<const void *, std::size_t> &func_map, const expression &e)
+{
+    return std::visit(
+        [&func_map](const auto &arg) -> std::size_t {
+            if constexpr (std::is_same_v<func, detail::uncvref_t<decltype(arg)>>) {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already computed the number of nodes for the current
+                    // function, return it.
+                    return it->second;
+                }
+
+                std::size_t retval = 1;
+                for (const auto &ex : arg.args()) {
+                    retval += get_n_nodes(func_map, ex);
+                }
+
+                // Store the number of nodes for the current function
+                // in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, retval});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return retval;
+            } else {
+                return 1;
+            }
+        },
+        e.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+std::size_t get_n_nodes(const expression &e)
+{
+    std::unordered_map<const void *, std::size_t> func_map;
+
+    return detail::get_n_nodes(func_map, e);
+}
+
+namespace detail
+{
+
+expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const std::string &s)
+{
+    return std::visit(
+        [&func_map, &s](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
+                                  arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                // NOTE: if we ever implement single-precision support,
+                // this should be probably changed into 0_flt (i.e., the lowest
+                // precision numerical type), so that it does not trigger
+                // type promotions in numerical constants. Other similar
+                // occurrences as well (e.g., diff for variable).
+                return 0_dbl;
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (s == arg.name()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(func_map, s);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
+expression diff(std::unordered_map<const void *, expression> &func_map, const expression &e, const param &p)
+{
+    return std::visit(
+        [&func_map, &p](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number>) {
+                return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; },
+                                  arg.value());
+            } else if constexpr (std::is_same_v<type, param>) {
+                if (p.idx() == arg.idx()) {
+                    return 1_dbl;
+                } else {
+                    return 0_dbl;
+                }
+            } else if constexpr (std::is_same_v<type, variable>) {
+                return 0_dbl;
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed diff on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                auto ret = arg.diff(func_map, p);
+
+                // Put the return value in the cache.
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        e.value());
+}
+
+} // namespace detail
+
 expression diff(const expression &e, const std::string &s)
 {
-    return std::visit([&s](const auto &arg) { return diff(arg, s); }, e.value());
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::diff(func_map, e, s);
+}
+
+expression diff(const expression &e, const param &p)
+{
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::diff(func_map, e, p);
 }
 
 expression diff(const expression &e, const expression &x)
@@ -736,19 +1024,76 @@ expression diff(const expression &e, const expression &x)
         [&e](const auto &v) -> expression {
             if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, variable>) {
                 return diff(e, v.name());
+            } else if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, param>) {
+                return diff(e, v);
             } else {
-                using namespace fmt::literals;
-
                 throw std::invalid_argument(
-                    "Cannot differentiate an expression with respect to the non-variable expression '{}'"_format(e));
+                    "Derivatives are currently supported only with respect to variables and parameters");
             }
         },
         x.value());
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// NOTE: an in-place API would perform better.
+expression subs(std::unordered_map<const void *, expression> &func_map, const expression &ex,
+                const std::unordered_map<std::string, expression> &smap)
+{
+    return std::visit(
+        [&func_map, &smap](const auto &arg) {
+            using type = detail::uncvref_t<decltype(arg)>;
+
+            if constexpr (std::is_same_v<type, number> || std::is_same_v<type, param>) {
+                return expression{arg};
+            } else if constexpr (std::is_same_v<type, variable>) {
+                if (auto it = smap.find(arg.name()); it == smap.end()) {
+                    return expression{arg};
+                } else {
+                    return it->second;
+                }
+            } else {
+                const auto f_id = arg.get_ptr();
+
+                if (auto it = func_map.find(f_id); it != func_map.end()) {
+                    // We already performed substitution on the current function,
+                    // fetch the result from the cache.
+                    return it->second;
+                }
+
+                // NOTE: this creates a separate instance of arg, but its
+                // arguments are shallow-copied.
+                auto tmp = arg.copy();
+
+                for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
+                    *b = subs(func_map, *b, smap);
+                }
+
+                // Put the return value in the cache.
+                auto ret = expression{std::move(tmp)};
+                [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
+
+                return ret;
+            }
+        },
+        ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
 expression subs(const expression &e, const std::unordered_map<std::string, expression> &smap)
 {
-    return std::visit([&smap](const auto &arg) { return subs(arg, smap); }, e.value());
+    std::unordered_map<const void *, expression> func_map;
+
+    return detail::subs(func_map, e, smap);
 }
 
 namespace detail
@@ -770,18 +1115,25 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
     // LCOV_EXCL_STOP
 
     while (list.size() != 1u) {
-        std::vector<expression> new_list;
+        const auto cur_size = list.size();
 
-        for (decltype(list.size()) i = 0; i < list.size(); i += 2u) {
-            if (i + 1u == list.size()) {
-                // We are at the last element of the vector
-                // and the size of the vector is odd. Just append
-                // the existing value.
-                new_list.push_back(std::move(list[i]));
-            } else {
-                new_list.push_back(func(std::move(list[i]), std::move(list[i + 1u])));
-            }
-        }
+        // Init the new list. The size will be halved, +1 if the
+        // current size is odd.
+        const auto next_size = cur_size / 2u + cur_size % 2u;
+        std::vector<expression> new_list(next_size);
+
+        tbb::parallel_for(tbb::blocked_range<decltype(new_list.size())>(0, new_list.size()),
+                          [&list, &new_list, cur_size, &func](const auto &r) {
+                              for (auto i = r.begin(); i != r.end(); ++i) {
+                                  if (i * 2u == cur_size - 1u) {
+                                      // list has an odd size, and we are at the last element of list.
+                                      // Just move it to new_list.
+                                      new_list[i] = std::move(list.back());
+                                  } else {
+                                      new_list[i] = func(std::move(list[i * 2u]), std::move(list[i * 2u + 1u]));
+                                  }
+                              }
+                          });
 
         new_list.swap(list);
     }
@@ -800,7 +1152,7 @@ expression pairwise_sum(std::vector<expression> sum)
     // return heyoka::sum(std::move(sum));
 
     if (sum.empty()) {
-        return expression{0.};
+        return 0_dbl;
     }
 
     return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) + std::move(b); },
@@ -811,7 +1163,7 @@ expression pairwise_sum(std::vector<expression> sum)
 expression pairwise_prod(std::vector<expression> prod)
 {
     if (prod.empty()) {
-        return expression{1.};
+        return 1_dbl;
     }
 
     return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) * std::move(b); },
@@ -901,17 +1253,29 @@ void update_grad_dbl(std::unordered_map<std::string, double> &grad, const expres
         e.value());
 }
 
-// Transform in-place ex by decomposition, appending the
-// result of the decomposition to u_vars_defs.
-// The return value is the index, in u_vars_defs,
+namespace detail
+{
+
+taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+                                        const expression &ex, taylor_dc_t &dc)
+{
+    if (auto fptr = std::get_if<func>(&ex.value())) {
+        return fptr->taylor_decompose(func_map, dc);
+    } else {
+        return 0;
+    }
+}
+
+} // namespace detail
+
+// Decompose ex into dc. The return value is the index, in dc,
 // which corresponds to the decomposed version of ex.
 // If the return value is zero, ex was not decomposed.
-// NOTE: this will render ex unusable.
-taylor_dc_t::size_type taylor_decompose_in_place(expression &&ex, taylor_dc_t &u_vars_defs)
+taylor_dc_t::size_type taylor_decompose(const expression &ex, taylor_dc_t &dc)
 {
-    return std::visit(
-        [&u_vars_defs](auto &&v) { return taylor_decompose_in_place(std::forward<decltype(v)>(v), u_vars_defs); },
-        std::move(ex.value()));
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+
+    return detail::taylor_decompose(func_map, ex, dc);
 }
 
 namespace detail
@@ -1085,15 +1449,18 @@ expression par_impl::operator[](std::uint32_t idx) const
 
 } // namespace detail
 
-// Determine the size of the parameter vector from the highest
-// param index appearing in an expression. If the return value
-// is zero, no params appear in the expression.
-std::uint32_t get_param_size(const expression &ex)
+namespace detail
+{
+
+namespace
+{
+
+std::uint32_t get_param_size(std::unordered_set<const void *> &func_set, const expression &ex)
 {
     std::uint32_t retval = 0;
 
     std::visit(
-        [&retval](const auto &v) {
+        [&retval, &func_set](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, param>) {
@@ -1103,9 +1470,22 @@ std::uint32_t get_param_size(const expression &ex)
 
                 retval = std::max(static_cast<std::uint32_t>(v.idx() + 1u), retval);
             } else if constexpr (std::is_same_v<type, func>) {
-                for (const auto &a : v.args()) {
-                    retval = std::max(get_param_size(a), retval);
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already computed the number of params for the current
+                    // function, exit.
+                    return;
                 }
+
+                for (const auto &a : v.args()) {
+                    retval = std::max(get_param_size(func_set, a), retval);
+                }
+
+                // Update the cache.
+                [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
+                // NOTE: an expression cannot contain itself.
+                assert(flag);
             }
         },
         ex.value());
@@ -1113,8 +1493,27 @@ std::uint32_t get_param_size(const expression &ex)
     return retval;
 }
 
-// Determine if an expression is time-dependent.
-bool has_time(const expression &ex)
+} // namespace
+
+} // namespace detail
+
+// Determine the size of the parameter vector from the highest
+// param index appearing in an expression. If the return value
+// is zero, no params appear in the expression.
+std::uint32_t get_param_size(const expression &ex)
+{
+    std::unordered_set<const void *> func_set;
+
+    return detail::get_param_size(func_set, ex);
+}
+
+namespace detail
+{
+
+namespace
+{
+
+bool has_time(std::unordered_set<const void *> &func_set, const expression &ex)
 {
     // If the expression itself is a time function or a tpoly,
     // return true.
@@ -1127,12 +1526,27 @@ bool has_time(const expression &ex)
     //   is time-dependent,
     // - otherwise, return false.
     return std::visit(
-        [](const auto &v) {
+        [&func_set](const auto &v) {
             using type = detail::uncvref_t<decltype(v)>;
 
             if constexpr (std::is_same_v<type, func>) {
+                const auto f_id = v.get_ptr();
+
+                if (auto it = func_set.find(f_id); it != func_set.end()) {
+                    // We already determined if this function contains time,
+                    // return false (if the function does contain time, the first
+                    // time it was encountered we returned true and we could not
+                    // possibly end up here).
+                    return false;
+                }
+
+                // Update the cache.
+                // NOTE: do it earlier than usual in order to avoid having
+                // to repeat this code twice for the two paths below.
+                func_set.insert(f_id);
+
                 for (const auto &a : v.args()) {
-                    if (has_time(a)) {
+                    if (has_time(func_set, a)) {
                         return true;
                     }
                 }
@@ -1141,6 +1555,18 @@ bool has_time(const expression &ex)
             return false;
         },
         ex.value());
+}
+
+} // namespace
+
+} // namespace detail
+
+// Determine if an expression is time-dependent.
+bool has_time(const expression &ex)
+{
+    std::unordered_set<const void *> func_set;
+
+    return detail::has_time(func_set, ex);
 }
 
 } // namespace heyoka

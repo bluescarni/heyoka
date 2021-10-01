@@ -6,17 +6,16 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include <cstddef>
 #include <sstream>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/math.hpp>
+#include <heyoka/math/exp.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 #include "catch.hpp"
 
 using namespace heyoka;
-using namespace Catch::literals;
 
 #include <iostream>
 
@@ -41,4 +40,40 @@ TEST_CASE("exp")
     point["x"] = 2.3;
     auto grad = compute_grad_dbl(ex, point, connections);
     REQUIRE(grad["x"] == std::exp(2.3));
+}
+
+TEST_CASE("exp diff")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(exp(x * x - y), x) == exp(x * x - y) * (2. * x));
+    REQUIRE(diff(exp(x * x - y), y) == -exp(x * x - y));
+
+    REQUIRE(diff(exp(par[0] * par[0] - y), par[0]) == exp(par[0] * par[0] - y) * (2. * par[0]));
+    REQUIRE(diff(exp(x * x - par[1]), par[1]) == -exp(x * x - par[1]));
+}
+
+TEST_CASE("exp s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = exp(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == exp(x));
 }

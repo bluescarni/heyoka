@@ -14,8 +14,10 @@
 #include <heyoka/math/asin.hpp>
 #include <heyoka/math/asinh.hpp>
 #include <heyoka/math/atan.hpp>
+#include <heyoka/math/atan2.hpp>
 #include <heyoka/math/atanh.hpp>
 #include <heyoka/math/binary_op.hpp>
+#include <heyoka/math/constants.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/erf.hpp>

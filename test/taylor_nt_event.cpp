@@ -15,7 +15,9 @@
 #include <limits>
 #include <sstream>
 #include <tuple>
+#include <typeinfo>
 #include <utility>
+#include <variant>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/lexical_cast.hpp>
@@ -26,9 +28,12 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -37,16 +42,82 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
 #endif
                                  >{};
 
+// Test for an event triggering exactly at the end of a timestep.
+TEST_CASE("linear box")
+{
+    using ev_t = taylor_adaptive<double>::nt_event_t;
+
+    auto [x] = make_vars("x");
+
+    auto counter = 0u;
+
+    auto ta_ev = taylor_adaptive<double>{
+        {prime(x) = 1_dbl}, {0.}, kw::nt_events = {ev_t(x - 1., [&counter](taylor_adaptive<double> &, double tm, int) {
+                                      REQUIRE(tm == approximately(1.));
+                                      ++counter;
+                                  })}};
+
+    // Check that the event triggers at the beginning of the second step.
+    auto [oc, h] = ta_ev.step(1.);
+
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(h == 1.);
+    REQUIRE(counter == 0u);
+    REQUIRE(ta_ev.get_state()[0] == 1.);
+
+    std::tie(oc, h) = ta_ev.step(1.);
+    REQUIRE(oc == taylor_outcome::time_limit);
+    REQUIRE(h == 1.);
+    REQUIRE(counter == 1u);
+    REQUIRE(ta_ev.get_state()[0] == 2.);
+}
+
+TEST_CASE("deep copy semantics")
+{
+    using ev_t = taylor_adaptive<double>::nt_event_t;
+
+    auto [v] = make_vars("v");
+
+    auto ex = v + 3_dbl;
+
+    // Expression is copied on construction.
+    ev_t ev(ex, [](taylor_adaptive<double> &, double, int) {});
+    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+
+    // Deep copy ctor.
+    auto ev2 = ev;
+
+    REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
+            != std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Self assignment.
+    auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
+    ev2 = *&ev2;
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Deep copy assignment.
+    ev2 = ev;
+    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+}
+
 // A test case to check that the propagation codepath
-// with events produces results identical results
-// to the no-events codepath.
+// with events produces results similar to the no-events codepath.
+// NOTE: we used to have strict equality testing here, but the test
+// fails on ppc64. This may be due to FP contraction and/or slightly
+// differences in the poly eval routines with/without events. Let's leave
+// it like this for the time being, if at one point we realise we need
+// to enforce strict equality in this scenario we can revisit.
 TEST_CASE("taylor nte match")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
@@ -74,10 +145,11 @@ TEST_CASE("taylor nte match")
             auto [oc, h] = ta.step();
 
             REQUIRE(oc_ev == oc);
-            REQUIRE(h_ev == h);
+            REQUIRE(h_ev == approximately(h, fp_t(1000)));
 
-            REQUIRE(ta_ev.get_state() == ta.get_state());
-            REQUIRE(ta_ev.get_time() == ta.get_time());
+            REQUIRE(ta_ev.get_state()[0] == approximately(ta.get_state()[0], fp_t(20000)));
+            REQUIRE(ta_ev.get_state()[1] == approximately(ta.get_state()[1], fp_t(20000)));
+            REQUIRE(ta_ev.get_time() == approximately(ta.get_time(), fp_t(20000)));
         }
     };
 
@@ -287,6 +359,67 @@ TEST_CASE("taylor nte multizero")
         counter = 0;
         cur_time = 0;
 
+        // Run the same test with sub-eps tolerance too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(0), fp_t(.25)},
+                                   kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::nt_events
+                                   = {ev_t(v * v - 1e-10,
+                                           [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                               using std::abs;
+
+                                               // Make sure the callbacks are called in order.
+                                               REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
+                                               REQUIRE((counter % 3u == 0u || counter % 3u == 2u));
+
+                                               ta.update_d_output(t);
+
+                                               const auto v = ta.get_d_output()[1];
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                               ++counter;
+
+                                               cur_time = t;
+                                           }),
+                                      ev_t(v, [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                          using std::abs;
+
+                                          // Make sure the callbacks are called in order.
+                                          REQUIRE(t > cur_time);
+
+                                          // Ensure the state of ta has
+                                          // been propagated until after the
+                                          // event.
+                                          REQUIRE(ta.get_time() > t);
+
+                                          REQUIRE((counter % 3u == 1u));
+
+                                          ta.update_d_output(t);
+
+                                          const auto v = ta.get_d_output()[1];
+                                          REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                          ++counter;
+
+                                          cur_time = t;
+                                      })}};
+
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
+
+        REQUIRE(counter == 12u);
+
+        counter = 0;
+        cur_time = 0;
+
         // We re-run the test, but this time we want to detect
         // only when the velocity goes from positive to negative.
         // Thus the sequence of events will be:
@@ -296,6 +429,74 @@ TEST_CASE("taylor nte multizero")
         // - 0 0
         ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                    {fp_t(0), fp_t(.25)},
+                                   kw::opt_level = opt_level,
+                                   kw::high_accuracy = high_accuracy,
+                                   kw::compact_mode = compact_mode,
+                                   kw::nt_events
+                                   = {ev_t(v * v - 1e-10,
+                                           [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int) {
+                                               using std::abs;
+
+                                               // Make sure the callbacks are called in order.
+                                               REQUIRE(t > cur_time);
+
+                                               // Ensure the state of ta has
+                                               // been propagated until after the
+                                               // event.
+                                               REQUIRE(ta.get_time() > t);
+
+                                               REQUIRE((counter == 0u || (counter >= 2u && counter <= 6u)
+                                                        || (counter >= 7u && counter <= 9u)));
+
+                                               ta.update_d_output(t);
+
+                                               const auto v = ta.get_d_output()[1];
+                                               REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                               ++counter;
+
+                                               cur_time = t;
+                                           }),
+                                      ev_t(
+                                          v,
+
+                                          [&counter, &cur_time](taylor_adaptive<fp_t> &ta, fp_t t, int d_sgn) {
+                                              using std::abs;
+
+                                              REQUIRE(d_sgn == -1);
+
+                                              // Make sure the callbacks are called in order.
+                                              REQUIRE(t > cur_time);
+
+                                              // Ensure the state of ta has
+                                              // been propagated until after the
+                                              // event.
+                                              REQUIRE(ta.get_time() > t);
+
+                                              REQUIRE((counter == 1u || counter == 6u));
+
+                                              ta.update_d_output(t);
+
+                                              const auto v = ta.get_d_output()[1];
+                                              REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                              ++counter;
+
+                                              cur_time = t;
+                                          },
+                                          kw::direction = event_direction::negative)}};
+
+        REQUIRE(std::get<0>(ta.propagate_until(fp_t(4))) == taylor_outcome::time_limit);
+
+        REQUIRE(counter == 10u);
+
+        counter = 0;
+        cur_time = 0;
+
+        // Sub-eps tolerance too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                   {fp_t(0), fp_t(.25)},
+                                   kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
                                    kw::opt_level = opt_level,
                                    kw::high_accuracy = high_accuracy,
                                    kw::compact_mode = compact_mode,
@@ -532,7 +733,6 @@ TEST_CASE("nt dir test")
                                       {-0.25, 0.},
                                       kw::nt_events = {nt_event<double>(
                                           v,
-
                                           [&fwd, &tlist, &rit](taylor_adaptive<double> &, double t, int d_sgn) {
                                               REQUIRE(d_sgn == 1);
 
@@ -552,4 +752,69 @@ TEST_CASE("nt dir test")
     rit = tlist.rbegin();
 
     ta.propagate_until(0);
+}
+
+struct s11n_callback {
+    template <typename T>
+    void operator()(taylor_adaptive<T> &, T, int) const
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, void, taylor_adaptive<double> &, double, int)
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, void, taylor_adaptive<long double> &, long double, int)
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_callback, void, taylor_adaptive<mppp::real128> &, mppp::real128, int)
+
+#endif
+
+TEST_CASE("nt s11n")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        nt_event<fp_t> ev(v, s11n_callback{}, kw::direction = event_direction::positive);
+
+        std::stringstream ss;
+
+        {
+            boost::archive::binary_oarchive oa(ss);
+
+            oa << ev;
+        }
+
+        ev = nt_event<fp_t>(v + x, [](taylor_adaptive<fp_t> &, fp_t, int) {});
+
+        {
+            boost::archive::binary_iarchive ia(ss);
+
+            ia >> ev;
+        }
+
+        REQUIRE(ev.get_expression() == v);
+        REQUIRE(ev.get_direction() == event_direction::positive);
+        REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_callback));
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("nte def ctor")
+{
+    nt_event<double> nte;
+
+    REQUIRE(nte.get_expression() == 0_dbl);
+    REQUIRE(nte.get_callback());
+    REQUIRE(nte.get_direction() == event_direction::any);
 }

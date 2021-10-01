@@ -37,7 +37,11 @@ using namespace heyoka;
 using namespace heyoka_test;
 namespace hy = heyoka;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -134,8 +138,6 @@ TEST_CASE("taylor time")
 {
     auto tester = [](auto fp_x, unsigned opt_level, bool high_accuracy, bool compact_mode) {
         using fp_t = decltype(fp_x);
-
-        using Catch::Matchers::Message;
 
         auto x = "x"_var, y = "y"_var;
 

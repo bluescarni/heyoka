@@ -19,6 +19,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -28,11 +29,18 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC tan_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     tan_impl();
     explicit tan_impl(expression);
 
-    expression diff(const std::string &) const;
+    std::vector<expression> gradient() const;
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -76,5 +84,7 @@ public:
 HEYOKA_DLL_PUBLIC expression tan(expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::tan_impl)
 
 #endif

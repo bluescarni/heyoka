@@ -10,6 +10,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/binary_op.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -33,16 +34,6 @@ TEST_CASE("basic")
 
         REQUIRE(op.lhs() == "x"_var);
         REQUIRE(op.rhs() == 2_dbl);
-    }
-
-    {
-        binary_op op{binary_op::type::div, "x"_var, 2_dbl};
-
-        op.lhs() = 1_dbl;
-        op.rhs() = "y"_var;
-
-        REQUIRE(op.lhs() == 1_dbl);
-        REQUIRE(op.rhs() == "y"_var);
     }
 }
 
@@ -103,7 +94,7 @@ TEST_CASE("hashing")
     REQUIRE(hash(add(x, y)) != hash(div(x, y)));
 }
 
-TEST_CASE("diff")
+TEST_CASE("diff var")
 {
     auto [x, y] = make_vars("x", "y");
 
@@ -111,4 +102,46 @@ TEST_CASE("diff")
     REQUIRE(diff(x - y, "y") == -1_dbl);
     REQUIRE(diff(x * y, "x") == y);
     REQUIRE(diff(x / y, "x") == y / (y * y));
+}
+
+TEST_CASE("diff par")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    REQUIRE(diff(par[0] + y, par[0]) == 1_dbl);
+    REQUIRE(diff(par[0] + y, par[1]) == 0_dbl);
+
+    REQUIRE(diff(x - par[0], par[0]) == -1_dbl);
+    REQUIRE(diff(x - par[0], par[1]) == 0_dbl);
+
+    REQUIRE(diff(par[2] * y, par[2]) == y);
+    REQUIRE(diff(par[2] * y, par[1]) == 0_dbl);
+
+    REQUIRE(diff(par[3] / y, par[3]) == y / (y * y));
+    REQUIRE(diff(par[3] / y, par[4]) == 0_dbl);
+}
+
+TEST_CASE("asin s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y] = make_vars("x", "y");
+
+    auto ex = x + y;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = x - y;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == x + y);
 }

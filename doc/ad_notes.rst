@@ -379,6 +379,44 @@ With the help of the general Leibniz rule :eq:`eq_leibniz_00`, after re-arrangin
 
    a^{\left[ n \right]}\left( t \right) = \frac{1}{n \left[ c^{\left[ 0 \right]}\left( t \right) + 1 \right]}\left[ n b^{\left[ n \right]}\left( t \right) - \sum_{j=1}^{n-1} j c^{\left[ n - j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right].
 
+Two-argument inverse tangent
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Given :math:`a\left( t \right) = \operatorname{arctan2}\left( b\left( t \right), c\left( t \right) \right)`, we have
+
+.. math::
+   :label: eq_ad_atan200
+
+   a^\prime\left( t \right) = \frac{c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right)}
+   {b^2\left( t \right)+c^2\left( t \right)}.
+
+After the introduction of the auxiliary function
+
+.. math::
+   :label:
+
+   d\left( t \right)  = b^2\left( t \right)+c^2\left( t \right),
+
+:eq:`eq_ad_atan200` can be rewritten as
+
+.. math::
+   :label:
+
+   d\left( t \right)a^\prime\left( t \right) = c\left( t \right) b^\prime\left( t \right)-b\left( t \right)c^\prime \left( t \right).
+
+We can now apply the normalised derivative of order :math:`n-1` to both sides, and, via :eq:`eq_leibniz_00`, obtain, for :math:`n > 0`:
+
+.. math::
+   :label:
+
+   \begin{aligned}
+   a^{\left[ n \right]}\left( t \right) &= \frac{1}{nd^{\left[ 0 \right]}\left( t \right)}\left[\vphantom{\sum_{j=1}^{n-1}j\left( \right)}
+   n\left( c^{\left[ 0 \right]}\left( t \right) b^{\left[ n \right]}\left( t \right) - b^{\left[ 0 \right]}\left( t \right) c^{\left[ n \right]}\left( t \right)\right) \right.\\
+   &\left. + \sum_{j=1}^{n-1}j\left( c^{\left[ n-j \right]}\left( t \right) b^{\left[ j \right]}\left( t \right) -
+   b^{\left[ n-j \right]}\left( t \right) c^{\left[ j \right]}\left( t \right) -
+   d^{\left[ n-j \right]}\left( t \right) a^{\left[ j \right]}\left( t \right) \right) \right].
+   \end{aligned}
+
 Hyperbolic functions
 --------------------
 

@@ -16,12 +16,17 @@
 #include <locale>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/core/demangle.hpp>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/IR/Constants.h>
@@ -36,7 +41,6 @@
 
 #endif
 
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -58,6 +62,8 @@ using fmt::literals::operator""_format;
 
 namespace heyoka
 {
+
+number::number() : number(0.) {}
 
 number::number(double x) : m_value(x) {}
 
@@ -144,13 +150,6 @@ std::ostream &operator<<(std::ostream &os, const number &n)
     return os << oss.str();
 }
 
-std::vector<std::string> get_variables(const number &)
-{
-    return {};
-}
-
-void rename_variables(number &, const std::unordered_map<std::string, std::string> &) {}
-
 bool is_zero(const number &n)
 {
     return std::visit([](const auto &arg) { return arg == 0; }, n.value());
@@ -171,11 +170,67 @@ number operator-(number n)
     return std::visit([](auto &&arg) { return number{-std::forward<decltype(arg)>(arg)}; }, std::move(n.value()));
 }
 
+namespace detail
+{
+
+namespace
+{
+
+// Type-traits to detect arithmetic and comparison capabilities
+// in a type. Used in the implementation of the corresponding operations
+// for the number class.
+template <typename T, typename U>
+using add_t = decltype(std::declval<T>() + std::declval<U>());
+
+template <typename T, typename U = T>
+using is_addable = std::conjunction<is_detected<add_t, T, U>, is_detected<add_t, U, T>,
+                                    std::is_same<detected_t<add_t, T, U>, detected_t<add_t, U, T>>>;
+
+template <typename T, typename U>
+using sub_t = decltype(std::declval<T>() - std::declval<U>());
+
+template <typename T, typename U = T>
+using is_subtractable = std::conjunction<is_detected<sub_t, T, U>, is_detected<sub_t, U, T>,
+                                         std::is_same<detected_t<sub_t, T, U>, detected_t<sub_t, U, T>>>;
+
+template <typename T, typename U>
+using mul_t = decltype(std::declval<T>() * std::declval<U>());
+
+template <typename T, typename U = T>
+using is_multipliable = std::conjunction<is_detected<mul_t, T, U>, is_detected<mul_t, U, T>,
+                                         std::is_same<detected_t<mul_t, T, U>, detected_t<mul_t, U, T>>>;
+
+template <typename T, typename U>
+using div_t = decltype(std::declval<T>() / std::declval<U>());
+
+template <typename T, typename U = T>
+using is_divisible = std::conjunction<is_detected<div_t, T, U>, is_detected<div_t, U, T>,
+                                      std::is_same<detected_t<div_t, T, U>, detected_t<div_t, U, T>>>;
+
+template <typename T, typename U>
+using eq_t = decltype(std::declval<T>() == std::declval<U>());
+
+template <typename T, typename U = T>
+using is_equality_comparable = std::conjunction<is_detected<eq_t, T, U>, is_detected<eq_t, U, T>,
+                                                std::is_same<detected_t<eq_t, T, U>, detected_t<eq_t, U, T>>,
+                                                std::is_convertible<detected_t<eq_t, U, T>, bool>>;
+
+} // namespace
+
+} // namespace detail
+
 number operator+(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
+        [](auto &&arg1, auto &&arg2) -> number {
+            if constexpr (detail::is_addable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) + std::forward<decltype(arg2)>(arg2)};
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot add an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -183,8 +238,15 @@ number operator+(number n1, number n2)
 number operator-(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
+        [](auto &&arg1, auto &&arg2) -> number {
+            if constexpr (detail::is_subtractable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) - std::forward<decltype(arg2)>(arg2)};
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot subtract an object of type {} from an object of type {}"_format(
+                    boost::core::demangle(typeid(arg2).name()), boost::core::demangle(typeid(arg1).name())));
+                // LCOV_EXCL_STOP
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -192,8 +254,15 @@ number operator-(number n1, number n2)
 number operator*(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
+        [](auto &&arg1, auto &&arg2) -> number {
+            if constexpr (detail::is_multipliable<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) * std::forward<decltype(arg2)>(arg2)};
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot multiply an object of type {} by an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -201,8 +270,15 @@ number operator*(number n1, number n2)
 number operator/(number n1, number n2)
 {
     return std::visit(
-        [](auto &&arg1, auto &&arg2) {
-            return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
+        [](auto &&arg1, auto &&arg2) -> number {
+            if constexpr (detail::is_divisible<decltype(arg1), decltype(arg2)>::value) {
+                return number{std::forward<decltype(arg1)>(arg1) / std::forward<decltype(arg2)>(arg2)};
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot divide an object of type {} by an object of type {}"_format(
+                    boost::core::demangle(typeid(arg1).name()), boost::core::demangle(typeid(arg2).name())));
+                // LCOV_EXCL_STOP
+            }
         },
         std::move(n1.value()), std::move(n2.value()));
 }
@@ -210,19 +286,26 @@ number operator/(number n1, number n2)
 bool operator==(const number &n1, const number &n2)
 {
     return std::visit(
-        [](const auto &v1, const auto &v2) {
-            using std::isnan;
+        [](const auto &v1, const auto &v2) -> bool {
+            if constexpr (detail::is_equality_comparable<decltype(v1), decltype(v2)>::value) {
+                using std::isnan;
 
-            if (isnan(v1) && isnan(v2)) {
-                // NOTE: make nan compare equal, for consistency
-                // with hashing.
-                return true;
+                if (isnan(v1) && isnan(v2)) {
+                    // NOTE: make nan compare equal, for consistency
+                    // with hashing.
+                    return true;
+                } else {
+                    // NOTE: this covers the following cases:
+                    // - neither v1 nor v2 is nan,
+                    // - v1 is nan and v2 is not,
+                    // - v2 is nan and v1 is not.
+                    return v1 == v2;
+                }
             } else {
-                // NOTE: this covers the following cases:
-                // - neither v1 nor v2 is nan,
-                // - v1 is nan and v2 is not,
-                // - v2 is nan and v1 is not.
-                return v1 == v2;
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot compare an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(v1).name()), boost::core::demangle(typeid(v2).name())));
+                // LCOV_EXCL_STOP
             }
         },
         n1.value(), n2.value());
@@ -233,33 +316,52 @@ bool operator!=(const number &n1, const number &n2)
     return !(n1 == n2);
 }
 
-expression subs(const number &n, const std::unordered_map<std::string, expression> &)
+namespace detail
 {
-    return expression{n};
+
+namespace
+{
+
+template <typename To>
+To number_eval_impl(const number &n)
+{
+    return std::visit(
+        [](const auto &v) -> To {
+            if constexpr (std::is_constructible_v<To, decltype(v)>) {
+                return static_cast<To>(v);
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument("Cannot convert an object of type {} to an object of type {}"_format(
+                    boost::core::demangle(typeid(v).name()), boost::core::demangle(typeid(To).name())));
+                // LCOV_EXCL_STOP
+            }
+        },
+        n.value());
 }
 
-expression diff(const number &n, const std::string &)
-{
-    return std::visit([](const auto &v) { return expression{number{detail::uncvref_t<decltype(v)>(0)}}; }, n.value());
-}
+} // namespace
+
+} // namespace detail
 
 double eval_dbl(const number &n, const std::unordered_map<std::string, double> &, const std::vector<double> &)
 {
-    return std::visit([](const auto &v) { return static_cast<double>(v); }, n.value());
+    return detail::number_eval_impl<double>(n);
 }
 
 long double eval_ldbl(const number &n, const std::unordered_map<std::string, long double> &,
                       const std::vector<long double> &)
 {
-    return std::visit([](const auto &v) { return static_cast<long double>(v); }, n.value());
+    return detail::number_eval_impl<long double>(n);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 eval_f128(const number &n, const std::unordered_map<std::string, mppp::real128> &,
                         const std::vector<mppp::real128> &)
 {
-    return std::visit([](const auto &v) { return static_cast<mppp::real128>(v); }, n.value());
+    return detail::number_eval_impl<mppp::real128>(n);
 }
+
 #endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const number &n,
@@ -307,24 +409,32 @@ llvm::Value *codegen_dbl(llvm_state &s, const number &n)
 llvm::Value *codegen_ldbl(llvm_state &s, const number &n)
 {
     return std::visit(
-        [&s](const auto &v) {
-            // NOTE: the idea here is that we first fetch the FP
-            // semantics of the LLVM type long double corresponds
-            // to. Then we use them to construct a FP constant from
-            // the string representation of v.
-            // NOTE: v must be cast to long double so that we ensure
-            // that fmt produces a string representation
-            // of v in long double precision accurate to the
-            // last digit.
-            // NOTE: regarding the format string: we use the general format
-            // 'g' and a precision of max_digits10, which should guarantee
-            // round trip behaviour. Note that when using 'g', the precision
-            // argument represents the total number of significant digits
-            // printed (before and after the decimal point).
-            const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
-            return llvm::ConstantFP::get(
-                s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
-                                                                 std::numeric_limits<long double>::max_digits10)));
+        [&s](const auto &v) -> llvm::Value * {
+            if constexpr (std::is_constructible_v<long double, decltype(v)>) {
+                // NOTE: the idea here is that we first fetch the FP
+                // semantics of the LLVM type long double corresponds
+                // to. Then we use them to construct a FP constant from
+                // the string representation of v.
+                // NOTE: v must be cast to long double so that we ensure
+                // that fmt produces a string representation
+                // of v in long double precision accurate to the
+                // last digit.
+                // NOTE: regarding the format string: we use the general format
+                // 'g' and a precision of max_digits10, which should guarantee
+                // round trip behaviour. Note that when using 'g', the precision
+                // argument represents the total number of significant digits
+                // printed (before and after the decimal point).
+                const auto &sem = detail::to_llvm_type<long double>(s.context())->getFltSemantics();
+                return llvm::ConstantFP::get(
+                    s.context(), llvm::APFloat(sem, "{:.{}g}"_format(static_cast<long double>(v),
+                                                                     std::numeric_limits<long double>::max_digits10)));
+            } else {
+                // LCOV_EXCL_START
+                throw std::invalid_argument(
+                    "Cannot perform long double codegen for the type {} on this platform"_format(
+                        boost::core::demangle(typeid(decltype(v)).name())));
+                // LCOV_EXCL_STOP
+            }
         },
         n.value());
 }
@@ -344,11 +454,5 @@ llvm::Value *codegen_f128(llvm_state &s, const number &n)
 }
 
 #endif
-
-taylor_dc_t::size_type taylor_decompose_in_place(number &&, taylor_dc_t &)
-{
-    // NOTE: numbers do not require decomposition.
-    return 0;
-}
 
 } // namespace heyoka

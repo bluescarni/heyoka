@@ -42,6 +42,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -51,6 +52,7 @@
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -81,7 +83,7 @@ llvm::Value *tan_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "tan", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -187,12 +189,6 @@ double tan_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>
 taylor_dc_t::size_type tan_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
-
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_{}"_format(dres)}};
-    }
 
     // Append the tan decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -492,13 +488,12 @@ llvm::Function *tan_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression tan_impl::diff(const std::string &s) const
+std::vector<expression> tan_impl::gradient() const
 {
     assert(args().size() == 1u);
-
     // NOTE: if single-precision floats are implemented,
     // should 1_dbl become 1_flt?
-    return (1_dbl + square(tan(args()[0]))) * heyoka::diff(args()[0], s);
+    return {1_dbl + square(tan(args()[0]))};
 }
 
 } // namespace detail
@@ -509,3 +504,5 @@ expression tan(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tan_impl)

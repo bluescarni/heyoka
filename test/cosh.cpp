@@ -12,6 +12,7 @@
 #include <heyoka/math/cosh.hpp>
 #include <heyoka/math/sinh.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -23,4 +24,32 @@ TEST_CASE("cosh diff")
 
     REQUIRE(diff(cosh(x * x - y), x) == sinh(square(x) - y) * (2. * x));
     REQUIRE(diff(cosh(x * x + y), y) == sinh(square(x) + y));
+
+    REQUIRE(diff(cosh(par[0] * par[0] - y), par[0]) == sinh(square(par[0]) - y) * (2. * par[0]));
+    REQUIRE(diff(cosh(x * x + par[1]), par[1]) == sinh(square(x) + par[1]));
+}
+
+TEST_CASE("cosh s11n")
+{
+    std::stringstream ss;
+
+    auto [x] = make_vars("x");
+
+    auto ex = cosh(x);
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == cosh(x));
 }

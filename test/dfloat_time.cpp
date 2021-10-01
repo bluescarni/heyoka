@@ -11,6 +11,7 @@
 #include <cmath>
 #include <initializer_list>
 #include <random>
+#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -21,6 +22,7 @@
 #endif
 
 #include <heyoka/expression.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -31,7 +33,11 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -290,4 +296,29 @@ TEST_CASE("batch test")
     };
 
     tuple_for_each(fp_types, [&tester](auto x) { tester(x); });
+}
+
+TEST_CASE("dfloat s11n")
+{
+    using df_t = detail::dfloat<double>;
+
+    auto df = df_t(1.1) + df_t(1.3);
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << df;
+    }
+
+    df = df_t(0.);
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> df;
+    }
+
+    REQUIRE(df == df_t(1.1) + df_t(1.3));
 }

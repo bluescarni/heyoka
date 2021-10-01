@@ -42,6 +42,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -52,6 +53,7 @@
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -82,7 +84,7 @@ llvm::Value *cos_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "cos", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -198,14 +200,8 @@ taylor_dc_t::size_type cos_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 1u);
 
-    // Decompose the argument.
-    auto &arg = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(arg), u_vars_defs)) {
-        arg = expression{variable{"u_{}"_format(dres)}};
-    }
-
     // Append the sine decomposition.
-    u_vars_defs.emplace_back(sin(arg), std::vector<std::uint32_t>{});
+    u_vars_defs.emplace_back(sin(args()[0]), std::vector<std::uint32_t>{});
 
     // Append the cosine decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -500,11 +496,10 @@ llvm::Function *cos_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression cos_impl::diff(const std::string &s) const
+std::vector<expression> cos_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return -sin(args()[0]) * heyoka::diff(args()[0], s);
+    return {-sin(args()[0])};
 }
 
 } // namespace detail
@@ -513,12 +508,24 @@ expression cos(expression e)
 {
     if (auto fptr = detail::is_neg(e)) {
         // Simplify cos(-x) to cos(x).
-        auto rng = fptr->get_mutable_args_it();
-        assert(rng.first != rng.second);
-        return cos(std::move(*rng.first));
+        assert(fptr->args().size() == 1u);
+        return cos(fptr->args()[0]);
     } else {
-        return expression{func{detail::cos_impl(std::move(e))}};
+        // Simplify cos(number) to its value.
+        if (auto num_ptr = std::get_if<number>(&e.value())) {
+            return expression{std::visit(
+                [](const auto &x) {
+                    using std::cos;
+
+                    return number{cos(x)};
+                },
+                num_ptr->value())};
+        } else {
+            return expression{func{detail::cos_impl(std::move(e))}};
+        }
     }
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::cos_impl)

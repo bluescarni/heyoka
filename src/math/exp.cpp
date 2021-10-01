@@ -40,6 +40,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -48,6 +49,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/exp.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -78,7 +80,7 @@ llvm::Value *exp_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
         if (const auto sfn = sleef_function_name(s.context(), "exp", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -466,11 +468,10 @@ llvm::Function *exp_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression exp_impl::diff(const std::string &s) const
+std::vector<expression> exp_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return exp(args()[0]) * heyoka::diff(args()[0], s);
+    return {exp(args()[0])};
 }
 
 } // namespace detail
@@ -481,3 +482,5 @@ expression exp(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::exp_impl)

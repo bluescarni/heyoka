@@ -43,6 +43,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
@@ -54,6 +55,7 @@
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -106,7 +108,7 @@ llvm::Value *pow_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
     // NOTE: we want to try the SLEEF route only if we are *not* approximating
     // pow() with sqrt() or iterated multiplications (in which case we are fine
     // with the LLVM builtin).
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType()); !allow_approx && vec_t != nullptr) {
         if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
                                                  boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
             !sfn.empty()) {
@@ -652,12 +654,10 @@ llvm::Function *pow_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 #endif
 
-expression pow_impl::diff(const std::string &s) const
+std::vector<expression> pow_impl::gradient() const
 {
     assert(args().size() == 2u);
-
-    return args()[1] * pow(args()[0], args()[1] - 1_dbl) * heyoka::diff(args()[0], s)
-           + pow(args()[0], args()[1]) * log(args()[0]) * heyoka::diff(args()[1], s);
+    return {args()[1] * pow(args()[0], args()[1] - 1_dbl), pow(args()[0], args()[1]) * log(args()[0])};
 }
 
 namespace
@@ -754,3 +754,5 @@ expression powi(expression b, std::uint32_t e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::pow_impl)

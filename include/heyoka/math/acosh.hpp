@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_ACOSH_HPP
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -17,6 +18,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -26,11 +28,18 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC acosh_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     acosh_impl();
     explicit acosh_impl(expression);
 
-    expression diff(const std::string &) const;
+    std::vector<expression> gradient() const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
@@ -69,5 +78,7 @@ public:
 HEYOKA_DLL_PUBLIC expression acosh(expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::acosh_impl)
 
 #endif

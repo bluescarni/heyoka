@@ -20,6 +20,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -29,13 +30,20 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC neg_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     neg_impl();
     explicit neg_impl(expression);
 
     void to_stream(std::ostream &) const;
 
-    expression diff(const std::string &) const;
+    std::vector<expression> gradient() const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
@@ -75,5 +83,7 @@ func *is_neg(expression &);
 HEYOKA_DLL_PUBLIC expression neg(expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::neg_impl)
 
 #endif

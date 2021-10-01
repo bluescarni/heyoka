@@ -59,10 +59,11 @@ This will produce the following output:
 
 .. code-block:: console
 
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 0.0000000000000000
-   State       : [0.050000000000000003, 0.025000000000000001]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 0.0000000000000000
+   State                   : [0.050000000000000003, 0.025000000000000001]
 
 By default, the error tolerance of an adaptive integrator is set to the
 machine epsilon, which, for ``double``, is :math:`\sim 2.2\times10^{-16}`.
@@ -92,10 +93,11 @@ The screen output will look something like this:
    Outcome : taylor_outcome::success
    Timestep: 0.216053
    
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 0.21605277478009474
-   State       : [0.043996448369926382, -0.078442455470687983]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 0.21605277478009474
+   State                   : [0.043996448369926382, -0.078442455470687983]
 
 It is also possible to perform a single timestep backward in time
 via the ``step_backward()`` function:
@@ -216,10 +218,11 @@ to propagate both forward and backward in time:
    Num. of steps: 97
    Current time : 0
 
-   Taylor order: 20
-   Dimension   : 2
-   Time        : 0.0000000000000000
-   State       : [0.049999999999999843, 0.025000000000002819]
+   Tolerance               : 2.2204460492503131e-16
+   Taylor order            : 20
+   Dimension               : 2
+   Time                    : 0.0000000000000000
+   State                   : [0.050000000000000044, 0.024999999999999991]
 
 Note also that the time-limited propagation functions will stop
 integrating if a non-finite value is detected in the state vector

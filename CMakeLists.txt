@@ -15,13 +15,19 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.11.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.15.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
 message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "System processor: ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "heyoka version: ${heyoka_VERSION}")
+
+# Print some info about the long double type.
+include(CheckTypeSize)
+CHECK_TYPE_SIZE("long double" _HEYOKA_LONG_DOUBLE_SIZE LANGUAGE CXX)
+message(STATUS "Size of the long double type: ${_HEYOKA_LONG_DOUBLE_SIZE}")
+unset(_HEYOKA_LONG_DOUBLE_SIZE)
 
 # Run the YACMA compiler setup.
 include(YACMACompilerLinkerSettings)
@@ -35,6 +41,8 @@ option(HEYOKA_WITH_SLEEF "Enable features relying on SLEEF." OFF)
 option(HEYOKA_BUILD_STATIC_LIBRARY "Build heyoka as a static library, instead of dynamic." OFF)
 option(HEYOKA_ENABLE_IPO "Enable IPO (requires CMake >= 3.9 and compiler support)." OFF)
 mark_as_advanced(HEYOKA_ENABLE_IPO)
+option(HEYOKA_SETUP_DOCS "Setup the files for building the docs." ON)
+mark_as_advanced(HEYOKA_SETUP_DOCS)
 
 # NOTE: on Unix systems, the correct library installation path
 # could be something other than just "lib", such as "lib64",
@@ -140,44 +148,11 @@ endif()
 # Mandatory dependency on LLVM.
 # NOTE: do it early so that we can set up
 # compiler flags based on the LLVM version
-# (see below).
+# if needed.
 find_package(LLVM REQUIRED CONFIG)
 
 if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
-endif()
-
-# NOTE: LLVM >= 12 deprecates the use of llvm::VectorType::getNumElements()
-# in favour of llvm::FixedVectorType::getNumElements(), which is however not
-# available in LLVM 10. Thus, as long as we support LLVM 10, we suppress
-# these deprecation warnings. Moving forward, we need to either drop support
-# for LLVM 10 or find a better solution.
-if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 12)
-    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
-        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
-        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
-    endif()
-endif()
-
-# Explanation: on MSVC, when building static libraries, it is good practice to link
-# to the static runtime. CMake, however, is hard-coded to link to the dynamic runtime.
-# Hence we hackishly replace the /MD flag with /MT. This is the approach suggested
-# in the CMake FAQ:
-#
-# https://gitlab.kitware.com/cmake/community/wikis/FAQ#how-can-i-build-my-msvc-application-with-a-static-runtime
-#
-# Note that at one point CMake added the possiblity to set this as a target property,
-# so in the future we should definitely migrate to that approach:
-#
-# https://cmake.org/cmake/help/git-master/prop_tgt/MSVC_RUNTIME_LIBRARY.html
-if(YACMA_COMPILER_IS_MSVC AND HEYOKA_BUILD_STATIC_LIBRARY)
-    foreach(flag_var
-            CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-        if(${flag_var} MATCHES "/MD")
-            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        endif()
-    endforeach()
 endif()
 
 # List of source files.
@@ -194,8 +169,65 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/expression.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/nbody.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mascon.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/gp.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
+    # VSOP2013.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/celmec/vsop2013.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_1_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_2_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_3_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_4_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_5_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_6_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_7_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_8_6.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_1.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_2.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_3.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_4.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_5.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/vsop2013/vsop2013_9_6.cpp"
+    # Math functions.
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/kepE.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/exp.cpp"
@@ -209,6 +241,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/asin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/acos.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/atan2.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/time.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/cosh.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sinh.cpp"
@@ -220,6 +253,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/logging_impl.cpp"
@@ -228,6 +262,15 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef.cpp"
 )
 
+if(HEYOKA_WITH_SLEEF)
+    # NOTE: the sleef dummy file needs to be compiled only
+    # if we are building with sleef support on.
+    set(HEYOKA_SRC_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/sleef_dummy.cpp"
+        "${HEYOKA_SRC_FILES}"
+    )
+endif()
+
 if(HEYOKA_BUILD_STATIC_LIBRARY)
     # Setup of the heyoka static library.
     message(STATUS "heyoka will be built as a static library.")
@@ -235,8 +278,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "11.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 11)
+    set_property(TARGET heyoka PROPERTY VERSION "15.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 15)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
@@ -312,7 +355,12 @@ else()
 endif()
 
 # Link to LLVM privately.
-target_link_libraries(heyoka PRIVATE heyoka_llvm_internal)
+# NOTE: the BUILD_INTERFACE bit is a workaround needed when building
+# heyoka as a static library: in this configuration, CMake would complain
+# that heyoka_llvm_internal needs to be in the export set, even if it is just
+# an interface library. See the discussion here:
+# https://gitlab.kitware.com/cmake/cmake/-/issues/15415
+target_link_libraries(heyoka PRIVATE "$<BUILD_INTERFACE:heyoka_llvm_internal>")
 
 # Mandatory dependency on fmt.
 find_package(fmt REQUIRED CONFIG)
@@ -322,11 +370,13 @@ target_link_libraries(heyoka PRIVATE fmt::fmt)
 find_package(spdlog REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE spdlog::spdlog)
 
-# Mandatory dependency on Boost.
-find_package(Boost 1.60 REQUIRED)
+# Mandatory dependency on TBB.
+find_package(TBB REQUIRED CONFIG)
+target_link_libraries(heyoka PRIVATE TBB::tbb)
 
-# Public dependency on the headers.
-target_link_libraries(heyoka PUBLIC Boost::boost)
+# Mandatory dependency on Boost.
+find_package(Boost 1.60 REQUIRED serialization)
+target_link_libraries(heyoka PUBLIC Boost::boost Boost::serialization)
 # NOTE: quench warnings from Boost when building the library.
 target_compile_definitions(heyoka PRIVATE BOOST_ALLOW_DEPRECATED_HEADERS)
 
@@ -350,8 +400,10 @@ endif()
 # Configure config.hpp.
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/include/heyoka/config.hpp" @ONLY)
 
-# Configure the doc files.
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py" @ONLY)
+if(HEYOKA_SETUP_DOCS)
+    # Configure the doc files.
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py.in" "${CMAKE_CURRENT_SOURCE_DIR}/doc/conf.py" @ONLY)
+endif()
 
 # Installation of the header files.
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/heyoka" DESTINATION include)

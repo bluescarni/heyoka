@@ -26,15 +26,19 @@
 
 #if defined(MPPP_WITH_QUADMATH)
 
-#if !defined(MPPP_FLOAT128_WITH_LONG_DOUBLE)
-
-#error Quadruple-precision support cannot be enabled if __float128 is not interoperable with long double.
-
-#endif
-
 #define HEYOKA_HAVE_REAL128
 
 #endif
+
+#endif
+
+#if defined(__i386) || defined(_M_IX86) || defined(_X86_) || defined(__amd64__) || defined(_M_AMD64)
+
+#define HEYOKA_ARCH_X86
+
+#elif defined(_ARCH_PPC) || defined(_M_PPC)
+
+#define HEYOKA_ARCH_PPC
 
 #endif
 

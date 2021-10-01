@@ -11,6 +11,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -40,6 +41,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -430,11 +432,10 @@ llvm::Function *square_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_
 
 #endif
 
-expression square_impl::diff(const std::string &s) const
+std::vector<expression> square_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return 2_dbl * args()[0] * heyoka::diff(args()[0], s);
+    return {2_dbl * args()[0]};
 }
 
 } // namespace detail
@@ -445,3 +446,5 @@ expression square(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::square_impl)

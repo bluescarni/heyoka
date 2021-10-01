@@ -11,6 +11,8 @@
 
 #include <cstdint>
 #include <ostream>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -19,6 +21,7 @@
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -28,10 +31,19 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC time_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     time_impl();
 
     void to_stream(std::ostream &) const;
+
+    std::vector<expression> gradient() const;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
@@ -58,5 +70,7 @@ HEYOKA_DLL_PUBLIC bool is_time(const expression &);
 HEYOKA_DLL_PUBLIC extern const expression time;
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::time_impl)
 
 #endif

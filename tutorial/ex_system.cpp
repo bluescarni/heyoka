@@ -29,11 +29,11 @@ int main()
     // Double precision.
     std::cout << 1.1_dbl << '\n'; // Prints '1.1000000000000001'
 
-    // Extended (80-bit) precision.
+    // Long double precision (80-bit on x86).
     std::cout << 1.1_ldbl << '\n'; // Prints '1.10000000000000000002'
 
 #if defined(HEYOKA_HAVE_REAL128)
-    // Quadruple precision.
+    // Quadruple precision on x86-64.
     std::cout << 1.1_f128 << '\n'; // Prints '1.10000000000000000000000000000000008'
 #endif
 

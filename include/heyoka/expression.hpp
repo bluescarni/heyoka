@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <array>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -20,6 +21,7 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -34,10 +36,10 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
-#include <heyoka/exceptions.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/variable.hpp>
 
 namespace heyoka
@@ -50,6 +52,14 @@ public:
 
 private:
     value_type m_value;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_value;
+    }
 
 public:
     expression();
@@ -78,6 +88,8 @@ public:
     const value_type &value() const;
 };
 
+HEYOKA_DLL_PUBLIC expression copy(const expression &);
+
 inline namespace literals
 {
 
@@ -105,30 +117,32 @@ namespace detail
 {
 
 // NOTE: these need to go here because
-// the definition of expression must be visible
-// in order for these to be well-formed.
+// the definition of expression must be available.
 template <typename T>
-inline expression func_inner<T>::diff(const std::string &s) const
+inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map,
+                                      const std::string &s) const
 {
-    if constexpr (func_has_diff_v<T>) {
-        return m_value.diff(s);
-    } else {
-        throw not_implemented_error("The derivative is not implemented for the function '" + get_name() + "'");
+    if constexpr (func_has_diff_var_v<T>) {
+        return m_value.diff(func_map, s);
     }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
 }
 
 template <typename T>
-inline taylor_dc_t::size_type func_inner<T>::taylor_decompose(taylor_dc_t &u_vars_defs) &&
+inline expression func_inner<T>::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
 {
-    if constexpr (func_has_taylor_decompose_v<T>) {
-        return std::move(m_value).taylor_decompose(u_vars_defs);
-    } else {
-        func_default_td_impl(static_cast<func_base &>(m_value), u_vars_defs);
-
-        u_vars_defs.emplace_back(func{std::move(m_value)}, std::vector<std::uint32_t>{});
-
-        return u_vars_defs.size() - 1u;
+    if constexpr (func_has_diff_par_v<T>) {
+        return m_value.diff(func_map, p);
     }
+
+    // LCOV_EXCL_START
+    assert(false);
+    throw;
+    // LCOV_EXCL_STOP
 }
 
 struct HEYOKA_DLL_PUBLIC prime_wrapper {
@@ -246,8 +260,20 @@ HEYOKA_DLL_PUBLIC expression &operator/=(expression &, mppp::real128);
 HEYOKA_DLL_PUBLIC bool operator==(const expression &, const expression &);
 HEYOKA_DLL_PUBLIC bool operator!=(const expression &, const expression &);
 
+HEYOKA_DLL_PUBLIC std::size_t get_n_nodes(const expression &);
+
 HEYOKA_DLL_PUBLIC expression subs(const expression &, const std::unordered_map<std::string, expression> &);
 
+namespace detail
+{
+
+HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &,
+                                  const std::string &);
+HEYOKA_DLL_PUBLIC expression diff(std::unordered_map<const void *, expression> &, const expression &, const param &);
+
+} // namespace detail
+
+HEYOKA_DLL_PUBLIC expression diff(const expression &, const param &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const std::string &);
 HEYOKA_DLL_PUBLIC expression diff(const expression &, const expression &);
 
@@ -305,7 +331,15 @@ HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double = 1.);
 
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(expression &&, taylor_dc_t &);
+namespace detail
+{
+
+taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &, const expression &,
+                                        taylor_dc_t &);
+
+}
+
+HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose(const expression &, taylor_dc_t &);
 
 template <typename... Args>
 inline std::array<expression, sizeof...(Args)> make_vars(const Args &...strs)

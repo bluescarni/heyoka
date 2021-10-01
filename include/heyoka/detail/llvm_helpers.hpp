@@ -96,6 +96,7 @@ HEYOKA_DLL_PUBLIC bool compare_function_signature(llvm::Function *, llvm::Type *
 HEYOKA_DLL_PUBLIC llvm::Value *make_global_zero_array(llvm::Module &, llvm::ArrayType *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, const std::string &);
+HEYOKA_DLL_PUBLIC llvm::Value *call_extern_vec(llvm_state &, llvm::Value *, llvm::Value *, const std::string &);
 
 // Math helpers.
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &, llvm::Value *);
@@ -104,6 +105,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_abs(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_min(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_dbl(llvm_state &, std::uint32_t, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_ldbl(llvm_state &, std::uint32_t, std::uint32_t);

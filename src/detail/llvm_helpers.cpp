@@ -24,7 +24,6 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
-#include <boost/math/special_functions/binomial.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -54,8 +53,10 @@
 
 #endif
 
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/visibility.hpp>
@@ -93,19 +94,28 @@ const auto type_map = []() {
         };
     }
 
-    // Try to associate C++ long double to LLVM double or x86_fp80.
+    // Try to associate C++ long double to an LLVM fp type.
     if (std::numeric_limits<long double>::is_iec559) {
         if (std::numeric_limits<long double>::digits == 53) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
-                // IEEE double-precision type (this is the case on MSVC for instance).
+                // IEEE double-precision format (this is the case on MSVC for instance).
                 auto ret = llvm::Type::getDoubleTy(c);
                 assert(ret != nullptr);
                 return ret;
             };
+#if defined(HEYOKA_ARCH_X86)
         } else if (std::numeric_limits<long double>::digits == 64) {
             retval[typeid(long double)] = [](llvm::LLVMContext &c) {
                 // x86 extended precision format.
                 auto ret = llvm::Type::getX86_FP80Ty(c);
+                assert(ret != nullptr);
+                return ret;
+            };
+#endif
+        } else if (std::numeric_limits<long double>::digits == 113) {
+            retval[typeid(long double)] = [](llvm::LLVMContext &c) {
+                // IEEE quadruple-precision format (e.g., ARM 64).
+                auto ret = llvm::Type::getFP128Ty(c);
                 assert(ret != nullptr);
                 return ret;
             };
@@ -146,7 +156,7 @@ std::string llvm_mangle_type(llvm::Type *t)
 {
     assert(t != nullptr);
 
-    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(t)) {
+    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(t)) {
         // If the type is a vector, get the name of the element type
         // and append the vector size.
         return "{}_{}"_format(llvm_type_name(v_t->getElementType()), v_t->getNumElements());
@@ -191,7 +201,7 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
 {
-    if (auto v_ptr_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+    if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
 
@@ -236,13 +246,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
     if (vector_size == 1u) {
         return t;
     } else {
-        auto retval =
-#if LLVM_VERSION_MAJOR == 10
-            llvm::VectorType::get
-#else
-            llvm::FixedVectorType::get
-#endif
-            (t, boost::numeric_cast<unsigned>(vector_size));
+        auto retval = llvm_vector_type::get(t, boost::numeric_cast<unsigned>(vector_size));
 
         assert(retval != nullptr);
 
@@ -254,7 +258,7 @@ llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
 // return {vec}.
 std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *vec)
 {
-    if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(vec->getType())) {
+    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
@@ -699,6 +703,8 @@ llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
 // and the return will be re-assembled as a vector.
 llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string &fname)
 {
+    assert(arg != nullptr);
+
     auto &builder = s.builder();
 
     // Decompose the argument into scalars.
@@ -709,6 +715,37 @@ llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string 
     for (auto scal : scalars) {
         retvals.push_back(llvm_invoke_external(
             s, fname, scal->getType(), {scal},
+            // NOTE: in theory we may add ReadNone here as well,
+            // but for some reason, at least up to LLVM 10,
+            // this causes strange codegen issues. Revisit
+            // in the future.
+            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+    }
+
+    // Build a vector with the results.
+    return scalars_to_vector(builder, retvals);
+}
+
+// Helper to invoke an external function on 2 vector arguments.
+// The function will be called on each elements of the vectors separately,
+// and the return will be re-assembled as a vector.
+llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg0, llvm::Value *arg1, const std::string &fname)
+{
+    assert(arg0 != nullptr);
+    assert(arg1 != nullptr);
+    assert(arg0->getType() == arg1->getType());
+
+    auto &builder = s.builder();
+
+    // Decompose the arguments into scalars.
+    auto scalars0 = vector_to_scalars(builder, arg0);
+    auto scalars1 = vector_to_scalars(builder, arg1);
+
+    // Invoke the function on each pair of scalars.
+    std::vector<llvm::Value *> retvals;
+    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
+        retvals.push_back(llvm_invoke_external(
+            s, fname, scalars0[i]->getType(), {scalars0[i], scalars1[i]},
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
@@ -836,7 +873,7 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         return {scalars_to_vector(builder, res_sin), scalars_to_vector(builder, res_cos)};
     } else {
 #endif
-        if (auto vec_t = llvm::dyn_cast<llvm::VectorType>(x->getType())) {
+        if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
             // NOTE: although there exists a SLEEF function for computing sin/cos
             // at the same time, we cannot use it directly because it returns a pair
             // of SIMD vectors rather than a single one and that does not play
@@ -1063,7 +1100,7 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
     // Convert to int32.
     llvm::Type *int_type;
-    if (auto *v_t = llvm::dyn_cast<llvm::VectorType>(cmp0->getType())) {
+    if (auto *v_t = llvm::dyn_cast<llvm_vector_type>(cmp0->getType())) {
         int_type = make_vector_type(builder.getInt32Ty(), boost::numeric_cast<std::uint32_t>(v_t->getNumElements()));
     } else {
         int_type = builder.getInt32Ty();
@@ -1073,6 +1110,85 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 
     // Compute and return the result.
     return builder.CreateSub(icmp0, icmp1);
+}
+
+// Two-argument arctan.
+// NOTE: requires FP values of the same type.
+llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
+{
+    assert(y != nullptr);
+    assert(x != nullptr);
+    assert(y->getType() == x->getType());
+    assert(y->getType()->getScalarType()->isFloatingPointTy());
+
+    auto &context = s.context();
+
+    // Determine the scalar type of the vector arguments.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        auto &builder = s.builder();
+
+        // NOTE: for __float128 we cannot use the intrinsic, we need
+        // to call an external function.
+
+        // Convert the vector arguments to scalars.
+        auto x_scalars = vector_to_scalars(builder, x), y_scalars = vector_to_scalars(builder, y);
+
+        // Execute the atan2q() function on the scalar values and store
+        // the results in res_scalars.
+        std::vector<llvm::Value *> res_scalars;
+        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
+            res_scalars.push_back(llvm_invoke_external(
+                s, "atan2q", x_t, {y_scalars[i], x_scalars[i]},
+                // NOTE: in theory we may add ReadNone here as well,
+                // but for some reason, at least up to LLVM 10,
+                // this causes strange codegen issues. Revisit
+                // in the future.
+                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+        }
+
+        // Reconstruct the return value as a vector.
+        return scalars_to_vector(builder, res_scalars);
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context)) {
+            if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "atan2", vec_t->getElementType(),
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {y, x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return call_extern_vec(s, y, x, "atan2");
+        } else if (x_t == to_llvm_type<long double>(context)) {
+            return call_extern_vec(s, y, x,
+#if defined(_MSC_VER)
+                                   // NOTE: it seems like the MSVC stdlib does not have an atan2l function,
+                                   // because LLVM complains about the symbol "atan2l" not being
+                                   // defined. Hence, use our own wrapper instead.
+                                   "heyoka_atan2l"
+#else
+                               "atan2l"
+#endif
+            );
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument(
+                "Invalid floating-point type encountered in the LLVM implementation of atan2()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
 }
 
 namespace
@@ -1539,9 +1655,7 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
         for (std::uint32_t j = 0; j <= n; ++j) {
             // NOTE: the Boost implementation requires j <= i. We don't care about
             // j > i anyway.
-            const auto val = (j <= i) ? boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i),
-                                                                             boost::numeric_cast<unsigned>(j))
-                                      : T(0);
+            const auto val = (j <= i) ? binomial<T>(i, j) : T(0);
             bc_const.push_back(llvm::cast<llvm::Constant>(codegen<T>(s, number{val})));
         }
     }

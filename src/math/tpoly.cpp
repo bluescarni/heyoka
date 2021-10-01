@@ -17,9 +17,6 @@
 #include <variant>
 #include <vector>
 
-#include <boost/math/special_functions/binomial.hpp>
-#include <boost/numeric/conversion/cast.hpp>
-
 #include <fmt/format.h>
 
 #include <llvm/IR/BasicBlock.h>
@@ -37,6 +34,7 @@
 
 #endif
 
+#include <heyoka/detail/binomial.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -44,6 +42,7 @@
 #include <heyoka/math/tpoly.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -94,13 +93,6 @@ void tpoly_impl::to_stream(std::ostream &os) const
 namespace
 {
 
-// Helper to compute the binomial coefficient via Boost.Math.
-template <typename T>
-auto bc_bmath(std::uint32_t i, std::uint32_t j)
-{
-    return boost::math::binomial_coefficient<T>(boost::numeric_cast<unsigned>(i), boost::numeric_cast<unsigned>(j));
-}
-
 template <typename T>
 llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                     std::uint32_t order, std::uint32_t batch_size)
@@ -125,7 +117,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
     // Init the return value with the highest-order coefficient (scaled by the corresponding
     // binomial coefficient).
     assert(tp.m_e_idx > 0u);
-    auto bc = bc_bmath<T>(n, order);
+    auto bc = binomial<T>(n, order);
     auto ret = taylor_codegen_numparam<T>(s, param{tp.m_e_idx - 1u}, par_ptr, batch_size);
     ret = builder.CreateFMul(ret, vector_splat(builder, codegen<T>(s, number{bc}), batch_size));
 
@@ -136,7 +128,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
         const auto i = n - order - i_;
 
         // Compute the binomial coefficient.
-        bc = bc_bmath<T>(i + order, order);
+        bc = binomial<T>(i + order, order);
 
         // Load the poly coefficient from the par array and multiply it by bc.
         auto cf = taylor_codegen_numparam<T>(s, param{tp.m_b_idx + i + order}, par_ptr, batch_size);
@@ -375,3 +367,5 @@ expression tpoly(expression b, expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::tpoly_impl)

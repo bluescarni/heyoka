@@ -12,6 +12,7 @@
 #include <initializer_list>
 #include <ostream>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -41,6 +42,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -62,11 +64,10 @@ void neg_impl::to_stream(std::ostream &os) const
 }
 
 // Derivative.
-expression neg_impl::diff(const std::string &s) const
+std::vector<expression> neg_impl::gradient() const
 {
     assert(args().size() == 1u);
-
-    return -heyoka::diff(args()[0], s);
+    return {-1_dbl};
 }
 
 llvm::Value *neg_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -357,3 +358,5 @@ expression neg(expression e)
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::neg_impl)

@@ -9,14 +9,24 @@
 #ifndef HEYOKA_VARIABLE_HPP
 #define HEYOKA_VARIABLE_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstddef>
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -25,7 +35,16 @@ class HEYOKA_DLL_PUBLIC variable
 {
     std::string m_name;
 
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_name;
+    }
+
 public:
+    variable();
     explicit variable(std::string);
     variable(const variable &);
     variable(variable &&) noexcept;
@@ -44,15 +63,8 @@ HEYOKA_DLL_PUBLIC std::size_t hash(const variable &);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const variable &);
 
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const variable &);
-HEYOKA_DLL_PUBLIC void rename_variables(variable &, const std::unordered_map<std::string, std::string> &);
-
 HEYOKA_DLL_PUBLIC bool operator==(const variable &, const variable &);
 HEYOKA_DLL_PUBLIC bool operator!=(const variable &, const variable &);
-
-HEYOKA_DLL_PUBLIC expression subs(const variable &, const std::unordered_map<std::string, expression> &);
-
-HEYOKA_DLL_PUBLIC expression diff(const variable &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const variable &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
@@ -75,8 +87,6 @@ HEYOKA_DLL_PUBLIC void update_node_values_dbl(std::vector<double> &, const varia
 HEYOKA_DLL_PUBLIC void update_grad_dbl(std::unordered_map<std::string, double> &, const variable &,
                                        const std::unordered_map<std::string, double> &, const std::vector<double> &,
                                        const std::vector<std::vector<std::size_t>> &, std::size_t &, double);
-
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(variable &&, taylor_dc_t &);
 
 } // namespace heyoka
 

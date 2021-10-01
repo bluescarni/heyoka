@@ -39,7 +39,11 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -154,7 +158,7 @@ TEST_CASE("two body batch")
 
                 // Check the state vectors.
                 for (std::uint32_t j = 0; j < 12u; ++j) {
-                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], tol_mul));
+                    REQUIRE(st[j] == approximately(bst[j * batch_size + i], tol_mul * 10));
                 }
 
                 // Check the conservation of the orbital elements.

@@ -9,17 +9,20 @@
 #ifndef HEYOKA_HEYOKA_HPP
 #define HEYOKA_HEYOKA_HPP
 
+#include <heyoka/callable.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
-#include <heyoka/gp.hpp>
+// #include <heyoka/gp.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>

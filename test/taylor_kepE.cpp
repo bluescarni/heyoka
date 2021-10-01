@@ -41,7 +41,11 @@ static std::mt19937 rng;
 using namespace heyoka;
 using namespace heyoka_test;
 
-const auto fp_types = std::tuple<double, long double
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
 #if defined(HEYOKA_HAVE_REAL128)
                                  ,
                                  mppp::real128
@@ -103,6 +107,16 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             }
         }
     }
+}
+
+// Issue in the decomposition when e = 0.
+TEST_CASE("taylor kepE decompose bug 00")
+{
+    llvm_state s;
+
+    auto M = "M"_var;
+
+    taylor_add_jet<double>(s, "jet", {kepE(0_dbl, M)}, 1, 1, false, false);
 }
 
 TEST_CASE("taylor kepE")

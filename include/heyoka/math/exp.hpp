@@ -19,6 +19,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -28,6 +29,13 @@ namespace detail
 
 class HEYOKA_DLL_PUBLIC exp_impl : public func_base
 {
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+
 public:
     exp_impl();
     explicit exp_impl(expression);
@@ -38,13 +46,13 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
-    expression diff(const std::string &) const;
+    std::vector<expression> gradient() const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
     mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                           const std::vector<mppp::real128> &) const;
+                            const std::vector<mppp::real128> &) const;
 #endif
 
     void eval_batch_dbl(std::vector<double> &, const std::unordered_map<std::string, std::vector<double>> &,
@@ -75,5 +83,7 @@ public:
 HEYOKA_DLL_PUBLIC expression exp(expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::exp_impl)
 
 #endif

@@ -14,18 +14,20 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include <fmt/format.h>
 
-#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/param.hpp>
 
 namespace heyoka
 {
+
+param::param() : param(0) {}
 
 param::param(std::uint32_t idx) : m_index(idx) {}
 
@@ -66,13 +68,6 @@ std::ostream &operator<<(std::ostream &os, const param &p)
     return os << "p{}"_format(p.idx());
 }
 
-std::vector<std::string> get_variables(const param &)
-{
-    return {};
-}
-
-void rename_variables(param &, const std::unordered_map<std::string, std::string> &) {}
-
 bool operator==(const param &p0, const param &p1)
 {
     return p0.idx() == p1.idx();
@@ -81,21 +76,6 @@ bool operator==(const param &p0, const param &p1)
 bool operator!=(const param &p0, const param &p1)
 {
     return !(p0 == p1);
-}
-
-expression subs(const param &p, const std::unordered_map<std::string, expression> &)
-{
-    return expression{p};
-}
-
-expression diff(const param &, const std::string &)
-{
-    // NOTE: if we ever implement single-precision support,
-    // this should be probably changed into 0_flt (i.e., the lowest
-    // precision numerical type), so that it does not trigger
-    // type promotions in numerical constants. Other similar
-    // occurrences as well.
-    return 0_dbl;
 }
 
 double eval_dbl(const param &p, const std::unordered_map<std::string, double> &, const std::vector<double> &pars)
@@ -173,12 +153,6 @@ void update_grad_dbl(std::unordered_map<std::string, double> &, const param &,
                      const std::vector<std::vector<std::size_t>> &, std::size_t &, double)
 {
     throw not_implemented_error("update_grad_dbl() not implemented for param");
-}
-
-taylor_dc_t::size_type taylor_decompose_in_place(param &&, taylor_dc_t &)
-{
-    // NOTE: params do not require decomposition.
-    return 0;
 }
 
 } // namespace heyoka

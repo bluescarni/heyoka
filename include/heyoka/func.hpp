@@ -15,11 +15,13 @@
 #include <cstdint>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -34,6 +36,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/exceptions.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -42,6 +45,15 @@ class HEYOKA_DLL_PUBLIC func_base
 {
     std::string m_name;
     std::vector<expression> m_args;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &m_name;
+        ar &m_args;
+    }
 
 public:
     explicit func_base(std::string, std::vector<expression>);
@@ -87,7 +99,12 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const = 0;
 #endif
 
-    virtual expression diff(const std::string &) const = 0;
+    virtual bool has_diff_var() const = 0;
+    virtual expression diff(std::unordered_map<const void *, expression> &, const std::string &) const = 0;
+    virtual bool has_diff_par() const = 0;
+    virtual expression diff(std::unordered_map<const void *, expression> &, const param &) const = 0;
+    virtual bool has_gradient() const = 0;
+    virtual std::vector<expression> gradient() const = 0;
 
     virtual double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const = 0;
     virtual long double eval_ldbl(const std::unordered_map<std::string, long double> &,
@@ -103,6 +120,7 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
     virtual double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const = 0;
 
     virtual taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && = 0;
+    virtual bool has_taylor_decompose() const = 0;
     virtual llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &,
                                          const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                                          std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t) const = 0;
@@ -119,6 +137,14 @@ struct HEYOKA_DLL_PUBLIC func_inner_base {
 #if defined(HEYOKA_HAVE_REAL128)
     virtual llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const = 0;
 #endif
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
 };
 
 template <typename T>
@@ -167,11 +193,24 @@ inline constexpr bool func_has_codegen_f128_v = std::is_same_v<detected_t<func_c
 #endif
 
 template <typename T>
-using func_diff_t
-    = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(std::declval<const std::string &>()));
+using func_diff_var_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
+    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const std::string &>()));
 
 template <typename T>
-inline constexpr bool func_has_diff_v = std::is_same_v<detected_t<func_diff_t, T>, expression>;
+inline constexpr bool func_has_diff_var_v = std::is_same_v<detected_t<func_diff_var_t, T>, expression>;
+
+template <typename T>
+using func_diff_par_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().diff(
+    std::declval<std::unordered_map<const void *, expression> &>(), std::declval<const param &>()));
+
+template <typename T>
+inline constexpr bool func_has_diff_par_v = std::is_same_v<detected_t<func_diff_par_t, T>, expression>;
+
+template <typename T>
+using func_gradient_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().gradient());
+
+template <typename T>
+inline constexpr bool func_has_gradient_v = std::is_same_v<detected_t<func_gradient_t, T>, std::vector<expression>>;
 
 template <typename T>
 using func_eval_dbl_t = decltype(std::declval<std::add_lvalue_reference_t<const T>>().eval_dbl(
@@ -295,8 +334,6 @@ inline constexpr bool func_has_taylor_c_diff_func_f128_v
 
 #endif
 
-HEYOKA_DLL_PUBLIC void func_default_td_impl(func_base &, taylor_dc_t &);
-
 HEYOKA_DLL_PUBLIC void func_default_to_stream_impl(std::ostream &, const func_base &);
 
 template <typename T>
@@ -408,7 +445,33 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
 #endif
 
     // diff.
-    expression diff(const std::string &) const final;
+    bool has_diff_var() const final
+    {
+        return func_has_diff_var_v<T>;
+    }
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const final;
+    bool has_diff_par() const final
+    {
+        return func_has_diff_par_v<T>;
+    }
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const final;
+
+    // gradient.
+    bool has_gradient() const final
+    {
+        return func_has_gradient_v<T>;
+    }
+    std::vector<expression> gradient() const final
+    {
+        if constexpr (func_has_gradient_v<T>) {
+            return m_value.gradient();
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
 
     // eval.
     double eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const final
@@ -468,7 +531,21 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
     }
 
     // Taylor.
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) && final;
+    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &dc) && final
+    {
+        if constexpr (func_has_taylor_decompose_v<T>) {
+            return std::move(m_value).taylor_decompose(dc);
+        }
+
+        // LCOV_EXCL_START
+        assert(false);
+        throw;
+        // LCOV_EXCL_STOP
+    }
+    bool has_taylor_decompose() const final
+    {
+        return func_has_taylor_decompose_v<T>;
+    }
     llvm::Value *taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                  const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                  std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
@@ -535,6 +612,16 @@ struct HEYOKA_DLL_PUBLIC_INLINE_CLASS func_inner final : func_inner_base {
         }
     }
 #endif
+
+private:
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_inner_base>(*this);
+        ar &m_value;
+    }
 };
 
 template <typename T>
@@ -565,12 +652,33 @@ class HEYOKA_DLL_PUBLIC func
     friend HEYOKA_DLL_PUBLIC bool operator==(const func &, const func &);
 
     // Pointer to the inner base.
-    std::unique_ptr<detail::func_inner_base> m_ptr;
+    std::shared_ptr<detail::func_inner_base> m_ptr;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned version)
+    {
+        // LCOV_EXCL_START
+        if (version == 0u) {
+            throw std::invalid_argument("Cannot load a function instance from an older archive");
+        }
+        // LCOV_EXCL_STOP
+
+        ar &m_ptr;
+    }
 
     // Just two small helpers to make sure that whenever we require
     // access to the pointer it actually points to something.
     const detail::func_inner_base *ptr() const;
     detail::func_inner_base *ptr();
+
+    // Private constructor used in the copy() function.
+    HEYOKA_DLL_LOCAL explicit func(std::unique_ptr<detail::func_inner_base>);
+
+    // Private helper to extract and check the gradient in the
+    // diff() implementations.
+    HEYOKA_DLL_LOCAL std::vector<expression> fetch_gradient(const std::string &) const;
 
     template <typename T>
     using generic_ctor_enabler
@@ -579,6 +687,8 @@ class HEYOKA_DLL_PUBLIC func
                            int>;
 
 public:
+    func();
+
     template <typename T, generic_ctor_enabler<T &&> = 0>
     explicit func(T &&x) : m_ptr(std::make_unique<detail::func_inner<detail::uncvref_t<T>>>(std::forward<T>(x)))
     {
@@ -591,6 +701,12 @@ public:
     func &operator=(func &&) noexcept;
 
     ~func();
+
+    // NOTE: this creates a new func containing
+    // a copy of the inner object: this means that
+    // the function arguments are shallow-copied and
+    // NOT deep-copied.
+    func copy() const;
 
     // NOTE: like in pagmo, this may fail if invoked
     // from different DLLs in certain situations (e.g.,
@@ -628,7 +744,8 @@ public:
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
 
-    expression diff(const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
@@ -642,7 +759,8 @@ public:
     double eval_num_dbl(const std::vector<double> &) const;
     double deval_num_dbl(const std::vector<double> &, std::vector<double>::size_type) const;
 
-    taylor_dc_t::size_type taylor_decompose(taylor_dc_t &) &&;
+    taylor_dc_t::size_type taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &,
+                                            taylor_dc_t &) const;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t) const;
@@ -660,13 +778,6 @@ public:
     llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const;
 #endif
 };
-
-HEYOKA_DLL_PUBLIC std::vector<std::string> get_variables(const func &);
-HEYOKA_DLL_PUBLIC void rename_variables(func &, const std::unordered_map<std::string, std::string> &);
-
-HEYOKA_DLL_PUBLIC expression subs(const func &, const std::unordered_map<std::string, expression> &);
-
-HEYOKA_DLL_PUBLIC expression diff(const func &, const std::string &);
 
 HEYOKA_DLL_PUBLIC double eval_dbl(const func &, const std::unordered_map<std::string, double> &,
                                   const std::vector<double> &);
@@ -713,8 +824,6 @@ inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::ve
 }
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC taylor_dc_t::size_type taylor_decompose_in_place(func &&, taylor_dc_t &);
 
 HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const func &, const std::vector<std::uint32_t> &,
                                                const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
@@ -777,5 +886,17 @@ inline llvm::Function *taylor_c_diff_func(llvm_state &s, const func &f, std::uin
 }
 
 } // namespace heyoka
+
+// Current archive version is 1.
+BOOST_CLASS_VERSION(heyoka::func, 1)
+
+// Macros for the registration of s11n for concrete functions.
+#define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f) BOOST_CLASS_EXPORT_IMPLEMENT(heyoka::detail::func_inner<f>)
+
+#define HEYOKA_S11N_FUNC_EXPORT(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_KEY(f)                                                                                     \
+    HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(f)
 
 #endif

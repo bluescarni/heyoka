@@ -31,6 +31,7 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/detail/dfloat.hpp>
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -38,7 +39,9 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
+#include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -117,38 +120,38 @@ HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
 
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<expression>,
-                                                                                      std::vector<expression>);
+HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::vector<expression> &,
+                                                                                      const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>>
-    taylor_decompose(std::vector<std::pair<expression, expression>>, std::vector<expression>);
+taylor_decompose(const std::vector<std::pair<expression, expression>> &, const std::vector<expression> &);
 
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &, std::vector<expression>,
-                                                 std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &, std::vector<expression>,
-                                                  std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                 std::uint32_t, std::uint32_t, bool, bool,
+                                                 const std::vector<expression> &);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                  std::uint32_t, std::uint32_t, bool, bool,
+                                                  const std::vector<expression> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &, std::vector<expression>,
-                                                  std::uint32_t, std::uint32_t, bool, bool, std::vector<expression>);
+HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &, const std::vector<expression> &,
+                                                  std::uint32_t, std::uint32_t, bool, bool,
+                                                  const std::vector<expression> &);
 
 #endif
 
 template <typename T>
-taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           std::vector<expression> sv_funcs = {})
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
+                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           const std::vector<expression> &sv_funcs = {})
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                  std::move(sv_funcs));
+        return taylor_add_jet_dbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                   std::move(sv_funcs));
+        return taylor_add_jet_ldbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                   std::move(sv_funcs));
+        return taylor_add_jet_f128(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -156,35 +159,33 @@ taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<e
 }
 
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_dbl(llvm_state &, const std::string &,
-                                                 std::vector<std::pair<expression, expression>>, std::uint32_t,
-                                                 std::uint32_t, bool, bool, std::vector<expression>);
+                                                 const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+                                                 std::uint32_t, bool, bool, const std::vector<expression> &);
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_ldbl(llvm_state &, const std::string &,
-                                                  std::vector<std::pair<expression, expression>>, std::uint32_t,
-                                                  std::uint32_t, bool, bool, std::vector<expression>);
+                                                  const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+                                                  std::uint32_t, bool, bool, const std::vector<expression> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 HEYOKA_DLL_PUBLIC taylor_dc_t taylor_add_jet_f128(llvm_state &, const std::string &,
-                                                  std::vector<std::pair<expression, expression>>, std::uint32_t,
-                                                  std::uint32_t, bool, bool, std::vector<expression>);
+                                                  const std::vector<std::pair<expression, expression>> &, std::uint32_t,
+                                                  std::uint32_t, bool, bool, const std::vector<expression> &);
 
 #endif
 
 template <typename T>
-taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name, std::vector<std::pair<expression, expression>> sys,
-                           std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                           std::vector<expression> sv_funcs = {})
+taylor_dc_t taylor_add_jet(llvm_state &s, const std::string &name,
+                           const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
+                           std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                           const std::vector<expression> &sv_funcs = {})
 {
     if constexpr (std::is_same_v<T, double>) {
-        return taylor_add_jet_dbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                  std::move(sv_funcs));
+        return taylor_add_jet_dbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
     } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_add_jet_ldbl(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                   std::move(sv_funcs));
+        return taylor_add_jet_ldbl(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_add_jet_f128(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                   std::move(sv_funcs));
+        return taylor_add_jet_f128(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 #endif
     } else {
         static_assert(detail::always_false_v<T>, "Unhandled type.");
@@ -207,10 +208,71 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, taylor_outcome);
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, event_direction);
 
+} // namespace heyoka
+
+// NOTE: implement a workaround for the serialisation of tuples whose first element
+// is a taylor outcome. We need this because Boost.Serialization treats all enums
+// as ints, which is not ok for taylor_outcome (whose underyling type will not
+// be an int on most platforms). Because it is not possible to override Boost's
+// enum implementation, we override the serialisation of tuples with outcomes
+// as first elements, which is all we need in the serialisation of the batch
+// integrator. The implementation below will be preferred over the generic tuple
+// s11n because it is more specialised.
+// NOTE: this workaround is not necessary for the other enums in heyoka because
+// those all have ints as underlying type.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename Archive, typename... Args>
+inline void save(Archive &ar, const std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](const auto &x) {
+        if constexpr (std::is_same_v<decltype(x), const heyoka::taylor_outcome &>) {
+            ar << static_cast<std::underlying_type_t<heyoka::taylor_outcome>>(x);
+        } else {
+            ar << x;
+        }
+    };
+
+    std::apply([&tf](const auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void load(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned)
+{
+    auto tf = [&ar](auto &x) {
+        if constexpr (std::is_same_v<decltype(x), heyoka::taylor_outcome &>) {
+            std::underlying_type_t<heyoka::taylor_outcome> val{};
+            ar >> val;
+
+            x = static_cast<heyoka::taylor_outcome>(val);
+        } else {
+            ar >> x;
+        }
+    };
+
+    std::apply([&tf](auto &...x) { (tf(x), ...); }, tup);
+}
+
+template <typename Archive, typename... Args>
+inline void serialize(Archive &ar, std::tuple<heyoka::taylor_outcome, Args...> &tup, unsigned v)
+{
+    split_free(ar, tup, v);
+}
+
+} // namespace serialization
+
+} // namespace boost
+
+namespace heyoka
+{
+
 namespace kw
 {
 
-IGOR_MAKE_NAMED_ARGUMENT(time);
 IGOR_MAKE_NAMED_ARGUMENT(tol);
 IGOR_MAKE_NAMED_ARGUMENT(high_accuracy);
 IGOR_MAKE_NAMED_ARGUMENT(compact_mode);
@@ -292,14 +354,31 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<void(taylor_adaptive_impl<T> &, T, int)>;
+    using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &dir;
+    }
+
     void finalise_ctor(event_direction);
 
 public:
+    nt_event_impl();
+
     template <typename... KwArgs>
-    explicit nt_event_impl(expression e, callback_t cb, KwArgs &&...kw_args) : eq(std::move(e)), callback(std::move(cb))
+    explicit nt_event_impl(const expression &e, callback_t cb, KwArgs &&...kw_args)
+        : eq(copy(e)), callback(std::move(cb))
     {
         igor::parser p{kw_args...};
 
@@ -333,11 +412,6 @@ public:
     const expression &get_expression() const;
     const callback_t &get_callback() const;
     event_direction get_direction() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    event_direction dir;
 };
 
 template <typename T>
@@ -367,14 +441,32 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = std::function<bool(taylor_adaptive_impl<T> &, bool, int)>;
+    using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
 
 private:
+    expression eq;
+    callback_t callback;
+    T cooldown;
+    event_direction dir;
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &eq;
+        ar &callback;
+        ar &cooldown;
+        ar &dir;
+    }
+
     void finalise_ctor(callback_t, T, event_direction);
 
 public:
+    t_event_impl();
+
     template <typename... KwArgs>
-    explicit t_event_impl(expression e, KwArgs &&...kw_args) : eq(std::move(e))
+    explicit t_event_impl(const expression &e, KwArgs &&...kw_args) : eq(copy(e))
     {
         igor::parser p{kw_args...};
 
@@ -427,12 +519,6 @@ public:
     const callback_t &get_callback() const;
     event_direction get_direction() const;
     T get_cooldown() const;
-
-private:
-    expression eq;
-    callback_t callback;
-    T cooldown;
-    event_direction dir;
 };
 
 template <typename T>
@@ -489,9 +575,11 @@ private:
     taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
+    // Tolerance.
+    T m_tol;
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *);
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
     std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
@@ -513,7 +601,7 @@ private:
     // are events, otherwise it stays empty.
     std::vector<T> m_ev_jet;
     // Vector of detected terminal events.
-    std::vector<std::tuple<std::uint32_t, T, bool, int>> m_d_tes;
+    std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
     // The vector of cooldowns for the terminal events.
     // If an event is on cooldown, the corresponding optional
     // in this vector will contain the total time elapsed
@@ -523,16 +611,27 @@ private:
     // Vector of detected non-terminal events.
     std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
 
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
     HEYOKA_DLL_LOCAL std::tuple<taylor_outcome, T> step_impl(T, bool);
 
     // Private implementation-detail constructor machinery.
     // NOTE: apparently on Windows we need to re-iterate
     // here that this is going to be dll-exported.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, T, T, bool, bool, std::vector<T>,
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, T, T, bool, bool, std::vector<T>,
                                               std::vector<t_event_t>, std::vector<nt_event_t>);
     template <typename U, typename... KwArgs>
-    void finalise_ctor(U sys, std::vector<T> state, KwArgs &&...kw_args)
+    void finalise_ctor(const U &sys, std::vector<T> state, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -575,24 +674,26 @@ private:
                 }
             }();
 
-            finalise_ctor_impl(std::move(sys), std::move(state), time, tol, high_accuracy, compact_mode,
-                               std::move(pars), std::move(tes), std::move(ntes));
+            finalise_ctor_impl(sys, std::move(state), time, tol, high_accuracy, compact_mode, std::move(pars),
+                               std::move(tes), std::move(ntes));
         }
     }
 
 public:
+    taylor_adaptive_impl();
+
     template <typename... KwArgs>
-    explicit taylor_adaptive_impl(std::vector<expression> sys, std::vector<T> state, KwArgs &&...kw_args)
+    explicit taylor_adaptive_impl(const std::vector<expression> &sys, std::vector<T> state, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
-        finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
+        finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
     }
     template <typename... KwArgs>
-    explicit taylor_adaptive_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
+    explicit taylor_adaptive_impl(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
                                   KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
-        finalise_ctor(std::move(sys), std::move(state), std::forward<KwArgs>(kw_args)...);
+        finalise_ctor(sys, std::move(state), std::forward<KwArgs>(kw_args)...);
     }
 
     taylor_adaptive_impl(const taylor_adaptive_impl &);
@@ -608,6 +709,7 @@ public:
     const taylor_dc_t &get_decomposition() const;
 
     std::uint32_t get_order() const;
+    T get_tol() const;
     std::uint32_t get_dim() const;
 
     T get_time() const
@@ -665,6 +767,10 @@ public:
     const std::vector<t_event_t> &get_t_events() const
     {
         return m_tes;
+    }
+    const auto &get_te_cooldowns() const
+    {
+        return m_te_cooldowns;
     }
     const std::vector<nt_event_t> &get_nt_events() const
     {
@@ -795,6 +901,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     taylor_dc_t m_dc;
     // Taylor order.
     std::uint32_t m_order;
+    // Tolerance.
+    T m_tol;
     // The stepper.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     step_f_t m_step_f;
@@ -830,14 +938,25 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
 
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
     HEYOKA_DLL_LOCAL void step_impl(const std::vector<T> &, bool);
 
     // Private implementation-detail constructor machinery.
     template <typename U>
-    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(U, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
+    HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
                                               std::vector<T>);
     template <typename U, typename... KwArgs>
-    void finalise_ctor(U sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
+    void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
 
@@ -858,25 +977,27 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
             auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
-            finalise_ctor_impl(std::move(sys), std::move(state), batch_size, std::move(time), tol, high_accuracy,
-                               compact_mode, std::move(pars));
+            finalise_ctor_impl(sys, std::move(state), batch_size, std::move(time), tol, high_accuracy, compact_mode,
+                               std::move(pars));
         }
     }
 
 public:
+    taylor_adaptive_batch_impl();
+
     template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(std::vector<expression> sys, std::vector<T> state, std::uint32_t batch_size,
-                                        KwArgs &&...kw_args)
-        : m_llvm{std::forward<KwArgs>(kw_args)...}
-    {
-        finalise_ctor(std::move(sys), std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
-    }
-    template <typename... KwArgs>
-    explicit taylor_adaptive_batch_impl(std::vector<std::pair<expression, expression>> sys, std::vector<T> state,
+    explicit taylor_adaptive_batch_impl(const std::vector<expression> &sys, std::vector<T> state,
                                         std::uint32_t batch_size, KwArgs &&...kw_args)
         : m_llvm{std::forward<KwArgs>(kw_args)...}
     {
-        finalise_ctor(std::move(sys), std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
+        finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
+    }
+    template <typename... KwArgs>
+    explicit taylor_adaptive_batch_impl(const std::vector<std::pair<expression, expression>> &sys, std::vector<T> state,
+                                        std::uint32_t batch_size, KwArgs &&...kw_args)
+        : m_llvm{std::forward<KwArgs>(kw_args)...}
+    {
+        finalise_ctor(sys, std::move(state), batch_size, std::forward<KwArgs>(kw_args)...);
     }
 
     taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &);
@@ -893,6 +1014,7 @@ public:
 
     std::uint32_t get_batch_size() const;
     std::uint32_t get_order() const;
+    T get_tol() const;
     std::uint32_t get_dim() const;
 
     const std::vector<T> &get_time() const
@@ -1107,5 +1229,33 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 } // namespace detail
 
 } // namespace heyoka
+
+// NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
+// not support class templates.
+namespace boost
+{
+
+namespace serialization
+{
+
+template <typename T>
+struct version<heyoka::taylor_adaptive<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+template <typename T>
+struct version<heyoka::taylor_adaptive_batch<T>> {
+    typedef mpl::int_<1> type;
+    typedef mpl::integral_c_tag tag;
+    BOOST_STATIC_CONSTANT(int, value = version::type::value);
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+};
+
+} // namespace serialization
+
+} // namespace boost
 
 #endif

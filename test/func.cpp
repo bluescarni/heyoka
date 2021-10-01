@@ -16,6 +16,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -24,6 +25,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -65,8 +67,15 @@ TEST_CASE("func minimal")
         f.codegen_f128(s, {nullptr, nullptr}), std::invalid_argument,
         Message("Null pointer detected in the array of values passed to func::codegen_f128() for the function 'f'"));
 #endif
-    REQUIRE_THROWS_MATCHES(f.diff(""), not_implemented_error,
-                           Message("The derivative is not implemented for the function 'f'"));
+    std::unordered_map<const void *, expression> func_map;
+    REQUIRE_THROWS_MATCHES(f.diff(func_map, ""), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
+    REQUIRE_THROWS_MATCHES(f.diff(func_map, std::get<param>(par[0].value())), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
     REQUIRE_THROWS_MATCHES(f.eval_dbl({{}}, {}), not_implemented_error,
                            Message("double eval is not implemented for the function 'f'"));
     std::vector<double> tmp;
@@ -94,7 +103,7 @@ TEST_CASE("func minimal")
     REQUIRE(orig_ptr == static_cast<const func &>(f).get_ptr());
 
     auto f2(f);
-    REQUIRE(orig_ptr != f2.get_ptr());
+    REQUIRE(orig_ptr == f2.get_ptr());
     REQUIRE(f2.get_type_index() == typeid(func_00));
     REQUIRE(f2.get_name() == "f");
     REQUIRE(f2.args() == std::vector{"x"_var, "y"_var});
@@ -103,15 +112,10 @@ TEST_CASE("func minimal")
     REQUIRE(orig_ptr == f3.get_ptr());
 
     f = f3;
-    REQUIRE(f.get_ptr() != f3.get_ptr());
+    REQUIRE(f.get_ptr() == f3.get_ptr());
 
     f = std::move(f3);
     REQUIRE(f.get_ptr() == orig_ptr);
-
-    f = func{func_00{{"x"_var, "y"_var}}};
-    auto [b, e] = f.get_mutable_args_it();
-    *b = "z"_var;
-    REQUIRE(f.args() == std::vector{"z"_var, "y"_var});
 
     auto a = 0;
     auto fake_ptr = reinterpret_cast<llvm::Value *>(&a);
@@ -193,7 +197,8 @@ TEST_CASE("func minimal")
 
     taylor_dc_t dec{{"x"_var, {}}};
     f = func{func_00{{"x"_var, "y"_var}}};
-    std::move(f).taylor_decompose(dec);
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map2;
+    f.taylor_decompose(func_map2, dec);
 }
 
 struct func_02 : func_base {
@@ -281,17 +286,44 @@ struct func_05 : func_base {
     func_05() : func_base("f", {}) {}
     explicit func_05(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    expression diff(const std::string &) const
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const
     {
         return 42_dbl;
     }
 };
 
+struct func_05a : func_base {
+    func_05a() : func_base("f", {}) {}
+    explicit func_05a(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    std::vector<expression> gradient() const
+    {
+        return {};
+    }
+};
+
+struct func_05b : func_base {
+    func_05b() : func_base("f", {}) {}
+    explicit func_05b(std::vector<expression> args) : func_base("f", std::move(args)) {}
+
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const
+    {
+        return -42_dbl;
+    }
+};
+
 TEST_CASE("func diff")
 {
+    using Catch::Matchers::Message;
+
     auto f = func(func_05{});
 
-    REQUIRE(f.diff("x") == 42_dbl);
+    std::unordered_map<const void *, expression> func_map;
+    REQUIRE(f.diff(func_map, "x") == 42_dbl);
+    REQUIRE_THROWS_MATCHES(func(func_05a{{"x"_var}}).diff(func_map, "x"), std::invalid_argument,
+                           Message("Inconsistent gradient returned by the function 'f': a vector of 1 elements was "
+                                   "expected, but the number of elements is 0 instead"));
+    REQUIRE(func(func_05b{{"x"_var}}).diff(func_map, std::get<param>(par[0].value())) == -42_dbl);
 }
 
 struct func_06 : func_base {
@@ -417,20 +449,23 @@ TEST_CASE("func taylor_decompose")
     auto f = func(func_10{{"x"_var}});
 
     taylor_dc_t u_vars_defs{{"x"_var, {}}};
-    REQUIRE(std::move(f).taylor_decompose(u_vars_defs) == 1u);
+    std::unordered_map<const void *, taylor_dc_t::size_type> func_map;
+    REQUIRE(f.taylor_decompose(func_map, u_vars_defs) == 1u);
     REQUIRE(u_vars_defs == taylor_dc_t{{"x"_var, {}}, {"foo"_var, {}}});
+
+    func_map = {};
 
     f = func(func_10a{{"x"_var}});
 
     REQUIRE_THROWS_MATCHES(
-        std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+        f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
         Message("Invalid value returned by the Taylor decomposition function for the function 'f': "
                 "the return value is 3, which is not less than the current size of the decomposition "
                 "(3)"));
 
     f = func(func_10b{{"x"_var}});
 
-    REQUIRE_THROWS_MATCHES(std::move(f).taylor_decompose(u_vars_defs), std::invalid_argument,
+    REQUIRE_THROWS_MATCHES(f.taylor_decompose(func_map, u_vars_defs), std::invalid_argument,
                            Message("The return value for the Taylor decomposition of a function can never be zero"));
 }
 
@@ -602,42 +637,42 @@ TEST_CASE("func eq ineq")
 TEST_CASE("func get_variables")
 {
     auto f1 = func(func_10{{}});
-    REQUIRE(get_variables(f1).empty());
+    REQUIRE(get_variables(expression{f1}).empty());
 
     f1 = func(func_10{{0_dbl}});
-    REQUIRE(get_variables(f1).empty());
+    REQUIRE(get_variables(expression{f1}).empty());
 
     f1 = func(func_10{{0_dbl, "x"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x"});
 
     f1 = func(func_10{{0_dbl, "y"_var, "x"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x", "y"});
     f1 = func(func_10{{0_dbl, "y"_var, "x"_var, 1_dbl, "x"_var, "y"_var, "z"_var}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"x", "y", "z"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"x", "y", "z"});
 }
 
 TEST_CASE("func rename_variables")
 {
-    auto f1 = func(func_10{{}});
+    auto f1 = expression{func(func_10{{}})};
     auto f2 = f1;
     rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
 
-    f1 = func(func_10{{0_dbl, "x"_var}});
+    f1 = expression{func(func_10{{0_dbl, "x"_var}})};
     f2 = f1;
     rename_variables(f1, {{}});
     REQUIRE(f2 == f1);
 
     rename_variables(f1, {{"x", "y"}});
-    REQUIRE(f2 != f1);
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+    REQUIRE(f2 == f1);
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
     rename_variables(f1, {{"x", "y"}});
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y"});
 
-    f1 = func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}});
+    f1 = expression{func(func_10{{"x"_var, 0_dbl, "z"_var, "y"_var}})};
     rename_variables(f1, {{"x", "y"}});
     REQUIRE(f2 != f1);
-    REQUIRE(get_variables(f1) == std::vector<std::string>{"y", "z"});
+    REQUIRE(get_variables(expression{f1}) == std::vector<std::string>{"y", "z"});
 }
 
 TEST_CASE("func diff free func")
@@ -646,11 +681,17 @@ TEST_CASE("func diff free func")
 
     auto f1 = func(func_05{{}});
 
-    REQUIRE(diff(f1, "x") == 42_dbl);
+    REQUIRE(diff(expression{f1}, "x") == 42_dbl);
 
     f1 = func(func_00{});
-    REQUIRE_THROWS_MATCHES(diff(f1, ""), not_implemented_error,
-                           Message("The derivative is not implemented for the function 'f'"));
+    REQUIRE_THROWS_MATCHES(diff(expression{f1}, ""), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a variable, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
+    REQUIRE_THROWS_MATCHES(diff(expression{f1}, par[0]), not_implemented_error,
+                           Message("Cannot compute the derivative of the function 'f' with respect to a parameter, "
+                                   "because the function does not provide "
+                                   "neither a diff() nor a gradient() member function"));
 }
 
 struct func_15 : func_base {
@@ -766,4 +807,91 @@ TEST_CASE("func extra_hash")
 
     REQUIRE(hash(f1) == hash(f2));
     REQUIRE(hash(f1) != hash(f3));
+}
+
+struct func_19 : func_base {
+    func_19(std::string name = "pippo", std::vector<expression> args = {}) : func_base(std::move(name), std::move(args))
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &ar, unsigned)
+    {
+        ar &boost::serialization::base_object<func_base>(*this);
+    }
+};
+
+HEYOKA_S11N_FUNC_EXPORT(func_19)
+
+TEST_CASE("func s11n")
+{
+    std::stringstream ss;
+
+    func f{func_19{"pluto", {"x"_var}}};
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << f;
+    }
+
+    f = func{};
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> f;
+    }
+
+    REQUIRE(f.get_name() == "pluto");
+    REQUIRE(f.args().size() == 1u);
+    REQUIRE(f.args()[0] == "x"_var);
+}
+
+TEST_CASE("ref semantics")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = (x + y) * z, bar = foo;
+
+    REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
+
+    foo = x - y;
+    bar = foo;
+
+    REQUIRE(std::get<func>(foo.value()).get_ptr() == std::get<func>(bar.value()).get_ptr());
+}
+
+TEST_CASE("copy")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto foo = ((x + y) * (z + x)) * ((z - x) * (y + x));
+
+    auto foo_copy = expression{std::get<func>(foo.value()).copy()};
+
+    // Copy creates a new obejct...
+    REQUIRE(std::get<func>(foo_copy.value()).get_ptr() != std::get<func>(foo.value()).get_ptr());
+
+    // ... but it does not deep copy the arguments.
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).get_ptr()
+            == std::get<func>(std::get<func>(foo.value()).args()[0].value()).get_ptr());
+    REQUIRE(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).get_ptr()
+            == std::get<func>(std::get<func>(foo.value()).args()[1].value()).get_ptr());
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[0].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[0].value()).get_ptr());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[0].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[0].value()).args()[1].value()).get_ptr());
+
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[0].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[0].value()).get_ptr());
+    REQUIRE(
+        std::get<func>(std::get<func>(std::get<func>(foo_copy.value()).args()[1].value()).args()[1].value()).get_ptr()
+        == std::get<func>(std::get<func>(std::get<func>(foo.value()).args()[1].value()).args()[1].value()).get_ptr());
 }

@@ -1,8 +1,117 @@
 Changelog
 =========
 
-0.11.0 (unreleased)
+0.15.0 (2021-09-28)
 -------------------
+
+New
+~~~
+
+- Implement derivatives with respect to the parameters
+  (`#196 <https://github.com/bluescarni/heyoka/pull/196>`__).
+- Implement additional automatic simplifications in the
+  expression system
+  (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
+- Add a way to define symbolic constants in the expression
+  system, and implement :math:`\pi` on top of it
+  (`#192 <https://github.com/bluescarni/heyoka/pull/192>`__).
+- Add a function to compute the size of an expression
+  (`#189 <https://github.com/bluescarni/heyoka/pull/189>`__).
+- Quadruple precision is now correctly supported on PPC64
+  (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__).
+- Add an implementation of the VSOP2013 analytical solution
+  for the motion of the planets of the Solar System, usable
+  in the definition of differential equations
+  (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__,
+  `#183 <https://github.com/bluescarni/heyoka/pull/183>`__,
+  `#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
+- Add the two-argument inverse tangent function ``atan2()``
+  to the expression system
+  (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
+- Implement additional automatic simplifications for sin/cos
+  (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
+
+Changes
+~~~~~~~
+
+- Implement a fast exclusion check for event detection which
+  improves performance when no event triggers in a timestep
+  (`#198 <https://github.com/bluescarni/heyoka/pull/198>`__).
+- **BREAKING**: the function class now uses reference
+  semantics. This means that copy operations on
+  non-trivial expressions now result in shallow copies,
+  not deep copies. This is a :ref:`breaking change <bchanges_0_15_0>`
+  (`#192 <https://github.com/bluescarni/heyoka/pull/192>`__).
+- heyoka now depends on the `TBB <https://github.com/oneapi-src/oneTBB>`__ library
+  (`#186 <https://github.com/bluescarni/heyoka/pull/186>`__).
+
+Fix
+~~~
+
+- Don't force the use of static MSVC runtime when
+  compiling heyoka as a static library
+  (`#198 <https://github.com/bluescarni/heyoka/pull/198>`__).
+- Fix compilation as a static library
+  (`#195 <https://github.com/bluescarni/heyoka/pull/195>`__).
+- Various fixes to the PPC64 support
+  (`#188 <https://github.com/bluescarni/heyoka/pull/188>`__,
+  `#187 <https://github.com/bluescarni/heyoka/pull/187>`__).
+- Fix an issue in ``kepE()`` arising from an automatic simplification
+  that would lead to an invalid decomposition for zero eccentricity
+  (`#185 <https://github.com/bluescarni/heyoka/pull/185>`__).
+
+0.14.0 (2021-08-03)
+-------------------
+
+New
+~~~
+
+- The tolerance value is now stored in the integrator objects
+  (`#175 <https://github.com/bluescarni/heyoka/pull/175>`__).
+
+Changes
+~~~~~~~
+
+- Improve the heuristic for the automatic deduction
+  of the cooldown value for terminal events
+  (`#178 <https://github.com/bluescarni/heyoka/pull/178>`__).
+
+Fix
+~~~
+
+- Ensure that code generation in compact mode is platform-agnostic
+  and deterministic across executions
+  (`#176 <https://github.com/bluescarni/heyoka/pull/176>`__).
+
+0.12.0 (2021-07-21)
+-------------------
+
+New
+~~~
+
+- Add support for 64-bit PowerPC processors
+  (`#171 <https://github.com/bluescarni/heyoka/pull/171>`__).
+- Add support for 64-bit ARM processors
+  (`#167 <https://github.com/bluescarni/heyoka/pull/167>`__).
+- Implement serialisation for the main classes via
+  Boost.Serialization
+  (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).
+
+Fix
+~~~
+
+- Fix a bug in the move assignment operator of ``llvm_state``
+  (`#163 <https://github.com/bluescarni/heyoka/pull/163>`__).
+
+0.11.0 (2021-07-06)
+-------------------
+
+New
+~~~
+
+- The ``time`` expression now supports symbolic
+  differentiation
+  (`#160 <https://github.com/bluescarni/heyoka/pull/160>`__).
 
 Changes
 ~~~~~~~

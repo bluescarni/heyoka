@@ -24,6 +24,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -34,10 +35,18 @@ namespace detail
 // Helper struct to signal the availability
 // of certain features on the host machine.
 struct target_features {
+    // x86.
     bool sse2 = false;
     bool avx = false;
     bool avx2 = false;
     bool avx512f = false;
+    // aarch64.
+    bool aarch64 = false;
+    // powerpc64.
+    // NOTE: for now, in the sleef support
+    // bit we need only vsx and vsx3 (not vsx2).
+    bool vsx = false;
+    bool vsx3 = false;
 };
 
 // NOTE: no need to make this DLL-public as long
@@ -72,6 +81,17 @@ class HEYOKA_DLL_PUBLIC llvm_state
     bool m_fast_math;
     std::string m_module_name;
     bool m_inline_functions;
+
+    // Serialization.
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void save_impl(Archive &, unsigned) const;
+    template <typename Archive>
+    HEYOKA_DLL_LOCAL void load_impl(Archive &, unsigned);
+
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
     // Check functions.
     HEYOKA_DLL_LOCAL void check_uncompiled(const char *) const;

@@ -11,13 +11,16 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono> // NOTE: needed for the spdlog stopwatch.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <locale>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <ostream>
@@ -39,6 +42,8 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+
+#include <spdlog/stopwatch.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -62,15 +67,19 @@
 #include <heyoka/detail/event_detection.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -456,6 +465,12 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
 {
     using idx_t = taylor_dc_t::size_type;
 
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
+    // Cache the original size for logging later.
+    const auto orig_size = v_ex.size();
+
     // A Taylor decomposition is supposed
     // to have n_eq variables at the beginning,
     // n_eq variables at the end and possibly
@@ -558,6 +573,9 @@ taylor_dc_t taylor_decompose_cse(taylor_dc_t &v_ex, std::vector<std::uint32_t> &
         idx = uname_to_index(it->second);
     }
 
+    get_logger()->debug("Taylor CSE reduced decomposition size from {} to {}", orig_size, retval.size());
+    get_logger()->trace("Taylor CSE runtime: {}", sw);
+
     return retval;
 }
 
@@ -581,6 +599,9 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
     // n_eq variables at the end and possibly
     // extra variables in the middle
     assert(dc.size() >= n_eq * 2u);
+
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
 
     // The graph type that we will use for the topological sorting.
     using graph_t = boost::adjacency_list<boost::vecS,           // std::vector for list of adjacent vertices
@@ -748,6 +769,8 @@ auto taylor_sort_dc(taylor_dc_t &dc, std::vector<std::uint32_t> &sv_funcs_dc, ta
         retval.push_back(std::move(dc[idx]));
     }
 
+    get_logger()->trace("Taylor topological sort runtime: {}", sw);
+
     return retval;
 }
 
@@ -874,6 +897,29 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 
 #endif
 
+// A couple of helpers for deep-copying containers of expressions.
+auto copy(const std::vector<expression> &v_ex)
+{
+    std::vector<expression> ret;
+    ret.reserve(v_ex.size());
+
+    std::transform(v_ex.begin(), v_ex.end(), std::back_inserter(ret), [](const expression &e) { return copy(e); });
+
+    return ret;
+}
+
+auto copy(const std::vector<std::pair<expression, expression>> &v)
+{
+    std::vector<std::pair<expression, expression>> ret;
+    ret.reserve(v.size());
+
+    std::transform(v.begin(), v.end(), std::back_inserter(ret), [](const auto &p) {
+        return std::pair{copy(p.first), copy(p.second)};
+    });
+
+    return ret;
+}
+
 } // namespace
 
 } // namespace detail
@@ -889,9 +935,14 @@ void verify_taylor_dec_sv_funcs(const std::vector<std::uint32_t> &sv_funcs_dc, c
 // is a number/param, not when, e.g., the argument is par[0] + par[1] - in
 // order to simplify this out, it should be recognized that the definition
 // of a u variable depends only on numbers/params.
-std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<expression> v_ex,
-                                                                    std::vector<expression> sv_funcs)
+std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::vector<expression> &v_ex_,
+                                                                    const std::vector<expression> &sv_funcs_)
 {
+    // Need to operate on copies due to in-place mutation
+    // via rename_variables().
+    auto v_ex = detail::copy(v_ex_);
+    auto sv_funcs = detail::copy(sv_funcs_);
+
     if (v_ex.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -936,10 +987,12 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     }
 
 #if !defined(NDEBUG)
+
     // Store a copy of the original system and
     // sv_funcs for checking later.
-    const auto orig_v_ex = v_ex;
-    const auto orig_sv_funcs = sv_funcs;
+    auto orig_v_ex = detail::copy(v_ex);
+    auto orig_sv_funcs = detail::copy(sv_funcs);
+
 #endif
 
     // Rename the variables in the original equations.
@@ -960,25 +1013,24 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
-    // Create a copy of the original equations in terms of u variables.
-    // We will be reusing this below.
-    auto v_ex_copy = v_ex;
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
 
     // Run the decomposition on each equation.
-    for (decltype(v_ex.size()) i = 0; i < v_ex.size(); ++i) {
+    for (auto &ex : v_ex) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose_in_place(std::move(v_ex[i]), u_vars_defs)) {
+        if (const auto dres = taylor_decompose(ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
-            // of the equation in v_ex_copy
+            // of the equation in v_ex
             // so that it points to the u variable
             // that now represents it.
             // NOTE: all functions are forced to return dres != 0
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            v_ex_copy[i] = expression{"u_{}"_format(dres)};
+            ex = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -989,7 +1041,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
         if (const auto *var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_ex), u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose(sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
@@ -1004,9 +1056,11 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
 
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
-    for (auto &ex : v_ex_copy) {
+    for (auto &ex : v_ex) {
         u_vars_defs.emplace_back(std::move(ex), std::vector<std::uint32_t>{});
     }
+
+    detail::get_logger()->trace("Taylor decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
@@ -1037,9 +1091,14 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
 
 // Taylor decomposition from lhs and rhs
 // of a system of equations.
-std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<std::pair<expression, expression>> sys,
-                                                                    std::vector<expression> sv_funcs)
+std::pair<taylor_dc_t, std::vector<std::uint32_t>>
+taylor_decompose(const std::vector<std::pair<expression, expression>> &sys_, const std::vector<expression> &sv_funcs_)
 {
+    // Need to operate on copies due to in-place mutation
+    // via rename_variables().
+    auto sys = detail::copy(sys_);
+    auto sv_funcs = detail::copy(sv_funcs_);
+
     if (sys.empty()) {
         throw std::invalid_argument("Cannot decompose a system of zero equations");
     }
@@ -1127,14 +1186,17 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
     }
 
 #if !defined(NDEBUG)
+
     // Store a copy of the original rhs and sv_funcs
     // for checking later.
     std::vector<expression> orig_rhs;
     orig_rhs.reserve(sys.size());
     for (const auto &[_, rhs_ex] : sys) {
-        orig_rhs.push_back(rhs_ex);
+        orig_rhs.push_back(copy(rhs_ex));
     }
-    const auto orig_sv_funcs = sv_funcs;
+
+    auto orig_sv_funcs = detail::copy(sv_funcs);
+
 #endif
 
     // Rename the variables in the original equations.
@@ -1147,6 +1209,9 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
         rename_variables(ex, repl_map);
     }
 
+    // Log the construction runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Init the decomposition. It begins with a list
     // of the original lhs variables of the system.
     taylor_dc_t u_vars_defs;
@@ -1155,25 +1220,21 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
         u_vars_defs.emplace_back(variable{var}, std::vector<std::uint32_t>{});
     }
 
-    // Create a copy of the original equations in terms of u variables.
-    // We will be reusing this below.
-    auto sys_copy = sys;
-
     // Run the decomposition on each equation.
-    for (decltype(sys.size()) i = 0; i < sys.size(); ++i) {
+    for (auto &[_, ex] : sys) {
         // Decompose the current equation.
-        if (const auto dres = taylor_decompose_in_place(std::move(sys[i].second), u_vars_defs)) {
+        if (const auto dres = taylor_decompose(ex, u_vars_defs)) {
             // NOTE: if the equation was decomposed
             // (that is, it is not constant or a single variable),
             // we have to update the original definition
-            // of the equation in sys_copy
+            // of the equation in sys
             // so that it points to the u variable
             // that now represents it.
             // NOTE: all functions are forced to return dres != 0
             // in the func API, so the only entities that
             // can return dres == 0 are const/params or
             // variables.
-            sys_copy[i].second = expression{"u_{}"_format(dres)};
+            ex = expression{"u_{}"_format(dres)};
         }
     }
 
@@ -1184,7 +1245,7 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
         if (auto *const var_ptr = std::get_if<variable>(&sv_ex.value())) {
             // The current sv_func is a variable, add its index to sv_funcs_dc.
             sv_funcs_dc.push_back(detail::uname_to_index(var_ptr->name()));
-        } else if (const auto dres = taylor_decompose_in_place(std::move(sv_ex), u_vars_defs)) {
+        } else if (const auto dres = taylor_decompose(sv_ex, u_vars_defs)) {
             // The sv_func was decomposed, add to sv_funcs_dc
             // the index of the u variable which represents
             // the result of the decomposition.
@@ -1199,9 +1260,11 @@ std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(std::vector<
 
     // Append the (possibly updated) definitions of the diff equations
     // in terms of u variables.
-    for (auto &[_, rhs] : sys_copy) {
+    for (auto &[_, rhs] : sys) {
         u_vars_defs.emplace_back(std::move(rhs), std::vector<std::uint32_t>{});
     }
+
+    detail::get_logger()->trace("Taylor decomposition construction runtime: {}", sw);
 
 #if !defined(NDEBUG)
     // Verify the decomposition.
@@ -1381,7 +1444,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef
         // function available for pow().
-        if (auto *vec_t = llvm::dyn_cast<llvm::VectorType>(x_v->getType())) {
+        if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
             // NOTE: if sfn ends up empty, we will be falling through
             // below and use the LLVM intrinsic instead.
             if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
@@ -1433,12 +1496,14 @@ llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &s, const std::vector<std::ui
 // following Jorba's prescription. diff_variant is the output of taylor_compute_jet(), and it contains
 // the jet of derivatives for the state variables and the sv_funcs. h_ptr is a pointer containing
 // the clamping values for the timesteps. svf_ptr is a pointer to an LLVM array containing the
-// values in sv_funcs_dc.
+// values in sv_funcs_dc. If max_abs_state_ptr is not nullptr, the computed norm infinity of the
+// state vector (including sv_funcs, if any) will be written into it.
 template <typename T>
-llvm::Value *
-taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
-                   const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
-                   std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+llvm::Value *taylor_determine_h(llvm_state &s,
+                                const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_variant,
+                                const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *h_ptr,
+                                std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                                std::uint32_t batch_size, llvm::Value *max_abs_state_ptr)
 {
     assert(batch_size != 0u);
 #if !defined(NDEBUG)
@@ -1554,6 +1619,11 @@ taylor_determine_h(llvm_state &s, const std::variant<llvm::Value *, std::vector<
         max_abs_diff_om1 = pairwise_reduce(v_max_abs_diff_om1, reducer);
     }
 
+    // Store max_abs_state, if requested.
+    if (max_abs_state_ptr != nullptr) {
+        store_vector_to_memory(builder, max_abs_state_ptr, max_abs_state);
+    }
+
     // Determine if we are in absolute or relative tolerance mode.
     auto abs_or_rel
         = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
@@ -1659,8 +1729,13 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
 // that do not represent state variables) into parallelisable segments. Within a segment,
 // the definition of a u variable does not depend on any u variable defined within that segment.
 // NOTE: the hidden deps are not considered as dependencies.
+// NOTE: the segments in the return value will contain shallow copies of the
+// expressions in dc.
 std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t n_eq)
 {
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Helper that takes in input the definition ex of a u variable, and returns
     // in output the list of indices of the u variables on which ex depends.
     auto udef_args_indices = [](const expression &ex) -> std::vector<std::uint32_t> {
@@ -1754,6 +1829,9 @@ std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &dc, std::uint32_t 
 
     assert(counter == dc.size() - n_eq * 2u);
 #endif
+
+    get_logger()->debug("Taylor N of segments: {}", s_dc.size());
+    get_logger()->trace("Taylor segment runtime: {}", sw);
 
     return s_dc;
 }
@@ -2071,6 +2149,8 @@ bool is_consecutive(const std::vector<std::uint32_t> &v)
     assert(!v.empty());
 
     for (decltype(v.size()) i = 1; i < v.size(); ++i) {
+        // NOTE: the first check is to avoid potential
+        // negative overflow in the second check.
         if (v[i] <= v[i - 1u] || v[i] - v[i - 1u] != 1u) {
             return false;
         }
@@ -2105,8 +2185,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
     }
 
     // Check if ind consists of a repeated pattern like [a, a, a, b, b, b, c, c, c, ...],
-    // that is, [a X n, b X n, c X n, ...].
-    if (ind.size() >= 2u) {
+    // that is, [a X n, b X n, c X n, ...], such that [a, b, c, ...] are consecutive numbers.
+    if (ind.size() > 1u) {
         // Determine the candidate number of repetitions.
         decltype(ind.size()) n_reps = 1;
         for (decltype(ind.size()) i = 1; i < ind.size(); ++i) {
@@ -2126,7 +2206,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
             bool rep_flag = true;
 
-            for (decltype(ind.size()) rep_idx = 1; rep_flag && rep_idx < ind.size() / n_reps; ++rep_idx) {
+            // Iterate over the blocks of repetitions.
+            for (decltype(ind.size()) rep_idx = 1; rep_idx < ind.size() / n_reps; ++rep_idx) {
                 for (decltype(ind.size()) i = 1; i < n_reps; ++i) {
                     const auto cur_idx = rep_idx * n_reps + i;
 
@@ -2138,6 +2219,8 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
                 if (rep_flag) {
                     rep_indices.push_back(ind[rep_idx * n_reps]);
+                } else {
+                    break;
                 }
             }
 
@@ -2234,7 +2317,15 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     };
 }
 
-// For each segment in s_dc, this function will return a vector containing a dict mapping an LLVM function
+// Comparision operator for LLVM functions based on their names.
+struct llvm_func_name_compare {
+    bool operator()(const llvm::Function *f0, const llvm::Function *f1) const
+    {
+        return f0->getName() < f1->getName();
+    }
+};
+
+// For each segment in s_dc, this function will return a dict mapping an LLVM function
 // f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
 // in the return value will read something like:
 // {f : (2, [g_0, g_1, g_2])}
@@ -2245,9 +2336,17 @@ template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // Log runtime in trace mode.
+    spdlog::stopwatch sw;
+
     // Init the return value.
-    std::vector<std::unordered_map<llvm::Function *,
-                                   std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>>>
+    // NOTE: use maps with name-based comparison for the functions. This ensures that the order in which these
+    // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
+    // comparisons instead, the order could vary across different executions and different platforms. The name
+    // mangling we do when creating the function names should ensure that there are no possible name collisions.
+    std::vector<
+        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+                 llvm_func_name_compare>>
         retval;
 
     // Variable to keep track of the u variable
@@ -2357,6 +2456,8 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         }
     }
 
+    get_logger()->trace("Taylor build function maps runtime: {}", sw);
+
     return retval;
 }
 
@@ -2375,6 +2476,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     // Generate the function maps.
     const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size);
+
+    // Log the runtime of IR construction in trace mode.
+    spdlog::stopwatch sw;
 
     // Generate the global arrays for the computation of the derivatives
     // of the state variables.
@@ -2536,6 +2640,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         }
     }
 
+    get_logger()->trace("Taylor IR creation compact mode runtime: {}", sw);
+
     // Return the array of derivatives of the u variables.
     return diff_arr;
 }
@@ -2638,6 +2744,9 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
                                                   batch_size);
     } else {
+        // Log the runtime of IR construction in trace mode.
+        spdlog::stopwatch sw;
+
         // Init the derivatives array with the order 0 of the state variables.
         auto diff_arr = taylor_load_values(s, order0, n_eq, batch_size);
 
@@ -2709,6 +2818,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
                 retval.push_back(taylor_fetch_diff(diff_arr, idx, o, n_uvars));
             }
         }
+
+        get_logger()->trace("Taylor IR creation default mode runtime: {}", sw);
 
         return retval;
     }
@@ -2843,9 +2954,9 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 // propagate the state of the system. Instead, its output will be the jet of derivatives
 // of all state variables and event equations, and the deduced timestep value(s).
 template <typename T, typename U>
-auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, U sys, T tol,
+auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          std::vector<expression> ntes)
+                                          const std::vector<expression> &evs)
 {
     using std::isfinite;
 
@@ -2860,7 +2971,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     const auto n_eq = boost::numeric_cast<std::uint32_t>(sys.size());
 
     // Decompose the system of equations.
-    auto [dc, ev_dc] = taylor_decompose(std::move(sys), std::move(ntes));
+    auto [dc, ev_dc] = taylor_decompose(sys, evs);
 
     // Compute the number of u variables.
     assert(dc.size() > n_eq);
@@ -2874,9 +2985,10 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     // - pointer to the current state vector (read only),
     // - pointer to the parameters (read only),
     // - pointer to the time value(s) (read only),
-    // - pointer to the array of max timesteps (read & write).
+    // - pointer to the array of max timesteps (read & write),
+    // - pointer to the max_abs_state output variable (write only).
     // These pointers cannot overlap.
-    std::vector<llvm::Type *> fargs(5, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    std::vector<llvm::Type *> fargs(6, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -2917,6 +3029,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     h_ptr->addAttr(llvm::Attribute::NoCapture);
     h_ptr->addAttr(llvm::Attribute::NoAlias);
 
+    auto *max_abs_state_ptr = h_ptr + 1;
+    max_abs_state_ptr->setName("max_abs_state_ptr");
+    max_abs_state_ptr->addAttr(llvm::Attribute::NoCapture);
+    max_abs_state_ptr->addAttr(llvm::Attribute::NoAlias);
+    max_abs_state_ptr->addAttr(llvm::Attribute::WriteOnly);
+
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
     assert(bb != nullptr);
@@ -2931,7 +3049,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
                                               batch_size, compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                   max_abs_state_ptr);
 
     // Store h to memory.
     store_vector_to_memory(builder, h_ptr, h);
@@ -2946,6 +3065,8 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     s.verify_function(f);
 
     // Run the optimisation pass.
+    // NOTE: this does nothing currently, as the optimisation
+    // level is set to zero from the outside.
     s.optimise();
 
     return std::tuple{std::move(dc), order};
@@ -3133,7 +3254,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
 // in the integrators' ctors.
 // NOTE: document this eventually.
 template <typename T, typename U>
-auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T tol, std::uint32_t batch_size,
+auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, T tol, std::uint32_t batch_size,
                               bool high_accuracy, bool compact_mode)
 {
     using std::isfinite;
@@ -3150,7 +3271,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
 
     // Decompose the system of equations.
     // NOTE: no sv_funcs needed for this stepper.
-    auto [dc, sv_funcs_dc] = taylor_decompose(std::move(sys), {});
+    auto [dc, sv_funcs_dc] = taylor_decompose(sys, {});
 
     assert(sv_funcs_dc.empty());
 
@@ -3218,7 +3339,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
                                               compact_mode);
 
     // Determine the integration timestep.
-    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size);
+    auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
+                                   nullptr);
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
@@ -3275,6 +3397,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
     s.verify_function(f);
 
     // Run the optimisation pass.
+    // NOTE: this does nothing currently, as the optimisation
+    // level is set to zero from the outside.
     s.optimise();
 
     return std::tuple{std::move(dc), order};
@@ -3284,10 +3408,16 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, U sys, T t
 
 template <typename T>
 template <typename U>
-void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T time, T tol, bool high_accuracy,
+void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
                                                  std::vector<nt_event_t> ntes)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Assign the data members.
@@ -3331,7 +3461,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     }
     // LCOV_EXCL_STOP
 
-    const auto with_events = !m_tes.empty() || !m_ntes.empty();
+    // Store the tolerance.
+    m_tol = tol;
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
@@ -3341,9 +3472,14 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // and then the d_out.
     std::optional<opt_disabler> od(m_llvm);
 
+    // Do we have events?
+    const auto with_events = !m_tes.empty() || !m_ntes.empty();
+
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
+        // NOTE: no need for deep copies of the expressions: ee is never mutated
+        // and we will be deep-copying it anyway when we do the decomposition.
         for (const auto &ev : m_tes) {
             ee.push_back(ev.get_expression());
         }
@@ -3351,11 +3487,10 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", std::move(sys), tol, 1,
-                                                                          high_accuracy, compact_mode, std::move(ee));
-    } else {
         std::tie(m_dc, m_order)
-            = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, 1, high_accuracy, compact_mode);
+            = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee);
+    } else {
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode);
     }
 
     // Fix m_pars' size, if necessary.
@@ -3369,9 +3504,15 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
                 m_pars.size(), npars));
     }
 
+    // Log runtimes in trace mode.
+    spdlog::stopwatch sw;
+
     // Add the function for the computation of
     // the dense output.
     taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, 1, high_accuracy);
+
+    get_logger()->trace("Taylor dense output runtime: {}", sw);
+    sw.reset();
 
     // Restore the original optimisation level in s.
     od.reset();
@@ -3379,8 +3520,13 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
+    get_logger()->trace("Taylor global opt pass runtime: {}", sw);
+    sw.reset();
+
     // Run the jit.
     m_llvm.compile();
+
+    get_logger()->trace("Taylor LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
     if (with_events) {
@@ -3435,12 +3581,25 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, T 
 }
 
 template <typename T>
+taylor_adaptive_impl<T>::taylor_adaptive_impl()
+    : taylor_adaptive_impl({prime("x"_var) = 0_dbl}, {T(0)}, kw::tol = T(1e-1))
+{
+}
+
+template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers.
-    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc),
-      m_order(other.m_order), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
+    // NOTE: make a manual copy of all members, apart from the function pointers
+    // and the vectors of detected events.
+    : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
+      m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
       m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
 {
+    // NOTE: make explicit deep copy of the decomposition.
+    m_dc.reserve(other.m_dc.size());
+    for (const auto &[ex, deps] : other.m_dc) {
+        m_dc.emplace_back(copy(ex), deps);
+    }
+
     if (m_tes.empty() && m_ntes.empty()) {
         m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     } else {
@@ -3473,6 +3632,96 @@ taylor_adaptive_impl<T> &taylor_adaptive_impl<T>::operator=(taylor_adaptive_impl
 template <typename T>
 taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers
+    // and the vectors of detected events.
+    ar << m_state;
+    ar << m_time;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_tol;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_tes;
+    ar << m_ntes;
+    ar << m_ev_jet;
+    ar << m_te_cooldowns;
+
+    // Save the capacities of the vectors
+    // of detected events.
+    ar << m_d_tes.capacity();
+    ar << m_d_ntes.capacity();
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
+{
+    ar >> m_state;
+    ar >> m_time;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument("Unable to load a taylor_adaptive integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_tes;
+    ar >> m_ntes;
+    ar >> m_ev_jet;
+    ar >> m_te_cooldowns;
+
+    // Load the capacities of the vectors
+    // of detected events.
+    decltype(m_d_tes.capacity()) d_tes_cap{};
+    ar >> d_tes_cap;
+    decltype(m_d_ntes.capacity()) d_ntes_cap{};
+    ar >> d_ntes_cap;
+
+    // Recover the function pointers.
+    if (m_tes.empty() && m_ntes.empty()) {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    }
+
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+
+    // Clear and reserve the capacities.
+    m_d_tes.clear();
+    m_d_tes.reserve(d_tes_cap);
+    m_d_ntes.clear();
+    m_d_ntes.reserve(d_ntes_cap);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
+
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced, but it will
 // always be not greater than abs(max_delta_t). The propagation
@@ -3485,6 +3734,7 @@ taylor_adaptive_impl<T>::~taylor_adaptive_impl() = default;
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
+    using std::abs;
     using std::isfinite;
 
 #if !defined(NDEBUG)
@@ -3518,16 +3768,46 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
     } else {
         assert(!m_tes.empty() || !m_ntes.empty());
 
-        using std::abs;
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
+        // event equations at the beginning of the timestep for later use.
+        T max_abs_state;
+        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
-        // Invoke the stepper for event handling.
-        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h);
+        // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
+        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
+        // in taylor_detect_events we skip event detection altogether.
+        T g_eps;
+        if (isfinite(max_abs_state)) {
+            // Are we in absolute or relative error control mode?
+            const auto abs_or_rel = max_abs_state < 1;
+
+            // Estimate the size of the largest remainder in the Taylor
+            // series of both the dynamical equations and the events.
+            const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+
+            // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+            // integration error cannot be too small due to floating-point truncation.
+            // This is the case for instance if we use sub-epsilon integration tolerances
+            // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+            // using eps * max_abs_state as an estimation of the smallest number
+            // that can be resolved with the current floating-point type.
+            // NOTE: the if condition in the next line is equivalent, in relative
+            // error control mode, to:
+            // if (m_tol < std::numeric_limits<T>::epsilon())
+            if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
+                g_eps = std::numeric_limits<T>::epsilon() * max_abs_state;
+            } else {
+                g_eps = max_r_size;
+            }
+        } else {
+            g_eps = std::numeric_limits<T>::infinity();
+        }
 
         // Write unconditionally the tcs.
         std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim);
+        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim, g_eps);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -3546,10 +3826,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
         std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
-
-        // Store the timestep that was used during event
-        // detection, before possibly modifying it.
-        const auto orig_h = h;
 
         // If we have terminal events we need
         // to update the value of h.
@@ -3632,10 +3908,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
-                // NOTE: the automatic cooldown deduction is done on the
-                // timestep that was used for event detection, not on the timestep
-                // which was clamped by the occurrence of a terminal event.
-                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(orig_h));
+                // NOTE: if g_eps is not finite, we skipped event detection
+                // altogether and thus we never end up here. If the derivative
+                // of the event equation is not finite, the event is also skipped.
+                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(g_eps, std::get<4>(m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
@@ -4070,6 +4346,12 @@ std::uint32_t taylor_adaptive_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 {
     return m_dim;
@@ -4098,6 +4380,11 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
 }
 
 template <typename T>
+nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+{
+}
+
+template <typename T>
 void nt_event_impl<T>::finalise_ctor(event_direction d)
 {
     if (!callback) {
@@ -4112,13 +4399,22 @@ void nt_event_impl<T>::finalise_ctor(event_direction d)
 }
 
 template <typename T>
-nt_event_impl<T>::nt_event_impl(const nt_event_impl &) = default;
+nt_event_impl<T>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
+{
+}
 
 template <typename T>
 nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
 
 template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &) = default;
+nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = nt_event_impl(o);
+    }
+
+    return *this;
+}
 
 template <typename T>
 nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
@@ -4182,6 +4478,11 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e
 #endif
 
 template <typename T>
+t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
+{
+}
+
+template <typename T>
 void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
 {
     using std::isfinite;
@@ -4200,13 +4501,23 @@ void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
 }
 
 template <typename T>
-t_event_impl<T>::t_event_impl(const t_event_impl &) = default;
+t_event_impl<T>::t_event_impl(const t_event_impl &o)
+    : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
+{
+}
 
 template <typename T>
 t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
 
 template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &) = default;
+t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = t_event_impl(o);
+    }
+
+    return *this;
+}
 
 template <typename T>
 t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;
@@ -4286,15 +4597,15 @@ template class taylor_adaptive_impl<double>;
 template class nt_event_impl<double>;
 template class t_event_impl<double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<expression>,
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<expression> &,
                                                                                  std::vector<double>, double, double,
                                                                                  bool, bool, std::vector<double>,
                                                                                  std::vector<t_event_t>,
                                                                                  std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>, std::vector<double>,
-                                                 double, double, bool, bool, std::vector<double>,
+taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
+                                                 std::vector<double>, double, double, bool, bool, std::vector<double>,
                                                  std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template class taylor_adaptive_impl<long double>;
@@ -4302,13 +4613,13 @@ template class nt_event_impl<long double>;
 template class t_event_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>, long double,
-                                                      long double, bool, bool, std::vector<long double>,
+taylor_adaptive_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
+                                                      long double, long double, bool, bool, std::vector<long double>,
                                                       std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<long double>, long double, long double, bool, bool,
-    std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
+    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -4317,12 +4628,12 @@ template class nt_event_impl<mppp::real128>;
 template class t_event_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
-    std::vector<expression>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
+    const std::vector<expression> &, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
     std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool,
-    bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
+    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 #endif
 
@@ -4333,10 +4644,16 @@ namespace detail
 
 template <typename T>
 template <typename U>
-void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> state, std::uint32_t batch_size,
+void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars)
 {
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     using std::isfinite;
 
     // Init the data members.
@@ -4389,6 +4706,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
                 tol));
     }
 
+    // Store the tolerance.
+    m_tol = tol;
+
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
@@ -4399,7 +4719,7 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 
     // Add the stepper function.
     std::tie(m_dc, m_order)
-        = taylor_add_adaptive_step<T>(m_llvm, "step", std::move(sys), tol, m_batch_size, high_accuracy, compact_mode);
+        = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, m_batch_size, high_accuracy, compact_mode);
 
     // Fix m_pars' size, if necessary.
     const auto npars = n_pars_in_dc(m_dc);
@@ -4481,16 +4801,28 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(U sys, std::vector<T> sta
 }
 
 template <typename T>
+taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl()
+    : taylor_adaptive_batch_impl({prime("x"_var) = 0_dbl}, {T(0)}, 1u, kw::tol = T(1e-1))
+{
+}
+
+template <typename T>
 taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_batch_impl &other)
     // NOTE: make a manual copy of all members, apart from the function pointers.
     : m_batch_size(other.m_batch_size), m_state(other.m_state), m_time_hi(other.m_time_hi), m_time_lo(other.m_time_lo),
-      m_llvm(other.m_llvm), m_dim(other.m_dim), m_dc(other.m_dc), m_order(other.m_order), m_pars(other.m_pars),
+      m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order), m_tol(other.m_tol), m_pars(other.m_pars),
       m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out), m_pinf(other.m_pinf), m_minf(other.m_minf),
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
       m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
 {
+    // NOTE: make explicit deep copy of the decomposition.
+    m_dc.reserve(other.m_dc.size());
+    for (const auto &[ex, deps] : other.m_dc) {
+        m_dc.emplace_back(copy(ex), deps);
+    }
+
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
@@ -4514,6 +4846,95 @@ taylor_adaptive_batch_impl<T>::operator=(taylor_adaptive_batch_impl &&) noexcept
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::~taylor_adaptive_batch_impl() = default;
+
+// NOTE: the save/load patterns mimic the copy constructor logic.
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
+{
+    // NOTE: save all members, apart from the function pointers.
+    ar << m_batch_size;
+    ar << m_state;
+    ar << m_time_hi;
+    ar << m_time_lo;
+    ar << m_llvm;
+    ar << m_dim;
+    ar << m_dc;
+    ar << m_order;
+    ar << m_tol;
+    ar << m_pars;
+    ar << m_tc;
+    ar << m_last_h;
+    ar << m_d_out;
+    ar << m_pinf;
+    ar << m_minf;
+    ar << m_delta_ts;
+    ar << m_step_res;
+    ar << m_prop_res;
+    ar << m_ts_count;
+    ar << m_min_abs_h;
+    ar << m_max_abs_h;
+    ar << m_cur_max_delta_ts;
+    ar << m_pfor_ts;
+    ar << m_t_dir;
+    ar << m_rem_time;
+    ar << m_d_out_time;
+}
+
+template <typename T>
+template <typename Archive>
+void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
+{
+    ar >> m_batch_size;
+    ar >> m_state;
+    ar >> m_time_hi;
+    ar >> m_time_lo;
+    ar >> m_llvm;
+    ar >> m_dim;
+    ar >> m_dc;
+    ar >> m_order;
+    if (version > 0u) {
+        ar >> m_tol;
+        // LCOV_EXCL_START
+    } else {
+        throw std::invalid_argument(
+            "Unable to load a taylor_adaptive_batch integrator: the archive version (0) is too old");
+    }
+    // LCOV_EXCL_STOP
+    ar >> m_pars;
+    ar >> m_tc;
+    ar >> m_last_h;
+    ar >> m_d_out;
+    ar >> m_pinf;
+    ar >> m_minf;
+    ar >> m_delta_ts;
+    ar >> m_step_res;
+    ar >> m_prop_res;
+    ar >> m_ts_count;
+    ar >> m_min_abs_h;
+    ar >> m_max_abs_h;
+    ar >> m_cur_max_delta_ts;
+    ar >> m_pfor_ts;
+    ar >> m_t_dir;
+    ar >> m_rem_time;
+    ar >> m_d_out_time;
+
+    // Recover the function pointers.
+    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::save(boost::archive::binary_oarchive &ar, unsigned v) const
+{
+    save_impl(ar, v);
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned v)
+{
+    load_impl(ar, v);
+}
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
@@ -5270,6 +5691,12 @@ std::uint32_t taylor_adaptive_batch_impl<T>::get_order() const
 }
 
 template <typename T>
+T taylor_adaptive_batch_impl<T>::get_tol() const
+{
+    return m_tol;
+}
+
+template <typename T>
 std::uint32_t taylor_adaptive_batch_impl<T>::get_batch_size() const
 {
     return m_batch_size;
@@ -5315,37 +5742,38 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch_impl<double>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<expression>, std::vector<double>, std::uint32_t,
-                                                       std::vector<double>, double, bool, bool, std::vector<double>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(const std::vector<expression> &,
+                                                                                       std::vector<double>,
+                                                                                       std::uint32_t,
+                                                                                       std::vector<double>, double,
+                                                                                       bool, bool, std::vector<double>);
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<double>::finalise_ctor_impl(std::vector<std::pair<expression, expression>>,
+taylor_adaptive_batch_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
                                                        std::vector<double>, std::uint32_t, std::vector<double>, double,
                                                        bool, bool, std::vector<double>);
 
 template class taylor_adaptive_batch_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(std::vector<expression>, std::vector<long double>,
+taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
                                                             std::uint32_t, std::vector<long double>, long double, bool,
                                                             bool, std::vector<long double>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<long double>, std::uint32_t, std::vector<long double>,
-    long double, bool, bool, std::vector<long double>);
+    const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
+    std::vector<long double>, long double, bool, bool, std::vector<long double>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_batch_impl<mppp::real128>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(std::vector<expression>, std::vector<mppp::real128>,
-                                                              std::uint32_t, std::vector<mppp::real128>, mppp::real128,
-                                                              bool, bool, std::vector<mppp::real128>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
+    mppp::real128, bool, bool, std::vector<mppp::real128>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
-    std::vector<std::pair<expression, expression>>, std::vector<mppp::real128>, std::uint32_t,
+    const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
     std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>);
 
 #endif
@@ -5367,8 +5795,8 @@ namespace
 // in the state, add the 2 jets and then run a single optimisation pass.
 // NOTE: document this eventually.
 template <typename T, typename U>
-auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uint32_t order, std::uint32_t batch_size,
-                         bool, bool compact_mode, std::vector<expression> sv_funcs)
+auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
+                         std::uint32_t batch_size, bool, bool compact_mode, const std::vector<expression> &sv_funcs)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -5383,6 +5811,12 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
         throw std::invalid_argument("The batch size of a Taylor jet cannot be zero");
     }
 
+#if defined(HEYOKA_ARCH_PPC)
+    if constexpr (std::is_same_v<T, long double>) {
+        throw not_implemented_error("'long double' computations are not supported on PowerPC");
+    }
+#endif
+
     auto &builder = s.builder();
 
     // Record the number of equations/variables.
@@ -5394,7 +5828,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
     // Decompose the system of equations.
     // NOTE: don't use structured bindings due to the
     // usual issues with lambdas.
-    const auto td_res = taylor_decompose(std::move(sys), std::move(sv_funcs));
+    const auto td_res = taylor_decompose(sys, sv_funcs);
     const auto &dc = td_res.first;
     const auto &sv_funcs_dc = td_res.second;
 
@@ -5588,61 +6022,59 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, U sys, std::uin
 
 } // namespace detail
 
-taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name, std::vector<expression> sys, std::uint32_t order,
-                               std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               std::vector<expression> sv_funcs)
+taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
+                               std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                               const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                               std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 }
 
-taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name, std::vector<expression> sys,
+taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                std::vector<expression> sv_funcs)
+                                const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                    compact_mode, std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
+                                                    sv_funcs);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, std::vector<expression> sys,
+taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                std::vector<expression> sv_funcs)
+                                const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                      compact_mode, std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
+                                                      sv_funcs);
 }
 
 #endif
 
 taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name,
-                               std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                               const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               std::vector<expression> sv_funcs)
+                               const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, std::move(sys), order, batch_size, high_accuracy, compact_mode,
-                                               std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
 }
 
 taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
-                                std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                std::vector<expression> sv_funcs)
+                                const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<long double>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                    compact_mode, std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
+                                                    sv_funcs);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
-                                std::vector<std::pair<expression, expression>> sys, std::uint32_t order,
+                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                std::vector<expression> sv_funcs)
+                                const std::vector<expression> &sv_funcs)
 {
-    return detail::taylor_add_jet_impl<mppp::real128>(s, name, std::move(sys), order, batch_size, high_accuracy,
-                                                      compact_mode, std::move(sv_funcs));
+    return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
+                                                      sv_funcs);
 }
 
 #endif
@@ -5663,6 +6095,7 @@ std::ostream &taylor_adaptive_stream_impl(std::ostream &os, const taylor_adaptiv
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance               : " << ta.get_tol() << '\n';
     oss << "Taylor order            : " << ta.get_order() << '\n';
     oss << "Dimension               : " << ta.get_dim() << '\n';
     oss << "Time                    : " << ta.get_time() << '\n';
@@ -5707,6 +6140,7 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
     oss << std::showpoint;
     oss.precision(std::numeric_limits<T>::max_digits10);
 
+    oss << "Tolerance   : " << ta.get_tol() << '\n';
     oss << "Taylor order: " << ta.get_order() << '\n';
     oss << "Dimension   : " << ta.get_dim() << '\n';
     oss << "Batch size  : " << ta.get_batch_size() << '\n';

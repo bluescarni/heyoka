@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_SINH_HPP
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -17,6 +18,7 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/s11n.hpp>
 
 namespace heyoka
 {
@@ -30,7 +32,7 @@ public:
     sinh_impl();
     explicit sinh_impl(expression);
 
-    expression diff(const std::string &) const;
+    std::vector<expression> gradient() const;
 
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
@@ -62,5 +64,7 @@ public:
 HEYOKA_DLL_PUBLIC expression sinh(expression);
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sinh_impl)
 
 #endif

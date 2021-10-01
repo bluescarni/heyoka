@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -38,15 +39,18 @@
 
 #endif
 
+#include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/kepE.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -72,7 +76,7 @@ kepE_impl::kepE_impl() : kepE_impl(0_dbl, 0_dbl) {}
 
 kepE_impl::kepE_impl(expression e, expression M) : func_base("kepE", std::vector{std::move(e), std::move(M)}) {}
 
-expression kepE_impl::diff(const std::string &s) const
+expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
 {
     assert(args().size() == 2u);
 
@@ -81,26 +85,30 @@ expression kepE_impl::diff(const std::string &s) const
 
     expression E{func{*this}};
 
-    return (heyoka::diff(e, s) * sin(E) + heyoka::diff(M, s)) / (1_dbl - e * cos(E));
+    return (detail::diff(func_map, e, s) * sin(E) + detail::diff(func_map, M, s)) / (1_dbl - e * cos(E));
+}
+
+expression kepE_impl::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    assert(args().size() == 2u);
+
+    const auto &e = args()[0];
+    const auto &M = args()[1];
+
+    expression E{func{*this}};
+
+    return (detail::diff(func_map, e, p) * sin(E) + detail::diff(func_map, M, p)) / (1_dbl - e * cos(E));
 }
 
 taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
 {
     assert(args().size() == 2u);
 
-    // Decompose the arguments.
-    auto &e = *get_mutable_args_it().first;
-    if (const auto dres = taylor_decompose_in_place(std::move(e), u_vars_defs)) {
-        e = expression{variable{"u_{}"_format(dres)}};
-    }
-
-    auto &M = *(get_mutable_args_it().first + 1);
-    if (const auto dres = taylor_decompose_in_place(std::move(M), u_vars_defs)) {
-        M = expression{variable{"u_{}"_format(dres)}};
-    }
-
     // Make a copy of e.
-    auto e_copy = e;
+    // NOTE: the arguments here have already been decomposed, thus
+    // args()[0] is a non-function value that will be deep-copied.
+    assert(!std::holds_alternative<func>(args()[0].value()));
+    auto e_copy = args()[0];
 
     // Append the kepE decomposition.
     u_vars_defs.emplace_back(func{std::move(*this)}, std::vector<std::uint32_t>{});
@@ -112,7 +120,10 @@ taylor_dc_t::size_type kepE_impl::taylor_decompose(taylor_dc_t &u_vars_defs) &&
                              std::vector<std::uint32_t>{});
 
     // Append the e*cos(a) decomposition.
-    u_vars_defs.emplace_back(std::move(e_copy) * expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}},
+    // NOTE: use mul() instead of * in order to avoid the automatic simplification
+    // of 0 * cos(a) -> 0, which would result in an invalid entry in the Taylor decomposition
+    // (i.e., a number entry).
+    u_vars_defs.emplace_back(mul(std::move(e_copy), expression{variable{"u_{}"_format(u_vars_defs.size() - 1u)}}),
                              std::vector<std::uint32_t>{});
 
     // Add the hidden deps.
@@ -1019,3 +1030,5 @@ expression kepE(mppp::real128 e, expression M)
 #endif
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::kepE_impl)

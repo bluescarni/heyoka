@@ -14,14 +14,16 @@
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
-#include <iterator>
+#include <memory>
 #include <ostream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeindex>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <boost/version.hpp>
@@ -49,8 +51,11 @@
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -115,16 +120,6 @@ bool llvm_valvec_has_null(const std::vector<llvm::Value *> &v)
 
 } // namespace
 
-// Default implementation of Taylor decomposition for a function.
-void func_default_td_impl(func_base &fb, taylor_dc_t &u_vars_defs)
-{
-    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
-        if (const auto dres = taylor_decompose_in_place(std::move(*r.first), u_vars_defs)) {
-            *r.first = expression{variable{"u_{}"_format(dres)}};
-        }
-    }
-}
-
 // Default implementation of to_stream() for func.
 void func_default_to_stream_impl(std::ostream &os, const func_base &f)
 {
@@ -143,24 +138,39 @@ void func_default_to_stream_impl(std::ostream &os, const func_base &f)
 
 func_inner_base::~func_inner_base() = default;
 
+namespace
+{
+
+struct null_func : func_base {
+    null_func() : func_base("null_func", {}) {}
+};
+
+} // namespace
+
 } // namespace detail
 
-func::func(const func &f) : m_ptr(f.ptr()->clone()) {}
+func::func(std::unique_ptr<detail::func_inner_base> p) : m_ptr(p.release()) {}
+
+func::func() : func(detail::null_func{}) {}
+
+func::func(const func &) = default;
 
 func::func(func &&) noexcept = default;
 
-func &func::operator=(const func &f)
-{
-    if (this != &f) {
-        *this = func(f);
-    }
-
-    return *this;
-}
+func &func::operator=(const func &) = default;
 
 func &func::operator=(func &&) noexcept = default;
 
 func::~func() = default;
+
+// NOTE: this creates a new func containing
+// a copy of the inner object: this means that
+// the function arguments are shallow-copied and
+// NOT deep-copied.
+func func::copy() const
+{
+    return func{m_ptr->clone()};
+}
 
 // Just two small helpers to make sure that whenever we require
 // access to the pointer it actually points to something.
@@ -208,8 +218,6 @@ std::pair<std::vector<expression>::iterator, std::vector<expression>::iterator> 
 
 llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -234,8 +242,6 @@ llvm::Value *func::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &
 
 llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the long double codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -262,8 +268,6 @@ llvm::Value *func::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> 
 
 llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &v) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the float128 codegen for the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -288,9 +292,73 @@ llvm::Value *func::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> 
 
 #endif
 
-expression func::diff(const std::string &s) const
+std::vector<expression> func::fetch_gradient(const std::string &target) const
 {
-    return ptr()->diff(s);
+    // Check if we have the gradient.
+    if (!ptr()->has_gradient()) {
+        throw not_implemented_error("Cannot compute the derivative of the function '{}' with respect to a {}, because "
+                                    "the function does not provide neither a diff() "
+                                    "nor a gradient() member function"_format(get_name(), target));
+    }
+
+    // Fetch the gradient.
+    auto grad = ptr()->gradient();
+
+    // Check it.
+    const auto arity = args().size();
+    if (grad.size() != arity) {
+        throw std::invalid_argument(
+            "Inconsistent gradient returned by the function '{}': a vector of {} elements was expected, but the number of elements is {} instead"_format(
+                get_name(), arity, grad.size()));
+    }
+
+    return grad;
+}
+
+expression func::diff(std::unordered_map<const void *, expression> &func_map, const std::string &s) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (ptr()->has_diff_var()) {
+        return ptr()->diff(func_map, s);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = fetch_gradient("variable");
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], s));
+    }
+
+    return pairwise_sum(std::move(prod));
+}
+
+expression func::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
+{
+    // Run the specialised diff implementation,
+    // if available.
+    if (ptr()->has_diff_par()) {
+        return ptr()->diff(func_map, p);
+    }
+
+    const auto arity = args().size();
+
+    // Fetch the gradient.
+    auto grad = fetch_gradient("parameter");
+
+    // Compute the total derivative.
+    std::vector<expression> prod;
+    prod.reserve(arity);
+    for (decltype(args().size()) i = 0; i < arity; ++i) {
+        prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], p));
+    }
+
+    return pairwise_sum(std::move(prod));
 }
 
 double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const
@@ -320,8 +388,6 @@ void func::eval_batch_dbl(std::vector<double> &out, const std::unordered_map<std
 double func::eval_num_dbl(const std::vector<double> &v) const
 {
     if (v.size() != args().size()) {
-        using namespace fmt::literals;
-
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
                 get_name(), args().size(), v.size()));
@@ -332,8 +398,6 @@ double func::eval_num_dbl(const std::vector<double> &v) const
 
 double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::size_type i) const
 {
-    using namespace fmt::literals;
-
     if (v.size() != args().size()) {
         throw std::invalid_argument(
             "Inconsistent number of arguments supplied to the double numerical evaluation of the derivative of function '{}': {} arguments were expected, but {} arguments were provided instead"_format(
@@ -349,22 +413,78 @@ double func::deval_num_dbl(const std::vector<double> &v, std::vector<double>::si
     return ptr()->deval_num_dbl(v, i);
 }
 
-taylor_dc_t::size_type func::taylor_decompose(taylor_dc_t &u_vars_defs) &&
+namespace detail
 {
-    auto ret = std::move(*ptr()).taylor_decompose(u_vars_defs);
+
+namespace
+{
+
+// Perform the decomposition of the arguments of a function. After this operation,
+// each argument will be either:
+// - a variable,
+// - a number,
+// - a param.
+void func_td_args(func &fb, std::unordered_map<const void *, taylor_dc_t::size_type> &func_map, taylor_dc_t &dc)
+{
+    for (auto r = fb.get_mutable_args_it(); r.first != r.second; ++r.first) {
+        if (const auto dres = taylor_decompose(func_map, *r.first, dc)) {
+            *r.first = expression{variable{"u_{}"_format(dres)}};
+        }
+
+        assert(std::holds_alternative<variable>(r.first->value()) || std::holds_alternative<number>(r.first->value())
+               || std::holds_alternative<param>(r.first->value()));
+    }
+}
+
+} // namespace
+
+} // namespace detail
+
+taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, taylor_dc_t::size_type> &func_map,
+                                              taylor_dc_t &dc) const
+{
+    const auto f_id = get_ptr();
+
+    if (auto it = func_map.find(f_id); it != func_map.end()) {
+        // We already decomposed the current function, fetch the result
+        // from the cache.
+        return it->second;
+    }
+
+    // Make a shallow copy: this will be a new function,
+    // but its arguments will be shallow-copied from this.
+    auto f_copy = copy();
+
+    // Decompose the arguments. This will overwrite
+    // the arguments in f_copy with their decomposition.
+    detail::func_td_args(f_copy, func_map, dc);
+
+    // Run the decomposition.
+    taylor_dc_t::size_type ret = 0;
+    if (f_copy.ptr()->has_taylor_decompose()) {
+        // Custom implementation.
+        ret = std::move(*f_copy.ptr()).taylor_decompose(dc);
+    } else {
+        // Default implementation: append f_copy and return the index
+        // at which it was appended.
+        dc.emplace_back(std::move(f_copy), std::vector<std::uint32_t>{});
+        ret = dc.size() - 1u;
+    }
 
     if (ret == 0u) {
         throw std::invalid_argument("The return value for the Taylor decomposition of a function can never be zero");
     }
 
-    if (ret >= u_vars_defs.size()) {
-        using namespace fmt::literals;
-
+    if (ret >= dc.size()) {
         throw std::invalid_argument(
             "Invalid value returned by the Taylor decomposition function for the function '{}': "
             "the return value is {}, which is not less than the current size of the decomposition "
-            "({})"_format(get_name(), ret, u_vars_defs.size()));
+            "({})"_format(get_name(), ret, dc.size()));
     }
+
+    // Update the cache before exiting.
+    [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ret});
+    assert(flag);
 
     return ret;
 }
@@ -374,8 +494,6 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                    std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
@@ -411,8 +529,6 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
@@ -450,8 +566,6 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
                                     std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
             "Null par_ptr detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
@@ -486,8 +600,6 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
 
 llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_dbl() for the function '{}'"_format(get_name()));
@@ -511,8 +623,6 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
 
 llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_ldbl() for the function '{}'"_format(get_name()));
@@ -538,8 +648,6 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
 
 llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
 {
-    using namespace fmt::literals;
-
     if (batch_size == 0u) {
         throw std::invalid_argument(
             "Zero batch size detected in func::taylor_c_diff_func_f128() for the function '{}'"_format(get_name()));
@@ -597,6 +705,11 @@ std::size_t hash(const func &f)
 
 bool operator==(const func &a, const func &b)
 {
+    // Check if the underlying object is the same.
+    if (a.m_ptr == b.m_ptr) {
+        return true;
+    }
+
     // NOTE: the initial comparison considers:
     // - the function name,
     // - the function inner type index,
@@ -615,44 +728,6 @@ bool operator!=(const func &a, const func &b)
     return !(a == b);
 }
 
-std::vector<std::string> get_variables(const func &f)
-{
-    std::vector<std::string> ret;
-
-    for (const auto &arg : f.args()) {
-        auto tmp = get_variables(arg);
-        ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
-        std::sort(ret.begin(), ret.end());
-        ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
-    }
-
-    return ret;
-}
-
-void rename_variables(func &f, const std::unordered_map<std::string, std::string> &repl_map)
-{
-    for (auto [b, e] = f.get_mutable_args_it(); b != e; ++b) {
-        rename_variables(*b, repl_map);
-    }
-}
-
-// NOTE: implementing this in-place would perform better.
-expression subs(const func &f, const std::unordered_map<std::string, expression> &smap)
-{
-    auto tmp = f;
-
-    for (auto [b, e] = tmp.get_mutable_args_it(); b != e; ++b) {
-        *b = subs(*b, smap);
-    }
-
-    return expression{std::move(tmp)};
-}
-
-expression diff(const func &f, const std::string &s)
-{
-    return f.diff(s);
-}
-
 double eval_dbl(const func &f, const std::unordered_map<std::string, double> &map, const std::vector<double> &pars)
 {
     return f.eval_dbl(map, pars);
@@ -665,11 +740,13 @@ long double eval_ldbl(const func &f, const std::unordered_map<std::string, long 
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
+
 mppp::real128 eval_f128(const func &f, const std::unordered_map<std::string, mppp::real128> &map,
                         const std::vector<mppp::real128> &pars)
 {
     return f.eval_f128(map, pars);
 }
+
 #endif
 
 void eval_batch_dbl(std::vector<double> &out_values, const func &f,
@@ -733,11 +810,6 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
         node_connections[node_id][i] = node_counter;
         update_connections(node_connections, f.args()[i], node_counter);
     };
-}
-
-taylor_dc_t::size_type taylor_decompose_in_place(func &&f, taylor_dc_t &dc)
-{
-    return std::move(f).taylor_decompose(dc);
 }
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,

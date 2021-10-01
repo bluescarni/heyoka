@@ -8,6 +8,8 @@
 
 #include <heyoka/config.hpp>
 
+// LCOV_EXCL_START
+
 #if defined(HEYOKA_WITH_SLEEF)
 
 #include <cstddef>
@@ -20,8 +22,6 @@
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
-
-#include <sleef.h>
 
 #include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/sleef.hpp>
@@ -54,6 +54,9 @@ struct sleef_key_hasher {
 using sleef_map_t = std::unordered_map<sleef_key_t, std::string, sleef_key_hasher>;
 
 // Helper to construct the sleef map for the double-precision type.
+// NOTE: at this time the sleef conda package for PPC64 does not seem
+// to provide VSX3 functions. Thus, for now we use only the
+// VSX implementations.
 auto make_sleef_map_dbl()
 {
     const auto &features = get_target_features();
@@ -73,6 +76,10 @@ auto make_sleef_map_dbl()
         retval[{"sin", 2}] = "Sleef_sind2_u10sse4";
     } else if (features.sse2) {
         retval[{"sin", 2}] = "Sleef_sind2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"sin", 2}] = "Sleef_sind2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"sin", 2}] = "Sleef_sind2_u10vsx";
     }
 
     // cos().
@@ -88,6 +95,10 @@ auto make_sleef_map_dbl()
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse4";
     } else if (features.sse2) {
         retval[{"cos", 2}] = "Sleef_cosd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"cos", 2}] = "Sleef_cosd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"cos", 2}] = "Sleef_cosd2_u10vsx";
     }
 
     // log().
@@ -103,6 +114,10 @@ auto make_sleef_map_dbl()
         retval[{"log", 2}] = "Sleef_logd2_u10sse4";
     } else if (features.sse2) {
         retval[{"log", 2}] = "Sleef_logd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"log", 2}] = "Sleef_logd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"log", 2}] = "Sleef_logd2_u10vsx";
     }
 
     // exp().
@@ -118,6 +133,10 @@ auto make_sleef_map_dbl()
         retval[{"exp", 2}] = "Sleef_expd2_u10sse4";
     } else if (features.sse2) {
         retval[{"exp", 2}] = "Sleef_expd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"exp", 2}] = "Sleef_expd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"exp", 2}] = "Sleef_expd2_u10vsx";
     }
 
     // pow().
@@ -133,6 +152,10 @@ auto make_sleef_map_dbl()
         retval[{"pow", 2}] = "Sleef_powd2_u10sse4";
     } else if (features.sse2) {
         retval[{"pow", 2}] = "Sleef_powd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"pow", 2}] = "Sleef_powd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"pow", 2}] = "Sleef_powd2_u10vsx";
     }
 
     // tan().
@@ -148,6 +171,10 @@ auto make_sleef_map_dbl()
         retval[{"tan", 2}] = "Sleef_tand2_u10sse4";
     } else if (features.sse2) {
         retval[{"tan", 2}] = "Sleef_tand2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"tan", 2}] = "Sleef_tand2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"tan", 2}] = "Sleef_tand2_u10vsx";
     }
 
     // asin().
@@ -163,6 +190,10 @@ auto make_sleef_map_dbl()
         retval[{"asin", 2}] = "Sleef_asind2_u10sse4";
     } else if (features.sse2) {
         retval[{"asin", 2}] = "Sleef_asind2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"asin", 2}] = "Sleef_asind2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"asin", 2}] = "Sleef_asind2_u10vsx";
     }
 
     // acos().
@@ -178,6 +209,10 @@ auto make_sleef_map_dbl()
         retval[{"acos", 2}] = "Sleef_acosd2_u10sse4";
     } else if (features.sse2) {
         retval[{"acos", 2}] = "Sleef_acosd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"acos", 2}] = "Sleef_acosd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"acos", 2}] = "Sleef_acosd2_u10vsx";
     }
 
     // atan().
@@ -193,6 +228,29 @@ auto make_sleef_map_dbl()
         retval[{"atan", 2}] = "Sleef_atand2_u10sse4";
     } else if (features.sse2) {
         retval[{"atan", 2}] = "Sleef_atand2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"atan", 2}] = "Sleef_atand2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"atan", 2}] = "Sleef_atand2_u10vsx";
+    }
+
+    // atan2().
+    if (features.avx512f) {
+        retval[{"atan2", 8}] = "Sleef_atan2d8_u10avx512f";
+        retval[{"atan2", 4}] = "Sleef_atan2d4_u10avx2";
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10avx2128";
+    } else if (features.avx2) {
+        retval[{"atan2", 4}] = "Sleef_atan2d4_u10avx2";
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10avx2128";
+    } else if (features.avx) {
+        retval[{"atan2", 4}] = "Sleef_atan2d4_u10avx";
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10sse4";
+    } else if (features.sse2) {
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"atan2", 2}] = "Sleef_atan2d2_u10vsx";
     }
 
     // cosh().
@@ -208,6 +266,10 @@ auto make_sleef_map_dbl()
         retval[{"cosh", 2}] = "Sleef_coshd2_u10sse4";
     } else if (features.sse2) {
         retval[{"cosh", 2}] = "Sleef_coshd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"cosh", 2}] = "Sleef_coshd2_u10vsx";
     }
 
     // sinh().
@@ -223,6 +285,10 @@ auto make_sleef_map_dbl()
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"sinh", 2}] = "Sleef_sinhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"sinh", 2}] = "Sleef_sinhd2_u10vsx";
     }
 
     // tanh().
@@ -238,6 +304,10 @@ auto make_sleef_map_dbl()
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"tanh", 2}] = "Sleef_tanhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"tanh", 2}] = "Sleef_tanhd2_u10vsx";
     }
 
     // asinh().
@@ -253,6 +323,10 @@ auto make_sleef_map_dbl()
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"asinh", 2}] = "Sleef_asinhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"asinh", 2}] = "Sleef_asinhd2_u10vsx";
     }
 
     // acosh().
@@ -268,6 +342,10 @@ auto make_sleef_map_dbl()
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse4";
     } else if (features.sse2) {
         retval[{"acosh", 2}] = "Sleef_acoshd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"acosh", 2}] = "Sleef_acoshd2_u10vsx";
     }
 
     // atanh().
@@ -283,6 +361,10 @@ auto make_sleef_map_dbl()
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse4";
     } else if (features.sse2) {
         retval[{"atanh", 2}] = "Sleef_atanhd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"atanh", 2}] = "Sleef_atanhd2_u10vsx";
     }
 
     // erf().
@@ -298,6 +380,10 @@ auto make_sleef_map_dbl()
         retval[{"erf", 2}] = "Sleef_erfd2_u10sse4";
     } else if (features.sse2) {
         retval[{"erf", 2}] = "Sleef_erfd2_u10sse2";
+    } else if (features.aarch64) {
+        retval[{"erf", 2}] = "Sleef_erfd2_u10advsimd";
+    } else if (features.vsx) {
+        retval[{"erf", 2}] = "Sleef_erfd2_u10vsx";
     }
 
     return retval;
@@ -325,17 +411,6 @@ std::string sleef_function_name(llvm::LLVMContext &c, const std::string &f, llvm
     }
 }
 
-// NOTE: this function is here only to introduce a fake
-// dependency of heyoka on libsleef. This is needed
-// in certain setups that would otherwise unlink libsleef
-// from heyoka after detecting that no symbol from libsleef
-// is being used (even though we need libsleef to be linked
-// in for use in the JIT machinery).
-HEYOKA_DLL_PUBLIC double sleef_dummy_f(double x)
-{
-    return ::Sleef_sin_u10(x);
-}
-
 } // namespace heyoka::detail
 
 #else
@@ -361,3 +436,5 @@ std::string sleef_function_name(llvm::LLVMContext &, const std::string &, llvm::
 } // namespace heyoka::detail
 
 #endif
+
+// LCOV_EXCL_STOP
