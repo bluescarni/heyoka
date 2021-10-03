@@ -1309,7 +1309,8 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
             auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
             auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(builder.CreateMaskedGather(
 #if LLVM_VERSION_MAJOR >= 13
-                                  // NOTE: new initial argument required since LLVM 13.
+                                  // NOTE: new initial argument required since LLVM 13
+                                  // (the vector type to gather).
                                   cur_cf->getType(),
 #endif
                                   last_nz_ptr,
