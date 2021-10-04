@@ -11,9 +11,13 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <tuple>
+#include <type_traits>
 #include <vector>
+
+#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -47,6 +51,14 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR == 13
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
@@ -187,7 +199,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[3] == approximately(jet[0] + jet[1]));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(expression{number{fp_t{.5}}}), x + y}, 1, 2, high_accuracy,
@@ -215,7 +227,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[7] == approximately(jet[1] + jet[3]));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(par[1]), x + y}, 1, 2, high_accuracy, compact_mode);
@@ -267,7 +279,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (jet[2] + jet[3])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(expression{number{fp_t{.25}}}), x + y}, 2, 2, high_accuracy,
@@ -301,7 +313,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * (jet[5] + jet[7])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(expression{number{fp_t{0.75}}}), x + y}, 3, 3, high_accuracy,
@@ -349,7 +361,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(par[0]), x + y}, 3, 3, high_accuracy, compact_mode);
@@ -398,9 +410,11 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[23] == approximately(fp_t{1} / 6 * (2 * jet[17] + 2 * jet[20])));
         }
 
-        // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({asin(expression{number{fp_t{.625}}}), x + y}, opt_level, high_accuracy,
-                                   compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            // Do the batch/scalar comparison.
+            compare_batch_scalar<fp_t>({asin(expression{number{fp_t{.625}}}), x + y}, opt_level, high_accuracy,
+                                       compact_mode);
+        }
 
         // Variable tests.
         {
@@ -423,7 +437,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[3] == approximately(asin(jet[0])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(y), asin(x)}, 1, 2, high_accuracy, compact_mode);
@@ -472,7 +486,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * (1 / sqrt(1 - jet[0] * jet[0]) * jet[2])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(y), asin(x)}, 2, 2, high_accuracy, compact_mode);
@@ -505,7 +519,7 @@ TEST_CASE("taylor asin")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * 1 / sqrt(1 - jet[1] * jet[1]) * jet[5]));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {asin(y), asin(x)}, 3, 3, high_accuracy, compact_mode);
@@ -570,8 +584,10 @@ TEST_CASE("taylor asin")
                                         + 1 / sqrt(1 - jet[2] * jet[2]) * 2 * jet[14])));
         }
 
-        // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({asin(y), asin(x)}, opt_level, high_accuracy, compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            // Do the batch/scalar comparison.
+            compare_batch_scalar<fp_t>({asin(y), asin(x)}, opt_level, high_accuracy, compact_mode);
+        }
     };
 
     for (auto cm : {false, true}) {

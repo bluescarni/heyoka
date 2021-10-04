@@ -11,9 +11,13 @@
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <tuple>
+#include <type_traits>
 #include <vector>
+
+#include <llvm/Config/llvm-config.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -45,6 +49,14 @@ const auto fp_types = std::tuple<double
                                  mppp::real128
 #endif
                                  >{};
+
+constexpr bool skip_batch_ld =
+#if LLVM_VERSION_MAJOR == 13
+    std::numeric_limits<long double>::digits == 64
+#else
+    false
+#endif
+    ;
 
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
@@ -157,7 +169,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == 5);
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, expression{number{b}}), x + y}, 1, 2,
@@ -185,7 +197,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == 4);
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, par[1]), x + y}, 1, 2, high_accuracy,
@@ -238,7 +250,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == fp_t{1} / 2 * (jet[2] + jet[3]));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, expression{number{b}}), x + y}, 2, 2,
@@ -272,7 +284,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == fp_t{1} / 2 * (jet[5] + jet[7]));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(par[0], par[1]), x + y}, 3, 3, high_accuracy, compact_mode);
@@ -322,8 +334,10 @@ TEST_CASE("taylor atan2")
         }
 
         // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({atan2(expression{number{a}}, expression{number{b}}), x + y}, opt_level,
-                                   high_accuracy, compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            compare_batch_scalar<fp_t>({atan2(expression{number{a}}, expression{number{b}}), x + y}, opt_level,
+                                       high_accuracy, compact_mode);
+        }
 
         // Variable-number tests.
         {
@@ -370,7 +384,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(jet[0], b)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 1, 2,
@@ -398,7 +412,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == approximately(atan2(jet[1], b)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, par[1])}, 1, 2, high_accuracy,
@@ -451,7 +465,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == approximately(fp_t{1} / 2 * b * jet[2] / (jet[0] * jet[0] + b * b)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 2, 2,
@@ -485,7 +499,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == approximately(fp_t{1} / 2 * b * jet[5] / (jet[1] * jet[1] + b * b)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, 3, 3,
@@ -551,9 +565,11 @@ TEST_CASE("taylor atan2")
                                      / ((jet[2] * jet[2] + b * b) * (jet[2] * jet[2] + b * b))));
         }
 
-        // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, opt_level,
-                                   high_accuracy, compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            // Do the batch/scalar comparison.
+            compare_batch_scalar<fp_t>({atan2(y, expression{number{b}}), atan2(x, expression{number{b}})}, opt_level,
+                                       high_accuracy, compact_mode);
+        }
 
         // Number-variable tests.
         {
@@ -600,7 +616,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(c, jet[0])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 1, 2,
@@ -628,7 +644,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[7] == approximately(atan2(c, jet[1])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(par[1], x)}, 1, 2, high_accuracy,
@@ -681,7 +697,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[5] == approximately(-fp_t{1} / 2 * c * jet[2] / (jet[0] * jet[0] + c * c)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 2, 2,
@@ -715,7 +731,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[11] == approximately(-fp_t{1} / 2 * c * jet[5] / (jet[1] * jet[1] + c * c)));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, 3, 3,
@@ -783,9 +799,11 @@ TEST_CASE("taylor atan2")
                                      / ((jet[2] * jet[2] + c * c) * (jet[2] * jet[2] + c * c))));
         }
 
-        // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, opt_level,
-                                   high_accuracy, compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            // Do the batch/scalar comparison.
+            compare_batch_scalar<fp_t>({atan2(expression{number{a}}, y), atan2(expression{number{c}}, x)}, opt_level,
+                                       high_accuracy, compact_mode);
+        }
 
         // Variable-variable tests.
         {
@@ -808,7 +826,7 @@ TEST_CASE("taylor atan2")
             REQUIRE(jet[3] == approximately(atan2(jet[1], jet[0])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 1, 2, high_accuracy, compact_mode);
@@ -861,7 +879,7 @@ TEST_CASE("taylor atan2")
                                      / (jet[0] * jet[0] + jet[1] * jet[1])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 2, 2, high_accuracy, compact_mode);
@@ -902,7 +920,7 @@ TEST_CASE("taylor atan2")
                                      / (jet[1] * jet[1] + jet[3] * jet[3])));
         }
 
-        {
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
             llvm_state s{kw::opt_level = opt_level};
 
             taylor_add_jet<fp_t>(s, "jet", {atan2(x, y), atan2(y, x)}, 3, 3, high_accuracy, compact_mode);
@@ -989,8 +1007,10 @@ TEST_CASE("taylor atan2")
                                  / ((jet[2] * jet[2] + jet[5] * jet[5]) * (jet[2] * jet[2] + jet[5] * jet[5]))));
         }
 
-        // Do the batch/scalar comparison.
-        compare_batch_scalar<fp_t>({atan2(x, y), atan2(y, x)}, opt_level, high_accuracy, compact_mode);
+        if constexpr (!std::is_same_v<long double, fp_t> || !skip_batch_ld) {
+            // Do the batch/scalar comparison.
+            compare_batch_scalar<fp_t>({atan2(x, y), atan2(y, x)}, opt_level, high_accuracy, compact_mode);
+        }
     };
 
     for (auto cm : {true, false}) {
