@@ -113,25 +113,7 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    auto &builder = s.builder();
-
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, args[0]);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, "logq", scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
+    return call_extern_vec(s, args[0], "logq");
 }
 
 #endif

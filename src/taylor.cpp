@@ -1336,28 +1336,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_maxabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_maxabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_maxabs128");
     } else {
 #endif
         // Compute abs(b).
@@ -1377,28 +1356,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_minabs128");
     } else {
 #endif
         // Compute abs(b).
@@ -1418,28 +1376,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the pow() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "powq", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "powq");
     } else {
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef

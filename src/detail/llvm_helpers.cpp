@@ -926,29 +926,7 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v);
-
-        // Execute the fabsq() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        res_scalars.reserve(x_scalars.size());
-        for (auto *x_scal : x_scalars) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "fabsq", x_t, {x_scal},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, "fabsq");
     } else {
 #endif
         return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
@@ -970,30 +948,7 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
     auto &context = s.context();
 
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        // NOTE: for __float128 we cannot use the intrinsics, we need
-        // to call an external function.
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x), y_scalars = vector_to_scalars(builder, y);
-
-        // Compute the modulus on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            auto quo = builder.CreateFDiv(x_scalars[i], y_scalars[i]);
-            auto fl_quo = llvm_invoke_external(
-                s, "floorq", x_t, {quo},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-
-            res_scalars.push_back(builder.CreateFSub(x_scalars[i], builder.CreateFMul(y_scalars[i], fl_quo)));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x, y, "heyoka_modulus128");
     } else {
 #endif
         auto quo = builder.CreateFDiv(x, y);
@@ -1013,28 +968,7 @@ llvm::Value *llvm_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minnum128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minnum128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_minnum128");
     } else {
 #endif
         return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
@@ -1051,28 +985,7 @@ llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_max128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_max128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_max128");
     } else {
 #endif
         // Return max(a, b).
@@ -1128,29 +1041,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        auto &builder = s.builder();
-
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x), y_scalars = vector_to_scalars(builder, y);
-
-        // Execute the atan2q() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "atan2q", x_t, {y_scalars[i], x_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, y, x, "atan2q");
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context)) {
