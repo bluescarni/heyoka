@@ -4,11 +4,11 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Batch mode &#8212; heyoka 0.15.0 documentation</title>
     
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  <link href="_static/css/theme.css" rel="stylesheet" />
+  <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
 
     
   <link rel="stylesheet"
@@ -20,35 +20,31 @@
 
     
       
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
 
     
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
     
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+  <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Serialisation" href="tut_s11n.html" />
     <link rel="prev" title="Advanced tutorials" href="advanced_tutorials.html" />
-
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
-
-
-
+    
   </head>
   <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
     
 
     <div class="container-xl">
@@ -57,30 +53,39 @@
 <div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
     
         <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
-  
-  <img src="_static/white_logo.png" class="logo" alt="logo">
-  
-  
-  <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
-  
-</a>
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="_static/white_logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
+      
+    </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
   <i class="icon fas fa-search"></i>
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
  <li class="toctree-l1">
   <a class="reference internal" href="install.html">
    Installation
   </a>
  </li>
- <li class="toctree-l1 collapsible-parent">
+ <li class="toctree-l1 has-children">
   <a class="reference internal" href="basic_tutorials.html">
    Basic tutorials
   </a>
-  <ul class="collapse-ul">
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_taylor_method.html">
      Taylor’s method
@@ -122,14 +127,17 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
- <li class="toctree-l1 current active collapsible-parent">
+ <li class="toctree-l1 current active has-children">
   <a class="reference internal" href="advanced_tutorials.html">
    Advanced tutorials
   </a>
-  <ul class="current collapse-ul">
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
    <li class="toctree-l2 current active">
     <a class="current reference internal" href="#">
      Batch mode
@@ -141,8 +149,6 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
  <li class="toctree-l1">
   <a class="reference internal" href="ad_notes.html">
@@ -171,6 +177,7 @@
  </li>
 </ul>
 
+    </div>
 </nav> <!-- To handle the deprecated key -->
 
 <div class="navbar_extra_footer">
@@ -236,12 +243,12 @@
     </div>
 </div>
 
-
             <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
 
             <!-- Launch buttons -->
 
@@ -250,12 +257,11 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#the-adaptive-batch-integrator">
    The adaptive batch integrator
@@ -285,8 +291,7 @@
  </li>
 </ul>
 
-        </nav>
-        
+            </nav>
         </div>
     </div>
 </div>
@@ -295,7 +300,7 @@
         
               <div>
                 
-  <section id="batch-mode">
+  <div class="section" id="batch-mode">
 <span id="tut-batch-mode"></span><h1>Batch mode<a class="headerlink" href="#batch-mode" title="Permalink to this headline">¶</a></h1>
 <p>heyoka’s API supports a mode of operation called <em>batch mode</em>.
 In batch mode, all the scalar quantities appearing in a system of ODEs
@@ -322,7 +327,7 @@ processor in use. Because at this time the most widespread SIMD instruction set 
 <a class="reference external" href="https://en.wikipedia.org/wiki/Advanced_Vector_Extensions">AVX</a> (available on
 most x86 processors sold since 2011), in this tutorial we will be using a
 batch size <span class="math notranslate nohighlight">\(n=4\)</span>.</p>
-<section id="the-adaptive-batch-integrator">
+<div class="section" id="the-adaptive-batch-integrator">
 <h2>The adaptive batch integrator<a class="headerlink" href="#the-adaptive-batch-integrator" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code> class is the batch mode counterpart of the adaptive
 (scalar) integrator <a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">described earlier</span></a>. Although at a high-level
@@ -435,7 +440,7 @@ all initialised to zero, as we can verify by printing to screen the time array:<
 <p>Note that, contrary to the scalar integrator, in the batch integrator it is not
 possible to write directly into the array of time coordinates. The function <code class="docutils literal notranslate"><span class="pre">set_time()</span></code>,
 accepting a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> of time coordinates in input, must be used instead.</p>
-<section id="step-by-step-integration">
+<div class="section" id="step-by-step-integration">
 <h3>Step-by-step integration<a class="headerlink" href="#step-by-step-integration" title="Permalink to this headline">¶</a></h3>
 <p>We are now ready to start integrating. Like <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>, <code class="docutils literal notranslate"><span class="pre">taylor_adaptive_batch</span></code>
 provides <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions for integrating forward or backward in time step-by-step.
@@ -511,8 +516,8 @@ then the timesteps will be clamped.</p>
 <span class="go">{ 0.215801,  0.21687 ,  0.216791,  0.216963}</span>
 </pre></div>
 </div>
-</section>
-<section id="time-limited-propagation">
+</div>
+<div class="section" id="time-limited-propagation">
 <h3>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions are also available for the
 batch integrator. Similarly to the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions, the outcomes of the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code>
@@ -570,8 +575,8 @@ that were used in the propagation,</p></li>
 <span class="go">{ 20.,  21.,  22.,  23.}</span>
 </pre></div>
 </div>
-</section>
-<section id="dense-output">
+</div>
+<div class="section" id="dense-output">
 <h3>Dense output<a class="headerlink" href="#dense-output" title="Permalink to this headline">¶</a></h3>
 <p>The batch integrator also supports <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. Like for <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>,
 enabling dense output is a two-step process. First we invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
@@ -667,9 +672,9 @@ at different time coordinates:</p>
 <span class="go"> { 1.289941,  0.411166, -0.134188,  0.776195}}</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="full-code-listing">
+</div>
+</div>
+<div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstddef&gt;</span><span class="cp"></span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
@@ -807,23 +812,43 @@ at different time coordinates:</p>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>
               
         
-        <div class='prev-next-bottom'>
             
-    <a class='left-prev' id="prev-link" href="advanced_tutorials.html" title="previous page">Advanced tutorials</a>
-    <a class='right-next' id="next-link" href="tut_s11n.html" title="next page">Serialisation</a>
 
-        </div>
+
+
+<div class='prev-next-bottom'>
+    
+    <div id="prev">
+        <a class="left-prev" href="advanced_tutorials.html" title="previous page">
+            <i class="prevnext-label fas fa-angle-left"></i>
+            <div class="prevnext-info">
+                <p class="prevnext-label">previous</p>
+                <p class="prevnext-title">Advanced tutorials</p>
+            </div>
+        </a>
+    </div>
+     <div id="next">
+        <a class="right-next" href="tut_s11n.html" title="next page">
+            <div class="prevnext-info">
+                <p class="prevnext-label">next</p>
+                <p class="prevnext-title">Serialisation</p>
+            </div>
+            <i class="prevnext-label fas fa-angle-right"></i>
+        </a>
+     </div>
+
+</div>
         
         </div>
     </div>
-    <footer class="footer mt-5 mt-md-0">
+    <footer class="footer">
     <div class="container">
       <p>
         
@@ -838,11 +863,9 @@ at different time coordinates:</p>
 
       </div>
     </div>
+  
+  <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  
   </body>
 </html>

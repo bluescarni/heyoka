@@ -4,11 +4,11 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Event detection &#8212; heyoka 0.15.0 documentation</title>
     
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  <link href="_static/css/theme.css" rel="stylesheet" />
+  <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
 
     
   <link rel="stylesheet"
@@ -20,35 +20,31 @@
 
     
       
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
 
     
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
     
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+  <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Advanced tutorials" href="advanced_tutorials.html" />
     <link rel="prev" title="Dense output" href="tut_d_output.html" />
-
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
-
-
-
+    
   </head>
   <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
     
 
     <div class="container-xl">
@@ -57,30 +53,39 @@
 <div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
     
         <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
-  
-  <img src="_static/white_logo.png" class="logo" alt="logo">
-  
-  
-  <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
-  
-</a>
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="_static/white_logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
+      
+    </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
   <i class="icon fas fa-search"></i>
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
  <li class="toctree-l1">
   <a class="reference internal" href="install.html">
    Installation
   </a>
  </li>
- <li class="toctree-l1 current active collapsible-parent">
+ <li class="toctree-l1 current active has-children">
   <a class="reference internal" href="basic_tutorials.html">
    Basic tutorials
   </a>
-  <ul class="current collapse-ul">
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
    <li class="toctree-l2">
     <a class="reference internal" href="tut_taylor_method.html">
      Taylor’s method
@@ -122,14 +127,17 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
- <li class="toctree-l1 collapsible-parent">
+ <li class="toctree-l1 has-children">
   <a class="reference internal" href="advanced_tutorials.html">
    Advanced tutorials
   </a>
-  <ul class="collapse-ul">
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_batch_mode.html">
      Batch mode
@@ -141,8 +149,6 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
  <li class="toctree-l1">
   <a class="reference internal" href="ad_notes.html">
@@ -171,6 +177,7 @@
  </li>
 </ul>
 
+    </div>
 </nav> <!-- To handle the deprecated key -->
 
 <div class="navbar_extra_footer">
@@ -236,12 +243,12 @@
     </div>
 </div>
 
-
             <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
 
             <!-- Launch buttons -->
 
@@ -250,12 +257,11 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#non-terminal-events">
    Non-terminal events
@@ -309,8 +315,7 @@
  </li>
 </ul>
 
-        </nav>
-        
+            </nav>
         </div>
     </div>
 </div>
@@ -319,7 +324,7 @@
         
               <div>
                 
-  <section id="event-detection">
+  <div class="section" id="event-detection">
 <span id="tut-events"></span><h1>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.6.0.</span></p>
@@ -348,7 +353,7 @@ in powers of time is available. Polynomial root finding techniques <span id="id1
 on the Taylor series of the event equations to accurately locate the time of occurrence of an event within the timestep.</p>
 <p>Like many other ODE integration libraries, heyoka makes a fundamental distinction between two types of events, <em>terminal</em> and <em>non-terminal</em>.
 We will begin with non-terminal events, as they are conceptually simpler.</p>
-<section id="non-terminal-events">
+<div class="section" id="non-terminal-events">
 <h2>Non-terminal events<a class="headerlink" href="#non-terminal-events" title="Permalink to this headline">¶</a></h2>
 <p>Non-terminal events are events that do not modify the state of an ODE system. That is, the occurrence of a non-terminal event does not
 change the system’s dynamics and it does not alter the state vector of the system. A typical use of non-terminal events is to detect and log
@@ -479,7 +484,7 @@ which can be computed exactly via elliptic functions. With the specific
 initial conditions of this example, <span class="math notranslate nohighlight">\(T = 2.0074035758801299\ldots\)</span>, and
 we can see from the event times printed to screen
 how the event detection system was accurate to machine precision.</p>
-<section id="event-direction">
+<div class="section" id="event-direction">
 <h3>Event direction<a class="headerlink" href="#event-direction" title="Permalink to this headline">¶</a></h3>
 <p>By default, heyoka will detect all zeroes of the event equations regardless
 of the <em>direction</em> of the zero crossing (i.e., the value of the time derivative
@@ -524,8 +529,8 @@ Let us take a look at the event times:</p>
 <p>Indeed, the event now triggers only 3 times (instead of 5), and the times confirm
 that the event is detected only when <span class="math notranslate nohighlight">\(v\)</span> switches from negative to positive, i.e.,
 at <span class="math notranslate nohighlight">\(t=0\)</span>, <span class="math notranslate nohighlight">\(t=T\)</span> and <span class="math notranslate nohighlight">\(t=2T\)</span>.</p>
-</section>
-<section id="multiple-events">
+</div>
+<div class="section" id="multiple-events">
 <h3>Multiple events<a class="headerlink" href="#multiple-events" title="Permalink to this headline">¶</a></h3>
 <p>When multiple events trigger within the same timestep (or if the same event triggers
 multiple times), heyoka will process the events in chronological order
@@ -579,9 +584,9 @@ modifying the <code class="docutils literal notranslate"><span class="pre">zero_
 </div>
 <p>Note how the events are indeed processed in chronological order, and how the event detection system is able to
 successfully recognize the second event triggering twice in close succession.</p>
-</section>
-</section>
-<section id="terminal-events">
+</div>
+</div>
+<div class="section" id="terminal-events">
 <h2>Terminal events<a class="headerlink" href="#terminal-events" title="Permalink to this headline">¶</a></h2>
 <p>The fundamental characteristic of terminal events is that, in contrast to non-terminal events,
 they alter the dynamics and/or the state of the system. A typical example of a terminal event is the
@@ -738,7 +743,7 @@ execution of the callback:</p>
 <p>The screen output confirms that indeed the integration continued up to the final time <span class="math notranslate nohighlight">\(t = 10\)</span>. The values
 of the angle and angular velocity throughout the integration show how the drag coefficient (which was on roughly
 for half of the total integration time) progressively slowed the bob down.</p>
-<section id="cooldown">
+<div class="section" id="cooldown">
 <span id="tut-t-event-cooldown"></span><h3>Cooldown<a class="headerlink" href="#cooldown" title="Permalink to this headline">¶</a></h3>
 <p>One notable complication when restarting an integration that was stopped in correspondence of a terminal event
 is the risk of immediately re-triggering the same event, which would lead to an endless loop without any progress
@@ -766,11 +771,11 @@ that multiple roots do not exist, just that they were not detected.</p>
 for terminal events. This could in principle lead to missing terminal events when the integration restarts.
 For this reason, a member function called <code class="docutils literal notranslate"><span class="pre">reset_cooldowns()</span></code> is available to clear the cooldown timers of
 all terminal events.</p>
-</section>
-</section>
-<section id="limitations-and-caveats">
+</div>
+</div>
+<div class="section" id="limitations-and-caveats">
 <h2>Limitations and caveats<a class="headerlink" href="#limitations-and-caveats" title="Permalink to this headline">¶</a></h2>
-<section id="badly-conditioned-event-equations">
+<div class="section" id="badly-conditioned-event-equations">
 <h3>Badly-conditioned event equations<a class="headerlink" href="#badly-conditioned-event-equations" title="Permalink to this headline">¶</a></h3>
 <p>Because heyoka’s event detection system is based on polynomial root finding techniques, it will experience
 issues when the Taylor series of the event equations have roots of multiplicity greater than 1. This is usually
@@ -788,8 +793,8 @@ a double root will tend to infinity.</p>
 <p>As a general rule, users should then avoid defining event equations in which the event trigger times
 are stationary points.</p>
 <p>Note that missed events due to badly-conditioned polynomials will likely be flagged by heyoka’s logging system.</p>
-</section>
-<section id="event-equations-and-timestepping">
+</div>
+<div class="section" id="event-equations-and-timestepping">
 <h3>Event equations and timestepping<a class="headerlink" href="#event-equations-and-timestepping" title="Permalink to this headline">¶</a></h3>
 <p>As explained earlier, the differential equations of the events are added to the ODE system and
 integrated together with the original equations. Because of this, event equations influence the
@@ -801,9 +806,9 @@ magnitude of the state variables, the integration error for the state variables 
 to an integration without event detection.</p>
 <p>As another example, an event equation which requires small timesteps for accurate numerical propagation
 will inevitably slow down also the propagation of the ODEs.</p>
-</section>
-</section>
-<section id="full-code-listing">
+</div>
+</div>
+<div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
@@ -945,23 +950,43 @@ will inevitably slow down also the propagation of the ODEs.</p>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>
               
         
-        <div class='prev-next-bottom'>
             
-    <a class='left-prev' id="prev-link" href="tut_d_output.html" title="previous page">Dense output</a>
-    <a class='right-next' id="next-link" href="advanced_tutorials.html" title="next page">Advanced tutorials</a>
 
-        </div>
+
+
+<div class='prev-next-bottom'>
+    
+    <div id="prev">
+        <a class="left-prev" href="tut_d_output.html" title="previous page">
+            <i class="prevnext-label fas fa-angle-left"></i>
+            <div class="prevnext-info">
+                <p class="prevnext-label">previous</p>
+                <p class="prevnext-title">Dense output</p>
+            </div>
+        </a>
+    </div>
+     <div id="next">
+        <a class="right-next" href="advanced_tutorials.html" title="next page">
+            <div class="prevnext-info">
+                <p class="prevnext-label">next</p>
+                <p class="prevnext-title">Advanced tutorials</p>
+            </div>
+            <i class="prevnext-label fas fa-angle-right"></i>
+        </a>
+     </div>
+
+</div>
         
         </div>
     </div>
-    <footer class="footer mt-5 mt-md-0">
+    <footer class="footer">
     <div class="container">
       <p>
         
@@ -976,11 +1001,9 @@ will inevitably slow down also the propagation of the ODEs.</p>
 
       </div>
     </div>
+  
+  <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  
   </body>
 </html>

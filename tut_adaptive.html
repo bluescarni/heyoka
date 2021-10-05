@@ -4,11 +4,11 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The adaptive integrator &#8212; heyoka 0.15.0 documentation</title>
     
-  <link rel="stylesheet" href="_static/css/index.f658d18f9b420779cfdf24aa0a7e2d77.css">
+  <link href="_static/css/theme.css" rel="stylesheet" />
+  <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
 
     
   <link rel="stylesheet"
@@ -20,35 +20,31 @@
 
     
       
-  <link rel="stylesheet"
-    href="_static/vendor/open-sans_all/1.44.1/index.css">
-  <link rel="stylesheet"
-    href="_static/vendor/lato_latin-ext/1.44.1/index.css">
 
     
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.c441f2ba0852f4cabcb80105e3a46ae6.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
     
-  <link rel="preload" as="script" href="_static/js/index.d3f166471bb80abb5163.js">
+  <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
 
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.7d483ff0a819d6edff12ce0b1ead3928.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Customising the adaptive integrator" href="tut_adaptive_custom.html" />
     <link rel="prev" title="The expression system" href="tut_expression_system.html" />
-
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
-
-
-
+    
   </head>
   <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
     
 
     <div class="container-xl">
@@ -57,30 +53,39 @@
 <div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
     
         <div class="navbar-brand-box">
-<a class="navbar-brand text-wrap" href="index.html">
-  
-  <img src="_static/white_logo.png" class="logo" alt="logo">
-  
-  
-  <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
-  
-</a>
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="_static/white_logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">heyoka 0.15.0 documentation</h1>
+      
+    </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
   <i class="icon fas fa-search"></i>
   <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
-</form>
-<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
-    <ul class="current nav sidenav_l1">
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
  <li class="toctree-l1">
   <a class="reference internal" href="install.html">
    Installation
   </a>
  </li>
- <li class="toctree-l1 current active collapsible-parent">
+ <li class="toctree-l1 current active has-children">
   <a class="reference internal" href="basic_tutorials.html">
    Basic tutorials
   </a>
-  <ul class="current collapse-ul">
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
    <li class="toctree-l2">
     <a class="reference internal" href="tut_taylor_method.html">
      Taylor’s method
@@ -122,14 +127,17 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
- <li class="toctree-l1 collapsible-parent">
+ <li class="toctree-l1 has-children">
   <a class="reference internal" href="advanced_tutorials.html">
    Advanced tutorials
   </a>
-  <ul class="collapse-ul">
+  <input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_batch_mode.html">
      Batch mode
@@ -141,8 +149,6 @@
     </a>
    </li>
   </ul>
-  <i class="fas fa-chevron-down">
-  </i>
  </li>
  <li class="toctree-l1">
   <a class="reference internal" href="ad_notes.html">
@@ -171,6 +177,7 @@
  </li>
 </ul>
 
+    </div>
 </nav> <!-- To handle the deprecated key -->
 
 <div class="navbar_extra_footer">
@@ -236,12 +243,12 @@
     </div>
 </div>
 
-
             <!-- Full screen (wrap in <a> to have style consistency -->
-            <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
-                    data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
-                    title="Fullscreen mode"><i
-                        class="fas fa-expand"></i></button></a>
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
 
             <!-- Launch buttons -->
 
@@ -250,12 +257,11 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
-        <div class="tocsection onthispage pt-5 pb-3">
-            <i class="fas fa-list"></i>
-            Contents
-        </div>
-        <nav id="bd-toc-nav">
-            <ul class="nav section-nav flex-column">
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#construction">
    Construction
@@ -288,8 +294,7 @@
  </li>
 </ul>
 
-        </nav>
-        
+            </nav>
         </div>
     </div>
 </div>
@@ -298,7 +303,7 @@
         
               <div>
                 
-  <section id="the-adaptive-integrator">
+  <div class="section" id="the-adaptive-integrator">
 <span id="tut-adaptive"></span><h1>The adaptive integrator<a class="headerlink" href="#the-adaptive-integrator" title="Permalink to this headline">¶</a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> class provides an easy-to-use interface to heyoka’s
 main capabilities. Objects of this class can be constructed from a system
@@ -319,7 +324,7 @@ v^\prime = -9.8 \sin x
 x\left( 0 \right) = 0.05 \\
 v\left( 0 \right) = 0.025
 \end{cases}\end{split}\]</div>
-<section id="construction">
+<div class="section" id="construction">
 <h2>Construction<a class="headerlink" href="#construction" title="Permalink to this headline">¶</a></h2>
 <p>Here’s the code:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
@@ -363,8 +368,8 @@ From this value, heyoka deduces an optimal Taylor order of 20, as indicated
 by the screen output. <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> manages its own copy of the state vector and the time variable.
 Both the state vector and the time variable are updated automatically by the timestepping
 functions. Note also how, by default, the time variable is initially set to zero.</p>
-</section>
-<section id="single-timestep">
+</div>
+<div class="section" id="single-timestep">
 <h2>Single timestep<a class="headerlink" href="#single-timestep" title="Permalink to this headline">¶</a></h2>
 <p>Let’s now try to perform a single integration timestep:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Perform a single step.</span>
@@ -450,8 +455,8 @@ to a finite value.</p>
 <p>Note that the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions (described <a class="reference internal" href="#tlimited-prop"><span class="std std-ref">below</span></a>)
 are not affected by this issue.</p>
 </div>
-</section>
-<section id="accessing-state-and-time">
+</div>
+<div class="section" id="accessing-state-and-time">
 <h2>Accessing state and time<a class="headerlink" href="#accessing-state-and-time" title="Permalink to this headline">¶</a></h2>
 <p>It is possible to read from and write to both the time variable and the state
 vector. The <code class="docutils literal notranslate"><span class="pre">get_time()</span></code>/<code class="docutils literal notranslate"><span class="pre">set_time()</span></code> functions can be used to access
@@ -472,8 +477,8 @@ can be used to access the state data:</p>
 <p>Note that <code class="docutils literal notranslate"><span class="pre">get_state()</span></code> returns a const reference to the <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>
 holding the integrator state, while <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> returns a naked pointer
 to the state data. Only <code class="docutils literal notranslate"><span class="pre">get_state_data()</span></code> can be used to mutate the state.</p>
-</section>
-<section id="time-limited-propagation">
+</div>
+<div class="section" id="time-limited-propagation">
 <span id="tlimited-prop"></span><h2>Time-limited propagation<a class="headerlink" href="#time-limited-propagation" title="Permalink to this headline">¶</a></h2>
 <p>In addition to the step-by-step integration functions,
 <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> also provides functions to propagate
@@ -573,8 +578,8 @@ will continue after the invocation of the callback, otherwise the integration
 will be interrupted.</p>
 </li>
 </ul>
-</section>
-<section id="propagation-over-a-time-grid">
+</div>
+<div class="section" id="propagation-over-a-time-grid">
 <h2>Propagation over a time grid<a class="headerlink" href="#propagation-over-a-time-grid" title="Permalink to this headline">¶</a></h2>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.4.0.</span></p>
@@ -639,8 +644,8 @@ will continue after the invocation of the callback, otherwise the integration
 will be interrupted.</p>
 </li>
 </ul>
-</section>
-<section id="full-code-listing">
+</div>
+<div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 
@@ -754,23 +759,43 @@ will be interrupted.</p>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-</section>
-</section>
+</div>
+</div>
 
 
               </div>
               
         
-        <div class='prev-next-bottom'>
             
-    <a class='left-prev' id="prev-link" href="tut_expression_system.html" title="previous page">The expression system</a>
-    <a class='right-next' id="next-link" href="tut_adaptive_custom.html" title="next page">Customising the adaptive integrator</a>
 
-        </div>
+
+
+<div class='prev-next-bottom'>
+    
+    <div id="prev">
+        <a class="left-prev" href="tut_expression_system.html" title="previous page">
+            <i class="prevnext-label fas fa-angle-left"></i>
+            <div class="prevnext-info">
+                <p class="prevnext-label">previous</p>
+                <p class="prevnext-title">The expression system</p>
+            </div>
+        </a>
+    </div>
+     <div id="next">
+        <a class="right-next" href="tut_adaptive_custom.html" title="next page">
+            <div class="prevnext-info">
+                <p class="prevnext-label">next</p>
+                <p class="prevnext-title">Customising the adaptive integrator</p>
+            </div>
+            <i class="prevnext-label fas fa-angle-right"></i>
+        </a>
+     </div>
+
+</div>
         
         </div>
     </div>
-    <footer class="footer mt-5 mt-md-0">
+    <footer class="footer">
     <div class="container">
       <p>
         
@@ -785,11 +810,9 @@ will be interrupted.</p>
 
       </div>
     </div>
+  
+  <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
 
-    
-  <script src="_static/js/index.d3f166471bb80abb5163.js"></script>
-
-
-    
+  
   </body>
 </html>
