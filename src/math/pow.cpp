@@ -156,26 +156,7 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args[0] != nullptr);
     assert(args[1] != nullptr);
 
-    auto &builder = s.builder();
-
-    // Decompose the arguments into scalars.
-    auto scalars0 = vector_to_scalars(builder, args[0]);
-    auto scalars1 = vector_to_scalars(builder, args[1]);
-
-    // Invoke the function on the scalars.
-    std::vector<llvm::Value *> retvals;
-    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
-        retvals.push_back(llvm_invoke_external(
-            s, "powq", scalars0[i]->getType(), {scalars0[i], scalars1[i]},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
+    return call_extern_vec(s, args[0], args[1], "powq");
 }
 
 #endif
