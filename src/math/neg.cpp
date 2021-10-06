@@ -318,19 +318,22 @@ llvm::Function *taylor_c_diff_func_neg(llvm_state &s, const neg_impl &fn, std::u
 
 } // namespace
 
-llvm::Function *neg_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *neg_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                 bool) const
 {
     return taylor_c_diff_func_neg<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *neg_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *neg_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_neg<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_neg<mppp::real128>(s, *this, n_uvars, batch_size);
 }

@@ -469,19 +469,22 @@ llvm::Function *taylor_c_diff_func_tan(llvm_state &s, const tan_impl &fn, std::u
 
 } // namespace
 
-llvm::Function *tan_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *tan_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                 bool) const
 {
     return taylor_c_diff_func_tan<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *tan_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *tan_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_tan<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *tan_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *tan_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_tan<mppp::real128>(s, *this, n_uvars, batch_size);
 }

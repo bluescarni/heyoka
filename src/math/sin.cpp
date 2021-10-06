@@ -459,19 +459,22 @@ llvm::Function *taylor_c_diff_func_sin(llvm_state &s, const sin_impl &fn, std::u
 
 } // namespace
 
-llvm::Function *sin_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sin_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                 bool) const
 {
     return taylor_c_diff_func_sin<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *sin_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sin_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_sin<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sin_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sin_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_sin<mppp::real128>(s, *this, n_uvars, batch_size);
 }

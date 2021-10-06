@@ -518,16 +518,16 @@ struct func_13 : func_base {
     func_13() : func_base("f", {}) {}
     explicit func_13(std::vector<expression> args) : func_base("f", std::move(args)) {}
 
-    llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const
     {
         return nullptr;
     }
-    llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const
     {
         return nullptr;
     }
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const
+    llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t, bool) const
     {
         return nullptr;
     }

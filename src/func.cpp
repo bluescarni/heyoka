@@ -615,7 +615,7 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -639,7 +639,7 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -665,7 +665,7 @@ llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uva
                 get_name()));
     }
 
-    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size);
+    auto retval = ptr()->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(

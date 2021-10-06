@@ -245,19 +245,22 @@ llvm::Function *taylor_c_diff_constant_impl(const constant_impl &c, llvm_state &
 
 } // namespace
 
-llvm::Function *constant_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *constant_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size,
+                                                      bool) const
 {
     return taylor_c_diff_constant_impl<double>(*this, s, batch_size);
 }
 
-llvm::Function *constant_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *constant_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size,
+                                                       bool) const
 {
     return taylor_c_diff_constant_impl<long double>(*this, s, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *constant_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *constant_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size,
+                                                       bool) const
 {
     return taylor_c_diff_constant_impl<mppp::real128>(*this, s, batch_size);
 }
