@@ -146,7 +146,7 @@ llvm::Value *taylor_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, llvm::V
 llvm::Value *tpoly_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                          const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
                                          llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t batch_size, bool) const
 {
     return taylor_diff_tpoly_impl<double>(s, *this, par_ptr, time_ptr, order, batch_size);
 }
@@ -154,7 +154,7 @@ llvm::Value *tpoly_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::u
 llvm::Value *tpoly_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                           const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
                                           llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size) const
+                                          std::uint32_t batch_size, bool) const
 {
     return taylor_diff_tpoly_impl<long double>(s, *this, par_ptr, time_ptr, order, batch_size);
 }
@@ -164,7 +164,7 @@ llvm::Value *tpoly_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::
 llvm::Value *tpoly_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
                                           const std::vector<llvm::Value *> &, llvm::Value *par_ptr,
                                           llvm::Value *time_ptr, std::uint32_t, std::uint32_t order, std::uint32_t,
-                                          std::uint32_t batch_size) const
+                                          std::uint32_t batch_size, bool) const
 {
     return taylor_diff_tpoly_impl<mppp::real128>(s, *this, par_ptr, time_ptr, order, batch_size);
 }
@@ -328,19 +328,19 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
 
 } // namespace
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_tpoly_impl<double>(s, *this, batch_size);
 }
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_tpoly_impl<long double>(s, *this, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_tpoly_impl<mppp::real128>(s, *this, batch_size);
 }

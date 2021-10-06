@@ -1284,19 +1284,29 @@ namespace
 template <typename T>
 llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                              bool high_accuracy)
 {
-    return std::visit(
-        [&](const auto &v) -> llvm::Value * {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                return taylor_diff<T>(s, v, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-            } else {
-                throw std::invalid_argument("Taylor derivatives can be computed only for functions");
-            }
-        },
-        ex.value());
+    if (auto fptr = std::get_if<func>(&ex.value())) {
+        if constexpr (std::is_same_v<T, double>) {
+            return fptr->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                         high_accuracy);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return fptr->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                          high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return fptr->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                          high_accuracy);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument("Taylor derivatives can be computed only for functions");
+        // LCOV_EXCL_STOP
+    }
 }
 
 } // namespace
@@ -1305,27 +1315,32 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
 
 llvm::Value *taylor_diff_dbl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                             bool high_accuracy)
 
 {
-    return detail::taylor_diff_impl<double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                            high_accuracy);
 }
 
 llvm::Value *taylor_diff_ldbl(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                              bool high_accuracy)
 {
-    return detail::taylor_diff_impl<long double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
+    return detail::taylor_diff_impl<long double>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                                 high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::vector<std::uint32_t> &deps,
                               const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
+                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size,
+                              bool high_accuracy)
 {
-    return detail::taylor_diff_impl<mppp::real128>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx,
-                                                   batch_size);
+    return detail::taylor_diff_impl<mppp::real128>(s, ex, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size,
+                                                   high_accuracy);
 }
 
 #endif
@@ -1338,19 +1353,25 @@ namespace
 
 template <typename T>
 llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+                                        std::uint32_t batch_size, bool high_accuracy)
 {
-    return std::visit(
-        [&](const auto &v) -> llvm::Function * {
-            using type = detail::uncvref_t<decltype(v)>;
-
-            if constexpr (std::is_same_v<type, func>) {
-                return taylor_c_diff_func<T>(s, v, n_uvars, batch_size);
-            } else {
-                throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
-            }
-        },
-        ex.value());
+    if (auto fptr = std::get_if<func>(&ex.value())) {
+        if constexpr (std::is_same_v<T, double>) {
+            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
+        } else if constexpr (std::is_same_v<T, long double>) {
+            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
+#if defined(HEYOKA_HAVE_REAL128)
+        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
+#endif
+        } else {
+            static_assert(detail::always_false_v<T>, "Unhandled type.");
+        }
+    } else {
+        // LCOV_EXCL_START
+        throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
+        // LCOV_EXCL_STOP
+    }
 }
 
 } // namespace
@@ -1358,23 +1379,23 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
 } // namespace detail
 
 llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size)
+                                       std::uint32_t batch_size, bool high_accuracy)
 {
-    return detail::taylor_c_diff_func_impl<double>(s, ex, n_uvars, batch_size);
+    return detail::taylor_c_diff_func_impl<double>(s, ex, n_uvars, batch_size, high_accuracy);
 }
 
 llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+                                        std::uint32_t batch_size, bool high_accuracy)
 {
-    return detail::taylor_c_diff_func_impl<long double>(s, ex, n_uvars, batch_size);
+    return detail::taylor_c_diff_func_impl<long double>(s, ex, n_uvars, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const expression &ex, std::uint32_t n_uvars,
-                                        std::uint32_t batch_size)
+                                        std::uint32_t batch_size, bool high_accuracy)
 {
-    return detail::taylor_c_diff_func_impl<mppp::real128>(s, ex, n_uvars, batch_size);
+    return detail::taylor_c_diff_func_impl<mppp::real128>(s, ex, n_uvars, batch_size, high_accuracy);
 }
 
 #endif
