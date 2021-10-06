@@ -763,14 +763,14 @@ public:
                                             taylor_dc_t &) const;
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                 std::uint32_t) const;
+                                 std::uint32_t, bool) const;
     llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t) const;
+                                  std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)
     llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t) const;
+                                  std::uint32_t, bool) const;
 #endif
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;
@@ -824,40 +824,6 @@ inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::ve
 }
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_dbl(llvm_state &, const func &, const std::vector<std::uint32_t> &,
-                                               const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                               std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_ldbl(llvm_state &, const func &, const std::vector<std::uint32_t> &,
-                                                const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                                std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Value *taylor_diff_f128(llvm_state &, const func &, const std::vector<std::uint32_t> &,
-                                                const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                                std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Value *taylor_diff(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
-                                const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_diff_dbl(s, f, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_diff_ldbl(s, f, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_diff_f128(s, f, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
 
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_dbl(llvm_state &, const func &, std::uint32_t, std::uint32_t);
 

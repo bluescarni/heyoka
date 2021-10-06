@@ -492,7 +492,7 @@ taylor_dc_t::size_type func::taylor_decompose(std::unordered_map<const void *, t
 llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                    const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                   std::uint32_t batch_size) const
+                                   std::uint32_t batch_size, bool high_accuracy) const
 {
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
@@ -527,7 +527,7 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_
 llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size) const
+                                    std::uint32_t batch_size, bool high_accuracy) const
 {
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
@@ -564,7 +564,7 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32
 llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
                                     std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                    std::uint32_t batch_size) const
+                                    std::uint32_t batch_size, bool high_accuracy) const
 {
     if (par_ptr == nullptr) {
         throw std::invalid_argument(
@@ -811,31 +811,6 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
         update_connections(node_connections, f.args()[i], node_counter);
     };
 }
-
-llvm::Value *taylor_diff_dbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
-                             const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
-{
-    return f.taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-}
-
-llvm::Value *taylor_diff_ldbl(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
-{
-    return f.taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Value *taylor_diff_f128(llvm_state &s, const func &f, const std::vector<std::uint32_t> &deps,
-                              const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *time_ptr,
-                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
-{
-    return f.taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
-}
-
-#endif
 
 llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
