@@ -601,7 +601,8 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
 
 #endif
 
-llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                             bool high_accuracy) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -624,7 +625,8 @@ llvm::Function *func::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvar
     return retval;
 }
 
-llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                              bool high_accuracy) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -649,7 +651,8 @@ llvm::Function *func::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uva
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *func::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                              bool high_accuracy) const
 {
     if (batch_size == 0u) {
         throw std::invalid_argument(
@@ -814,24 +817,5 @@ void update_connections(std::vector<std::vector<std::size_t>> &node_connections,
         update_connections(node_connections, f.args()[i], node_counter);
     };
 }
-
-llvm::Function *taylor_c_diff_func_dbl(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
-{
-    return f.taylor_c_diff_func_dbl(s, n_uvars, batch_size);
-}
-
-llvm::Function *taylor_c_diff_func_ldbl(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
-{
-    return f.taylor_c_diff_func_ldbl(s, n_uvars, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *taylor_c_diff_func_f128(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
-{
-    return f.taylor_c_diff_func_f128(s, n_uvars, batch_size);
-}
-
-#endif
 
 } // namespace heyoka

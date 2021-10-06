@@ -775,10 +775,10 @@ public:
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                   std::uint32_t, bool) const;
 #endif
-    llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t) const;
-    llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t) const;
+    llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
+    llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)
-    llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t) const;
+    llvm::Function *taylor_c_diff_func_f128(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
 #endif
 };
 
@@ -827,32 +827,6 @@ inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::ve
 }
 
 } // namespace detail
-
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_dbl(llvm_state &, const func &, std::uint32_t, std::uint32_t);
-
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, const func &, std::uint32_t, std::uint32_t);
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func_f128(llvm_state &, const func &, std::uint32_t, std::uint32_t);
-
-#endif
-
-template <typename T>
-inline llvm::Function *taylor_c_diff_func(llvm_state &s, const func &f, std::uint32_t n_uvars, std::uint32_t batch_size)
-{
-    if constexpr (std::is_same_v<T, double>) {
-        return taylor_c_diff_func_dbl(s, f, n_uvars, batch_size);
-    } else if constexpr (std::is_same_v<T, long double>) {
-        return taylor_c_diff_func_ldbl(s, f, n_uvars, batch_size);
-#if defined(HEYOKA_HAVE_REAL128)
-    } else if constexpr (std::is_same_v<T, mppp::real128>) {
-        return taylor_c_diff_func_f128(s, f, n_uvars, batch_size);
-#endif
-    } else {
-        static_assert(detail::always_false_v<T>, "Unhandled type.");
-    }
-}
 
 } // namespace heyoka
 

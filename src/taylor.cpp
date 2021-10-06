@@ -2271,7 +2271,7 @@ struct llvm_func_name_compare {
 // to yield the value of the i-th function argument for f at the j-th invocation.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
-                                std::uint32_t n_uvars, std::uint32_t batch_size)
+                                std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -2300,7 +2300,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size);
+            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2404,7 +2404,8 @@ template <typename T>
 llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
                                              llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
-                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                             bool high_accuracy)
 {
     auto &builder = s.builder();
 
@@ -2412,7 +2413,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     const auto s_dc = taylor_segment_dc(dc, n_eq);
 
     // Generate the function maps.
-    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size);
+    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
@@ -2680,7 +2681,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // LCOV_EXCL_STOP
 
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                                  batch_size);
+                                                  batch_size, high_accuracy);
     } else {
         // Log the runtime of IR construction in trace mode.
         spdlog::stopwatch sw;
