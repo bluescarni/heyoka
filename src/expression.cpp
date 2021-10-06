@@ -1303,7 +1303,9 @@ llvm::Value *taylor_diff_impl(llvm_state &s, const expression &ex, const std::ve
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives can be computed only for functions");
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -1366,7 +1368,9 @@ llvm::Function *taylor_c_diff_func_impl(llvm_state &s, const expression &ex, std
             static_assert(detail::always_false_v<T>, "Unhandled type.");
         }
     } else {
+        // LCOV_EXCL_START
         throw std::invalid_argument("Taylor derivatives in compact mode can be computed only for functions");
+        // LCOV_EXCL_STOP
     }
 }
 
