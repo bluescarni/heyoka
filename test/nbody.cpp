@@ -39,6 +39,11 @@ TEST_CASE("N-body param")
     for (const auto &[_, ex] : make_nbody_par_sys(20, kw::n_massive = 3)) {
         std::cout << ex << '\n';
     }
+
+    // Exercise fixed masses + massless particles.
+    const auto G = 6.674e-11;
+    auto masses = std::vector{1.989e30, 1.898e27, 0.};
+    auto sys = make_nbody_sys(3, kw::masses = masses, kw::Gconst = G);
 }
 
 // Test case for an issue that arised when using

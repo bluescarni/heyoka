@@ -120,7 +120,7 @@ struct ffnn {
 
 int main()
 {
-    for (auto i = 2u; i < 6; ++i) {
+    for (auto i = 2u; i < 15; ++i) {
         std::cout << "\nLayers: " << std::to_string(i) << std::endl;
         // A FFNN 2 in, 2 out 4 extra layers, ten neurons
         ffnn eclipsenet(2, 2, i, 10);
@@ -141,7 +141,7 @@ int main()
 
         // We show here the scaling
         std::cout << "\tSize of decomposion: " << ta.get_decomposition().size() << std::endl;
-        std::cout << "\tSize of output expression: " << 2 * boost::lexical_cast<std::string>(out[0]).size() << std::endl;
+        std::cout << "\tSize of output expression: " << get_n_nodes(out[0]) << std::endl;
     }
     return 0;
 }
