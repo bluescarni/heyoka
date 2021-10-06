@@ -40,7 +40,7 @@ TEST_CASE("N-body param")
         std::cout << ex << '\n';
     }
 
-    // Excercise fixed masses + massless particles.
+    // Exercise fixed masses + massless particles.
     const auto G = 6.674e-11;
     auto masses = std::vector{1.989e30, 1.898e27, 0.};
     auto sys = make_nbody_sys(3, kw::masses = masses, kw::Gconst = G);
