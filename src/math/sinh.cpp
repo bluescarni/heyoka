@@ -243,7 +243,7 @@ llvm::Value *taylor_diff_sinh(llvm_state &s, const sinh_impl &f, const std::vect
 llvm::Value *sinh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size) const
+                                        std::uint32_t batch_size, bool) const
 {
     return taylor_diff_sinh<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -251,7 +251,7 @@ llvm::Value *sinh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::ui
 llvm::Value *sinh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t batch_size, bool) const
 {
     return taylor_diff_sinh<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -261,7 +261,7 @@ llvm::Value *sinh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::u
 llvm::Value *sinh_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t batch_size, bool) const
 {
     return taylor_diff_sinh<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }

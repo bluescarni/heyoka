@@ -514,7 +514,8 @@ llvm::Value *func::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_
             "Zero number of u variables detected in func::taylor_diff_dbl() for the function '{}'"_format(get_name()));
     }
 
-    auto retval = ptr()->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
+    auto retval
+        = ptr()->taylor_diff_dbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -549,7 +550,8 @@ llvm::Value *func::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32
             "Zero number of u variables detected in func::taylor_diff_ldbl() for the function '{}'"_format(get_name()));
     }
 
-    auto retval = ptr()->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
+    auto retval
+        = ptr()->taylor_diff_ldbl(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(
@@ -586,7 +588,8 @@ llvm::Value *func::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32
             "Zero number of u variables detected in func::taylor_diff_f128() for the function '{}'"_format(get_name()));
     }
 
-    auto retval = ptr()->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size);
+    auto retval
+        = ptr()->taylor_diff_f128(s, deps, arr, par_ptr, time_ptr, n_uvars, order, idx, batch_size, high_accuracy);
 
     if (retval == nullptr) {
         throw std::invalid_argument(

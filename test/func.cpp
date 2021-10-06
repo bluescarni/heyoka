@@ -475,20 +475,20 @@ struct func_12 : func_base {
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                 std::uint32_t) const
+                                 std::uint32_t, bool) const
     {
         return nullptr;
     }
     llvm::Value *taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t) const
+                                  std::uint32_t, bool) const
     {
         return nullptr;
     }
 #if defined(HEYOKA_HAVE_REAL128)
     llvm::Value *taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
-                                  std::uint32_t) const
+                                  std::uint32_t, bool) const
     {
         return nullptr;
     }

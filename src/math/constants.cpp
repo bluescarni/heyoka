@@ -128,8 +128,8 @@ llvm::Value *constant_taylor_diff_impl(const constant_impl &c, llvm_state &s, st
 
 llvm::Value *constant_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                             const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
-                                            std::uint32_t, std::uint32_t order, std::uint32_t,
-                                            std::uint32_t batch_size) const
+                                            std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                            bool) const
 {
     return constant_taylor_diff_impl<double>(*this, s, order, batch_size);
 }
@@ -137,7 +137,7 @@ llvm::Value *constant_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std
 llvm::Value *constant_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                                              std::uint32_t, std::uint32_t order, std::uint32_t,
-                                             std::uint32_t batch_size) const
+                                             std::uint32_t batch_size, bool) const
 {
     return constant_taylor_diff_impl<long double>(*this, s, order, batch_size);
 }
@@ -147,7 +147,7 @@ llvm::Value *constant_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<st
 llvm::Value *constant_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
                                              const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *,
                                              std::uint32_t, std::uint32_t order, std::uint32_t,
-                                             std::uint32_t batch_size) const
+                                             std::uint32_t batch_size, bool) const
 {
     return constant_taylor_diff_impl<mppp::real128>(*this, s, order, batch_size);
 }
