@@ -1336,28 +1336,7 @@ llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_maxabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_maxabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_maxabs128");
     } else {
 #endif
         // Compute abs(b).
@@ -1377,28 +1356,7 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the heyoka_minabs128() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "heyoka_minabs128", x_t, {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "heyoka_minabs128");
     } else {
 #endif
         // Compute abs(b).
@@ -1418,28 +1376,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        // NOTE: for __float128 we cannot use the intrinsic, we need
-        // to call an external function.
-        auto &builder = s.builder();
-
-        // Convert the vector arguments to scalars.
-        auto x_scalars = vector_to_scalars(builder, x_v), y_scalars = vector_to_scalars(builder, y_v);
-
-        // Execute the pow() function on the scalar values and store
-        // the results in res_scalars.
-        std::vector<llvm::Value *> res_scalars;
-        for (decltype(x_scalars.size()) i = 0; i < x_scalars.size(); ++i) {
-            res_scalars.push_back(llvm_invoke_external(
-                s, "powq", llvm::Type::getFP128Ty(s.context()), {x_scalars[i], y_scalars[i]},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-        }
-
-        // Reconstruct the return value as a vector.
-        return scalars_to_vector(builder, res_scalars);
+        return call_extern_vec(s, x_v, y_v, "powq");
     } else {
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef
@@ -2334,7 +2271,7 @@ struct llvm_func_name_compare {
 // to yield the value of the i-th function argument for f at the j-th invocation.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
-                                std::uint32_t n_uvars, std::uint32_t batch_size)
+                                std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -2363,7 +2300,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size);
+            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -2467,7 +2404,8 @@ template <typename T>
 llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr,
                                              llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
-                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
+                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                             bool high_accuracy)
 {
     auto &builder = s.builder();
 
@@ -2475,7 +2413,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     const auto s_dc = taylor_segment_dc(dc, n_eq);
 
     // Generate the function maps.
-    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size);
+    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
@@ -2704,7 +2642,8 @@ template <typename T>
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
-                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode)
+                   std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode,
+                   bool high_accuracy)
 {
     assert(batch_size > 0u);
     assert(n_eq > 0u);
@@ -2742,7 +2681,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // LCOV_EXCL_STOP
 
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                                  batch_size);
+                                                  batch_size, high_accuracy);
     } else {
         // Log the runtime of IR construction in trace mode.
         spdlog::stopwatch sw;
@@ -2752,8 +2691,8 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
 
         // Compute the order-0 derivatives of the other u variables.
         for (auto i = n_eq; i < n_uvars; ++i) {
-            diff_arr.push_back(
-                taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i, batch_size));
+            diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, 0, i,
+                                              batch_size, high_accuracy));
         }
 
         // Compute the derivatives order by order, starting from 1 to order excluded.
@@ -2771,7 +2710,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
             // Now the other u variables.
             for (auto i = n_eq; i < n_uvars; ++i) {
                 diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars,
-                                                  cur_order, i, batch_size));
+                                                  cur_order, i, batch_size, high_accuracy));
             }
         }
 
@@ -2792,7 +2731,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // NOTE: <= because max_svf_idx is an index, not a size.
         for (std::uint32_t i = n_eq; i <= max_svf_idx; ++i) {
             diff_arr.push_back(taylor_diff<T>(s, dc[i].first, dc[i].second, diff_arr, par_ptr, time_ptr, n_uvars, order,
-                                              i, batch_size));
+                                              i, batch_size, high_accuracy));
         }
 
 #if !defined(NDEBUG)
@@ -2956,7 +2895,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 template <typename T, typename U>
 auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          const std::vector<expression> &evs)
+                                          const std::vector<expression> &evs, bool high_accuracy)
 {
     using std::isfinite;
 
@@ -3046,7 +2985,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode);
+                                              batch_size, compact_mode, high_accuracy);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -3336,7 +3275,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
-                                              compact_mode);
+                                              compact_mode, high_accuracy);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -3487,8 +3426,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order)
-            = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee);
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", sys, tol, 1, high_accuracy,
+                                                                          compact_mode, ee, high_accuracy);
     } else {
         std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode);
     }
@@ -5796,7 +5735,8 @@ namespace
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
-                         std::uint32_t batch_size, bool, bool compact_mode, const std::vector<expression> &sv_funcs)
+                         std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
+                         const std::vector<expression> &sv_funcs)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -5878,7 +5818,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Compute the jet of derivatives.
     auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode);
+                                              batch_size, compact_mode, high_accuracy);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array

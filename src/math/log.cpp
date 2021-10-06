@@ -113,25 +113,7 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    auto &builder = s.builder();
-
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, args[0]);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, "logq", scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
-    }
-
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
+    return call_extern_vec(s, args[0], "logq");
 }
 
 #endif
@@ -288,7 +270,7 @@ llvm::Value *taylor_diff_log(llvm_state &s, const log_impl &f, const std::vector
 llvm::Value *log_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                       std::uint32_t batch_size) const
+                                       std::uint32_t batch_size, bool) const
 {
     return taylor_diff_log<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -296,7 +278,7 @@ llvm::Value *log_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uin
 llvm::Value *log_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size) const
+                                        std::uint32_t batch_size, bool) const
 {
     return taylor_diff_log<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -306,7 +288,7 @@ llvm::Value *log_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::ui
 llvm::Value *log_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                        std::uint32_t batch_size) const
+                                        std::uint32_t batch_size, bool) const
 {
     return taylor_diff_log<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -468,19 +450,22 @@ llvm::Function *taylor_c_diff_func_log(llvm_state &s, const log_impl &fn, std::u
 
 } // namespace
 
-llvm::Function *log_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *log_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                 bool) const
 {
     return taylor_c_diff_func_log<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *log_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *log_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_log<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *log_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *log_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
     return taylor_c_diff_func_log<mppp::real128>(s, *this, n_uvars, batch_size);
 }

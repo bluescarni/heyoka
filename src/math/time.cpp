@@ -101,16 +101,16 @@ llvm::Value *time_taylor_diff_impl(llvm_state &s, llvm::Value *time_ptr, std::ui
 
 llvm::Value *time_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                         const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                        std::uint32_t, std::uint32_t order, std::uint32_t,
-                                        std::uint32_t batch_size) const
+                                        std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                        bool) const
 {
     return time_taylor_diff_impl<double>(s, time_ptr, order, batch_size);
 }
 
 llvm::Value *time_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &,
                                          const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                         bool) const
 {
     return time_taylor_diff_impl<long double>(s, time_ptr, order, batch_size);
 }
@@ -119,8 +119,8 @@ llvm::Value *time_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::u
 
 llvm::Value *time_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &,
                                          const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *time_ptr,
-                                         std::uint32_t, std::uint32_t order, std::uint32_t,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t, std::uint32_t order, std::uint32_t, std::uint32_t batch_size,
+                                         bool) const
 {
     return time_taylor_diff_impl<mppp::real128>(s, time_ptr, order, batch_size);
 }
@@ -230,19 +230,19 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
 
 } // namespace
 
-llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_time_impl<double>(s, batch_size);
 }
 
-llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_time_impl<long double>(s, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size) const
+llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
 {
     return taylor_c_diff_time_impl<mppp::real128>(s, batch_size);
 }

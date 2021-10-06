@@ -291,7 +291,7 @@ llvm::Value *taylor_diff_asinh(llvm_state &s, const asinh_impl &f, const std::ve
 llvm::Value *asinh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                         std::uint32_t batch_size) const
+                                         std::uint32_t batch_size, bool) const
 {
     return taylor_diff_asinh<double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -299,7 +299,7 @@ llvm::Value *asinh_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::u
 llvm::Value *asinh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                          std::uint32_t batch_size) const
+                                          std::uint32_t batch_size, bool) const
 {
     return taylor_diff_asinh<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -309,7 +309,7 @@ llvm::Value *asinh_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::
 llvm::Value *asinh_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t idx,
-                                          std::uint32_t batch_size) const
+                                          std::uint32_t batch_size, bool) const
 {
     return taylor_diff_asinh<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
@@ -480,21 +480,22 @@ llvm::Function *taylor_c_diff_func_asinh(llvm_state &s, const asinh_impl &fn, st
 
 } // namespace
 
-llvm::Function *asinh_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *asinh_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                   bool) const
 {
     return taylor_c_diff_func_asinh<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *asinh_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars,
-                                                    std::uint32_t batch_size) const
+llvm::Function *asinh_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                    bool) const
 {
     return taylor_c_diff_func_asinh<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *asinh_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars,
-                                                    std::uint32_t batch_size) const
+llvm::Function *asinh_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                    bool) const
 {
     return taylor_c_diff_func_asinh<mppp::real128>(s, *this, n_uvars, batch_size);
 }

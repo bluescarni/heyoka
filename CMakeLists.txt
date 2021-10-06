@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE)
 	FORCE)
 endif()
 
-project(heyoka VERSION 0.15.0 LANGUAGES CXX C)
+project(heyoka VERSION 0.16.0 LANGUAGES CXX C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/yacma")
 
@@ -155,6 +155,15 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
+# NOTE: LLVM >= 13 introduces various deprecations. We will have to
+# sort through them eventually.
+if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 13)
+    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
+        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
+        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
+    endif()
+endif()
+
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
@@ -278,8 +287,8 @@ if(HEYOKA_BUILD_STATIC_LIBRARY)
 else()
     # Setup of the heyoka shared library.
     add_library(heyoka SHARED "${HEYOKA_SRC_FILES}")
-    set_property(TARGET heyoka PROPERTY VERSION "15.0")
-    set_property(TARGET heyoka PROPERTY SOVERSION 15)
+    set_property(TARGET heyoka PROPERTY VERSION "16.0")
+    set_property(TARGET heyoka PROPERTY SOVERSION 16)
     set_target_properties(heyoka PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(heyoka PROPERTIES VISIBILITY_INLINES_HIDDEN TRUE)
 endif()
