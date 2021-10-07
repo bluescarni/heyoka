@@ -93,7 +93,8 @@ TEST_CASE("N-body")
                                       // Saturn.
                                       s_x[0], s_x[1], s_x[2], s_v[0], s_v[1], s_v[2]},
                                      kw::high_accuracy = ha,
-                                     kw::compact_mode = cm};
+                                     kw::compact_mode = cm,
+                                     kw::tol = 1e-18};
 
             // Create xtensor views on the the state and mass vectors
             // for ease of indexing.
