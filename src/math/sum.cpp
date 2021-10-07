@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 #include <variant>
@@ -37,6 +38,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
@@ -76,27 +78,81 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v))
     }
 }
 
-llvm::Value *sum_impl::taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &,
-                                       const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                                       std::uint32_t, std::uint32_t, std::uint32_t) const
+namespace
 {
-    throw;
+
+template <typename T>
+llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::vector<std::uint32_t> &deps,
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
+                                  std::uint32_t batch_size, bool high_accuracy)
+{
+    // NOTE: this is prevented in the implementation
+    // of the sum() function.
+    assert(!sf.args().empty());
+
+    if (!deps.empty()) {
+        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a sum "
+                                    "should be empty, but instead it has a size of {}"_format(deps.size()));
+    }
+
+    auto &builder = s.builder();
+
+    if (high_accuracy && false) {
+        // Init sum and c.
+        auto sum = vector_splat(builder, codegen<T>(s, number{0.}), batch_size), c = sum;
+
+        for (const auto &arg : sf.args()) {
+            const auto idx = uname_to_index(std::get<variable>(arg.value()).name());
+            auto cur_val = taylor_fetch_diff(arr, idx, order, n_uvars);
+
+            auto y = builder.CreateFSub(cur_val, c);
+            auto t = builder.CreateFAdd(sum, y);
+
+            c = builder.CreateFSub(builder.CreateFSub(t, sum), y);
+            sum = t;
+        }
+
+        return sum;
+    } else {
+        // Load all values to be summed in local variables and
+        // do a pairwise summation.
+        std::vector<llvm::Value *> vals;
+        vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
+        for (const auto &arg : sf.args()) {
+            vals.push_back(
+                taylor_fetch_diff(arr, uname_to_index(std::get<variable>(arg.value()).name()), order, n_uvars));
+        }
+
+        return pairwise_sum(builder, vals);
+    }
 }
 
-llvm::Value *sum_impl::taylor_diff_ldbl(llvm_state &, const std::vector<std::uint32_t> &,
-                                        const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                                        std::uint32_t, std::uint32_t, std::uint32_t) const
+} // namespace
+
+llvm::Value *sum_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
+                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                       std::uint32_t batch_size, bool high_accuracy) const
 {
-    throw;
+    return sum_taylor_diff_impl<double>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
+}
+
+llvm::Value *sum_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size, bool high_accuracy) const
+{
+    return sum_taylor_diff_impl<long double>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Value *sum_impl::taylor_diff_f128(llvm_state &, const std::vector<std::uint32_t> &,
-                                        const std::vector<llvm::Value *> &, llvm::Value *, llvm::Value *, std::uint32_t,
-                                        std::uint32_t, std::uint32_t, std::uint32_t) const
+llvm::Value *sum_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size, bool high_accuracy) const
 {
-    throw;
+    return sum_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
 }
 
 #endif
@@ -106,8 +162,12 @@ namespace
 
 template <typename T>
 llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t batch_size, bool)
 {
+    // NOTE: this is prevented in the implementation
+    // of the sum() function.
+    assert(!sf.args().empty());
+
     auto &md = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -140,7 +200,22 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         is_consecutive = false;
     }
 
-    std::cout << "Consecutive: {}, start={}, stride={}\n"_format(is_consecutive, v_idx[0], stride);
+    assert(!is_consecutive || stride > 0u);
+
+    if (is_consecutive) {
+        // NOTE: in consecutive mode, we need to be able to compute
+        // v_idx.back() + stride safely for looping purposes.
+        if (v_idx.back() > std::numeric_limits<std::uint32_t>::max() - stride) {
+            // LCOV_EXCL_START
+            throw std::overflow_error("Overflow detected in the implementation of the Taylor derivative of a sum");
+            // LCOV_EXCL_STOP
+        }
+
+        // Also log the loop limits and stride size
+        // in consecutive mode.
+        get_logger()->debug("computing sum() in consecutive mode: start={}, stride={}, end={}", v_idx[0], stride,
+                            v_idx.back());
+    }
 
     // Get the function name.
     const auto fname = is_consecutive ? "heyoka_taylor_diff_sum_{}_consec_{}_{}_{}_n_uvars_{}"_format(
@@ -175,6 +250,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         // Create the function
         f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
         assert(f != nullptr);
+        // NOTE: force inline.
         f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the necessary function arguments.
@@ -191,7 +267,10 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
             builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), ret);
 
             llvm_loop_u32(
-                s, builder.getInt32(v_idx[0]), builder.getInt32(v_idx.back()),
+                s, builder.getInt32(v_idx[0]),
+                // NOTE: need + stride here in order to avoid
+                // skipping the last value.
+                builder.getInt32(v_idx.back() + stride),
                 [&](llvm::Value *cur_idx) {
                     auto old_val = builder.CreateLoad(ret);
                     auto new_val
@@ -203,14 +282,15 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 
             builder.CreateRet(builder.CreateLoad(ret));
         } else {
-            // Create the return value.
-            auto ret = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-
+            // Load all values to be summed in local variables and
+            // do a pairwise summation.
+            std::vector<llvm::Value *> vals;
+            vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
             for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
-                ret = builder.CreateFAdd(ret, taylor_c_load_diff(s, diff_arr, n_uvars, order, vars + i));
+                vals.push_back(taylor_c_load_diff(s, diff_arr, n_uvars, order, vars + i));
             }
 
-            builder.CreateRet(ret);
+            builder.CreateRet(pairwise_sum(builder, vals));
         }
 
         // Verify.
@@ -234,21 +314,24 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 
 } // namespace
 
-llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                 bool high_accuracy) const
 {
-    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size, high_accuracy);
 }
 
-llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool high_accuracy) const
 {
-    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size, high_accuracy);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size) const
+llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool high_accuracy) const
 {
-    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size, high_accuracy);
 }
 
 #endif
@@ -257,6 +340,10 @@ llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 expression sum(std::vector<expression> args)
 {
+    if (args.empty()) {
+        return 0_dbl;
+    }
+
     return expression{func{detail::sum_impl{std::move(args)}}};
 }
 
