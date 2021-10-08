@@ -10,7 +10,6 @@
 #define HEYOKA_MATH_SUM_HPP
 
 #include <cstdint>
-#include <utility>
 #include <vector>
 
 #include <heyoka/config.hpp>
@@ -52,12 +51,6 @@ public:
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>);
-
-template <typename... Args>
-inline auto sum(Args &&...args) -> decltype(sum(std::vector<expression>{expression(std::forward<Args>(args))...}))
-{
-    return sum(std::vector<expression>{expression(std::forward<Args>(args))...});
-}
 
 } // namespace heyoka
 

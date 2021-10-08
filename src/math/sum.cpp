@@ -141,7 +141,7 @@ namespace
 
 template <typename T>
 llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size, bool)
+                                            std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -200,7 +200,6 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         // do a pairwise summation.
         std::vector<llvm::Value *> vals;
         vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
-
         for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
             vals.push_back(taylor_c_load_diff(s, diff_arr, n_uvars, order, vars + i));
         }
@@ -229,23 +228,23 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 } // namespace
 
 llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool high_accuracy) const
+                                                 bool) const
 {
-    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size, high_accuracy);
+    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
 }
 
 llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool high_accuracy) const
+                                                  bool) const
 {
-    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size, high_accuracy);
+    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool high_accuracy) const
+                                                  bool) const
 {
-    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size, high_accuracy);
+    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif
@@ -258,7 +257,24 @@ expression sum(std::vector<expression> args)
         return 0_dbl;
     }
 
-    return expression{func{detail::sum_impl{std::move(args)}}};
+    if (args.size() == 1u) {
+        return std::move(args[0]);
+    }
+
+    std::vector<expression> ret_seq, tmp;
+    for (auto &arg : args) {
+        tmp.push_back(std::move(arg));
+        if (tmp.size() == 100u) {
+            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+            tmp.clear();
+        }
+    }
+
+    if (!tmp.empty()) {
+        ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+    }
+
+    return sum(std::move(ret_seq));
 }
 
 } // namespace heyoka

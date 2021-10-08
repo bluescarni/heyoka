@@ -17,6 +17,7 @@
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/mascon.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/taylor.hpp>
@@ -143,6 +144,7 @@ taylor_adaptive<double> taylor_factory(const P &mascon_points, const M &mascon_m
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << "Time to construct the integrator: " << duration.count() / 1e6 << "s" << std::endl;
+    std::cout << "Decomposition size: " << taylor.get_decomposition().size() << '\n';
     return taylor;
 }
 
@@ -230,6 +232,8 @@ void plot_data_rkf78(const P &mascon_points, const M &mascon_masses, taylor_adap
 
 int main(int argc, char *argv[])
 {
+    set_logger_level_trace();
+
     auto inclination = 45.;              // degrees
     auto distance = 3.;                  // non dimensional units
     auto integration_time = 86400. * 1.; // seconds (1day of operations)
@@ -243,7 +247,7 @@ int main(int argc, char *argv[])
     auto T_67p = 4500.388359040116;
     auto wz_67p = 0.633440278094151;
     fmt::print("67P, {} mascons:\n", std::size(mascon_masses_67p));
-    // auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
+    auto taylor_67p = taylor_factory(mascon_points_67p, mascon_masses_67p, wz_67p, distance, inclination, 1.);
     // compare_taylor_vs_rkf(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p);
     // plot_data(mascon_points_67p, mascon_masses_67p, taylor_67p, wz_67p, integration_time / T_67p * 365.25, 5000u);
 
@@ -256,8 +260,7 @@ int main(int argc, char *argv[])
     auto wz_bennu = 1.5633255034258877;
     fmt::print("\nBennu, {} mascons:\n", std::size(mascon_masses_bennu));
     auto taylor_bennu = taylor_factory(mascon_points_bennu, mascon_masses_bennu, wz_bennu, distance, inclination, 1.);
-    // compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu,
-    // integration_time / T_bennu);
+    compare_taylor_vs_rkf(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu);
     // plot_data(mascon_points_bennu, mascon_masses_bennu, taylor_bennu, wz_bennu, integration_time / T_bennu * 7,
     // 1000u);
 
