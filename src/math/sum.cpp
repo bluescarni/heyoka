@@ -81,10 +81,8 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v))
 namespace
 {
 
-template <typename T>
 llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::vector<std::uint32_t> &deps,
-                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order,
-                                  std::uint32_t batch_size, bool high_accuracy)
+                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -97,34 +95,15 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
 
     auto &builder = s.builder();
 
-    if (high_accuracy && false) {
-        // Init sum and c.
-        auto sum = vector_splat(builder, codegen<T>(s, number{0.}), batch_size), c = sum;
-
-        for (const auto &arg : sf.args()) {
-            const auto idx = uname_to_index(std::get<variable>(arg.value()).name());
-            auto cur_val = taylor_fetch_diff(arr, idx, order, n_uvars);
-
-            auto y = builder.CreateFSub(cur_val, c);
-            auto t = builder.CreateFAdd(sum, y);
-
-            c = builder.CreateFSub(builder.CreateFSub(t, sum), y);
-            sum = t;
-        }
-
-        return sum;
-    } else {
-        // Load all values to be summed in local variables and
-        // do a pairwise summation.
-        std::vector<llvm::Value *> vals;
-        vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
-        for (const auto &arg : sf.args()) {
-            vals.push_back(
-                taylor_fetch_diff(arr, uname_to_index(std::get<variable>(arg.value()).name()), order, n_uvars));
-        }
-
-        return pairwise_sum(builder, vals);
+    // Load all values to be summed in local variables and
+    // do a pairwise summation.
+    std::vector<llvm::Value *> vals;
+    vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
+    for (const auto &arg : sf.args()) {
+        vals.push_back(taylor_fetch_diff(arr, uname_to_index(std::get<variable>(arg.value()).name()), order, n_uvars));
     }
+
+    return pairwise_sum(builder, vals);
 }
 
 } // namespace
@@ -132,17 +111,17 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
 llvm::Value *sum_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                        const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                       std::uint32_t batch_size, bool high_accuracy) const
+                                       std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl<double>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
+    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
 }
 
 llvm::Value *sum_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                        std::uint32_t batch_size, bool high_accuracy) const
+                                        std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl<long double>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
+    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -150,9 +129,9 @@ llvm::Value *sum_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::ui
 llvm::Value *sum_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
                                         const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
                                         std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                                        std::uint32_t batch_size, bool high_accuracy) const
+                                        std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, n_uvars, order, batch_size, high_accuracy);
+    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
 }
 
 #endif

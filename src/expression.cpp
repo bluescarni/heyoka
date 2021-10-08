@@ -1144,8 +1144,6 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
 // https://en.wikipedia.org/wiki/Pairwise_summation
 expression pairwise_sum(std::vector<expression> sum)
 {
-    // return heyoka::sum(std::move(sum));
-
     if (sum.empty()) {
         return 0_dbl;
     }
