@@ -264,7 +264,7 @@ expression sum(std::vector<expression> args)
     std::vector<expression> ret_seq, tmp;
     for (auto &arg : args) {
         tmp.push_back(std::move(arg));
-        if (tmp.size() == 100u) {
+        if (tmp.size() == 64u) {
             ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
             tmp.clear();
         }
