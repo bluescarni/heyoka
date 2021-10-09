@@ -6,6 +6,7 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -14,6 +15,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/s11n.hpp>
 
 #include "catch.hpp"
 
@@ -147,4 +149,29 @@ TEST_CASE("sum function")
     REQUIRE(sum({x, y, z, t}, 3) == sum({sum({x, y, z}), sum({t})}));
     REQUIRE(sum({x, y, z, t}, 4) == sum({x, y, z, t}));
     REQUIRE(sum({x, y, z, t, 2_dbl * x}, 3) == sum({sum({x, y, z}), sum({t, 2_dbl * x})}));
+}
+
+TEST_CASE("sum s11n")
+{
+    std::stringstream ss;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    auto ex = sum({x, y, z});
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ex;
+    }
+
+    ex = 0_dbl;
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ex;
+    }
+
+    REQUIRE(ex == sum({x, y, z}));
 }
