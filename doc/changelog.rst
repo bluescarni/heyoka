@@ -13,6 +13,8 @@ New
 Changes
 ~~~~~~~
 
+- Performance optimisations for ODE systems containing large summations
+  (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
 - Performance optimisations in the construction of Taylor integrators
   (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
 - **BREAKING**: the ``pairwise_sum()`` function has been replaced
