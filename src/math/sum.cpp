@@ -12,11 +12,10 @@
 #include <cstddef>
 #include <ostream>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -39,10 +38,12 @@
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
@@ -67,15 +68,7 @@ namespace detail
 
 sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
-sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v))
-{
-    for (const auto &ex : args()) {
-        if (!std::holds_alternative<variable>(ex.value()) && !std::holds_alternative<func>(ex.value())) {
-            throw std::invalid_argument("The 'sum()' function accepts only variables or functions as arguments, "
-                                        "but the expression '{}' is neither"_format(ex));
-        }
-    }
-}
+sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
 void sum_impl::to_stream(std::ostream &os) const
 {
@@ -104,8 +97,10 @@ std::vector<expression> sum_impl::gradient() const
 namespace
 {
 
+template <typename T>
 llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::vector<std::uint32_t> &deps,
-                                  const std::vector<llvm::Value *> &arr, std::uint32_t n_uvars, std::uint32_t order)
+                                  const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                  std::uint32_t order, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -123,7 +118,28 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
     std::vector<llvm::Value *> vals;
     vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
     for (const auto &arg : sf.args()) {
-        vals.push_back(taylor_fetch_diff(arr, uname_to_index(std::get<variable>(arg.value()).name()), order, n_uvars));
+        std::visit(
+            [&](const auto &v) {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    // Variable.
+                    vals.push_back(taylor_fetch_diff(arr, uname_to_index(v.name()), order, n_uvars));
+                } else if constexpr (is_num_param_v<type>) {
+                    // Number/param.
+                    if (order == 0u) {
+                        vals.push_back(taylor_codegen_numparam<T>(s, v, par_ptr, batch_size));
+                    } else {
+                        vals.push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+                    }
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
+                                                "Taylor derivative of a sum");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            arg.value());
     }
 
     return pairwise_sum(builder, vals);
@@ -132,29 +148,29 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
 } // namespace
 
 llvm::Value *sum_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                       const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
-                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t,
-                                       bool) const
+                                       const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                       std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                       std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
+    return sum_taylor_diff_impl<double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
 }
 
 llvm::Value *sum_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t,
-                                        bool) const
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
+    return sum_taylor_diff_impl<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *sum_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
-                                        const std::vector<llvm::Value *> &arr, llvm::Value *, llvm::Value *,
-                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t, std::uint32_t,
-                                        bool) const
+                                        const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                        std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                        std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_diff_impl(s, *this, deps, arr, n_uvars, order);
+    return sum_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
 }
 
 #endif
@@ -177,9 +193,32 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname
-        = "heyoka_taylor_diff_sum_{}_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), sf.args().size(), n_uvars);
+    // Construct the function name.
+    auto fname = "heyoka_taylor_diff_sum_{}_"_format(taylor_mangle_suffix(val_t));
+    for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
+        fname += std::visit(
+            [](const auto &v) -> std::string {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    return "var";
+                } else if constexpr (is_num_param_v<type>) {
+                    return taylor_c_diff_numparam_mangle(v);
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
+                                                "Taylor derivative of a sum");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            sf.args()[i].value());
+
+        if (i != sf.args().size() - 1u) {
+            fname += '_';
+        }
+    }
+    // The suffix.
+    fname += "_n_uvars_{}"_format(n_uvars);
 
     // The function arguments:
     // - diff order,
@@ -187,12 +226,28 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     // - diff array,
     // - par ptr,
     // - time ptr,
-    // - indices of the variable arguments.
+    // - sum arguments.
     std::vector<llvm::Type *> fargs{
         llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
         llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
-    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(sf.args().size()),
-                 llvm::Type::getInt32Ty(context));
+    for (const auto &arg : sf.args()) {
+        fargs.push_back(std::visit(
+            [&](const auto &v) -> llvm::Type * {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, variable>) {
+                    return llvm::Type::getInt32Ty(context);
+                } else if constexpr (is_num_param_v<type>) {
+                    return taylor_c_diff_numparam_argtype<T>(s, v);
+                } else {
+                    // LCOV_EXCL_START
+                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
+                                                "Taylor derivative of a sum");
+                    // LCOV_EXCL_STOP
+                }
+            },
+            arg.value()));
+    }
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -214,7 +269,8 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         // Fetch the necessary function arguments.
         auto order = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
-        auto vars = f->args().begin() + 5;
+        auto par_ptr = f->args().begin() + 3;
+        auto terms = f->args().begin() + 5;
 
         // Create a new basic block to start insertion into.
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
@@ -224,7 +280,39 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         std::vector<llvm::Value *> vals;
         vals.reserve(static_cast<decltype(vals.size())>(sf.args().size()));
         for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
-            vals.push_back(taylor_c_load_diff(s, diff_arr, n_uvars, order, vars + i));
+            vals.push_back(std::visit(
+                [&](const auto &v) -> llvm::Value * {
+                    using type = detail::uncvref_t<decltype(v)>;
+
+                    if constexpr (std::is_same_v<type, variable>) {
+                        return taylor_c_load_diff(s, diff_arr, n_uvars, order, terms + i);
+                    } else if constexpr (is_num_param_v<type>) {
+                        // Create the return value.
+                        auto retval = builder.CreateAlloca(val_t);
+
+                        llvm_if_then_else(
+                            s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                            [&]() {
+                                // If the order is zero, run the codegen.
+                                builder.CreateStore(
+                                    taylor_c_diff_numparam_codegen(s, v, terms + i, par_ptr, batch_size), retval);
+                            },
+                            [&]() {
+                                // Otherwise, return zero.
+                                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+                                                    retval);
+                            });
+
+                        return builder.CreateLoad(retval);
+                    } else {
+                        // LCOV_EXCL_START
+                        throw std::invalid_argument(
+                            "An invalid argument type was encountered while trying to build the "
+                            "Taylor derivative of a sum");
+                        // LCOV_EXCL_STOP
+                    }
+                },
+                sf.args()[i].value()));
         }
 
         builder.CreateRet(pairwise_sum(builder, vals));
@@ -309,7 +397,15 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     // exactly args.size(). In such a case, we need to do the
     // last iteration manually.
     if (!tmp.empty()) {
-        ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+        // NOTE: contrary to the previous loop, here we could
+        // in principle end up creating a sum_impl with only one
+        // term. In such a case, for consistency with the general
+        // behaviour of sum({arg}), return arg directly.
+        if (tmp.size() == 1u) {
+            ret_seq.emplace_back(std::move(tmp[0]));
+        } else {
+            ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
+        }
     }
 
     // Perform a sum over the sums.

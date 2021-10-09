@@ -6,59 +6,21 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// #include <heyoka/config.hpp>
-
-// #include <cmath>
-// #include <cstdint>
-// #include <sstream>
-// #include <variant>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
 
-// #include <fmt/format.h>
-// #include <fmt/ranges.h>
-
-// #if defined(HEYOKA_HAVE_REAL128)
-
-// #include <mp++/real128.hpp>
-
-// #endif
+#include <boost/algorithm/string/predicate.hpp>
 
 #include <heyoka/expression.hpp>
-// #include <heyoka/func.hpp>
-// #include <heyoka/llvm_state.hpp>
-// #include <heyoka/math/cos.hpp>
-// #include <heyoka/math/kepE.hpp>
-// #include <heyoka/math/pow.hpp>
-// #include <heyoka/math/sin.hpp>
-// #include <heyoka/math/sqrt.hpp>
-// #include <heyoka/number.hpp>
-// #include <heyoka/taylor.hpp>
 #include <heyoka/math/sum.hpp>
 
 #include "catch.hpp"
-// #include "test_utils.hpp"
-
-// #if defined(_MSC_VER) && !defined(__clang__)
-
-// // NOTE: MSVC has issues with the other "using"
-// // statement form.
-// using namespace fmt::literals;
-
-// #else
-
-// using fmt::literals::operator""_format;
-
-// #endif
 
 using namespace heyoka;
-// using namespace heyoka_test;
 
 TEST_CASE("basic test")
 {
-    using Catch::Matchers::Message;
-
     auto [x, y, z] = make_vars("x", "y", "z");
 
     {
@@ -74,10 +36,11 @@ TEST_CASE("basic test")
         REQUIRE(ss.args() == std::vector{x, y, z});
     }
 
-    REQUIRE_THROWS_MATCHES(detail::sum_impl{{par[0]}}, std::invalid_argument,
-                           Message("The 'sum()' function accepts only variables or functions as arguments, "
-                                   "but the expression 'p0' is neither"));
-    REQUIRE_THROWS_AS((detail::sum_impl{{x, 0_dbl}}), std::invalid_argument);
+    {
+        detail::sum_impl ss({par[0], x, y, 2_dbl, z});
+
+        REQUIRE(ss.args() == std::vector{par[0], x, y, 2_dbl, z});
+    }
 }
 
 TEST_CASE("stream test")
@@ -135,6 +98,14 @@ TEST_CASE("stream test")
 
         REQUIRE(oss.str() == "((x + y) + (z + (x - y)))");
     }
+
+    {
+        std::ostringstream oss;
+
+        oss << sum({x, par[42], z, 4_dbl}, 2u);
+
+        REQUIRE(boost::starts_with(oss.str(), "((x + p42) + (z + 4"));
+    }
 }
 
 TEST_CASE("diff test")
@@ -151,5 +122,29 @@ TEST_CASE("diff test")
         REQUIRE(ss.gradient() == std::vector{1_dbl, 1_dbl, 1_dbl});
     }
 
-    // TODO: test on expression too.
+    {
+        REQUIRE(diff(sum({x, y, z}), "x") == 1_dbl);
+        REQUIRE(diff(sum({x, x * x, z}), "x") == 1_dbl + 2_dbl * x);
+        REQUIRE(diff(sum({x, x * x, -z}), "z") == -1_dbl);
+    }
+}
+
+TEST_CASE("sum function")
+{
+    using Catch::Matchers::Message;
+
+    auto [x, y, z, t] = make_vars("x", "y", "z", "t");
+
+    REQUIRE(sum({}) == 0_dbl);
+    REQUIRE(sum({x}) == x);
+
+    REQUIRE_THROWS_MATCHES(sum({x}, 0), std::invalid_argument,
+                           Message("The 'split' value for a sum must be at least 2, but it is 0 instead"));
+    REQUIRE_THROWS_MATCHES(sum({x}, 1), std::invalid_argument,
+                           Message("The 'split' value for a sum must be at least 2, but it is 1 instead"));
+
+    REQUIRE(sum({x, y, z, t}, 2) == sum({sum({x, y}), sum({z, t})}));
+    REQUIRE(sum({x, y, z, t}, 3) == sum({sum({x, y, z}), sum({t})}));
+    REQUIRE(sum({x, y, z, t}, 4) == sum({x, y, z, t}));
+    REQUIRE(sum({x, y, z, t, 2_dbl * x}, 3) == sum({sum({x, y, z}), sum({t, 2_dbl * x})}));
 }
