@@ -58,7 +58,7 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
     auto coriolis_y = expression{2.} * (re * vx - pe * vz);
     auto coriolis_z = expression{2.} * (pe * vy - qe * vx);
 
-    // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of pairwise_sum for
+    // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of sum() for
     // efficiency and to allow compact mode to do his job)
     retval.push_back(prime(x) = vx);
     retval.push_back(prime(y) = vy);

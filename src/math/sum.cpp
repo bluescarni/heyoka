@@ -385,6 +385,11 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     // sum in ret_seq.
     std::vector<expression> ret_seq, tmp;
     for (auto &arg : args) {
+        // NOTE: skip the term if it is zero.
+        if (auto nptr = std::get_if<number>(&arg.value()); nptr && is_zero(*nptr)) {
+            continue;
+        }
+
         tmp.push_back(std::move(arg));
         if (tmp.size() == split) {
             // NOTE: after the move, tmp is guaranteed to be empty.

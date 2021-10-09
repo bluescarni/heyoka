@@ -59,6 +59,7 @@
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -272,7 +273,7 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
                     }
 
                     // Compute the trig arg.
-                    auto trig_arg = pairwise_sum(trig);
+                    auto trig_arg = sum(trig);
 
                     // Add the term to the chunk.
                     auto tmp = Sval * sin(trig_arg);
@@ -295,12 +296,12 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
             cur.erase(new_end, cur.end());
 
             // Sum the terms in the chunk and multiply them by t**alpha.
-            parts[alpha] = powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * pairwise_sum(std::move(cur));
+            parts[alpha] = powi(t_expr, boost::numeric_cast<std::uint32_t>(alpha)) * sum(std::move(cur));
         }
     });
 
     // Sum the chunks and return them.
-    return pairwise_sum(std::move(parts));
+    return sum(std::move(parts));
 }
 
 // Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates

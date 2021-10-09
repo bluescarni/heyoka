@@ -126,7 +126,7 @@ TEST_CASE("diff test")
 
     {
         REQUIRE(diff(sum({x, y, z}), "x") == 1_dbl);
-        REQUIRE(diff(sum({x, x * x, z}), "x") == 1_dbl + 2_dbl * x);
+        REQUIRE(diff(sum({x, x * x, z}), "x") == sum({1_dbl, 2_dbl * x}));
         REQUIRE(diff(sum({x, x * x, -z}), "z") == -1_dbl);
     }
 }
@@ -149,6 +149,7 @@ TEST_CASE("sum function")
     REQUIRE(sum({x, y, z, t}, 3) == sum({sum({x, y, z}), sum({t})}));
     REQUIRE(sum({x, y, z, t}, 4) == sum({x, y, z, t}));
     REQUIRE(sum({x, y, z, t, 2_dbl * x}, 3) == sum({sum({x, y, z}), sum({t, 2_dbl * x})}));
+    REQUIRE(sum({0_dbl, y, 0_dbl, t, 2_dbl * x}, 3) == sum({y, t, 2_dbl * x}));
 }
 
 TEST_CASE("sum s11n")
