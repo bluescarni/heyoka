@@ -12,7 +12,9 @@
 // #include <cstdint>
 // #include <sstream>
 // #include <variant>
-// #include <vector>
+#include <sstream>
+#include <stdexcept>
+#include <vector>
 
 // #include <fmt/format.h>
 // #include <fmt/ranges.h>
@@ -53,7 +55,101 @@
 using namespace heyoka;
 // using namespace heyoka_test;
 
-TEST_CASE("sum ctor")
+TEST_CASE("basic test")
 {
-    sum({1_dbl, 2_dbl, 3_dbl});
+    using Catch::Matchers::Message;
+
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        detail::sum_impl ss;
+
+        REQUIRE(ss.args().empty());
+        REQUIRE(ss.get_name() == "sum");
+    }
+
+    {
+        detail::sum_impl ss({x, y, z});
+
+        REQUIRE(ss.args() == std::vector{x, y, z});
+    }
+
+    REQUIRE_THROWS_MATCHES(detail::sum_impl{{par[0]}}, std::invalid_argument,
+                           Message("The 'sum()' function accepts only variables or functions as arguments, "
+                                   "but the expression 'p0' is neither"));
+    REQUIRE_THROWS_AS((detail::sum_impl{{x, 0_dbl}}), std::invalid_argument);
+}
+
+TEST_CASE("stream test")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss;
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "()");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({x});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "x");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({x, y});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "(x + y)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        detail::sum_impl ss({x, y, z});
+        ss.to_stream(oss);
+
+        REQUIRE(oss.str() == "(x + y + z)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << sum({x, y, z}, 2u);
+
+        REQUIRE(oss.str() == "((x + y) + z)");
+    }
+
+    {
+        std::ostringstream oss;
+
+        oss << sum({x, y, z, x - y}, 2u);
+
+        REQUIRE(oss.str() == "((x + y) + (z + (x - y)))");
+    }
+}
+
+TEST_CASE("diff test")
+{
+    auto [x, y, z] = make_vars("x", "y", "z");
+
+    {
+        detail::sum_impl ss;
+        REQUIRE(ss.gradient().empty());
+    }
+
+    {
+        detail::sum_impl ss({x, y, z});
+        REQUIRE(ss.gradient() == std::vector{1_dbl, 1_dbl, 1_dbl});
+    }
+
+    // TODO: test on expression too.
 }

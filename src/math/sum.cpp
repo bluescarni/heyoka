@@ -8,10 +8,9 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <limits>
+#include <ostream>
 #include <stdexcept>
 #include <utility>
 #include <variant>
@@ -20,6 +19,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -38,14 +38,12 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/sum.hpp>
-#include <heyoka/number.hpp>
-#include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -71,11 +69,36 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v))
 {
-    if (std::any_of(args().begin(), args().end(), [](const expression &ex) {
-            return std::holds_alternative<param>(ex.value()) || std::holds_alternative<number>(ex.value());
-        })) {
-        throw std::invalid_argument("The sum() function cannot accept numbers or parameters as input arguments");
+    for (const auto &ex : args()) {
+        if (!std::holds_alternative<variable>(ex.value()) && !std::holds_alternative<func>(ex.value())) {
+            throw std::invalid_argument("The 'sum()' function accepts only variables or functions as arguments, "
+                                        "but the expression '{}' is neither"_format(ex));
+        }
     }
+}
+
+void sum_impl::to_stream(std::ostream &os) const
+{
+    if (args().size() == 1u) {
+        // NOTE: avoid brackets if there's only 1 argument.
+        os << args()[0];
+    } else {
+        os << '(';
+
+        for (decltype(args().size()) i = 0; i < args().size(); ++i) {
+            os << args()[i];
+            if (i != args().size() - 1u) {
+                os << " + ";
+            }
+        }
+
+        os << ')';
+    }
+}
+
+std::vector<expression> sum_impl::gradient() const
+{
+    return std::vector<expression>(args().size(), 1_dbl);
 }
 
 namespace
@@ -251,30 +274,48 @@ llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n
 
 } // namespace detail
 
-expression sum(std::vector<expression> args)
+expression sum(std::vector<expression> args, std::uint32_t split)
 {
+    if (split < 2u) {
+        throw std::invalid_argument(
+            "The 'split' value for a sum must be at least 2, but it is {} instead"_format(split));
+    }
+
     if (args.empty()) {
         return 0_dbl;
     }
 
+    // NOTE: this terminates the recursion.
     if (args.size() == 1u) {
         return std::move(args[0]);
     }
 
+    // NOTE: ret_seq will contain a sequence
+    // of sums each containing 'split' terms.
+    // tmp is a temporary vector
+    // used to accumulate the arguments to each
+    // sum in ret_seq.
     std::vector<expression> ret_seq, tmp;
     for (auto &arg : args) {
         tmp.push_back(std::move(arg));
-        if (tmp.size() == 64u) {
+        if (tmp.size() == split) {
+            // NOTE: after the move, tmp is guaranteed to be empty.
             ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
-            tmp.clear();
+            assert(tmp.empty());
         }
     }
 
+    // NOTE: tmp is not empty if 'split' does not divide
+    // exactly args.size(). In such a case, we need to do the
+    // last iteration manually.
     if (!tmp.empty()) {
         ret_seq.emplace_back(func{detail::sum_impl{std::move(tmp)}});
     }
 
+    // Perform a sum over the sums.
     return sum(std::move(ret_seq));
 }
 
 } // namespace heyoka
+
+HEYOKA_S11N_FUNC_EXPORT_IMPLEMENT(heyoka::detail::sum_impl)
