@@ -107,8 +107,10 @@ llvm::Value *sum_taylor_diff_impl(llvm_state &s, const sum_impl &sf, const std::
     assert(!sf.args().empty());
 
     if (!deps.empty()) {
+        // LCOV_EXCL_START
         throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a sum "
                                     "should be empty, but instead it has a size of {}"_format(deps.size()));
+        // LCOV_EXCL_STOP
     }
 
     auto &builder = s.builder();
@@ -328,8 +330,10 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
+            // LCOV_EXCL_START
             throw std::invalid_argument(
                 "Inconsistent function signature for the Taylor derivative of sum() in compact mode detected");
+            // LCOV_EXCL_STOP
         }
     }
 
