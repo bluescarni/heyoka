@@ -54,6 +54,7 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/variable.hpp>
@@ -335,7 +336,7 @@ expression func::diff(std::unordered_map<const void *, expression> &func_map, co
         prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], s));
     }
 
-    return pairwise_sum(std::move(prod));
+    return sum(std::move(prod));
 }
 
 expression func::diff(std::unordered_map<const void *, expression> &func_map, const param &p) const
@@ -358,7 +359,7 @@ expression func::diff(std::unordered_map<const void *, expression> &func_map, co
         prod.push_back(std::move(grad[i]) * detail::diff(func_map, args()[i], p));
     }
 
-    return pairwise_sum(std::move(prod));
+    return sum(std::move(prod));
 }
 
 double func::eval_dbl(const std::unordered_map<std::string, double> &m, const std::vector<double> &pars) const

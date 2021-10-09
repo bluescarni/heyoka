@@ -19,7 +19,9 @@
 #include <fmt/format.h>
 
 #include <heyoka/expression.hpp>
-#include <heyoka/math.hpp>
+#include <heyoka/math/pow.hpp>
+#include <heyoka/math/square.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
@@ -124,7 +126,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                 auto diff_y = y_vars[j] - y_vars[i];
                 auto diff_z = z_vars[j] - z_vars[i];
 
-                auto r_m3 = pow(square(diff_x) + square(diff_y) + square(diff_z), expression{-3. / 2});
+                auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
                 if (j < n_fc_massive) {
                     // Body j is massive and it interacts mutually with body i.
                     // NOTE: the idea here is that we want to help the CSE process
@@ -155,9 +157,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             }
 
             // Add the expressions of the accelerations to the system.
-            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
         }
 
         // All the accelerations on the massless particles
@@ -168,9 +170,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             retval.push_back(prime(y_vars[i]) = vy_vars[i]);
             retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
-            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
         }
     } else {
         for (std::uint32_t i = 0; i < n; ++i) {
@@ -189,7 +191,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                 auto diff_y = y_vars[j] - y_vars[i];
                 auto diff_z = z_vars[j] - z_vars[i];
 
-                auto r_m3 = pow(square(diff_x) + square(diff_y) + square(diff_z), expression{-3. / 2});
+                auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
                 if (is_zero(masses[j])) {
                     // NOTE: special-case for m_j = 0, so that
                     // we avoid a division by zero in the other branch.
@@ -219,9 +221,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
             }
 
             // Add the expressions of the accelerations to the system.
-            retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-            retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-            retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+            retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+            retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+            retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
         }
     }
 
@@ -282,7 +284,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
             auto diff_y = y_vars[j] - y_vars[i];
             auto diff_z = z_vars[j] - z_vars[i];
 
-            auto r_m3 = pow(square(diff_x) + square(diff_y) + square(diff_z), expression{-3. / 2});
+            auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
             if (j < n_massive) {
                 // Body j is massive and it interacts mutually with body i.
                 // NOTE: the idea here is that we want to help the CSE process
@@ -313,9 +315,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
         }
 
         // Add the expressions of the accelerations to the system.
-        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
     }
 
     // All the accelerations on the massless particles
@@ -326,9 +328,9 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);
         retval.push_back(prime(z_vars[i]) = vz_vars[i]);
 
-        retval.push_back(prime(vx_vars[i]) = pairwise_sum(x_acc[i]));
-        retval.push_back(prime(vy_vars[i]) = pairwise_sum(y_acc[i]));
-        retval.push_back(prime(vz_vars[i]) = pairwise_sum(z_acc[i]));
+        retval.push_back(prime(vx_vars[i]) = sum(x_acc[i]));
+        retval.push_back(prime(vy_vars[i]) = sum(y_acc[i]));
+        retval.push_back(prime(vz_vars[i]) = sum(z_acc[i]));
     }
 
     return retval;

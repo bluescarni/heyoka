@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <initializer_list>
+#include <utility>
 #include <vector>
 
 #include <heyoka/expression.hpp>
@@ -40,7 +42,7 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
         auto xdiff = (x - x_masc);
         auto ydiff = (y - y_masc);
         auto zdiff = (z - z_masc);
-        auto r2 = square(xdiff) + square(ydiff) + square(zdiff);
+        auto r2 = sum({square(xdiff), square(ydiff), square(zdiff)});
         auto common_factor = -Gconst * m_masc * pow(r2, expression{-3. / 2.});
         x_acc.push_back(common_factor * xdiff);
         y_acc.push_back(common_factor * ydiff);
@@ -56,14 +58,14 @@ make_mascon_system_impl(expression Gconst, std::vector<std::vector<expression>> 
     auto coriolis_y = expression{2.} * (re * vx - pe * vz);
     auto coriolis_z = expression{2.} * (pe * vy - qe * vx);
 
-    // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of pairwise_sum for
+    // Assembling the return vector containing l.h.s. and r.h.s. (note the fundamental use of sum() for
     // efficiency and to allow compact mode to do his job)
     retval.push_back(prime(x) = vx);
     retval.push_back(prime(y) = vy);
     retval.push_back(prime(z) = vz);
-    retval.push_back(prime(vx) = pairwise_sum(x_acc) - centripetal_x - coriolis_x);
-    retval.push_back(prime(vy) = pairwise_sum(y_acc) - centripetal_y - coriolis_y);
-    retval.push_back(prime(vz) = pairwise_sum(z_acc) - centripetal_z - coriolis_z);
+    retval.push_back(prime(vx) = sum(x_acc) - centripetal_x - coriolis_x);
+    retval.push_back(prime(vy) = sum(y_acc) - centripetal_y - coriolis_y);
+    retval.push_back(prime(vz) = sum(z_acc) - centripetal_z - coriolis_z);
 
     return retval;
 }

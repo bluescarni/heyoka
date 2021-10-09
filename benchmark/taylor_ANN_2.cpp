@@ -102,7 +102,7 @@ struct ffnn {
             // b
             tmp.push_back(par[flattenb(layer, neuron)]);
             // wij xj + bi
-            retval[neuron] = pairwise_sum(tmp);
+            retval[neuron] = sum(tmp);
             // non linearity
             retval[neuron] = sin(retval[neuron]);
         }

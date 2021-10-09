@@ -8,13 +8,12 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
 #include <limits>
 #include <ostream>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -48,6 +47,7 @@
 #include <heyoka/math/binary_op.hpp>
 #include <heyoka/math/neg.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/sum.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/math/tpoly.hpp>
 #include <heyoka/number.hpp>
@@ -249,40 +249,33 @@ namespace detail
 namespace
 {
 
-std::vector<std::string> get_variables(std::unordered_set<const void *> &func_set, const expression &e)
+void get_variables(std::unordered_set<const void *> &func_set, std::set<std::string> &s_set, const expression &e)
 {
-    return std::visit(
-        [&func_set](const auto &arg) -> std::vector<std::string> {
+    std::visit(
+        [&func_set, &s_set](const auto &arg) {
             using type = detail::uncvref_t<decltype(arg)>;
 
             if constexpr (std::is_same_v<type, func>) {
                 const auto f_id = arg.get_ptr();
 
                 if (func_set.find(f_id) != func_set.end()) {
-                    // We already determined the list of variables for the current function,
-                    // return an empty value.
-                    return {};
+                    // We already determined the list of variables for the
+                    // current function, exit.
+                    return;
                 }
 
-                std::vector<std::string> ret;
-
+                // Determine the list of variables for each
+                // function argument.
                 for (const auto &farg : arg.args()) {
-                    auto tmp = get_variables(func_set, farg);
-                    ret.insert(ret.end(), std::make_move_iterator(tmp.begin()), std::make_move_iterator(tmp.end()));
-                    std::sort(ret.begin(), ret.end());
-                    ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+                    get_variables(func_set, s_set, farg);
                 }
 
                 // Add the id of f to the set.
                 [[maybe_unused]] const auto [_, flag] = func_set.insert(f_id);
                 // NOTE: an expression cannot contain itself.
                 assert(flag);
-
-                return ret;
             } else if constexpr (std::is_same_v<type, variable>) {
-                return {arg.name()};
-            } else {
-                return {};
+                s_set.insert(arg.name());
             }
         },
         e.value());
@@ -328,8 +321,11 @@ void rename_variables(std::unordered_set<const void *> &func_set, expression &e,
 std::vector<std::string> get_variables(const expression &e)
 {
     std::unordered_set<const void *> func_set;
+    std::set<std::string> s_set;
 
-    return detail::get_variables(func_set, e);
+    detail::get_variables(func_set, s_set, e);
+
+    return std::vector<std::string>(s_set.begin(), s_set.end());
 }
 
 void rename_variables(expression &e, const std::unordered_map<std::string, std::string> &repl_map)
@@ -1143,18 +1139,6 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
 } // namespace
 
 } // namespace detail
-
-// Pairwise summation of a vector of expressions.
-// https://en.wikipedia.org/wiki/Pairwise_summation
-expression pairwise_sum(std::vector<expression> sum)
-{
-    if (sum.empty()) {
-        return 0_dbl;
-    }
-
-    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) + std::move(b); },
-                                   std::move(sum));
-}
 
 // Pairwise product.
 expression pairwise_prod(std::vector<expression> prod)
