@@ -10,6 +10,15 @@ New
 - Support LLVM 13
   (`#201 <https://github.com/bluescarni/heyoka/pull/201>`__).
 
+Changes
+~~~~~~~
+
+- Performance optimisations in the construction of Taylor integrators
+  (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
+- **BREAKING**: the ``pairwise_sum()`` function has been replaced
+  by a new function called ``sum()`` with similar semantics
+  (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
+
 0.15.0 (2021-09-28)
 -------------------
 

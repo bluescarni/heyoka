@@ -3,6 +3,14 @@
 Breaking changes
 ================
 
+0.16.0
+------
+
+- The ``pairwise_sum()`` function has been replaced
+  by a new function called ``sum()`` with similar semantics.
+  ``sum()`` should behave in most cases as a drop-in replacement
+  for ``pairwise_sum()``.
+
 .. _bchanges_0_15_0:
 
 0.15.0

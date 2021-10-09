@@ -1140,18 +1140,6 @@ expression pairwise_reduce(const F &func, std::vector<expression> list)
 
 } // namespace detail
 
-// Pairwise summation of a vector of expressions.
-// https://en.wikipedia.org/wiki/Pairwise_summation
-expression pairwise_sum(std::vector<expression> sum)
-{
-    if (sum.empty()) {
-        return 0_dbl;
-    }
-
-    return detail::pairwise_reduce([](expression &&a, expression &&b) { return std::move(a) + std::move(b); },
-                                   std::move(sum));
-}
-
 // Pairwise product.
 expression pairwise_prod(std::vector<expression> prod)
 {

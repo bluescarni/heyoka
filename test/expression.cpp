@@ -732,19 +732,6 @@ TEST_CASE("has time")
     REQUIRE(has_time(bar));
 }
 
-TEST_CASE("pairwise_sum")
-{
-    auto [x0, x1, x2, x3, x4, x5] = make_vars("x0", "x1", "x2", "x3", "x4", "x5");
-
-    REQUIRE(pairwise_sum({}) == 0_dbl);
-    REQUIRE(pairwise_sum({x0}) == x0);
-    REQUIRE(pairwise_sum({x0, x1}) == x0 + x1);
-    REQUIRE(pairwise_sum({x0, x1, x2}) == x0 + x1 + x2);
-    REQUIRE(pairwise_sum({x0, x1, x2, x3}) == (x0 + x1) + (x2 + x3));
-    REQUIRE(pairwise_sum({x0, x1, x2, x3, x4}) == (x0 + x1) + (x2 + x3) + x4);
-    REQUIRE(pairwise_sum({x0, x1, x2, x3, x4, x5}) == ((x0 + x1) + (x2 + x3)) + (x4 + x5));
-}
-
 TEST_CASE("pairwise_prod")
 {
     auto [x0, x1, x2, x3, x4, x5] = make_vars("x0", "x1", "x2", "x3", "x4", "x5");
