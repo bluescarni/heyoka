@@ -61,11 +61,13 @@ public:
 #endif
 };
 
-} // namespace detail
-
 // NOTE: the default split value is a power of two so that the
 // internal pairwise sums are rounded up exactly.
-HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>, std::uint32_t = 64);
+inline constexpr std::uint32_t default_sum_split = 64;
+
+} // namespace detail
+
+HEYOKA_DLL_PUBLIC expression sum(std::vector<expression>, std::uint32_t = detail::default_sum_split);
 
 } // namespace heyoka
 
