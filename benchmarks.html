@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Basic tutorials &#8212; heyoka 0.16.0 documentation</title>
+    <title>Benchmarks &#8212; heyoka 0.16.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -32,10 +32,11 @@
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Taylor’s method" href="tut_taylor_method.html" />
-    <link rel="prev" title="Installation" href="install.html" />
+    <link rel="next" title="Notes on automatic differentiation" href="ad_notes.html" />
+    <link rel="prev" title="Serialisation" href="tut_s11n.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
     
@@ -75,11 +76,11 @@
    Installation
   </a>
  </li>
- <li class="toctree-l1 current active has-children">
-  <a class="current reference internal" href="#">
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="basic_tutorials.html">
    Basic tutorials
   </a>
-  <input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
   <label for="toctree-checkbox-1">
    <i class="fas fa-chevron-down">
    </i>
@@ -149,8 +150,8 @@
    </li>
   </ul>
  </li>
- <li class="toctree-l1">
-  <a class="reference internal" href="benchmarks.html">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
    Benchmarks
   </a>
  </li>
@@ -220,7 +221,7 @@
         <!-- ipynb file if we had a myst markdown file -->
         
         <!-- Download raw file -->
-        <a class="dropdown-buttons" href="_sources/basic_tutorials.rst.txt"><button type="button"
+        <a class="dropdown-buttons" href="_sources/benchmarks.rst.txt"><button type="button"
                 class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
                 data-placement="left">.rst</button></a>
         <!-- Download PDF via print -->
@@ -240,7 +241,7 @@
                 data-toggle="tooltip" data-placement="left" title="Source repository"><i
                     class="fab fa-github"></i>repository</button></a>
         <a class="issues-button"
-            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbasic_tutorials.html&body=Your%20issue%20content%20here."><button
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Fbenchmarks.html&body=Your%20issue%20content%20here."><button
                 type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
                 title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
         
@@ -261,6 +262,34 @@
         <!-- Table of contents -->
         <div class="d-none d-md-block col-md-2 bd-toc show">
             
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#">
+   Benchmarks
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#the-simple-pendulum">
+   The simple pendulum
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#the-three-body-problem">
+   The three-body problem
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#the-outer-solar-system">
+   The outer Solar System
+  </a>
+ </li>
+</ul>
+
+            </nav>
         </div>
     </div>
 </div>
@@ -269,37 +298,90 @@
         
               <div>
                 
-  <div class="section" id="basic-tutorials">
-<span id="id1"></span><h1>Basic tutorials<a class="headerlink" href="#basic-tutorials" title="Permalink to this headline">¶</a></h1>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>More <a class="reference external" href="https://bluescarni.github.io/heyoka.py/tutorials.html#tutorials" title="(in heyoka.py)"><span class="xref std std-ref">tutorials</span></a> and <a class="reference external" href="https://bluescarni.github.io/heyoka.py/examples.html#examples" title="(in heyoka.py)"><span class="xref std std-ref">examples</span></a> are available in the documentation
-of heyoka’s <a class="reference external" href="https://bluescarni.github.io/heyoka.py">Python bindings</a>.</p>
-</div>
-<p>The code snippets in these tutorials assume the inclusion of the
-global header <code class="docutils literal notranslate"><span class="pre">heyoka/heyoka.hpp</span></code>, and the use of</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span><span class="w"></span>
-<span class="k">namespace</span><span class="w"> </span><span class="nn">hy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">heyoka</span><span class="p">;</span><span class="w"></span>
-</pre></div>
-</div>
-<p>to import all names from the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace, and to provide
-a handy shortcut <code class="docutils literal notranslate"><span class="pre">hy</span></code> to the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> namespace.</p>
-<p>The tutorials’ code is available in the <code class="docutils literal notranslate"><span class="pre">tutorials/</span></code> subdirectory
-of the source tree. The tutorials can be compiled by enabling the
-<code class="docutils literal notranslate"><span class="pre">HEYOKA_BUILD_TUTORIALS</span></code> option when
-<a class="reference internal" href="install.html#installation-from-source"><span class="std std-ref">compiling from source</span></a>.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="tut_taylor_method.html">Taylor’s method</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_expression_system.html">The expression system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_adaptive.html">The adaptive integrator</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_adaptive_custom.html">Customising the adaptive integrator</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_param.html">Runtime parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_nonauto.html">Non-autonomous systems</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_d_output.html">Dense output</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tut_events.html">Event detection</a></li>
+  <div class="section" id="benchmarks">
+<h1>Benchmarks<a class="headerlink" href="#benchmarks" title="Permalink to this headline">¶</a></h1>
+<p>In this section we provide a few performance comparisons between heyoka and other popular
+ODE integration packages. Specifically, we compare heyoka to:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>, a popular Julia
+library implementing several ODE solvers. In these benchmarks, we will be using
+the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> solver (which is the <a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">recommended solver</a>
+for high-precision integrations);</p></li>
+<li><p><a class="reference external" href="https://github.com/PerezHz/TaylorIntegration.jl">TaylorIntegration.jl</a>, a
+Julia-based implementation of Taylor’s integration method. In these benchmarks, we will ensure
+that the Taylor order and tolerances for TaylorIntegration.jl match those selected by heyoka;</p></li>
+<li><p><a class="reference external" href="https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html">Boost.ODEInt</a>,
+a C++ package implementing various algorithms for the solution of systems of ODEs. In these
+benchmarks, we will be using the Runge-Kutta Fehlberg 78 solver;</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>,
+a popular N-body integration package. Like heyoka, <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is a high-precision
+non-symplectic integrator with adaptive timestepping capable of conserving the
+dynamical invariants over billions of dynamical timescales. Note, however, that
+<code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is not a general-purpose integrator, and thus we will be able to use
+it only in benchmarks involving gravitational N-body systems.</p></li>
 </ul>
+<p>The Taylor integrator from <a class="reference external" href="https://github.com/PerezHz/TaylorIntegration.jl">TaylorIntegration.jl</a>
+can be sped up via the use of the <code class="docutils literal notranslate"><span class="pre">&#64;taylorize</span></code> macro, which however imposes some limitations
+on the form of the right-hand sides of the ODEs
+(more details <a class="reference external" href="https://perezhz.github.io/TaylorIntegration.jl/latest/taylorize/">here</a>). In the benchmarks,
+we will measure the runtime of TaylorIntegration.jl with and without the <code class="docutils literal notranslate"><span class="pre">&#64;taylorize</span></code> macro.</p>
+<p>All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
+<a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.</p>
+<p>The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
 </div>
+<div class="section" id="the-simple-pendulum">
+<h1>The simple pendulum<a class="headerlink" href="#the-simple-pendulum" title="Permalink to this headline">¶</a></h1>
+<p>In this first benchmark, we numerically integrate the <a class="reference external" href="https://en.wikipedia.org/wiki/Pendulum_(mathematics)">simple pendulum</a></p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x^\prime = v \\
+v^\prime = -\sin x
+\end{cases},\end{split}\]</div>
+<p>with initial conditions</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x\left( 0 \right) &amp;= 1.3 \\
+v\left( 0 \right) &amp;= 0
+\end{cases},\end{split}\]</div>
+<p>for <span class="math notranslate nohighlight">\(10^4\)</span> time units. The tolerance for all integrators is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>.</p>
+<p>Here are the results:</p>
+<img alt="Pendulum benchmark" class="align-center" src="_images/pendulum_bench.png" />
+<p>We can see how heyoka is between 5 and 32 times faster than the other tested integrators.</p>
+</div>
+<div class="section" id="the-three-body-problem">
+<h1>The three-body problem<a class="headerlink" href="#the-three-body-problem" title="Permalink to this headline">¶</a></h1>
+<p>Here we will numerically integrate the planar circular restricted <a class="reference external" href="https://en.wikipedia.org/wiki/Three-body_problem">three-body problem</a>
+(PCR3BP). The dynamical equations are:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+ \dot{x} &amp; = p_x + y\\
+ \dot{y} &amp; = p_y - x\\
+ \dot{p_x} &amp; = - \frac{(1-\mu)(x-\mu)}{((x-\mu)^2+y^2)^{3/2}} - \frac{\mu(x+1-\mu)}{((x+1-\mu)^2+y^2)^{3/2}} + p_y\\
+ \dot{p_y} &amp; = - \frac{(1-\mu)y      }{((x-\mu)^2+y^2)^{3/2}} - \frac{\mu y       }{((x+1-\mu)^2+y^2)^{3/2}} - p_x
+\end{cases},\end{split}\]</div>
+<p>with mass parameter <span class="math notranslate nohighlight">\(\mu = 0.01\)</span> and initial conditions</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+x\left( 0 \right) &amp; = -0.8 \\
+y\left( 0 \right) &amp; = 0 \\
+p_x\left( 0 \right) &amp; = 0 \\
+p_y\left( 0 \right) &amp; = -0.6276410653920694 \\
+\end{cases},\end{split}\]</div>
+<p>for <span class="math notranslate nohighlight">\(2 \times 10^3\)</span> time units. The tolerance for all integrators is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>.</p>
+<p>Here are the results:</p>
+<img alt="PCR3BP benchmark" class="align-center" src="_images/pcr3bp_bench.png" />
+<p>We can see how heyoka is between 8 and 62 times faster than the other tested integrators.</p>
+</div>
+<div class="section" id="the-outer-solar-system">
+<h1>The outer Solar System<a class="headerlink" href="#the-outer-solar-system" title="Permalink to this headline">¶</a></h1>
+<p>In this benchmark, we will integrate the motion of the outer Solar System for 1 million years. We define the outer Solar
+System as the 6-body problem consisting of the Sun, Jupiter, Saturn, Uranus, Neptune and Pluto, all considered as point
+masses attracting each other according to <a class="reference external" href="https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation">Newtonian gravity</a>.
+The initial conditions are taken from <a class="reference external" href="https://ntrs.nasa.gov/citations/19860060859">this paper</a>.</p>
+<p>For this benchmark, we will be comparing heyoka to the <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>.</p>
+<p>Here are the results:</p>
+<a class="reference internal image-reference" href="_images/outer_ss_bench.png"><img alt="Outer Solar System benchmark" class="align-center" src="_images/outer_ss_bench.png" style="width: 576.0px; height: 360.0px;" /></a>
+<p>We can see how heyoka is about 5 times faster than <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> in this specific test.</p>
 </div>
 
 
@@ -313,19 +395,19 @@ of the source tree. The tutorials can be compiled by enabling the
 <div class='prev-next-bottom'>
     
     <div id="prev">
-        <a class="left-prev" href="install.html" title="previous page">
+        <a class="left-prev" href="tut_s11n.html" title="previous page">
             <i class="prevnext-label fas fa-angle-left"></i>
             <div class="prevnext-info">
                 <p class="prevnext-label">previous</p>
-                <p class="prevnext-title">Installation</p>
+                <p class="prevnext-title">Serialisation</p>
             </div>
         </a>
     </div>
      <div id="next">
-        <a class="right-next" href="tut_taylor_method.html" title="next page">
+        <a class="right-next" href="ad_notes.html" title="next page">
             <div class="prevnext-info">
                 <p class="prevnext-label">next</p>
-                <p class="prevnext-title">Taylor’s method</p>
+                <p class="prevnext-title">Notes on automatic differentiation</p>
             </div>
             <i class="prevnext-label fas fa-angle-right"></i>
         </a>

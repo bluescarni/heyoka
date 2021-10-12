@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add new benchmarks and benchmark results to the documentation
+  (`#204 <https://github.com/bluescarni/heyoka/pull/204>`__).
 - Support LLVM 13
   (`#201 <https://github.com/bluescarni/heyoka/pull/201>`__).
 
