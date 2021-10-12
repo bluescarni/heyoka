@@ -9,14 +9,14 @@ const μ = 0.01
     x1sq = x1^2
     y = q[2]
     ysq = y^2
-    r1_1p5 = (x1sq+ysq)^1.5
+    r1_1p5 = (x1sq+ysq)^-1.5
     x2 = q[1]+onemμ
     x2sq = x2^2
-    r2_1p5 = (x2sq+ysq)^1.5
+    r2_1p5 = (x2sq+ysq)^-1.5
     dq[1] = q[3] + q[2]
     dq[2] = q[4] - q[1]
-    dq[3] = (-((onemμ*x1)/r1_1p5) - ((μ*x2)/r2_1p5)) + q[4]
-    dq[4] = (-((onemμ*y )/r1_1p5) - ((μ*y )/r2_1p5)) - q[3]
+    dq[3] = (-((onemμ*x1)*r1_1p5) - ((μ*x2)*r2_1p5)) + q[4]
+    dq[4] = (-((onemμ*y )*r1_1p5) - ((μ*y )*r2_1p5)) - q[3]
     return nothing
 end
 

@@ -28,14 +28,14 @@ void pcr3bp(const state_type &q, state_type &dq, double)
     auto x1sq = x1 * x1;
     auto y = q[1];
     auto ysq = y * y;
-    auto r1_1p5 = std::pow(x1sq + ysq, 1.5);
+    auto r1_1p5 = std::pow(x1sq + ysq, -1.5);
     auto x2 = q[0] + onemmu;
     auto x2sq = x2 * x2;
-    auto r2_1p5 = std::pow(x2sq + ysq, 1.5);
+    auto r2_1p5 = std::pow(x2sq + ysq, -1.5);
     dq[0] = q[2] + q[1];
     dq[1] = q[3] - q[0];
-    dq[2] = (-((onemmu * x1) / r1_1p5) - ((mu * x2) / r2_1p5)) + q[3];
-    dq[3] = (-((onemmu * y) / r1_1p5) - ((mu * y) / r2_1p5)) - q[2];
+    dq[2] = (-((onemmu * x1) * r1_1p5) - ((mu * x2) * r2_1p5)) + q[3];
+    dq[3] = (-((onemmu * y) * r1_1p5) - ((mu * y) * r2_1p5)) - q[2];
 }
 
 namespace odeint = boost::numeric::odeint;
