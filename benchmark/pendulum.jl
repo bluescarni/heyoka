@@ -6,13 +6,13 @@ using TaylorIntegration
     return dx
 end
 
-# Initial time (t0), final time (tf) and initial condition (q0)
-t0 = 0.0
-tf = 10000.0
+tspan = (0.0, 10000.0)
 q0 = [1.3, 0.0]
 
-# The actual integration
-t1, x1 = taylorinteg(pendulum!, q0, t0, tf, 20, 2.2e-16, maxsteps=150000); # warm-up run
-e1 = @elapsed taylorinteg(pendulum!, q0, t0, tf, 20, 2.2e-16, maxsteps=150000);
-println(e1)
+using DiffEqBase
+using OrdinaryDiffEq
+prob = ODEProblem(pendulum!, q0, tspan,)
 
+using BenchmarkTools
+bV = @benchmark solve($prob, $(Vern9()), abstol=1e-15, reltol=1e-15)
+bT = @benchmark solve($prob, $(TaylorMethod(19)), abstol=1e-15)

@@ -30,10 +30,6 @@ prob = ODEProblem(pcr3bp!, q0, tspan, p)
 
 using OrdinaryDiffEq
 
-#solV = solve(prob, Vern9(), abstol=1e-15, reltol=1e-15);
-
 using BenchmarkTools
 bV = @benchmark solve($prob, $(Vern9()), abstol=1e-15, reltol=1e-15)
 bT = @benchmark solve($prob, $(TaylorMethod(19)), abstol=1e-15)
-bV
-bT

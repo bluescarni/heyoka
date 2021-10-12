@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     state_type ic = {1.3, 0};
 
     auto start = std::chrono::high_resolution_clock::now();
-    odeint::integrate_adaptive(odeint::make_controlled<error_stepper_type>(2.2e-16, 2.2e-16), &pendulum, ic, 0.0,
+    odeint::integrate_adaptive(odeint::make_controlled<error_stepper_type>(1e-15, 1e-15), &pendulum, ic, 0.0,
                                10000., 1e-8);
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
