@@ -106,7 +106,6 @@ void test_eval()
         REQUIRE(eval(sqrt(x), in) == approximately(sqrt(T(0.125))));
         REQUIRE(eval(sigmoid(x), in) == approximately(T(1.) / (T(1.) + exp(-T(0.125)))));
         REQUIRE(eval(erf(x), in) == approximately(erf(T(0.125))));
-        REQUIRE(eval(neg(x), in) == approximately(-T(0.125)));
         REQUIRE(eval(square(x), in) == approximately(T(0.125) * T(0.125)));
         REQUIRE(eval(acosh(x + heyoka::expression(T(1.))), in) == approximately(acosh(T(1.125))));
         REQUIRE(eval(asinh(x), in) == approximately(asinh(T(0.125))));
@@ -625,18 +624,18 @@ TEST_CASE("neg simpls")
 
     REQUIRE(x + (-y) == x - y);
     REQUIRE(x - (-y) == x + y);
-    REQUIRE(x + (neg(neg(y))) == x + y);
-    REQUIRE(x - (neg(neg(y))) == x - y);
-    REQUIRE(x + (neg(neg(par[0]))) == x + par[0]);
-    REQUIRE(x - (neg(neg(par[0]))) == x - par[0]);
+    REQUIRE(x + (-(-(y))) == x + y);
+    REQUIRE(x - (-(-(y))) == x - y);
+    REQUIRE(x + (-(-(par[0]))) == x + par[0]);
+    REQUIRE(x - (-(-(par[0]))) == x - par[0]);
 
     REQUIRE((-x) * (-y) == x * y);
     REQUIRE((-x) / (-y) == x / y);
 
-    REQUIRE(neg(neg(x)) * neg(neg(y)) == x * y);
-    REQUIRE(neg(neg(x)) / neg(neg(y)) == x / y);
-    REQUIRE(neg(neg(x)) * neg(neg(par[0])) == x * par[0]);
-    REQUIRE(neg(neg(x)) / neg(neg(par[0])) == x / par[0]);
+    REQUIRE(-(-(x)) * -(-(y)) == x * y);
+    REQUIRE(-(-(x)) / -(-(y)) == x / y);
+    REQUIRE(-(-(x)) * -(-(par[0])) == x * par[0]);
+    REQUIRE(-(-(x)) / -(-(par[0])) == x / par[0]);
 }
 
 TEST_CASE("div simpls")
@@ -848,7 +847,7 @@ TEST_CASE("get_n_nodes")
 
     REQUIRE(get_n_nodes(x + y) == 3u);
     REQUIRE(get_n_nodes(x - y) == 3u);
-    REQUIRE(get_n_nodes(-z) == 2u);
+    REQUIRE(get_n_nodes(-z) == 3u);
     REQUIRE(get_n_nodes(heyoka::time) == 1u);
     REQUIRE(get_n_nodes(x + (y * z)) == 5u);
     REQUIRE(get_n_nodes((x - y - z) + (y * z)) == 9u);

@@ -50,7 +50,6 @@
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/neg.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/s11n.hpp>
@@ -491,10 +490,9 @@ std::vector<expression> cos_impl::gradient() const
 
 expression cos(expression e)
 {
-    if (auto fptr = detail::is_neg(e)) {
+    if (auto neg_ptr = detail::is_neg(e)) {
         // Simplify cos(-x) to cos(x).
-        assert(fptr->args().size() == 1u);
-        return cos(fptr->args()[0]);
+        return cos(*neg_ptr);
     } else {
         // Simplify cos(number) to its value.
         if (auto num_ptr = std::get_if<number>(&e.value())) {
