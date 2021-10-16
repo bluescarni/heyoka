@@ -315,6 +315,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, con
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <bool, typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -323,6 +324,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, co
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of add()/sub()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -366,6 +368,9 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num0, const V &num1
 }
 
 // Derivative of var * number.
+// NOTE: no need to special-case x * -1 here, as it seems like most compilers
+// already optimise it to -x. We will though provide specialised negation implementations
+// in compact mode.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var, const U &num,
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
@@ -385,6 +390,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num, const variable
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
+    // Return derivative of var * number.
     return bo_taylor_diff_mul_impl<T>(s, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
@@ -414,6 +420,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -422,6 +429,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of mul()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -526,6 +534,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const U
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -534,6 +543,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of div()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -555,10 +565,12 @@ llvm::Value *taylor_diff_bo_impl(llvm_state &s, const binary_op &bo, const std::
     assert(bo.args().size() == 2u);
     assert(bo.op() >= binary_op::type::add && bo.op() <= binary_op::type::div);
 
+    // LCOV_EXCL_START
     if (!deps.empty()) {
         throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a binary operator "
                                     "should be empty, but instead it has a size of {}"_format(deps.size()));
     }
+    // LCOV_EXCL_STOP
 
     switch (bo.op()) {
         case binary_op::type::add:
@@ -1012,6 +1024,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <bool, typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_op &, const V1 &, const V2 &,
@@ -1020,6 +1033,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_op 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of add()/sub() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_add(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
@@ -1043,12 +1057,249 @@ llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_op &bo, st
         bo.lhs().value(), bo.rhs().value());
 }
 
+// Implementation of the derivative of -1 * x, where x is a variable, number or param.
+// We will adopt an approach based on negation rather than multiplication.
+template <typename T, typename U>
+llvm::Function *taylor_c_diff_neg_first(llvm_state &s, const U &arg, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+
+    // Get the function name.
+    const auto fname = [&]() {
+        if constexpr (std::is_same_v<U, variable>) {
+            return "heyoka_taylor_diff_neg_first_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
+        } else {
+            return "heyoka_taylor_diff_neg_first_{}_{}"_format(taylor_c_diff_numparam_mangle(arg),
+                                                               taylor_mangle_suffix(val_t));
+        }
+    }();
+
+    // The function arguments:
+    // - diff order,
+    // - idx of the u variable whose diff is being computed,
+    // - diff array,
+    // - par ptr,
+    // - time ptr,
+    // - the -1 multiplier (unused),
+    // - var/num/param argument (index/constant/index).
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    llvm::Type::getInt32Ty(context),
+                                    llvm::PointerType::getUnqual(val_t),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
+                                    to_llvm_type<T>(context)};
+    if constexpr (std::is_same_v<U, variable>) {
+        fargs.push_back(llvm::Type::getInt32Ty(context));
+    } else {
+        fargs.push_back(taylor_c_diff_numparam_argtype<T>(s, arg));
+    }
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto ord = f->args().begin();
+        auto diff_ptr = f->args().begin() + 2;
+        auto par_ptr = f->args().begin() + 3;
+        auto farg = f->args().begin() + 6;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Computer the return value.
+        llvm::Value *retval = nullptr;
+        if constexpr (std::is_same_v<U, variable>) {
+            retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, farg));
+        } else {
+            retval = builder.CreateAlloca(val_t);
+
+            llvm_if_then_else(
+                s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+                [&]() {
+                    // If the order is zero, run the codegen.
+                    builder.CreateStore(
+                        builder.CreateFNeg(taylor_c_diff_numparam_codegen(s, arg, farg, par_ptr, batch_size)), retval);
+                },
+                [&]() {
+                    // Otherwise, return zero.
+                    builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                });
+
+            retval = builder.CreateLoad(retval);
+        }
+
+        // Return the result.
+        builder.CreateRet(retval);
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // LCOV_EXCL_START
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of negation "
+                                        "in compact mode detected");
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    return f;
+}
+
+// Implementation of the derivative of x * -1, where x is a variable, number or param.
+// We will adopt an approach based on negation rather than multiplication.
+template <typename T, typename U>
+llvm::Function *taylor_c_diff_neg_second(llvm_state &s, const U &arg, std::uint32_t n_uvars, std::uint32_t batch_size)
+{
+    auto &module = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+
+    // Get the function name.
+    const auto fname = [&]() {
+        if constexpr (std::is_same_v<U, variable>) {
+            return "heyoka_taylor_diff_neg_second_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
+        } else {
+            return "heyoka_taylor_diff_neg_second_{}_{}"_format(taylor_c_diff_numparam_mangle(arg),
+                                                                taylor_mangle_suffix(val_t));
+        }
+    }();
+
+    // The function arguments:
+    // - diff order,
+    // - idx of the u variable whose diff is being computed,
+    // - diff array,
+    // - par ptr,
+    // - time ptr,
+    // - var/num/param argument (index/constant/index),
+    // - the -1 multiplier (unused).
+    std::vector<llvm::Type *> fargs{
+        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
+        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    if constexpr (std::is_same_v<U, variable>) {
+        fargs.push_back(llvm::Type::getInt32Ty(context));
+    } else {
+        fargs.push_back(taylor_c_diff_numparam_argtype<T>(s, arg));
+    }
+    fargs.push_back(to_llvm_type<T>(context));
+
+    // Try to see if we already created the function.
+    auto f = module.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &module);
+        assert(f != nullptr);
+
+        // Fetch the necessary function arguments.
+        auto ord = f->args().begin();
+        auto diff_ptr = f->args().begin() + 2;
+        auto par_ptr = f->args().begin() + 3;
+        auto farg = f->args().begin() + 5;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Computer the return value.
+        llvm::Value *retval = nullptr;
+        if constexpr (std::is_same_v<U, variable>) {
+            retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, farg));
+        } else {
+            retval = builder.CreateAlloca(val_t);
+
+            llvm_if_then_else(
+                s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
+                [&]() {
+                    // If the order is zero, run the codegen.
+                    builder.CreateStore(
+                        builder.CreateFNeg(taylor_c_diff_numparam_codegen(s, arg, farg, par_ptr, batch_size)), retval);
+                },
+                [&]() {
+                    // Otherwise, return zero.
+                    builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                });
+
+            retval = builder.CreateLoad(retval);
+        }
+
+        // Return the result.
+        builder.CreateRet(retval);
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // LCOV_EXCL_START
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of negation "
+                                        "in compact mode detected");
+        }
+        // LCOV_EXCL_STOP
+    }
+
+    return f;
+}
+
 // Derivative of number/param * number/param.
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                               std::uint32_t, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // Handle specially the case where at least one operand is the number -1.
+    // In such a case, we will use an implementation based on negation rather
+    // than multiplication.
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(num0)) {
+            return taylor_c_diff_neg_first<T>(s, num1, n_uvars, batch_size);
+        }
+    }
+
+    if constexpr (std::is_same_v<V, number>) {
+        if (is_negative_one(num1)) {
+            return taylor_c_diff_neg_second<T>(s, num0, n_uvars, batch_size);
+        }
+    }
+
     return bo_taylor_c_diff_func_num_num<T>(
         s, bo, num0, num1, batch_size,
         "heyoka_taylor_diff_mul_{}_{}_{}"_format(taylor_c_diff_numparam_mangle(num0),
@@ -1059,9 +1310,16 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &b
 
 // Derivative of var * number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // Special case for x * -1.
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(n)) {
+            return taylor_c_diff_neg_second<T>(s, var, n_uvars, batch_size);
+        }
+    }
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1141,9 +1399,16 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 
 // Derivative of number * var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
+    // Special case for -1 * x.
+    if constexpr (std::is_same_v<U, number>) {
+        if (is_negative_one(n)) {
+            return taylor_c_diff_neg_first<T>(s, var, n_uvars, batch_size);
+        }
+    }
+
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1310,6 +1575,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
@@ -1318,6 +1584,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of mul() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
@@ -1637,6 +1904,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
@@ -1645,6 +1913,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of div() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
