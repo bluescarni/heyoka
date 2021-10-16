@@ -376,10 +376,6 @@ expression sum(std::vector<expression> args, std::uint32_t split)
             "The 'split' value for a sum must be at least 2, but it is {} instead"_format(split));
     }
 
-    if (args.empty()) {
-        return 0_dbl;
-    }
-
     // Partition args so that all numbers are at the end.
     const auto n_end_it = std::stable_partition(
         args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
@@ -393,6 +389,15 @@ expression sum(std::vector<expression> args, std::uint32_t split)
 
         // Remove all numbers but the first one.
         args.erase(n_end_it + 1, args.end());
+
+        // Remove the remaining number if it is zero.
+        if (is_zero(std::get<number>(n_end_it->value()))) {
+            args.pop_back();
+        }
+    }
+
+    if (args.empty()) {
+        return 0_dbl;
     }
 
     // NOTE: this terminates the recursion.
