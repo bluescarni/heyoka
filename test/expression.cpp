@@ -1004,5 +1004,6 @@ TEST_CASE("is_neg")
     REQUIRE(!detail::is_neg("y"_var * 2.5_dbl));
 
     REQUIRE(*detail::is_neg(-1_dbl * "y"_var) == "y"_var);
-    REQUIRE(*detail::is_neg("y"_var * -1_dbl) == "y"_var);
+    REQUIRE(*detail::is_neg(mul(-1_dbl, "y"_var)) == "y"_var);
+    REQUIRE(*detail::is_neg(mul("y"_var, -1_dbl)) == "y"_var);
 }
