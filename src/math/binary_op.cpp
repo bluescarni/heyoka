@@ -97,6 +97,19 @@ void binary_op::to_stream(std::ostream &os) const
     assert(args().size() == 2u);
     assert(m_type >= type::add && m_type <= type::div);
 
+    // Special casing for -1 * x and x * -1.
+    if (m_type == type::mul) {
+        if (auto num_ptr = std::get_if<number>(&args()[0].value()); num_ptr != nullptr && is_negative_one(*num_ptr)) {
+            os << '-' << args()[1];
+            return;
+        }
+
+        if (auto num_ptr = std::get_if<number>(&args()[1].value()); num_ptr != nullptr && is_negative_one(*num_ptr)) {
+            os << '-' << args()[0];
+            return;
+        }
+    }
+
     os << '(' << lhs() << ' ';
 
     switch (m_type) {
