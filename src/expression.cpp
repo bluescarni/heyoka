@@ -389,12 +389,14 @@ expression operator+(expression e)
 expression operator-(expression e)
 {
     if (auto num_ptr = std::get_if<number>(&e.value())) {
+        // Simplify -number to its numerical value.
         return expression{-std::move(*num_ptr)};
     } else {
         if (auto neg_ptr = detail::is_neg(e)) {
             // Simplify -(-x) to x.
             return *neg_ptr;
         } else {
+            // Default implementation.
             return -1_dbl * std::move(e);
         }
     }
@@ -412,7 +414,7 @@ expression operator+(expression e1, expression e2)
         using type2 = detail::uncvref_t<decltype(v2)>;
 
         if constexpr (std::is_same_v<type1, number> && std::is_same_v<type2, number>) {
-            // Both are numbers, add them.
+            // Both are numbers, add them and return the result.
             return expression{std::forward<decltype(v1)>(v1) + std::forward<decltype(v2)>(v2)};
         } else if constexpr (std::is_same_v<type1, number>) {
             // e1 number, e2 symbolic.
