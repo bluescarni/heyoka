@@ -989,3 +989,20 @@ TEST_CASE("subs")
         == std::get<func>(std::get<func>(std::get<func>(bar_subs.value()).args()[1].value()).args()[1].value())
                .get_ptr());
 }
+
+TEST_CASE("is_neg")
+{
+    REQUIRE(!detail::is_neg(0_dbl));
+    REQUIRE(!detail::is_neg(123_dbl));
+    REQUIRE(!detail::is_neg(-123_dbl));
+
+    REQUIRE(!detail::is_neg(cos("x"_var)));
+
+    REQUIRE(!detail::is_neg("x"_var * "y"_var));
+
+    REQUIRE(!detail::is_neg(2.5_dbl * "y"_var));
+    REQUIRE(!detail::is_neg("y"_var * 2.5_dbl));
+
+    REQUIRE(*detail::is_neg(-1_dbl * "y"_var) == "y"_var);
+    REQUIRE(*detail::is_neg("y"_var * -1_dbl) == "y"_var);
+}

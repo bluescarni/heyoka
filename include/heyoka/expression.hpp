@@ -181,9 +181,10 @@ HEYOKA_DLL_PUBLIC void rename_variables(expression &, const std::unordered_map<s
 namespace detail
 {
 
-const expression *is_neg(const expression &);
+// NOTE: public for testing purposes.
+HEYOKA_DLL_PUBLIC const expression *is_neg(const expression &);
 
-}
+} // namespace detail
 
 HEYOKA_DLL_PUBLIC expression operator+(expression);
 HEYOKA_DLL_PUBLIC expression operator-(expression);
