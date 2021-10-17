@@ -176,3 +176,27 @@ TEST_CASE("sum s11n")
 
     REQUIRE(ex == sum({x, y, z}));
 }
+
+TEST_CASE("sum number compress")
+{
+    REQUIRE(sum({1_dbl, 2_dbl, 3_dbl}) == 6_dbl);
+    REQUIRE(sum({1_dbl, -2_dbl, 1_dbl}) == 0_dbl);
+
+    REQUIRE(sum({1_dbl, 2_dbl, "x"_var}) == sum({"x"_var, 3_dbl}));
+    REQUIRE(sum({2_dbl, "x"_var}) == sum({"x"_var, 2_dbl}));
+    REQUIRE(sum({1_dbl, "x"_var, 2_dbl}) == sum({"x"_var, 3_dbl}));
+    REQUIRE(sum({1_dbl, 2_dbl, "x"_var}) == sum({"x"_var, 3_dbl}));
+    REQUIRE(sum({"x"_var, 2_dbl}) == sum({"x"_var, 2_dbl}));
+    REQUIRE(sum({-1_dbl, "x"_var, 2_dbl, -1_dbl}) == "x"_var);
+
+    REQUIRE(sum({"y"_var, 1_dbl, -21_dbl, "x"_var}) == sum({"y"_var, "x"_var, -20_dbl}));
+    REQUIRE(sum({1_dbl, "y"_var, -21_dbl, "x"_var}) == sum({"y"_var, "x"_var, -20_dbl}));
+    REQUIRE(sum({"y"_var, 1_dbl, "x"_var, -21_dbl}) == sum({"y"_var, "x"_var, -20_dbl}));
+    REQUIRE(sum({"x"_var, 1_dbl, "y"_var, -21_dbl}) == sum({"x"_var, "y"_var, -20_dbl}));
+    REQUIRE(sum({"x"_var, 1_dbl, "y"_var, par[0]}) == sum({"x"_var, "y"_var, par[0], 1_dbl}));
+    REQUIRE(sum({"x"_var, "y"_var, par[0]}) == sum({"x"_var, "y"_var, par[0]}));
+    REQUIRE(sum({1_dbl, "y"_var, -21_dbl, "x"_var, 20_dbl}) == sum({"y"_var, "x"_var}));
+
+    REQUIRE(std::get<func>(sum({"y"_var, 1_dbl, "x"_var, -21_dbl}).value()).args()
+            == std::vector{"y"_var, "x"_var, -20_dbl});
+}
