@@ -714,8 +714,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
 
 // Derivative of atan2(var, var).
 template <typename T>
-llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, const variable &, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var0, const variable &var1,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -724,26 +724,10 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &, c
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_atan2_var_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the y argument,
-    // - idx of the x argument,
-    // - index of d.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "atan2", n_uvars, batch_size, {var0, var1}, 1);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);

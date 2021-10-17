@@ -316,14 +316,10 @@ namespace
 
 // Derivative of cos(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const U &num, std::uint32_t,
+llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, const U &num, std::uint32_t n_uvars,
                                             std::uint32_t batch_size)
 {
-    return taylor_c_diff_func_unary_num_det<T>(
-        s, fn, num, batch_size,
-        "heyoka_taylor_diff_cos_{}_{}"_format(taylor_c_diff_numparam_mangle(num),
-                                              taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "the cosine", 1);
+    return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "cos", 1);
 }
 
 // Derivative of cos(variable).

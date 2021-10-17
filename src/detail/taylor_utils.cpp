@@ -23,6 +23,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
@@ -136,7 +137,7 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
     }
 
     // Finally, add the mangling for the floating-point type.
-    fname += taylor_mangle_suffix(val_t);
+    fname += llvm_mangle_type(val_t);
 
     // Fill in the hidden dependency arguments. These are all indices.
     fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_hidden_deps),

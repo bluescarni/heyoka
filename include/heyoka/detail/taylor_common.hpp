@@ -37,9 +37,9 @@ namespace heyoka::detail
 // 'func(number)' in compact mode. The function will always return zero,
 // unless the order is 0 (in which case it will return the result of the codegen).
 template <typename T, typename F, typename U>
-inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &fn, const U &n,
-                                                        std::uint32_t batch_size, const std::string &fname,
-                                                        const std::string &desc, std::uint32_t n_deps = 0)
+inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &fn, const U &n, std::uint32_t n_uvars,
+                                                        std::uint32_t batch_size, const std::string &name,
+                                                        std::uint32_t n_deps = 0)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -48,21 +48,10 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time_ptr,
-    // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n)};
-    // Add the hidden deps at the end.
-    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_deps), llvm::Type::getInt32Ty(context));
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, name, n_uvars, batch_size, {n}, n_deps);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -112,14 +101,16 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
         // Restore the original insertion block.
         builder.SetInsertPoint(orig_bb);
     } else {
+        // LCOV_EXCL_START
         // The function was created before. Check if the signatures match.
         // NOTE: there could be a mismatch if the derivative function was created
         // and then optimised - optimisation might remove arguments which are compile-time
         // constants.
         if (!compare_function_signature(f, val_t, fargs)) {
-            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of " + desc
-                                        + " in compact mode detected");
+            throw std::invalid_argument("Inconsistent function signature for the Taylor derivative of " + name
+                                        + "() in compact mode detected");
         }
+        // LCOV_EXCL_STOP
     }
 
     return f;

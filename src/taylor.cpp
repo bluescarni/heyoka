@@ -101,14 +101,6 @@ namespace heyoka
 namespace detail
 {
 
-// Helper to produce a unique string for the type t.
-// This is used in certain AD implementations
-// to avoid potential clashing in function names.
-std::string taylor_mangle_suffix(llvm::Type *t)
-{
-    return llvm_mangle_type(t);
-}
-
 namespace
 {
 
@@ -206,34 +198,6 @@ llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const param &p, llvm::V
 }
 
 #endif
-
-// Return different name mangling strings for number and param.
-// For use in the c_diff implementations to generate unique
-// function names.
-std::string taylor_c_diff_numparam_mangle(const number &)
-{
-    return "num";
-}
-
-std::string taylor_c_diff_numparam_mangle(const param &)
-{
-    return "par";
-}
-
-// Deduce the c_diff function argument type for number/param
-// arguments.
-llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &ti, llvm_state &s, const number &)
-{
-    // NOTE: for number, the value of the constant is passed in as function argument.
-    // Thus, the argument type is the floating-point type of the constant.
-    return to_llvm_type_impl(s.context(), ti);
-}
-
-llvm::Type *taylor_c_diff_numparam_argtype(const std::type_info &, llvm_state &s, const param &)
-{
-    // NOTE: for param, the index into the par_ptr array is passed as function argument.
-    return s.builder().getInt32Ty();
-}
 
 // Codegen helpers for number/param for use in the generic c_diff implementations.
 llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,
