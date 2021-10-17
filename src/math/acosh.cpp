@@ -333,7 +333,7 @@ llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &f
 
 // Derivative of acosh(variable).
 template <typename T>
-llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &fn, const variable &,
+llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &fn, const variable &var,
                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -343,24 +343,10 @@ llvm::Function *taylor_c_diff_func_acosh_impl(llvm_state &s, const acosh_impl &f
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_acosh_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the var argument,
-    // - idx of the uvar whose definition is sqrt(var * var - 1).
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "acosh", n_uvars, batch_size, {var}, 1);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);

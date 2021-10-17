@@ -134,7 +134,7 @@ namespace
 // for nullary functions, in the same mold as
 // taylor_c_diff_func_unary_num_det().
 template <typename T>
-llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -143,18 +143,10 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Compose the function name.
-    const auto fname = "heyoka_taylor_diff_time_{}"_format(taylor_mangle_suffix(val_t));
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "time", n_uvars, batch_size, {});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -230,21 +222,24 @@ llvm::Function *taylor_c_diff_time_impl(llvm_state &s, std::uint32_t batch_size)
 
 } // namespace
 
-llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *time_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                  bool) const
 {
-    return taylor_c_diff_time_impl<double>(s, batch_size);
+    return taylor_c_diff_time_impl<double>(s, n_uvars, batch_size);
 }
 
-llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *time_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                   bool) const
 {
-    return taylor_c_diff_time_impl<long double>(s, batch_size);
+    return taylor_c_diff_time_impl<long double>(s, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *time_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                   bool) const
 {
-    return taylor_c_diff_time_impl<mppp::real128>(s, batch_size);
+    return taylor_c_diff_time_impl<mppp::real128>(s, n_uvars, batch_size);
 }
 
 #endif

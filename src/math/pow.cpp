@@ -367,8 +367,8 @@ namespace
 // Derivative of pow(number, number).
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1, std::uint32_t,
-                                            std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1,
+                                            std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -377,25 +377,9 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_pow_{}_{}_{}"_format(
-        taylor_c_diff_numparam_mangle(n0), taylor_c_diff_numparam_mangle(n1), taylor_mangle_suffix(val_t));
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - base argument,
-    // - exp argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n0),
-                                    taylor_c_diff_numparam_argtype<T>(s, n1)};
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {n0, n1});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -463,7 +447,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 
 // Derivative of pow(variable, number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &, const U &n,
+llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &var, const U &n,
                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -473,25 +457,9 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_pow_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the var argument,
-    // - exp argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    taylor_c_diff_numparam_argtype<T>(s, n)};
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {var, n});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);

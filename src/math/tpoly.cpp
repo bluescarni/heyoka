@@ -175,7 +175,8 @@ namespace
 {
 
 template <typename T>
-llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, std::uint32_t n_uvars,
+                                         std::uint32_t batch_size)
 {
     assert(tp.m_e_idx > tp.m_b_idx);
     assert(std::holds_alternative<param>(tp.args()[0].value()));
@@ -191,26 +192,14 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Compose the function name.
+    // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
     // generating a different function for each polynomial degree.
-    const auto fname = "heyoka_taylor_diff_tpoly_{}_deg_{}"_format(taylor_mangle_suffix(val_t), n_const);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - begin/end indices of the polynomial
-    //   coefficients in the par array.
-    std::vector<llvm::Type *> fargs{builder.getInt32Ty(),
-                                    builder.getInt32Ty(),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    builder.getInt32Ty(),
-                                    builder.getInt32Ty()};
+    const auto na_pair = taylor_c_diff_func_name_args<T>(
+        context, "tpoly_{}"_format(n_const), n_uvars, batch_size,
+        {std::get<param>(tp.args()[0].value()), std::get<param>(tp.args()[1].value())});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -328,21 +317,24 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
 
 } // namespace
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                   bool) const
 {
-    return taylor_c_diff_tpoly_impl<double>(s, *this, batch_size);
+    return taylor_c_diff_tpoly_impl<double>(s, *this, n_uvars, batch_size);
 }
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                    bool) const
 {
-    return taylor_c_diff_tpoly_impl<long double>(s, *this, batch_size);
+    return taylor_c_diff_tpoly_impl<long double>(s, *this, n_uvars, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t, std::uint32_t batch_size, bool) const
+llvm::Function *tpoly_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                    bool) const
 {
-    return taylor_c_diff_tpoly_impl<mppp::real128>(s, *this, batch_size);
+    return taylor_c_diff_tpoly_impl<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif

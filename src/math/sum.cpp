@@ -198,61 +198,30 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Construct the function name.
-    auto fname = "heyoka_taylor_diff_sum_{}_"_format(taylor_mangle_suffix(val_t));
-    for (decltype(sf.args().size()) i = 0; i < sf.args().size(); ++i) {
-        fname += std::visit(
-            [](const auto &v) -> std::string {
-                using type = detail::uncvref_t<decltype(v)>;
-
-                if constexpr (std::is_same_v<type, variable>) {
-                    return "var";
-                } else if constexpr (is_num_param_v<type>) {
-                    return taylor_c_diff_numparam_mangle(v);
-                } else {
-                    // LCOV_EXCL_START
-                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
-                                                "Taylor derivative of a sum");
-                    // LCOV_EXCL_STOP
-                }
-            },
-            sf.args()[i].value());
-
-        if (i != sf.args().size() - 1u) {
-            fname += '_';
-        }
-    }
-    // The suffix.
-    fname += "_n_uvars_{}"_format(n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - sum arguments.
-    std::vector<llvm::Type *> fargs{
-        llvm::Type::getInt32Ty(context), llvm::Type::getInt32Ty(context), llvm::PointerType::getUnqual(val_t),
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    // Build the vector of arguments needed to determine the functio name.
+    std::vector<std::variant<variable, number, param>> nm_args;
+    nm_args.reserve(static_cast<decltype(nm_args.size())>(sf.args().size()));
     for (const auto &arg : sf.args()) {
-        fargs.push_back(std::visit(
-            [&](const auto &v) -> llvm::Type * {
+        nm_args.push_back(std::visit(
+            [](const auto &v) -> std::variant<variable, number, param> {
                 using type = detail::uncvref_t<decltype(v)>;
 
-                if constexpr (std::is_same_v<type, variable>) {
-                    return llvm::Type::getInt32Ty(context);
-                } else if constexpr (is_num_param_v<type>) {
-                    return taylor_c_diff_numparam_argtype<T>(s, v);
-                } else {
+                if constexpr (std::is_same_v<type, func>) {
                     // LCOV_EXCL_START
-                    throw std::invalid_argument("An invalid argument type was encountered while trying to build the "
-                                                "Taylor derivative of a sum");
+                    assert(false);
+                    throw;
                     // LCOV_EXCL_STOP
+                } else {
+                    return v;
                 }
             },
             arg.value()));
     }
+
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sum", n_uvars, batch_size, nm_args);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);

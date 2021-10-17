@@ -423,7 +423,7 @@ namespace
 // Derivative of kepE(number, number).
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
-llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t,
+llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
     auto &md = s.module();
@@ -433,28 +433,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_kepE_{}_{}_{}"_format(
-        taylor_c_diff_numparam_mangle(n0), taylor_c_diff_numparam_mangle(n1), taylor_mangle_suffix(val_t));
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - e argument,
-    // - M argument,
-    // - indices of c and d.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n0),
-                                    taylor_c_diff_numparam_argtype<T>(s, n1),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {n0, n1}, 2);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -524,7 +506,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V
 
 // Derivative of kepE(var, number).
 template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &, const U &n, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var, const U &n, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
     auto &md = s.module();
@@ -534,28 +516,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &, co
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_kepE_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                             taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the e argument,
-    // - M argument,
-    // - indices of c and d.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    taylor_c_diff_numparam_argtype<T>(s, n),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {var, n}, 2);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -667,7 +631,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &, co
 
 // Derivative of kepE(number, var).
 template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
-llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const variable &, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const variable &var, std::uint32_t n_uvars,
                                              std::uint32_t batch_size)
 {
     auto &md = s.module();
@@ -677,28 +641,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_kepE_{}_var_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                             taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - e argument,
-    // - idx of the M argument,
-    // - indices of c and d.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {n, var}, 2);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -802,8 +748,8 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
 
 // Derivative of kepE(var, var).
 template <typename T>
-llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &, const variable &, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0, const variable &var1,
+                                             std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -812,27 +758,10 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &, co
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_kepE_var_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the e argument,
-    // - idx of the M argument,
-    // - indices of c and d.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "kepE", n_uvars, batch_size, {var0, var1}, 2);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);

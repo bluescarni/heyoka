@@ -36,12 +36,16 @@
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
 #include <heyoka/detail/llvm_fwd.hpp>
+#include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
+#include <heyoka/number.hpp>
+#include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/variable.hpp>
 
 namespace heyoka
 {
@@ -117,6 +121,22 @@ HEYOKA_DLL_PUBLIC llvm::Value *taylor_c_load_diff(llvm_state &, llvm::Value *, s
                                                   llvm::Value *);
 
 HEYOKA_DLL_PUBLIC std::string taylor_mangle_suffix(llvm::Type *);
+
+HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_func_name_args_impl(llvm::LLVMContext &, const std::string &, llvm::Type *, std::uint32_t,
+                                  const std::vector<std::variant<variable, number, param>> &, std::uint32_t);
+
+template <typename T>
+inline std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_func_name_args(llvm::LLVMContext &c, const std::string &name, std::uint32_t n_uvars,
+                             std::uint32_t batch_size, const std::vector<std::variant<variable, number, param>> &args,
+                             std::uint32_t n_hidden_deps = 0)
+{
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(c, batch_size);
+
+    return taylor_c_diff_func_name_args_impl(c, name, val_t, n_uvars, args, n_hidden_deps);
+}
 
 } // namespace detail
 
