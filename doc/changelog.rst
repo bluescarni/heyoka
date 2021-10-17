@@ -15,6 +15,9 @@ New
 Changes
 ~~~~~~~
 
+- Various internal simplifications in the implementation
+  of Taylor derivatives
+  (`#208 <https://github.com/bluescarni/heyoka/pull/208>`__).
 - Performance optimisations for ODE systems containing large summations
   (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
 - Performance optimisations in the construction of Taylor integrators
