@@ -6,9 +6,13 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
-#include <cstddef>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -20,11 +24,20 @@
 #include <fmt/format.h>
 
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/taylor.hpp>
@@ -144,6 +157,125 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
                  llvm::Type::getInt32Ty(context));
 
     return std::make_pair(std::move(fname), std::move(fargs));
+}
+
+namespace
+{
+
+template <typename T>
+llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), codegen<T>(s, num), batch_size);
+}
+
+llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u);
+
+    auto &builder = s.builder();
+
+    // Determine the index into the parameter array.
+    // LCOV_EXCL_START
+    if (p.idx() > std::numeric_limits<std::uint32_t>::max() / batch_size) {
+        throw std::overflow_error("Overflow detected in the computation of the index into a parameter array");
+    }
+    // LCOV_EXCL_STOP
+    const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
+
+    // Compute the pointer to load from.
+    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.getInt32(arr_idx)});
+
+    // Load.
+    return load_vector_from_memory(builder, ptr, batch_size);
+}
+
+} // namespace
+
+llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_num<double>(s, num, batch_size);
+}
+
+llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_num<long double>(s, num, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const number &num, llvm::Value *, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_num<mppp::real128>(s, num, batch_size);
+}
+
+#endif
+
+llvm::Value *taylor_codegen_numparam_dbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
+}
+
+llvm::Value *taylor_codegen_numparam_ldbl(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *taylor_codegen_numparam_f128(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
+{
+    return taylor_codegen_numparam_par(s, p, par_ptr, batch_size);
+}
+
+#endif
+
+// Codegen helpers for number/param for use in the generic c_diff implementations.
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,
+                                            std::uint32_t batch_size)
+{
+    return vector_splat(s.builder(), n, batch_size);
+}
+
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
+                                            std::uint32_t batch_size)
+{
+    auto &builder = s.builder();
+
+    // Fetch the pointer into par_ptr.
+    // NOTE: the overflow check is done in taylor_compute_jet().
+    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
+
+    return load_vector_from_memory(builder, ptr, batch_size);
+}
+
+// Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
+// derivative array 'arr'. The total number of u variables is n_uvars.
+llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint32_t u_idx, std::uint32_t order,
+                               std::uint32_t n_uvars)
+{
+    // Sanity check.
+    assert(u_idx < n_uvars);
+
+    // Compute the index.
+    const auto idx = static_cast<decltype(arr.size())>(order) * n_uvars + u_idx;
+    assert(idx < arr.size());
+
+    return arr[idx];
+}
+
+// Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
+// n_uvars is the total number of u variables.
+llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
+                                llvm::Value *u_idx)
+{
+    auto &builder = s.builder();
+
+    // NOTE: overflow check has already been done to ensure that the
+    // total size of diff_arr fits in a 32-bit unsigned integer.
+    auto *ptr = builder.CreateInBoundsGEP(
+        diff_arr, {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
+
+    return builder.CreateLoad(ptr);
 }
 
 } // namespace heyoka::detail
