@@ -101,6 +101,16 @@ Please refer to the `conda documentation <https://docs.conda.io/en/latest/>`__ f
 on how to setup and manage
 your conda installation.
 
+FreeBSD
+```````
+
+A community-supported FreeBSD port via `pkg <https://www.freebsd.org/doc/handbook/pkgng-intro.html>`__ is available for
+heyoka. In order to install heyoka using pkg, execute the following command:
+
+.. code-block:: console
+
+   $ pkg install heyoka
+
 .. _installation_from_source:
 
 Installation from source
