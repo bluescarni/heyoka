@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <ostream>
@@ -70,6 +71,8 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
+// NOTE: a possible improvement here is to transform
+// "(x + y + -20)" into "(x + y - 20)".
 void sum_impl::to_stream(std::ostream &os) const
 {
     if (args().size() == 1u) {
@@ -371,6 +374,26 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     if (split < 2u) {
         throw std::invalid_argument(
             "The 'split' value for a sum must be at least 2, but it is {} instead"_format(split));
+    }
+
+    // Partition args so that all numbers are at the end.
+    const auto n_end_it = std::stable_partition(
+        args.begin(), args.end(), [](const expression &ex) { return !std::holds_alternative<number>(ex.value()); });
+
+    // If we have two or more numbers, accumulate them
+    // into the first number in the second partition.
+    if (n_end_it != args.end()) {
+        for (auto it = n_end_it + 1; it != args.end(); ++it) {
+            *n_end_it += *it;
+        }
+
+        // Remove all numbers but the first one.
+        args.erase(n_end_it + 1, args.end());
+
+        // Remove the remaining number if it is zero.
+        if (is_zero(std::get<number>(n_end_it->value()))) {
+            args.pop_back();
+        }
     }
 
     if (args.empty()) {
