@@ -315,6 +315,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &s, const variable &var0, con
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <bool, typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -323,6 +324,7 @@ llvm::Value *bo_taylor_diff_addsub_impl(llvm_state &, const V1 &, const V2 &, co
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of add()/sub()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_add(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -385,6 +387,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const U &num, const variable
                                      const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
                                      std::uint32_t order, std::uint32_t idx, std::uint32_t batch_size)
 {
+    // Return the derivative of var * number.
     return bo_taylor_diff_mul_impl<T>(s, var, num, arr, par_ptr, n_uvars, order, idx, batch_size);
 }
 
@@ -414,6 +417,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &s, const variable &var0, const 
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -422,6 +426,7 @@ llvm::Value *bo_taylor_diff_mul_impl(llvm_state &, const V1 &, const V2 &, const
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of mul()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_mul(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -526,6 +531,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &s, const variable &var, const U
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const std::vector<llvm::Value *> &,
@@ -534,6 +540,7 @@ llvm::Value *bo_taylor_diff_div_impl(llvm_state &, const V1 &, const V2 &, const
     throw std::invalid_argument(
         "An invalid argument type was encountered while trying to build the Taylor derivative of div()");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Value *bo_taylor_diff_div(llvm_state &s, const binary_op &bo, const std::vector<llvm::Value *> &arr,
@@ -1012,6 +1019,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <bool, typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_op &, const V1 &, const V2 &,
@@ -1020,6 +1028,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &, const binary_op 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of add()/sub() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_add(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
@@ -1310,6 +1319,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
@@ -1318,6 +1328,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of mul() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
@@ -1637,6 +1648,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 }
 
 // All the other cases.
+// LCOV_EXCL_START
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
@@ -1645,6 +1657,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, 
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of div() in compact mode");
 }
+// LCOV_EXCL_STOP
 
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_op &bo, std::uint32_t n_uvars,
