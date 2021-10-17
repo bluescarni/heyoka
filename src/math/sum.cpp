@@ -71,6 +71,8 @@ sum_impl::sum_impl() : sum_impl(std::vector<expression>{}) {}
 
 sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {}
 
+// NOTE: a possible improvement here is to transform
+// "(x + y + -20)" into "(x + y - 20)".
 void sum_impl::to_stream(std::ostream &os) const
 {
     if (args().size() == 1u) {
