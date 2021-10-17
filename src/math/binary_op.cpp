@@ -618,7 +618,7 @@ namespace
 // unless the order is 0 (in which case it will return the result of the codegen).
 template <typename T, typename U, typename V>
 llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo, const U &n0, const V &n1,
-                                              std::uint32_t batch_size, const std::string &fname,
+                                              std::uint32_t n_uvars, std::uint32_t batch_size,
                                               const std::string &op_name)
 {
     auto &module = s.module();
@@ -628,20 +628,10 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - number/par idx arguments.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n0),
-                                    taylor_c_diff_numparam_argtype<T>(s, n1)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, op_name, n_uvars, batch_size, {n0, n1});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -722,19 +712,14 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
 template <bool AddOrSub, typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                                  std::uint32_t, std::uint32_t batch_size)
+                                                  std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return bo_taylor_c_diff_func_num_num<T>(
-        s, bo, num0, num1, batch_size,
-        "heyoka_taylor_diff_{}_{}_{}_{}"_format(AddOrSub ? "add" : "sub", taylor_c_diff_numparam_mangle(num0),
-                                                taylor_c_diff_numparam_mangle(num1),
-                                                taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "addition");
+    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, AddOrSub ? "add" : "sub");
 }
 
 // Derivative of number +- var.
 template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
                                                   std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -744,25 +729,11 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_{}_{}_var_{}_n_uvars_{}"_format(
-        AddOrSub ? "add" : "sub", taylor_c_diff_numparam_mangle(n), taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - number/par idx argument,
-    // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair
+        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {n, var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -838,7 +809,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
 // Derivative of var +- number.
 template <bool AddOrSub, typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
                                                   std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -848,25 +819,11 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_{}_var_{}_{}_n_uvars_{}"_format(
-        AddOrSub ? "add" : "sub", taylor_c_diff_numparam_mangle(n), taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the var argument,
-    // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    taylor_c_diff_numparam_argtype<T>(s, n)};
+    // Fetch the function name and arguments.
+    const auto na_pair
+        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var, n});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -935,8 +892,8 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
 
 // Derivative of var +- var.
 template <bool AddOrSub, typename T>
-llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
-                                                  std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op &, const variable &var0,
+                                                  const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -945,25 +902,11 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_{}_var_var_{}_n_uvars_{}"_format(AddOrSub ? "add" : "sub",
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the first var argument,
-    // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair
+        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var0, var1});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1056,19 +999,14 @@ llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_op &bo, st
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                               std::uint32_t, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return bo_taylor_c_diff_func_num_num<T>(
-        s, bo, num0, num1, batch_size,
-        "heyoka_taylor_diff_mul_{}_{}_{}"_format(taylor_c_diff_numparam_mangle(num0),
-                                                 taylor_c_diff_numparam_mangle(num1),
-                                                 taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "multiplication");
+    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "mul");
 }
 
 // Derivative of var * number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -1078,25 +1016,10 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_mul_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the var argument,
-    // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    taylor_c_diff_numparam_argtype<T>(s, n)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var, n});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1150,7 +1073,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 
 // Derivative of number * var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -1160,25 +1083,10 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_mul_{}_var_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - number/par idx argument,
-    // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {n, var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1232,8 +1140,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 
 // Derivative of var * var.
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &var0,
+                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1242,24 +1150,10 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_mul_var_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the first var argument,
-    // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var0, var1});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1345,19 +1239,14 @@ llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, st
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                               std::uint32_t, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size)
 {
-    return bo_taylor_c_diff_func_num_num<T>(
-        s, bo, num0, num1, batch_size,
-        "heyoka_taylor_diff_div_{}_{}_{}"_format(taylor_c_diff_numparam_mangle(num0),
-                                                 taylor_c_diff_numparam_mangle(num1),
-                                                 taylor_mangle_suffix(to_llvm_vector_type<T>(s.context(), batch_size))),
-        "division");
+    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "div");
 }
 
 // Derivative of var / number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &, const U &n,
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -1367,25 +1256,10 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_div_var_{}_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the var argument,
-    // - number/par idx argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    taylor_c_diff_numparam_argtype<T>(s, n)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var, n});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1439,7 +1313,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 
 // Derivative of number / var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const U &n, const variable &,
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
                                                std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
@@ -1449,25 +1323,10 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_div_{}_var_{}_n_uvars_{}"_format(taylor_c_diff_numparam_mangle(n),
-                                                                            taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - number/par idx argument,
-    // - idx of the var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    taylor_c_diff_numparam_argtype<T>(s, n),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {n, var});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);
@@ -1557,8 +1416,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 
 // Derivative of var / var.
 template <typename T>
-llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &, const variable &,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &var0,
+                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -1567,24 +1426,10 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Get the function name.
-    const auto fname = "heyoka_taylor_diff_div_var_var_{}_n_uvars_{}"_format(taylor_mangle_suffix(val_t), n_uvars);
-
-    // The function arguments:
-    // - diff order,
-    // - idx of the u variable whose diff is being computed,
-    // - diff array,
-    // - par ptr,
-    // - time ptr,
-    // - idx of the first var argument,
-    // - idx of the second var argument.
-    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::PointerType::getUnqual(val_t),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-                                    llvm::Type::getInt32Ty(context),
-                                    llvm::Type::getInt32Ty(context)};
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var0, var1});
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
 
     // Try to see if we already created the function.
     auto f = module.getFunction(fname);

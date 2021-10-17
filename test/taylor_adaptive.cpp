@@ -290,70 +290,86 @@ TEST_CASE("propagate grid scalar")
 
 TEST_CASE("streaming op")
 {
-    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
-    std::ostringstream oss;
+        auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
 
-    {
-        auto tad = taylor_adaptive<double>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}};
+        std::ostringstream oss;
 
-        oss << tad;
+        {
+            auto tad = taylor_adaptive<fp_t>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}};
 
-        REQUIRE(!oss.str().empty());
-        REQUIRE(!boost::algorithm::contains(oss.str(), "events"));
+            oss << tad;
 
-        oss.str("");
-    }
+            REQUIRE(!oss.str().empty());
+            REQUIRE(!boost::algorithm::contains(oss.str(), "events"));
 
-    using t_ev_t = t_event<double>;
-    using nt_ev_t = nt_event<double>;
+            oss.str("");
+        }
 
-    {
-        auto tad
-            = taylor_adaptive<double>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}, kw::t_events = {t_ev_t("x_0"_var)}};
+        using t_ev_t = t_event<fp_t>;
+        using nt_ev_t = nt_event<fp_t>;
 
-        oss << tad;
+        {
+            auto tad
+                = taylor_adaptive<fp_t>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}, kw::t_events = {t_ev_t("x_0"_var)}};
 
-        REQUIRE(!oss.str().empty());
-        REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
-        REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
-        REQUIRE(!boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+            oss << tad;
 
-        oss.str("");
-    }
+            REQUIRE(!oss.str().empty());
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(!boost::algorithm::contains(oss.str(), "N of non-terminal events"));
 
-    {
-        auto tad = taylor_adaptive<double>{sys,
-                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                           kw::nt_events
-                                           = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double, int) {})}};
+            oss.str("");
+        }
 
-        oss << tad;
+        {
+            auto tad = taylor_adaptive<fp_t>{sys,
+                                             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                             kw::nt_events
+                                             = {nt_ev_t("x_0"_var, [](taylor_adaptive<fp_t> &, fp_t, int) {})}};
 
-        REQUIRE(!oss.str().empty());
-        REQUIRE(!boost::algorithm::contains(oss.str(), "N of terminal events"));
-        REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+            oss << tad;
 
-        oss.str("");
-    }
+            REQUIRE(!oss.str().empty());
+            REQUIRE(!boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
 
-    {
-        auto tad = taylor_adaptive<double>{sys,
-                                           {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
-                                           kw::t_events = {t_ev_t("x_0"_var)},
-                                           kw::nt_events
-                                           = {nt_ev_t("x_0"_var, [](taylor_adaptive<double> &, double, int) {})}};
+            oss.str("");
+        }
 
-        oss << tad;
+        {
+            auto tad = taylor_adaptive<fp_t>{sys,
+                                             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0},
+                                             kw::t_events = {t_ev_t("x_0"_var)},
+                                             kw::nt_events
+                                             = {nt_ev_t("x_0"_var, [](taylor_adaptive<fp_t> &, fp_t, int) {})}};
 
-        REQUIRE(!oss.str().empty());
-        REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
-        REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+            oss << tad;
 
-        oss.str("");
-    }
+            REQUIRE(!oss.str().empty());
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+
+            oss.str("");
+        }
+
+        {
+            auto [x, y] = make_vars("x", "y");
+
+            auto tad = taylor_adaptive<fp_t>{{prime(x) = y + par[0], prime(y) = y * x + par[1]}, {0, 0}};
+
+            oss << tad;
+
+            REQUIRE(boost::algorithm::contains(oss.str(), "Parameters"));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
 }
 
 TEST_CASE("param scalar")

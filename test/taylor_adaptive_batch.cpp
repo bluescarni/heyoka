@@ -790,20 +790,27 @@ TEST_CASE("def ctor")
 
 TEST_CASE("stream output")
 {
-    auto [x, v] = make_vars("x", "v");
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
 
-    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x + par[0])},
-                                            {0., 0.01, 0.5, 0.51},
-                                            2u,
-                                            kw::pars = std::vector<double>{-1e-4, -1.1e-4}};
+        auto [x, v] = make_vars("x", "v");
 
-    std::ostringstream oss;
+        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
+                                              {0., 0.01, 0.5, 0.51},
+                                              2u,
+                                              kw::pars = std::vector<fp_t>{-1e-4, -1.1e-4}};
 
-    oss << ta;
+        std::ostringstream oss;
 
-    REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
-    REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
-    REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
+        oss << ta;
+
+        REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
+        REQUIRE(boost::algorithm::contains(oss.str(), "Parameters"));
+    };
+
+    tuple_for_each(fp_types, tester);
 }
 
 #if defined(HEYOKA_ARCH_PPC)
