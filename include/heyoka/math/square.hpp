@@ -10,6 +10,7 @@
 #define HEYOKA_MATH_SQUARE_HPP
 
 #include <cstdint>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -40,13 +41,15 @@ public:
     square_impl();
     explicit square_impl(expression);
 
+    void to_stream(std::ostream &) const;
+
+    std::vector<expression> gradient() const;
+
     llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
     llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
 #if defined(HEYOKA_HAVE_REAL128)
     llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
 #endif
-
-    std::vector<expression> gradient() const;
 
     double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
     long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;

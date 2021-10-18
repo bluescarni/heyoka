@@ -10,6 +10,7 @@
 
 #include <cassert>
 #include <initializer_list>
+#include <ostream>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -66,6 +67,19 @@ namespace detail
 square_impl::square_impl(expression e) : func_base("square", std::vector{std::move(e)}) {}
 
 square_impl::square_impl() : square_impl(0_dbl) {}
+
+void square_impl::to_stream(std::ostream &os) const
+{
+    assert(args().size() == 1u);
+
+    os << args()[0] << "**2";
+}
+
+std::vector<expression> square_impl::gradient() const
+{
+    assert(args().size() == 1u);
+    return {2_dbl * args()[0]};
+}
 
 llvm::Value *square_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
@@ -414,12 +428,6 @@ llvm::Function *square_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_
 }
 
 #endif
-
-std::vector<expression> square_impl::gradient() const
-{
-    assert(args().size() == 1u);
-    return {2_dbl * args()[0]};
-}
 
 } // namespace detail
 
