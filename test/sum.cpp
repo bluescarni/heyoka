@@ -9,11 +9,13 @@
 #include <initializer_list>
 #include <sstream>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/func.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/s11n.hpp>
 
