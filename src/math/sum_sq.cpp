@@ -9,6 +9,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
@@ -23,7 +24,13 @@
 
 #include <fmt/format.h>
 
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Value.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -274,6 +281,263 @@ llvm::Value *sum_sq_impl::taylor_diff_f128(llvm_state &s, const std::vector<std:
                                            std::uint32_t batch_size, bool) const
 {
     return sum_sq_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
+}
+
+#endif
+
+namespace
+{
+
+template <typename T>
+llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl &sf, std::uint32_t n_uvars,
+                                               std::uint32_t batch_size)
+{
+    // NOTE: this is prevented in the implementation
+    // of the sum() function.
+    assert(!sf.args().empty());
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the floating-point type.
+    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+
+    // Build the vector of arguments needed to determine the functio name.
+    std::vector<std::variant<variable, number, param>> nm_args;
+    nm_args.reserve(static_cast<decltype(nm_args.size())>(sf.args().size()));
+    for (const auto &arg : sf.args()) {
+        nm_args.push_back(std::visit(
+            [](const auto &v) -> std::variant<variable, number, param> {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, func>) {
+                    // LCOV_EXCL_START
+                    assert(false);
+                    throw;
+                    // LCOV_EXCL_STOP
+                } else {
+                    return v;
+                }
+            },
+            arg.value()));
+    }
+
+    // Fetch the function name and arguments.
+    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "sum_sq", n_uvars, batch_size, nm_args);
+    const auto &fname = na_pair.first;
+    const auto &fargs = na_pair.second;
+
+    // Try to see if we already created the function.
+    auto f = md.getFunction(fname);
+
+    if (f == nullptr) {
+        // The function was not created before, do it now.
+
+        // Fetch the current insertion block.
+        auto orig_bb = builder.GetInsertBlock();
+
+        // The return type is val_t.
+        auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+        // Create the function
+        f = llvm::Function::Create(ft, llvm::Function::InternalLinkage, fname, &md);
+        assert(f != nullptr);
+        // NOTE: force inline.
+        f->addFnAttr(llvm::Attribute::AlwaysInline);
+
+        // Fetch the necessary function arguments.
+        auto order = f->args().begin();
+        auto diff_arr = f->args().begin() + 2;
+        auto par_ptr = f->args().begin() + 3;
+        auto terms = f->args().begin() + 5;
+
+        // Create a new basic block to start insertion into.
+        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+        // Create the accumulators for each argument in the summation, and init them to zero.
+        std::vector<llvm::Value *> v_accs;
+        v_accs.resize(boost::numeric_cast<decltype(v_accs.size())>(sf.args().size()));
+        for (auto &acc : v_accs) {
+            acc = builder.CreateAlloca(val_t);
+            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+        }
+
+        // Create the return value.
+        auto retval = builder.CreateAlloca(val_t);
+
+        // This function calculates the j-th term in the summation in the formula for the
+        // Taylor derivative of square() for each k-th argument in sf, and accumulates the result
+        // into the k-th entry in v_accs.
+        auto looper = [&](llvm::Value *j) {
+            for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
+                std::visit(
+                    [&](const auto &v) {
+                        using type = detail::uncvref_t<decltype(v)>;
+
+                        if constexpr (std::is_same_v<type, variable>) {
+                            // Variable.
+                            auto v0 = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, j), terms + k);
+                            auto v1 = taylor_c_load_diff(s, diff_arr, n_uvars, j, terms + k);
+
+                            // Update the k-th accumulator.
+                            builder.CreateStore(
+                                builder.CreateFAdd(builder.CreateLoad(v_accs[k]), builder.CreateFMul(v0, v1)),
+                                v_accs[k]);
+                        } else if constexpr (is_num_param_v<type>) {
+                            // Number/param: nothing to do, leave the accumulator to zero.
+                        } else {
+                            // LCOV_EXCL_START
+                            throw std::invalid_argument(
+                                "An invalid argument type was encountered while trying to build the "
+                                "Taylor derivative of a sum of squares in compact mode");
+                            // LCOV_EXCL_STOP
+                        }
+                    },
+                    sf.args()[k].value());
+            }
+        };
+
+        // Distinguish odd/even cases.
+        const auto odd_or_even
+            = builder.CreateICmpEQ(builder.CreateURem(order, builder.getInt32(2)), builder.getInt32(1));
+
+        llvm_if_then_else(
+            s, odd_or_even,
+            [&]() {
+                // Odd order.
+                const auto loop_end = builder.CreateAdd(
+                    builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(1)), builder.getInt32(2)),
+                    builder.getInt32(1));
+
+                llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) { looper(j); });
+
+                // Run a pairwise summation on the vector of accumulators.
+                std::vector<llvm::Value *> tmp;
+                tmp.reserve(v_accs.size());
+                for (auto &acc : v_accs) {
+                    tmp.push_back(builder.CreateLoad(acc));
+                }
+                auto ret = pairwise_sum(builder, tmp);
+
+                // Return 2 * ret.
+                builder.CreateStore(builder.CreateFAdd(ret, ret), retval);
+            },
+            [&]() {
+                // Even order.
+                // NOTE: run the loop only if we are not at order 0.
+                llvm_if_then_else(
+                    s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                    []() {
+                        // Order 0, do nothing.
+                    },
+                    [&]() {
+                        // Order 2 or higher.
+                        const auto loop_end = builder.CreateAdd(
+                            builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(2)), builder.getInt32(2)),
+                            builder.getInt32(1));
+
+                        llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) { looper(j); });
+                    });
+
+                // Multiply each accumulator by two and add the term outside the summation.
+                std::vector<llvm::Value *> tmp;
+                tmp.reserve(v_accs.size());
+                for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
+                    // Load the current accumulator and multiply it by 2.
+                    auto acc_val = builder.CreateLoad(v_accs[k]);
+                    auto acc2 = builder.CreateFAdd(acc_val, acc_val);
+
+                    // Load the external term.
+                    auto ex_term = std::visit(
+                        [&](const auto &v) -> llvm::Value * {
+                            using type = detail::uncvref_t<decltype(v)>;
+
+                            if constexpr (std::is_same_v<type, variable>) {
+                                // Variable.
+                                auto val = taylor_c_load_diff(
+                                    s, diff_arr, n_uvars, builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
+                                return builder.CreateFMul(val, val);
+                            } else if constexpr (is_num_param_v<type>) {
+                                auto ret = builder.CreateAlloca(val_t);
+
+                                llvm_if_then_else(
+                                    s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                                    [&]() {
+                                        // Order 0, store the num/param.
+                                        builder.CreateStore(
+                                            taylor_c_diff_numparam_codegen(s, v, terms + k, par_ptr, batch_size), ret);
+                                    },
+                                    [&]() {
+                                        // Order 2 or higher, store zero.
+                                        builder.CreateStore(
+                                            vector_splat(builder, codegen<T>(s, number{0.}), batch_size), ret);
+                                    });
+
+                                auto val = builder.CreateLoad(ret);
+
+                                return builder.CreateFMul(val, val);
+                            } else {
+                                // LCOV_EXCL_START
+                                throw std::invalid_argument(
+                                    "An invalid argument type was encountered while trying to build the "
+                                    "Taylor derivative of a sum of squares in compact mode");
+                                // LCOV_EXCL_STOP
+                            }
+                        },
+                        sf.args()[k].value());
+
+                    // Compute the Taylor derivative for the current argument.
+                    tmp.push_back(builder.CreateFAdd(acc2, ex_term));
+                }
+
+                // Return the pairwise sum.
+                builder.CreateStore(pairwise_sum(builder, tmp), retval);
+            });
+
+        // Create the return value.
+        builder.CreateRet(builder.CreateLoad(retval));
+
+        // Verify.
+        s.verify_function(f);
+
+        // Restore the original insertion block.
+        builder.SetInsertPoint(orig_bb);
+    } else {
+        // The function was created before. Check if the signatures match.
+        // NOTE: there could be a mismatch if the derivative function was created
+        // and then optimised - optimisation might remove arguments which are compile-time
+        // constants.
+        if (!compare_function_signature(f, val_t, fargs)) {
+            // LCOV_EXCL_START
+            throw std::invalid_argument(
+                "Inconsistent function signature for the Taylor derivative of sum_sq() in compact mode detected");
+            // LCOV_EXCL_STOP
+        }
+    }
+
+    return f;
+}
+
+} // namespace
+
+llvm::Function *sum_sq_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                    bool) const
+{
+    return sum_sq_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+}
+
+llvm::Function *sum_sq_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                     bool) const
+{
+    return sum_sq_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *sum_sq_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                                     bool) const
+{
+    return sum_sq_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
 }
 
 #endif
