@@ -49,8 +49,6 @@ public:
     expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
     expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
-#if 0
-
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                  std::uint32_t, bool) const;
@@ -62,6 +60,8 @@ public:
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                   std::uint32_t, bool) const;
 #endif
+
+#if 0
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)

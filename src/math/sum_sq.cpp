@@ -6,26 +6,46 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <algorithm>
 #include <cstdint>
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <fmt/format.h>
 
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Value.h>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/string_conv.hpp>
+#include <heyoka/detail/type_traits.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/llvm_state.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
 #include <heyoka/s11n.hpp>
+#include <heyoka/taylor.hpp>
+#include <heyoka/variable.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -90,6 +110,173 @@ expression sum_sq_impl::diff(std::unordered_map<const void *, expression> &func_
 {
     return diff_impl(func_map, p);
 }
+
+namespace
+{
+
+template <typename T>
+llvm::Value *sum_sq_taylor_diff_impl(llvm_state &s, const sum_sq_impl &sf, const std::vector<std::uint32_t> &deps,
+                                     const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, std::uint32_t n_uvars,
+                                     std::uint32_t order, std::uint32_t batch_size)
+{
+    // NOTE: this is prevented in the implementation
+    // of the sum_sq() function.
+    assert(!sf.args().empty());
+
+    if (!deps.empty()) {
+        // LCOV_EXCL_START
+        throw std::invalid_argument("The vector of hidden dependencies in the Taylor diff for a sum of squares "
+                                    "should be empty, but instead it has a size of {}"_format(deps.size()));
+        // LCOV_EXCL_STOP
+    }
+
+    auto &builder = s.builder();
+
+    // Each vector in v_sums will contain the terms in the summation in the formula
+    // for the computation of the Taylor derivative of square() for each argument in sf.
+    std::vector<std::vector<llvm::Value *>> v_sums;
+    v_sums.resize(boost::numeric_cast<decltype(v_sums.size())>(sf.args().size()));
+
+    // This function calculates the j-th term in the summation in the formula for the
+    // Taylor derivative of square() for each k-th argument in sf, and appends the result
+    // to the k-th entry in v_sums.
+    auto looper = [&](std::uint32_t j) {
+        for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
+            std::visit(
+                [&](const auto &v) {
+                    using type = detail::uncvref_t<decltype(v)>;
+
+                    if constexpr (std::is_same_v<type, variable>) {
+                        // Variable.
+                        const auto u_idx = uname_to_index(v.name());
+
+                        auto v0 = taylor_fetch_diff(arr, u_idx, order - j, n_uvars);
+                        auto v1 = taylor_fetch_diff(arr, u_idx, j, n_uvars);
+
+                        v_sums[k].push_back(builder.CreateFMul(v0, v1));
+                    } else if constexpr (is_num_param_v<type>) {
+                        // Number/param.
+
+                        // NOTE: for number/params, all terms in the summation
+                        // will be zero. Thus, ensure that v_sums[k] just
+                        // contains a single zero.
+                        if (v_sums[k].empty()) {
+                            v_sums[k].push_back(vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+                        }
+                    } else {
+                        // LCOV_EXCL_START
+                        throw std::invalid_argument(
+                            "An invalid argument type was encountered while trying to build the "
+                            "Taylor derivative of a sum of squares");
+                        // LCOV_EXCL_STOP
+                    }
+                },
+                sf.args()[k].value());
+        }
+    };
+
+    if (order % 2u == 1u) {
+        // Odd order.
+        for (std::uint32_t j = 0; j <= (order - 1u) / 2u; ++j) {
+            looper(j);
+        }
+
+        // Pairwise sum each item in v_sums.
+        std::vector<llvm::Value *> tmp;
+        tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(v_sums.size()));
+        for (auto &v_sum : v_sums) {
+            tmp.push_back(pairwise_sum(builder, v_sum));
+        }
+
+        // Sum the sums.
+        pairwise_sum(builder, tmp);
+
+        // Multiply by 2 and return.
+        return builder.CreateFAdd(tmp[0], tmp[0]);
+    } else {
+        // Even order.
+        for (std::uint32_t j = 0; order > 0u && j <= (order - 2u) / 2u; ++j) {
+            looper(j);
+        }
+
+        // Pairwise sum each item in v_sums, multiply the result by 2 and add the
+        // term outside the summation.
+        std::vector<llvm::Value *> tmp;
+        tmp.reserve(boost::numeric_cast<decltype(tmp.size())>(v_sums.size()));
+        for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
+            // Compute the term outside the summation and store it in tmp.
+            tmp.push_back(std::visit(
+                [&](const auto &v) -> llvm::Value * {
+                    using type = detail::uncvref_t<decltype(v)>;
+
+                    if constexpr (std::is_same_v<type, variable>) {
+                        // Variable.
+                        auto val = taylor_fetch_diff(arr, uname_to_index(v.name()), order / 2u, n_uvars);
+                        return builder.CreateFMul(val, val);
+                    } else if constexpr (is_num_param_v<type>) {
+                        // Number/param.
+                        if (order == 0u) {
+                            auto val = taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
+                            return builder.CreateFMul(val, val);
+                        } else {
+                            return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+                        }
+                    } else {
+                        // LCOV_EXCL_START
+                        throw std::invalid_argument(
+                            "An invalid argument type was encountered while trying to build the "
+                            "Taylor derivative of a sum of squares");
+                        // LCOV_EXCL_STOP
+                    }
+                },
+                sf.args()[k].value()));
+
+            // NOTE: avoid doing the pairwise sum if the order is 0, in which case
+            // the items in v_sums are all empty and tmp.back() contains only the term
+            // outside the summation.
+            if (order > 0u) {
+                auto p_sum = pairwise_sum(builder, v_sums[k]);
+                // Muliply the pairwise sum by 2.
+                p_sum = builder.CreateFAdd(p_sum, p_sum);
+                // Add it to the term outside the sum.
+                tmp.back() = builder.CreateFAdd(p_sum, tmp.back());
+            }
+        }
+
+        // Sum the sums and return.
+        return pairwise_sum(builder, tmp);
+    }
+}
+
+} // namespace
+
+llvm::Value *sum_sq_impl::taylor_diff_dbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                          const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                          std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                          std::uint32_t batch_size, bool) const
+{
+    return sum_sq_taylor_diff_impl<double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
+}
+
+llvm::Value *sum_sq_impl::taylor_diff_ldbl(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                           std::uint32_t batch_size, bool) const
+{
+    return sum_sq_taylor_diff_impl<long double>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Value *sum_sq_impl::taylor_diff_f128(llvm_state &s, const std::vector<std::uint32_t> &deps,
+                                           const std::vector<llvm::Value *> &arr, llvm::Value *par_ptr, llvm::Value *,
+                                           std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
+                                           std::uint32_t batch_size, bool) const
+{
+    return sum_sq_taylor_diff_impl<mppp::real128>(s, *this, deps, arr, par_ptr, n_uvars, order, batch_size);
+}
+
+#endif
 
 } // namespace detail
 
