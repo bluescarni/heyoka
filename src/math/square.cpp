@@ -433,7 +433,12 @@ llvm::Function *square_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_
 
 expression square(expression e)
 {
-    return expression{func{detail::square_impl(std::move(e))}};
+    if (auto nptr = std::get_if<number>(&e.value())) {
+        // NOTE: if e is a number, compute its numerical value.
+        return expression{*nptr * *nptr};
+    } else {
+        return expression{func{detail::square_impl(std::move(e))}};
+    }
 }
 
 } // namespace heyoka
