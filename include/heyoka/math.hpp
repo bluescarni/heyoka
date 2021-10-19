@@ -32,6 +32,7 @@
 #include <heyoka/math/sqrt.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/math/tan.hpp>
 #include <heyoka/math/tanh.hpp>
 #include <heyoka/math/time.hpp>
