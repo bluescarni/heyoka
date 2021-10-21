@@ -20,7 +20,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/math/cos.hpp>
-#include <heyoka/math/square.hpp>
+#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -382,7 +382,7 @@ TEST_CASE("nbody")
                 auto diff_y = y_vars[j] - y_vars[i];
                 auto diff_z = z_vars[j] - z_vars[i];
 
-                sv_funcs.push_back(square(diff_x) + square(diff_y) + square(diff_z));
+                sv_funcs.push_back(sum_sq({diff_x, diff_y, diff_z}));
             }
         }
 

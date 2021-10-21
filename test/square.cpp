@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/cos.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/s11n.hpp>
 
@@ -50,4 +51,51 @@ TEST_CASE("square s11n")
     }
 
     REQUIRE(ex == square(x));
+}
+
+TEST_CASE("square stream")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    {
+        std::ostringstream oss;
+        oss << square(x);
+
+        REQUIRE(oss.str() == "x**2");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << square(x + y);
+
+        REQUIRE(oss.str() == "(x + y)**2");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << square(2_dbl);
+
+        REQUIRE(oss.str() == "2.0000000000000000**2");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << square(par[0]);
+
+        REQUIRE(oss.str() == "p0**2");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << square(x + par[0]);
+
+        REQUIRE(oss.str() == "(x + p0)**2");
+    }
+
+    {
+        std::ostringstream oss;
+        oss << square(cos(x + par[0]));
+
+        REQUIRE(oss.str() == "cos((x + p0))**2");
+    }
 }

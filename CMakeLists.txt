@@ -263,6 +263,7 @@ set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/neg.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/tpoly.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/math/sum_sq.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/math/constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/string_conv.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/detail/math_wrappers.cpp"

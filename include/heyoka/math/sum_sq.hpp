@@ -6,8 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef HEYOKA_MATH_SQUARE_HPP
-#define HEYOKA_MATH_SQUARE_HPP
+#ifndef HEYOKA_MATH_SUM_SQ_HPP
+#define HEYOKA_MATH_SUM_SQ_HPP
 
 #include <cstdint>
 #include <ostream>
@@ -28,7 +28,7 @@ namespace heyoka
 namespace detail
 {
 
-class HEYOKA_DLL_PUBLIC square_impl : public func_base
+class HEYOKA_DLL_PUBLIC sum_sq_impl : public func_base
 {
     friend class boost::serialization::access;
     template <typename Archive>
@@ -37,26 +37,17 @@ class HEYOKA_DLL_PUBLIC square_impl : public func_base
         ar &boost::serialization::base_object<func_base>(*this);
     }
 
+    template <typename T>
+    HEYOKA_DLL_LOCAL expression diff_impl(std::unordered_map<const void *, expression> &, const T &) const;
+
 public:
-    square_impl();
-    explicit square_impl(expression);
+    sum_sq_impl();
+    explicit sum_sq_impl(std::vector<expression>);
 
     void to_stream(std::ostream &) const;
 
-    std::vector<expression> gradient() const;
-
-    llvm::Value *codegen_dbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-    llvm::Value *codegen_ldbl(llvm_state &, const std::vector<llvm::Value *> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    llvm::Value *codegen_f128(llvm_state &, const std::vector<llvm::Value *> &) const;
-#endif
-
-    double eval_dbl(const std::unordered_map<std::string, double> &, const std::vector<double> &) const;
-    long double eval_ldbl(const std::unordered_map<std::string, long double> &, const std::vector<long double> &) const;
-#if defined(HEYOKA_HAVE_REAL128)
-    mppp::real128 eval_f128(const std::unordered_map<std::string, mppp::real128> &,
-                            const std::vector<mppp::real128> &) const;
-#endif
+    expression diff(std::unordered_map<const void *, expression> &, const std::string &) const;
+    expression diff(std::unordered_map<const void *, expression> &, const param &) const;
 
     llvm::Value *taylor_diff_dbl(llvm_state &, const std::vector<std::uint32_t> &, const std::vector<llvm::Value *> &,
                                  llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
@@ -69,6 +60,7 @@ public:
                                   llvm::Value *, llvm::Value *, std::uint32_t, std::uint32_t, std::uint32_t,
                                   std::uint32_t, bool) const;
 #endif
+
     llvm::Function *taylor_c_diff_func_dbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
     llvm::Function *taylor_c_diff_func_ldbl(llvm_state &, std::uint32_t, std::uint32_t, bool) const;
 #if defined(HEYOKA_HAVE_REAL128)
@@ -76,12 +68,16 @@ public:
 #endif
 };
 
+// NOTE: the default split value is a power of two so that the
+// internal pairwise sums are rounded up exactly.
+inline constexpr std::uint32_t default_sum_sq_split = 64;
+
 } // namespace detail
 
-HEYOKA_DLL_PUBLIC expression square(expression);
+HEYOKA_DLL_PUBLIC expression sum_sq(std::vector<expression>, std::uint32_t = detail::default_sum_sq_split);
 
 } // namespace heyoka
 
-HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::square_impl)
+HEYOKA_S11N_FUNC_EXPORT_KEY(heyoka::detail::sum_sq_impl)
 
 #endif

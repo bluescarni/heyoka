@@ -73,6 +73,7 @@ sum_impl::sum_impl(std::vector<expression> v) : func_base("sum", std::move(v)) {
 
 // NOTE: a possible improvement here is to transform
 // "(x + y + -20)" into "(x + y - 20)".
+// Perhaps in sum_sq() as well?
 void sum_impl::to_stream(std::ostream &os) const
 {
     if (args().size() == 1u) {
@@ -198,7 +199,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Build the vector of arguments needed to determine the functio name.
+    // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
     nm_args.reserve(static_cast<decltype(nm_args.size())>(sf.args().size()));
     for (const auto &arg : sf.args()) {
@@ -381,10 +382,16 @@ expression sum(std::vector<expression> args, std::uint32_t split)
     // sum in ret_seq.
     std::vector<expression> ret_seq, tmp;
     for (auto &arg : args) {
-        // NOTE: skip the term if it is zero.
+        // LCOV_EXCL_START
+#if !defined(NDEBUG)
+        // NOTE: there cannot be zero numbers here because
+        // the numbers were compactified earlier and
+        // compactification also removes the result if zero.
         if (auto nptr = std::get_if<number>(&arg.value()); nptr && is_zero(*nptr)) {
-            continue;
+            assert(false);
         }
+#endif
+        // LCOV_EXCL_STOP
 
         tmp.push_back(std::move(arg));
         if (tmp.size() == split) {
