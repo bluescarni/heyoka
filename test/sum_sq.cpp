@@ -15,6 +15,7 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
 #include <heyoka/math/sum_sq.hpp>
 #include <heyoka/s11n.hpp>
@@ -200,7 +201,7 @@ TEST_CASE("sum_sq zero ignore")
     REQUIRE(sum_sq({1_dbl, 2_dbl, 0_dbl}) == sum_sq({1_dbl, 2_dbl}));
     REQUIRE(sum_sq({1_dbl, 0_dbl, 1_dbl}) == sum_sq({1_dbl, 1_dbl}));
     REQUIRE(sum_sq({0_dbl, 0_dbl, 0_dbl}) == 0_dbl);
-    REQUIRE(sum_sq({0_dbl, -1_dbl, 0_dbl}) == 1_dbl);
+    REQUIRE(sum_sq({0_dbl, -1_dbl, 0_dbl}) == square(-1_dbl));
 
     REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var}) == sum_sq({2_dbl, "x"_var}));
     REQUIRE(sum_sq({0_dbl, 2_dbl, "x"_var, 0_dbl}) == sum_sq({2_dbl, "x"_var}));
