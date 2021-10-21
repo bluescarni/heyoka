@@ -199,7 +199,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Build the vector of arguments needed to determine the functio name.
+    // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
     nm_args.reserve(static_cast<decltype(nm_args.size())>(sf.args().size()));
     for (const auto &arg : sf.args()) {

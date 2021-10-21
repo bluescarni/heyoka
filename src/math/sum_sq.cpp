@@ -303,7 +303,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
     // Fetch the floating-point type.
     auto val_t = to_llvm_vector_type<T>(context, batch_size);
 
-    // Build the vector of arguments needed to determine the functio name.
+    // Build the vector of arguments needed to determine the function name.
     std::vector<std::variant<variable, number, param>> nm_args;
     nm_args.reserve(static_cast<decltype(nm_args.size())>(sf.args().size()));
     for (const auto &arg : sf.args()) {
@@ -458,6 +458,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                     s, diff_arr, n_uvars, builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
                                 return builder.CreateFMul(val, val);
                             } else if constexpr (is_num_param_v<type>) {
+                                // Number/param.
                                 auto ret = builder.CreateAlloca(val_t);
 
                                 llvm_if_then_else(
