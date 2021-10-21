@@ -448,7 +448,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                     auto acc2 = builder.CreateFAdd(acc_val, acc_val);
 
                     // Load the external term.
-                    auto ex_term = std::visit(
+                    auto ex_term = std::visit( // LCOV_EXCL_LINE
                         [&](const auto &v) -> llvm::Value * {
                             using type = detail::uncvref_t<decltype(v)>;
 
