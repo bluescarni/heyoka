@@ -20,8 +20,8 @@
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/pow.hpp>
-#include <heyoka/math/square.hpp>
 #include <heyoka/math/sum.hpp>
+#include <heyoka/math/sum_sq.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/variable.hpp>
@@ -126,7 +126,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                 auto diff_y = y_vars[j] - y_vars[i];
                 auto diff_z = z_vars[j] - z_vars[i];
 
-                auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
+                auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
                 if (j < n_fc_massive) {
                     // Body j is massive and it interacts mutually with body i.
                     // NOTE: the idea here is that we want to help the CSE process
@@ -191,7 +191,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
                 auto diff_y = y_vars[j] - y_vars[i];
                 auto diff_z = z_vars[j] - z_vars[i];
 
-                auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
+                auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
                 if (is_zero(masses[j])) {
                     // NOTE: special-case for m_j = 0, so that
                     // we avoid a division by zero in the other branch.
@@ -284,7 +284,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
             auto diff_y = y_vars[j] - y_vars[i];
             auto diff_z = z_vars[j] - z_vars[i];
 
-            auto r_m3 = pow(sum({square(diff_x), square(diff_y), square(diff_z)}), expression{-3. / 2});
+            auto r_m3 = pow(sum_sq({diff_x, diff_y, diff_z}), expression{-3. / 2});
             if (j < n_massive) {
                 // Body j is massive and it interacts mutually with body i.
                 // NOTE: the idea here is that we want to help the CSE process
