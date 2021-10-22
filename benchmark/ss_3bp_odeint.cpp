@@ -144,5 +144,5 @@ int main(int argc, char *argv[])
         const auto loc_err = ref[i] - ic[i];
         rms_err += loc_err * loc_err;
     }
-    std::cout << "RMS error: " << std::sqrt(rms_err) << '\n';
+    std::cout << "RMS error: " << std::sqrt(rms_err / 18) << '\n';
 }
