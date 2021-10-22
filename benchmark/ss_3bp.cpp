@@ -7,8 +7,10 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <chrono>
+#include <cstddef>
 #include <initializer_list>
 #include <iostream>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -28,11 +30,12 @@ int main(int argc, char *argv[])
     namespace po = boost::program_options;
 
     double tol;
+    bool with_dense = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("tol", po::value<double>(&tol)->default_value(1e-15),
-                                                       "tolerance");
+                                                       "tolerance")("with_dense", "enable dense output");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -43,7 +46,20 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if (vm.count("with_dense")) {
+        with_dense = true;
+    }
+
     warmup();
+
+    // Prepare the time grid, if needed.
+    std::vector<double> grid;
+    if (with_dense) {
+        for (auto i = 0ull; i < 500000ull; ++i) {
+            grid.push_back(100000. / 500000 * i);
+        }
+        grid.push_back(100000.);
+    }
 
     auto masses = {1.00000597682, 1 / 1047.355, 1 / 3501.6};
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
@@ -62,8 +78,19 @@ int main(int argc, char *argv[])
 
     taylor_adaptive<double> ta{std::move(sys), ic, kw::tol = tol};
 
+    taylor_outcome oc;
+    double h_min, h_max;
+    std::size_t n_steps;
+    std::vector<double> d_out;
+
     auto start = std::chrono::high_resolution_clock::now();
-    auto [oc, h_min, h_max, _] = ta.propagate_until(100000.);
+
+    if (with_dense) {
+        std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(grid);
+    } else {
+        std::tie(oc, h_min, h_max, n_steps) = ta.propagate_until(100000.);
+    }
+
     auto elapsed = static_cast<double>(
         std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
             .count());
