@@ -9,7 +9,7 @@ ODE integration packages. Specifically, we compare heyoka to:
 - `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__, a popular Julia
   library implementing several ODE solvers. In these benchmarks, we will be using
   the ``Vern9`` solver (which is the `recommended solver <https://diffeq.sciml.ai/stable/solvers/ode_solve/>`__
-  for high-precision integrations); 
+  for low-tolerance integrations in double precision);
 - `TaylorIntegration.jl <https://github.com/PerezHz/TaylorIntegration.jl>`__, a
   Julia-based implementation of Taylor's integration method. In these benchmarks, we will ensure
   that the Taylor order and tolerances for TaylorIntegration.jl match those selected by heyoka;

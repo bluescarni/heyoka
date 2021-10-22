@@ -90,22 +90,10 @@ if with_dense
     println(sqrt(sum(err.^2.) / length(err)))
     bV = @benchmark solve($prob, $(Vern9()), abstol=tol, reltol=tol, saveat=grid)
     println(bV)
-
-    sol = solve(prob, Feagin14(), abstol=tol, reltol=tol, saveat=grid);
-    err = ref - sol.u[length(sol.u)];
-    println(sqrt(sum(err.^2.) / length(err)))
-    bV = @benchmark solve($prob, $(Feagin14()), abstol=tol, reltol=tol, saveat=grid)
-    println(bV)
 else
     sol = solve(prob, Vern9(), abstol=tol, reltol=tol, save_everystep=false);
     err = ref - sol.u[length(sol.u)];
     println(sqrt(sum(err.^2.) / length(err)))
     bV = @benchmark solve($prob, $(Vern9()), abstol=tol, reltol=tol, save_everystep=false)
-    println(bV)
-
-    sol = solve(prob, Feagin14(), abstol=tol, reltol=tol, save_everystep=false);
-    err = ref - sol.u[length(sol.u)];
-    println(sqrt(sum(err.^2.) / length(err)))
-    bV = @benchmark solve($prob, $(Feagin14()), abstol=tol, reltol=tol, save_everystep=false)
     println(bV)
 end
