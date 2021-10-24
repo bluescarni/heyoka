@@ -267,17 +267,12 @@
             </div>
             <nav id="bd-toc-nav" aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
- <li class="toc-h1 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#">
-   Benchmarks
-  </a>
- </li>
- <li class="toc-h1 nav-item toc-entry">
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#the-planetary-three-body-problem">
    The planetary three-body problem
   </a>
  </li>
- <li class="toc-h1 nav-item toc-entry">
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#the-outer-solar-system">
    The outer Solar System
   </a>
@@ -320,9 +315,8 @@ In these benchmarks, we will be testing both heyoka and <code class="docutils li
 <p>All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
 <a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.
 The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
-</div>
 <div class="section" id="the-planetary-three-body-problem">
-<h1>The planetary three-body problem<a class="headerlink" href="#the-planetary-three-body-problem" title="Permalink to this headline">¶</a></h1>
+<h2>The planetary three-body problem<a class="headerlink" href="#the-planetary-three-body-problem" title="Permalink to this headline">¶</a></h2>
 <p>Here we will numerically integrate a specific case of the <a class="reference external" href="https://en.wikipedia.org/wiki/Three-body_problem">three-body problem</a>
 in which the three particles are the Sun, Jupiter and Saturn, all represented as point masses
 attracting each other according to <a class="reference external" href="https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation">Newtonian gravity</a>.
@@ -352,7 +346,7 @@ advantage is smaller.</p>
 the accuracy of Boost.ODEInt is two orders of magnitude worse.</p>
 </div>
 <div class="section" id="the-outer-solar-system">
-<h1>The outer Solar System<a class="headerlink" href="#the-outer-solar-system" title="Permalink to this headline">¶</a></h1>
+<h2>The outer Solar System<a class="headerlink" href="#the-outer-solar-system" title="Permalink to this headline">¶</a></h2>
 <p>In this benchmark, we will integrate the motion of the outer Solar System for 1 million years. We define the outer Solar
 System as the 6-body problem consisting of the Sun, Jupiter, Saturn, Uranus, Neptune and Pluto, all considered as point
 masses attracting each other according to <a class="reference external" href="https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation">Newtonian gravity</a>.
@@ -361,6 +355,7 @@ The initial conditions are taken from <a class="reference external" href="https:
 <p>Here are the results:</p>
 <a class="reference internal image-reference" href="_images/outer_ss_bench.png"><img alt="Outer Solar System benchmark" class="align-center" src="_images/outer_ss_bench.png" style="width: 576.0px; height: 360.0px;" /></a>
 <p>We can see how heyoka is about 5 times faster than <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> in this specific test.</p>
+</div>
 </div>
 
 

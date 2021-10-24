@@ -31,7 +31,7 @@ All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark resu
 The benchmarks' source code is available in the `github repository <https://github.com/bluescarni/heyoka/tree/master/benchmark>`__.
 
 The planetary three-body problem
-================================
+--------------------------------
 
 Here we will numerically integrate a specific case of the `three-body problem <https://en.wikipedia.org/wiki/Three-body_problem>`__
 in which the three particles are the Sun, Jupiter and Saturn, all represented as point masses
@@ -76,7 +76,7 @@ The integration accuracy of both heyoka and ``Vern9`` is of the order of :math:`
 the accuracy of Boost.ODEInt is two orders of magnitude worse.
 
 The outer Solar System
-======================
+----------------------
 
 In this benchmark, we will integrate the motion of the outer Solar System for 1 million years. We define the outer Solar
 System as the 6-body problem consisting of the Sun, Jupiter, Saturn, Uranus, Neptune and Pluto, all considered as point
