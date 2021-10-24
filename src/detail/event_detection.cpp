@@ -502,9 +502,8 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
     // No overlap is allowed.
-    std::vector<llvm::Type *> fargs{
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()), fp_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
