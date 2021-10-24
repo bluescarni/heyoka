@@ -3310,145 +3310,10 @@ const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_
     return m_d_out;
 }
 
-template <typename T>
-nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
-{
-}
-
-template <typename T>
-void nt_event_impl<T>::finalise_ctor(event_direction d)
-{
-    if (!callback) {
-        throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
-    }
-
-    if (d < event_direction::negative || d > event_direction::positive) {
-        throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
-    }
-
-    dir = d;
-}
-
-template <typename T>
-nt_event_impl<T>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
-{
-}
-
-template <typename T>
-nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
-
-template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
-{
-    if (this != &o) {
-        *this = nt_event_impl(o);
-    }
-
-    return *this;
-}
-
-template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
-
-template <typename T>
-nt_event_impl<T>::~nt_event_impl() = default;
-
-template <typename T>
-const expression &nt_event_impl<T>::get_expression() const
-{
-    return eq;
-}
-
-template <typename T>
-const typename nt_event_impl<T>::callback_t &nt_event_impl<T>::get_callback() const
-{
-    return callback;
-}
-
-template <typename T>
-event_direction nt_event_impl<T>::get_direction() const
-{
-    return dir;
-}
-
-template <typename T>
-t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
-{
-}
-
-template <typename T>
-void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
-{
-    using std::isfinite;
-
-    callback = std::move(cb);
-
-    if (!isfinite(cd)) {
-        throw std::invalid_argument("Cannot set a non-finite cooldown value for a terminal event");
-    }
-    cooldown = cd;
-
-    if (d < event_direction::negative || d > event_direction::positive) {
-        throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
-    }
-    dir = d;
-}
-
-template <typename T>
-t_event_impl<T>::t_event_impl(const t_event_impl &o)
-    : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
-{
-}
-
-template <typename T>
-t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
-
-template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
-{
-    if (this != &o) {
-        *this = t_event_impl(o);
-    }
-
-    return *this;
-}
-
-template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;
-
-template <typename T>
-t_event_impl<T>::~t_event_impl() = default;
-
-template <typename T>
-const expression &t_event_impl<T>::get_expression() const
-{
-    return eq;
-}
-
-template <typename T>
-const typename t_event_impl<T>::callback_t &t_event_impl<T>::get_callback() const
-{
-    return callback;
-}
-
-template <typename T>
-event_direction t_event_impl<T>::get_direction() const
-{
-    return dir;
-}
-
-template <typename T>
-T t_event_impl<T>::get_cooldown() const
-{
-    return cooldown;
-}
-
 // Explicit instantiation of the implementation classes/functions.
 // NOTE: on Windows apparently it is necessary to declare that
 // these instantiations are meant to be dll-exported.
 template class taylor_adaptive_impl<double>;
-template class nt_event_impl<double>;
-template class t_event_impl<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<expression> &,
                                                                                  std::vector<double>, double, double,
@@ -3462,8 +3327,6 @@ taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<std::pair<exp
                                                  std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template class taylor_adaptive_impl<long double>;
-template class nt_event_impl<long double>;
-template class t_event_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
@@ -3477,8 +3340,6 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class taylor_adaptive_impl<mppp::real128>;
-template class nt_event_impl<mppp::real128>;
-template class t_event_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
