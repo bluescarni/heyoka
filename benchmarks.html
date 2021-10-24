@@ -273,13 +273,8 @@
   </a>
  </li>
  <li class="toc-h1 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#the-simple-pendulum">
-   The simple pendulum
-  </a>
- </li>
- <li class="toc-h1 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#the-three-body-problem">
-   The three-body problem
+  <a class="reference internal nav-link" href="#the-planetary-three-body-problem">
+   The planetary three-body problem
   </a>
  </li>
  <li class="toc-h1 nav-item toc-entry">
@@ -305,14 +300,12 @@ ODE integration packages. Specifically, we compare heyoka to:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>, a popular Julia
 library implementing several ODE solvers. In these benchmarks, we will be using
-the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> solver (which is the <a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">recommended solver</a>
-for high-precision integrations);</p></li>
-<li><p><a class="reference external" href="https://github.com/PerezHz/TaylorIntegration.jl">TaylorIntegration.jl</a>, a
-Julia-based implementation of Taylor’s integration method. In these benchmarks, we will ensure
-that the Taylor order and tolerances for TaylorIntegration.jl match those selected by heyoka;</p></li>
+the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> explicit Runge-Kutta solver (which is the
+<a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">recommended solver</a>
+for low-tolerance integrations of non-stiff problems in double precision);</p></li>
 <li><p><a class="reference external" href="https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html">Boost.ODEInt</a>,
 a C++ package implementing various algorithms for the solution of systems of ODEs. In these
-benchmarks, we will be using the Runge-Kutta Fehlberg 78 solver;</p></li>
+benchmarks, we will be using the explicit Runge-Kutta-Fehlberg 78 solver;</p></li>
 <li><p>The <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>,
 a popular N-body integration package. Like heyoka, <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is a high-precision
 non-symplectic integrator with adaptive timestepping capable of conserving the
@@ -320,57 +313,43 @@ dynamical invariants over billions of dynamical timescales. Note, however, that
 <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is not a general-purpose integrator, and thus we will be able to use
 it only in benchmarks involving gravitational N-body systems.</p></li>
 </ul>
-<p>The Taylor integrator from <a class="reference external" href="https://github.com/PerezHz/TaylorIntegration.jl">TaylorIntegration.jl</a>
-can be sped up via the use of the <code class="docutils literal notranslate"><span class="pre">&#64;taylorize</span></code> macro, which however imposes some limitations
-on the form of the right-hand sides of the ODEs
-(more details <a class="reference external" href="https://perezhz.github.io/TaylorIntegration.jl/latest/taylorize/">here</a>). In the benchmarks,
-we will measure the runtime of TaylorIntegration.jl with and without the <code class="docutils literal notranslate"><span class="pre">&#64;taylorize</span></code> macro.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> integrator from <a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a> by default
+enables dense output, which however incurs in a heavy computational cost. While heyoka also supports
+<a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>, this feature is opt-in and its performance impact is much more limited.
+In these benchmarks, we will be testing both heyoka and <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> with and without dense output.</p>
 <p>All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
-<a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.</p>
-<p>The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
+<a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.
+The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
 </div>
-<div class="section" id="the-simple-pendulum">
-<h1>The simple pendulum<a class="headerlink" href="#the-simple-pendulum" title="Permalink to this headline">¶</a></h1>
-<p>In this first benchmark, we numerically integrate the <a class="reference external" href="https://en.wikipedia.org/wiki/Pendulum_(mathematics)">simple pendulum</a></p>
-<div class="math notranslate nohighlight">
-\[\begin{split}\begin{cases}
-x^\prime = v \\
-v^\prime = -\sin x
-\end{cases},\end{split}\]</div>
-<p>with initial conditions</p>
-<div class="math notranslate nohighlight">
-\[\begin{split}\begin{cases}
-x\left( 0 \right) &amp;= 1.3 \\
-v\left( 0 \right) &amp;= 0
-\end{cases},\end{split}\]</div>
-<p>for <span class="math notranslate nohighlight">\(10^4\)</span> time units. The tolerance for all integrators is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>.</p>
-<p>Here are the results:</p>
-<img alt="Pendulum benchmark" class="align-center" src="_images/pendulum_bench.png" />
-<p>We can see how heyoka is between 5 and 32 times faster than the other tested integrators.</p>
-</div>
-<div class="section" id="the-three-body-problem">
-<h1>The three-body problem<a class="headerlink" href="#the-three-body-problem" title="Permalink to this headline">¶</a></h1>
-<p>Here we will numerically integrate the planar circular restricted <a class="reference external" href="https://en.wikipedia.org/wiki/Three-body_problem">three-body problem</a>
-(PCR3BP). The dynamical equations are:</p>
-<div class="math notranslate nohighlight">
-\[\begin{split}\begin{cases}
- \dot{x} &amp; = p_x + y\\
- \dot{y} &amp; = p_y - x\\
- \dot{p_x} &amp; = - \frac{(1-\mu)(x-\mu)}{((x-\mu)^2+y^2)^{3/2}} - \frac{\mu(x+1-\mu)}{((x+1-\mu)^2+y^2)^{3/2}} + p_y\\
- \dot{p_y} &amp; = - \frac{(1-\mu)y      }{((x-\mu)^2+y^2)^{3/2}} - \frac{\mu y       }{((x+1-\mu)^2+y^2)^{3/2}} - p_x
-\end{cases},\end{split}\]</div>
-<p>with mass parameter <span class="math notranslate nohighlight">\(\mu = 0.01\)</span> and initial conditions</p>
-<div class="math notranslate nohighlight">
-\[\begin{split}\begin{cases}
-x\left( 0 \right) &amp; = -0.8 \\
-y\left( 0 \right) &amp; = 0 \\
-p_x\left( 0 \right) &amp; = 0 \\
-p_y\left( 0 \right) &amp; = -0.6276410653920694 \\
-\end{cases},\end{split}\]</div>
-<p>for <span class="math notranslate nohighlight">\(2 \times 10^3\)</span> time units. The tolerance for all integrators is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>.</p>
-<p>Here are the results:</p>
-<img alt="PCR3BP benchmark" class="align-center" src="_images/pcr3bp_bench.png" />
-<p>We can see how heyoka is between 8 and 62 times faster than the other tested integrators.</p>
+<div class="section" id="the-planetary-three-body-problem">
+<h1>The planetary three-body problem<a class="headerlink" href="#the-planetary-three-body-problem" title="Permalink to this headline">¶</a></h1>
+<p>Here we will numerically integrate a specific case of the <a class="reference external" href="https://en.wikipedia.org/wiki/Three-body_problem">three-body problem</a>
+in which the three particles are the Sun, Jupiter and Saturn, all represented as point masses
+attracting each other according to <a class="reference external" href="https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation">Newtonian gravity</a>.
+The initial conditions are taken from <a class="reference external" href="https://ntrs.nasa.gov/citations/19860060859">this paper</a>, and the integration
+is run for a total of <span class="math notranslate nohighlight">\(10^5\)</span> years.
+For <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and heyoka, the test is run both with and without <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. When dense output is enabled,
+the result of the integration over <span class="math notranslate nohighlight">\(5 \times 10^5\)</span> equispaced time grid points is requested.</p>
+<p>In order to measure the accuracy of the integration, we will also compare the final state of the system
+with the result of a numerical integration in quadruple precision with a tolerance of <span class="math notranslate nohighlight">\(10^{-30}\)</span>.</p>
+<p>Let us see first the results for an error tolerance of <span class="math notranslate nohighlight">\(10^{-15}\)</span>:</p>
+<img alt="3BP benchmark 1e-15" class="align-center" src="_images/ss_3bp_15.png" />
+<p>We can see how, without dense output, heyoka is about 3 times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. When dense output is requested,
+heyoka’s runtime increases by a modest <span class="math notranslate nohighlight">\(\sim 24\%\)</span>, whereas for <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> the runtime increases by a factor of
+<span class="math notranslate nohighlight">\(\sim 3\)</span>, so that, with dense output, heyoka is about <span class="math notranslate nohighlight">\(\sim 7\)</span> times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. Performance-wise,
+Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that Boost.ODEInt does not support dense output).</p>
+<p>From the point of view of the integration accuracy, we can see how the RMS of the error across the components of the state
+vector with respect to the quadruple-precision integration is of the order of <span class="math notranslate nohighlight">\(10^{-9}\)</span> for heyoka, while for both
+<code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and Boost.ODEInt the error is about <span class="math notranslate nohighlight">\(\sim 35\)</span> times larger.</p>
+<p>Note that, even if the error tolerance for the integration is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>, the error at the end of the integration
+is of the order of <span class="math notranslate nohighlight">\(10^{-9}\)</span>. This is to be expected, as the error on the state variables accumulates as (at least)
+<span class="math notranslate nohighlight">\(t^{\frac{3}{2}}\)</span> (a result known as Brouwer’s law).</p>
+<p>Let us now see the results for an error tolerance of <span class="math notranslate nohighlight">\(10^{-9}\)</span>:</p>
+<img alt="3BP benchmark 1e-9" class="align-center" src="_images/ss_3bp_9.png" />
+<p>Whereas heyoka is still faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and Boost.ODEInt, at this higher integration tolerance the performance
+advantage is smaller.</p>
+<p>The integration accuracy of both heyoka and <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> is of the order of <span class="math notranslate nohighlight">\(10^{-3}\)</span>. By contrast,
+the accuracy of Boost.ODEInt is two orders of magnitude worse.</p>
 </div>
 <div class="section" id="the-outer-solar-system">
 <h1>The outer Solar System<a class="headerlink" href="#the-outer-solar-system" title="Permalink to this headline">¶</a></h1>
