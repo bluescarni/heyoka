@@ -298,10 +298,12 @@ std::uint32_t taylor_order_from_tol(T tol)
 
     // Determine the order from the tolerance.
     auto order_f = ceil(-log(tol) / 2 + 1);
+    // LCOV_EXCL_START
     if (!isfinite(order_f)) {
         throw std::invalid_argument(
             "The computation of the Taylor order in an adaptive Taylor stepper produced a non-finite value");
     }
+    // LCOV_EXCL_STOP
     // NOTE: min order is 2.
     order_f = std::max(T(2), order_f);
 
@@ -1921,10 +1923,12 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
     assert(ft != nullptr);
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
+    // LCOV_EXCL_START
     if (f == nullptr) {
         throw std::invalid_argument(
             "Unable to create a function for an adaptive Taylor stepper with name '{}'"_format(name));
     }
+    // LCOV_EXCL_STOP
 
     // Set the names/attributes of the function arguments.
     auto *jet_ptr = f->args().begin();
@@ -1964,7 +1968,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Create a global read-only array containing the values in ev_dc, if there

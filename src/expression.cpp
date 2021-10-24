@@ -120,9 +120,9 @@ namespace
 expression copy(std::unordered_map<const void *, expression> &func_map, const expression &e)
 {
     return std::visit(
-        [&func_map](const auto &arg) {
-            if constexpr (std::is_same_v<detail::uncvref_t<decltype(arg)>, func>) {
-                const auto f_id = arg.get_ptr();
+        [&func_map](const auto &v) {
+            if constexpr (std::is_same_v<detail::uncvref_t<decltype(v)>, func>) {
+                const auto f_id = v.get_ptr();
 
                 if (auto it = func_map.find(f_id); it != func_map.end()) {
                     // We already copied the current function, fetch the copy
@@ -130,27 +130,33 @@ expression copy(std::unordered_map<const void *, expression> &func_map, const ex
                     return it->second;
                 }
 
-                // Perform a copy of arg. Note that this does
-                // a shallow copy of the arguments (i.e., the arguments
-                // will be copied via the copy ctor).
-                auto f_copy = arg.copy();
+                // Create a copy of v. Note that this will copy
+                // the arguments of v via their copy constructor,
+                // and thus any argument which is itself a function
+                // will be shallow-copied.
+                auto f_copy = v.copy();
 
-                // Perform a copy of the arguments.
-                assert(arg.args().size() == f_copy.args().size());
-                auto b1 = arg.args().begin();
+                // Perform a copy of the arguments of v which are functions.
+                assert(v.args().size() == f_copy.args().size()); // LCOV_EXCL_LINE
+                auto b1 = v.args().begin();
                 for (auto [b2, e2] = f_copy.get_mutable_args_it(); b2 != e2; ++b1, ++b2) {
-                    *b2 = copy(func_map, *b1);
+                    // NOTE: the argument needs to be copied via a recursive
+                    // call to copy() only if it is a func. Otherwise, the copy
+                    // we made earlier via the copy constructor is already a deep copy.
+                    if (std::holds_alternative<func>(b1->value())) {
+                        *b2 = copy(func_map, *b1);
+                    }
                 }
 
                 // Construct the return value and put it into the cache.
                 auto ex = expression{std::move(f_copy)};
                 [[maybe_unused]] const auto [_, flag] = func_map.insert(std::pair{f_id, ex});
                 // NOTE: an expression cannot contain itself.
-                assert(flag);
+                assert(flag); // LCOV_EXCL_LINE
 
                 return ex;
             } else {
-                return expression{arg};
+                return expression{v};
             }
         },
         e.value());
