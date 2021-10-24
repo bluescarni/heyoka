@@ -123,7 +123,7 @@ void put_poly_in_cache(poly_cache_t<T> &cache, std::vector<T> &&v)
 {
     // Fetch the order of the polynomial.
     // NOTE: the order is the size - 1.
-    assert(!v.empty());
+    assert(!v.empty()); // LCOV_EXCL_LINE
     const auto n = v.size() - 1u;
 
     // Look if we have inited the cache for order n.
@@ -189,7 +189,7 @@ int sgn(T val)
 template <typename InputIt, typename T>
 auto poly_eval_1(InputIt a, T x, std::uint32_t n)
 {
-    assert(n >= 2u);
+    assert(n >= 2u); // LCOV_EXCL_LINE
 
     // Init the return value.
     auto ret1 = a[n] * n;
@@ -234,19 +234,19 @@ public:
     pwrap(pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
     {
         // Make sure we moved from a valid pwrap.
-        assert(!v.empty());
+        assert(!v.empty()); // LCOV_EXCL_LINE
     }
     pwrap &operator=(pwrap &&other) noexcept
     {
         // Disallow self move.
-        assert(this != &other);
+        assert(this != &other); // LCOV_EXCL_LINE
 
         // Make sure the polyomial caches match.
-        assert(&pc == &other.pc);
+        assert(&pc == &other.pc); // LCOV_EXCL_LINE
 
         // Make sure we are not moving from an
         // invalid pwrap.
-        assert(!other.v.empty());
+        assert(!other.v.empty()); // LCOV_EXCL_LINE
 
         // Put the current v in the cache.
         back_to_cache();
@@ -370,7 +370,7 @@ constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 template <typename T>
 llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
-    assert(order > 0u);
+    assert(order > 0u); // LCOV_EXCL_LINE
 
     // Overflow check: we need to be able to index
     // into the array of coefficients.
@@ -406,7 +406,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
     // LCOV_EXCL_START
@@ -429,7 +429,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Init the return values as zeroes.
@@ -475,7 +475,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 template <typename T>
 llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    assert(batch_size > 0u);
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
 
     // Overflow check: we need to be able to index
     // into the array of coefficients.
@@ -507,7 +507,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
         llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
     // LCOV_EXCL_START
@@ -547,7 +547,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Do the reversion into out_ptr1.
@@ -612,7 +612,7 @@ auto get_ed_jit_functions(std::uint32_t order)
 
         // Insert state and functions into the cache.
         [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, rtscc}});
-        assert(ret.second);
+        assert(ret.second); // LCOV_EXCL_LINE
 
         return std::pair{pt, rtscc};
     } else {
@@ -698,7 +698,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
         return;
     }
 
-    assert(order >= 2u);
+    assert(order >= 2u); // LCOV_EXCL_LINE
 
     // NOTE: trigger the creation of the poly cache
     // *before* triggering the creation of the other
@@ -905,8 +905,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // it invalid) but it will immediately be revived at the
             // first iteration of the do/while loop. Thus, when we get
             // here again, tmp will be again in a well-formed state.
-            assert(!tmp.v.empty());
-            assert(tmp.v.size() - 1u == order);
+            assert(!tmp.v.empty());             // LCOV_EXCL_LINE
+            assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
             poly_rescale(tmp.v.data(), ptr, h, order);
 
             // Place the first element in the working list.
@@ -1061,7 +1061,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                         // NOTE: this should be ensured by the fact that
                         // we ensure above (lb_offset < mid) that we don't
                         // end up with an invalid interval.
-                        assert(lb < ub);
+                        assert(lb < ub); // LCOV_EXCL_LINE
 
                         // Check if the interval still contains a zero.
                         const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
