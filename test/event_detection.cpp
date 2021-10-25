@@ -118,7 +118,7 @@ TEST_CASE("fast exclusion check")
                 res.resize(batch_size);
 
                 // Iterate over a number of trials.
-                for (auto i = 0; i < 100; ++i) {
+                for (auto _ = 0; _ < 100; ++_) {
                     // Generate random polys.
                     for (auto &cf : poly) {
                         cf = rdist(rng);
