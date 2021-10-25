@@ -321,41 +321,13 @@ std::uint32_t taylor_order_from_tol(T tol)
 // Helper to compute max(x_v, abs(y_v)) in the Taylor stepper implementation.
 llvm::Value *taylor_step_maxabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, y_v, "heyoka_maxabs128");
-    } else {
-#endif
-        // Compute abs(b).
-        auto *abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
-        // Return max(a, abs(b)).
-        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, abs_y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    return llvm_max(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute min(x_v, abs(y_v)) in the Taylor stepper implementation.
 llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
-
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, y_v, "heyoka_minabs128");
-    } else {
-#endif
-        // Compute abs(b).
-        auto *abs_y_v = llvm_invoke_intrinsic(s, "llvm.fabs", {y_v->getType()}, {y_v});
-        // Return min(a, abs(b)).
-        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, abs_y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    return llvm_min(s, x_v, llvm_abs(s, y_v));
 }
 
 // Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
