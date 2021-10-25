@@ -41,6 +41,7 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -724,7 +725,11 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // Check if the signs are equal and the low sign is nonzero.
     auto cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
     auto cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
-    auto retval = builder.CreateZExt(builder.CreateLogicalAnd(cmp1, cmp2), builder.getInt32Ty());
+    // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
+    // function for this.
+    auto cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
+    // Extend cmp to int32_t.
+    auto retval = builder.CreateZExt(cmp, builder.getInt32Ty());
 
     // Store the result in out_ptr.
     store_vector_to_memory(builder, out_ptr, retval);

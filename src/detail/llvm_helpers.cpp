@@ -1413,7 +1413,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
             // NOTE: this is a way of creating a logical AND.
-            return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::getNullValue(tol_cond->getType()));
+            return builder.CreateSelect(c_cond, tol_cond, llvm::Constant::getNullValue(tol_cond->getType()));
         };
 
         // Run the loop.
