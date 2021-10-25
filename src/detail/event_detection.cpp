@@ -8,10 +8,8 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
 #include <cerrno>
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
@@ -368,6 +366,7 @@ constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
 // Helper to add a polynomial translation function
 // to the state 's'.
+// NOTE: these event-detection-related LLVM functions are currently not mangled in any way.
 template <typename T>
 llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
@@ -726,7 +725,7 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // function for this.
     auto cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
     // Extend cmp to int32_t.
-    auto retval = builder.CreateZExt(cmp, builder.getInt32Ty());
+    auto retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
 
     // Store the result in out_ptr.
     store_vector_to_memory(builder, out_ptr, retval);
@@ -770,7 +769,7 @@ auto get_ed_jit_functions(std::uint32_t order)
         add_poly_rtscc<T>(s, order, 1);
 
         // Add the function for the fast exclusion check.
-        llvm_add_fex_check_impl<T>(s, order, 1);
+        llvm_add_fex_check<T>(s, order, 1);
 
         // Run the optimisation pass.
         s.optimise();
@@ -793,48 +792,6 @@ auto get_ed_jit_functions(std::uint32_t order)
         // Cache hit, return the function.
         return it->second.second;
     }
-}
-
-// Minimal interval class supporting a couple
-// of elementary operations.
-template <typename T>
-struct ival {
-    T lower;
-    T upper;
-
-    ival() : ival(T(0)) {}
-    explicit ival(T val) : ival(val, val) {}
-    explicit ival(T l, T u) : lower(l), upper(u)
-    {
-#if !defined(NDEBUG)
-        using std::isnan;
-
-        if (!isnan(lower) && !isnan(upper)) {
-            assert(upper >= lower); // LCOV_EXCL_LINE
-        }
-#endif
-    }
-};
-
-// NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
-template <typename T>
-ival<T> operator+(ival<T> a, ival<T> b)
-{
-    return ival<T>(a.lower + b.lower, a.upper + b.upper);
-}
-
-template <typename T>
-ival<T> operator*(ival<T> a, ival<T> b)
-{
-    const auto tmp1 = a.lower * b.lower;
-    const auto tmp2 = a.lower * b.upper;
-    const auto tmp3 = a.upper * b.lower;
-    const auto tmp4 = a.upper * b.upper;
-
-    const auto l = std::min(std::min(tmp1, tmp2), std::min(tmp3, tmp4));
-    const auto u = std::max(std::max(tmp1, tmp2), std::max(tmp3, tmp4));
-
-    return ival<T>(l, u);
 }
 
 // Implementation of event detection.
@@ -1364,6 +1321,25 @@ template <>
 mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 {
     return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+#endif
+
+llvm::Function *llvm_add_fex_check_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_fex_check_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<mppp::real128>(s, n, batch_size);
 }
 
 #endif
