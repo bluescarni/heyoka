@@ -578,14 +578,13 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     return f;
 }
 
-// Add a function for the computation of fast event exclusion check via the computation
+// Add a function implementing fast event exclusion check via the computation
 // of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
 // via Horner's scheme using interval arithmetic.
 template <typename T>
 llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
-    assert(n > 0u);          // LCOV_EXCL_LINE
 
     // Overflow check: we need to be able to index
     // into the array of coefficients.
@@ -610,8 +609,8 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // - output pointer (write-only).
     // No overlap is allowed.
     auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
-    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                    llvm::PointerType::getUnqual(builder.getInt32Ty())};
+    auto int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
+    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr); // LCOV_EXCL_LINE
@@ -677,7 +676,7 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // Load the timestep.
     auto h = load_vector_from_memory(builder, h_ptr, batch_size);
 
-    // Load the back_flag, convert it to a boolean vector.
+    // Load back_flag and convert it to a boolean vector.
     auto back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
                                          make_vector_type(builder.getInt1Ty(), batch_size));
 
@@ -691,7 +690,7 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     auto acc_lo = builder.CreateAlloca(fp_vec_t);
     auto acc_hi = builder.CreateAlloca(fp_vec_t);
 
-    // Init the accumulator's hi/lo components with the highest-order coefficient.
+    // Init the accumulator's lo/hi components with the highest-order coefficient.
     auto ho_cf = load_vector_from_memory(
         builder,
         builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))}),
@@ -710,10 +709,8 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
         // Multiply the accumulator by h.
         auto [acc_h_lo, acc_h_hi] = ival_prod(builder.CreateLoad(acc_lo), builder.CreateLoad(acc_hi), h_lo, h_hi);
 
-        // Add the result to the current coefficient.
+        // Update the value of the accumulator.
         auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
-
-        // Update the accumulator.
         builder.CreateStore(new_acc_lo, acc_lo);
         builder.CreateStore(new_acc_hi, acc_hi);
     });
@@ -755,6 +752,7 @@ auto get_ed_jit_functions(std::uint32_t order)
     using pt_t = void (*)(T *, const T *);
     // rtscc function type.
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+    // fex_check function type.
     using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
 
     thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::tuple<pt_t, rtscc_t, fex_check_t>>>
@@ -771,6 +769,7 @@ auto get_ed_jit_functions(std::uint32_t order)
         // add the translator function.
         add_poly_rtscc<T>(s, order, 1);
 
+        // Add the function for the fast exclusion check.
         llvm_add_fex_check_impl<T>(s, order, 1);
 
         // Run the optimisation pass.
@@ -900,8 +899,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
-    // Interval version of h, for use in the fast exclusion check.
-    const auto h_int = (h >= 0) ? ival<T>(0, h) : ival<T>(h, 0);
+    // Determine if we are integrating backwards in time.
     const std::uint32_t back_int = h < 0;
 
     // Helper to run event detection on a vector of events
@@ -927,33 +925,9 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // step() implementations anyway.
             std::uint32_t fex_check_result;
             fex_check(ptr, &h, &back_int, &fex_check_result);
-
             if (fex_check_result) {
                 continue;
             }
-#if 0
-            {
-                // Run Horner's scheme using interval
-                // arithmetic.
-                ival<T> acc(ptr[order]);
-
-                for (std::uint32_t j = 1; j <= order; ++j) {
-                    acc = ival<T>(ptr[order - j]) + acc * h_int;
-                }
-
-                // Check if zero is contained within the
-                // resulting interval.
-                // NOTE: here we are checking the closed interval [0, h],
-                // even though throughout the event detection loop we are
-                // actually determining roots in the half-open interval
-                // [0, h). This is fine, as if there are no zeroes in
-                // [0, h], there are also no zeroes in [0, h).
-                const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
-                if (s_lower == s_upper && s_lower != 0) {
-                    continue;
-                }
-            }
-#endif
 
             // Clear out the list of isolating intervals.
             isol.clear();
