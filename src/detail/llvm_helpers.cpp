@@ -31,6 +31,7 @@
 #include <llvm/Config/llvm-config.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -960,39 +961,22 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
 #endif
 }
 
-// Minimum value.
-llvm::Value *llvm_min(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+// Minimum value, floating-point arguments. Implemented as std::min():
+// return (b < a) ? b : a;
+llvm::Value *llvm_min(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
+    auto &builder = s.builder();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, y_v, "heyoka_minnum128");
-    } else {
-#endif
-        return llvm_invoke_intrinsic(s, "llvm.minnum", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    return builder.CreateSelect(builder.CreateFCmpOLT(b, a), b, a);
 }
 
-// Maximum value.
-llvm::Value *llvm_max(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
+// Maximum value, floating-point arguments. Implemented as std::max():
+// return (a < b) ? b : a;
+llvm::Value *llvm_max(llvm_state &s, llvm::Value *a, llvm::Value *b)
 {
-#if defined(HEYOKA_HAVE_REAL128)
-    // Determine the scalar type of the vector arguments.
-    auto *x_t = x_v->getType()->getScalarType();
+    auto &builder = s.builder();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, y_v, "heyoka_max128");
-    } else {
-#endif
-        // Return max(a, b).
-        return llvm_invoke_intrinsic(s, "llvm.maxnum", {x_v->getType()}, {x_v, y_v});
-#if defined(HEYOKA_HAVE_REAL128)
-    }
-#endif
+    return builder.CreateSelect(builder.CreateFCmpOLT(a, b), b, a);
 }
 
 // Branchless sign function.
@@ -1429,7 +1413,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
             // NOTE: this is a way of creating a logical AND.
-            return builder.CreateSelect(c_cond, tol_cond, llvm::ConstantInt::getNullValue(tol_cond->getType()));
+            return builder.CreateSelect(c_cond, tol_cond, llvm::Constant::getNullValue(tol_cond->getType()));
         };
 
         // Run the loop.

@@ -30,25 +30,6 @@ static_assert(alignof(__float128) == alignof(mppp::real128));
 // related to incompatibilities between GCC
 // and LLVM in the implementation of __float128,
 // and needs to be investigated more.
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_max128(__float128 x, __float128 y) noexcept
-{
-    return mppp::fmax(mppp::real128{x}, mppp::real128{y}).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_maxabs128(__float128 x, __float128 y) noexcept
-{
-    return mppp::fmax(mppp::real128{x}, mppp::abs(mppp::real128{y})).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minabs128(__float128 x, __float128 y) noexcept
-{
-    return mppp::fmin(mppp::real128{x}, mppp::abs(mppp::real128{y})).m_value;
-}
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_minnum128(__float128 x, __float128 y) noexcept
-{
-    return mppp::fmin(mppp::real128{x}, mppp::real128{y}).m_value;
-}
 
 // A small wrapper used in the implementation of llvm_modulus. This will return:
 // x - y * floor(x / y)

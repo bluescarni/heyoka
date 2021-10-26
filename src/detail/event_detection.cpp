@@ -8,10 +8,8 @@
 
 #include <heyoka/config.hpp>
 
-#include <algorithm>
 #include <cassert>
 #include <cerrno>
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
@@ -41,6 +39,7 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constant.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -123,7 +122,7 @@ void put_poly_in_cache(poly_cache_t<T> &cache, std::vector<T> &&v)
 {
     // Fetch the order of the polynomial.
     // NOTE: the order is the size - 1.
-    assert(!v.empty());
+    assert(!v.empty()); // LCOV_EXCL_LINE
     const auto n = v.size() - 1u;
 
     // Look if we have inited the cache for order n.
@@ -189,7 +188,7 @@ int sgn(T val)
 template <typename InputIt, typename T>
 auto poly_eval_1(InputIt a, T x, std::uint32_t n)
 {
-    assert(n >= 2u);
+    assert(n >= 2u); // LCOV_EXCL_LINE
 
     // Init the return value.
     auto ret1 = a[n] * n;
@@ -234,19 +233,19 @@ public:
     pwrap(pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
     {
         // Make sure we moved from a valid pwrap.
-        assert(!v.empty());
+        assert(!v.empty()); // LCOV_EXCL_LINE
     }
     pwrap &operator=(pwrap &&other) noexcept
     {
         // Disallow self move.
-        assert(this != &other);
+        assert(this != &other); // LCOV_EXCL_LINE
 
         // Make sure the polyomial caches match.
-        assert(&pc == &other.pc);
+        assert(&pc == &other.pc); // LCOV_EXCL_LINE
 
         // Make sure we are not moving from an
         // invalid pwrap.
-        assert(!other.v.empty());
+        assert(!other.v.empty()); // LCOV_EXCL_LINE
 
         // Put the current v in the cache.
         back_to_cache();
@@ -367,10 +366,11 @@ constexpr bool is_terminal_event_v = is_terminal_event<T>::value;
 
 // Helper to add a polynomial translation function
 // to the state 's'.
+// NOTE: these event-detection-related LLVM functions are currently not mangled in any way.
 template <typename T>
 llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::uint32_t batch_size)
 {
-    assert(order > 0u);
+    assert(order > 0u); // LCOV_EXCL_LINE
 
     // Overflow check: we need to be able to index
     // into the array of coefficients.
@@ -406,7 +406,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     std::vector<llvm::Type *> fargs(2, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_translate_1", &s.module());
     // LCOV_EXCL_START
@@ -429,7 +429,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Init the return values as zeroes.
@@ -475,7 +475,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 template <typename T>
 llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    assert(batch_size > 0u);
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
 
     // Overflow check: we need to be able to index
     // into the array of coefficients.
@@ -502,12 +502,11 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
     // No overlap is allowed.
-    std::vector<llvm::Type *> fargs{
-        llvm::PointerType::getUnqual(to_llvm_type<T>(context)), llvm::PointerType::getUnqual(to_llvm_type<T>(context)),
-        llvm::PointerType::getUnqual(builder.getInt32Ty()), llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+    auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()), fp_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "poly_rtscc", &md);
     // LCOV_EXCL_START
@@ -547,7 +546,7 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Do the reversion into out_ptr1.
@@ -578,6 +577,172 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     return f;
 }
 
+// Add a function implementing fast event exclusion check via the computation
+// of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
+// via Horner's scheme using interval arithmetic.
+template <typename T>
+llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    // Overflow check: we need to be able to index
+    // into the array of coefficients.
+    // LCOV_EXCL_START
+    if (n == std::numeric_limits<std::uint32_t>::max()
+        || batch_size > std::numeric_limits<std::uint32_t>::max() / (n + 1u)) {
+        throw std::overflow_error("Overflow detected while adding a fex_check function");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
+    // The function arguments:
+    // - pointer to the array of poly coefficients (read-only),
+    // - pointer to the timestep value (s) (read-only),
+    // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
+    // - output pointer (write-only).
+    // No overlap is allowed.
+    auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+    auto int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
+    std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "fex_check", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create an fex_check function");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto cf_ptr = f->args().begin();
+    cf_ptr->setName("cf_ptr");
+    cf_ptr->addAttr(llvm::Attribute::NoCapture);
+    cf_ptr->addAttr(llvm::Attribute::NoAlias);
+    cf_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto h_ptr = f->args().begin() + 1;
+    h_ptr->setName("h_ptr");
+    h_ptr->addAttr(llvm::Attribute::NoCapture);
+    h_ptr->addAttr(llvm::Attribute::NoAlias);
+    h_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto back_flag_ptr = f->args().begin() + 2;
+    back_flag_ptr->setName("back_flag_ptr");
+    back_flag_ptr->addAttr(llvm::Attribute::NoCapture);
+    back_flag_ptr->addAttr(llvm::Attribute::NoAlias);
+    back_flag_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto out_ptr = f->args().begin() + 3;
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    // Helper to implement the sum of two intervals.
+    // NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
+    auto ival_sum = [&builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        return std::make_pair(builder.CreateFAdd(a_lo, b_lo), builder.CreateFAdd(a_hi, b_hi));
+    };
+
+    // Helper to implement the product of two intervals.
+    auto ival_prod = [&s, &builder](llvm::Value *a_lo, llvm::Value *a_hi, llvm::Value *b_lo, llvm::Value *b_hi) {
+        auto tmp1 = builder.CreateFMul(a_lo, b_lo);
+        auto tmp2 = builder.CreateFMul(a_lo, b_hi);
+        auto tmp3 = builder.CreateFMul(a_hi, b_lo);
+        auto tmp4 = builder.CreateFMul(a_hi, b_hi);
+
+        auto cmp1 = llvm_min(s, tmp1, tmp2);
+        auto cmp2 = llvm_min(s, tmp3, tmp4);
+        auto cmp3 = llvm_max(s, tmp1, tmp2);
+        auto cmp4 = llvm_max(s, tmp3, tmp4);
+
+        return std::make_pair(llvm_min(s, cmp1, cmp2), llvm_max(s, cmp3, cmp4));
+    };
+
+    // Load the timestep.
+    auto h = load_vector_from_memory(builder, h_ptr, batch_size);
+
+    // Load back_flag and convert it to a boolean vector.
+    auto back_flag = builder.CreateTrunc(load_vector_from_memory(builder, back_flag_ptr, batch_size),
+                                         make_vector_type(builder.getInt1Ty(), batch_size));
+
+    // Compute the components of the interval version of h. If we are integrating
+    // forward, the components are (0, h), otherwise they are (h, 0).
+    auto h_lo = builder.CreateSelect(back_flag, h, llvm::Constant::getNullValue(h->getType()));
+    auto h_hi = builder.CreateSelect(back_flag, llvm::Constant::getNullValue(h->getType()), h);
+
+    // Create the lo/hi components of the accumulator.
+    auto fp_vec_t = to_llvm_vector_type<T>(context, batch_size);
+    auto acc_lo = builder.CreateAlloca(fp_vec_t);
+    auto acc_hi = builder.CreateAlloca(fp_vec_t);
+
+    // Init the accumulator's lo/hi components with the highest-order coefficient.
+    auto ho_cf = load_vector_from_memory(
+        builder,
+        builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))}),
+        batch_size);
+    builder.CreateStore(ho_cf, acc_lo);
+    builder.CreateStore(ho_cf, acc_hi);
+
+    // Run the Horner scheme (starting from 1 because we already consumed the
+    // highest-order coefficient).
+    llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *i) {
+        // Load the current coefficient.
+        auto ptr = builder.CreateInBoundsGEP(
+            cf_ptr, {builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size))});
+        auto cur_cf = load_vector_from_memory(builder, ptr, batch_size);
+
+        // Multiply the accumulator by h.
+        auto [acc_h_lo, acc_h_hi] = ival_prod(builder.CreateLoad(acc_lo), builder.CreateLoad(acc_hi), h_lo, h_hi);
+
+        // Update the value of the accumulator.
+        auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
+        builder.CreateStore(new_acc_lo, acc_lo);
+        builder.CreateStore(new_acc_hi, acc_hi);
+    });
+
+    // Compute the sign of the components of the accumulator.
+    auto s_lo = llvm_sgn(s, builder.CreateLoad(acc_lo));
+    auto s_hi = llvm_sgn(s, builder.CreateLoad(acc_hi));
+
+    // Check if the signs are equal and the low sign is nonzero.
+    auto cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
+    auto cmp2 = builder.CreateICmpNE(s_lo, llvm::Constant::getNullValue(s_lo->getType()));
+    // NOTE: this is a way of creating a logical AND between cmp1 and cmp2. LLVM 13 has a specific
+    // function for this.
+    auto cmp = builder.CreateSelect(cmp1, cmp2, llvm::Constant::getNullValue(cmp1->getType()));
+    // Extend cmp to int32_t.
+    auto retval = builder.CreateZExt(cmp, make_vector_type(builder.getInt32Ty(), batch_size));
+
+    // Store the result in out_ptr.
+    store_vector_to_memory(builder, out_ptr, retval);
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+
+    // NOTE: the optimisation pass will be run outside.
+    return f;
+}
+
 // Fetch the JITted functions used in the event detection implementation.
 template <typename T>
 auto get_ed_jit_functions(std::uint32_t order)
@@ -586,8 +751,11 @@ auto get_ed_jit_functions(std::uint32_t order)
     using pt_t = void (*)(T *, const T *);
     // rtscc function type.
     using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+    // fex_check function type.
+    using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
 
-    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::pair<pt_t, rtscc_t>>> tf_map;
+    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::tuple<pt_t, rtscc_t, fex_check_t>>>
+        tf_map;
 
     auto it = tf_map.find(order);
 
@@ -600,6 +768,9 @@ auto get_ed_jit_functions(std::uint32_t order)
         // add the translator function.
         add_poly_rtscc<T>(s, order, 1);
 
+        // Add the function for the fast exclusion check.
+        llvm_add_fex_check<T>(s, order, 1);
+
         // Run the optimisation pass.
         s.optimise();
 
@@ -609,58 +780,18 @@ auto get_ed_jit_functions(std::uint32_t order)
         // Fetch the functions.
         auto pt = reinterpret_cast<pt_t>(s.jit_lookup("poly_translate_1"));
         auto rtscc = reinterpret_cast<rtscc_t>(s.jit_lookup("poly_rtscc"));
+        auto fex_check = reinterpret_cast<fex_check_t>(s.jit_lookup("fex_check"));
 
         // Insert state and functions into the cache.
-        [[maybe_unused]] const auto ret = tf_map.try_emplace(order, std::pair{std::move(s), std::pair{pt, rtscc}});
-        assert(ret.second);
+        [[maybe_unused]] const auto ret
+            = tf_map.try_emplace(order, std::pair{std::move(s), std::tuple{pt, rtscc, fex_check}});
+        assert(ret.second); // LCOV_EXCL_LINE
 
-        return std::pair{pt, rtscc};
+        return std::tuple{pt, rtscc, fex_check};
     } else {
         // Cache hit, return the function.
         return it->second.second;
     }
-}
-
-// Minimal interval class supporting a couple
-// of elementary operations.
-template <typename T>
-struct ival {
-    T lower;
-    T upper;
-
-    ival() : ival(T(0)) {}
-    explicit ival(T val) : ival(val, val) {}
-    explicit ival(T l, T u) : lower(l), upper(u)
-    {
-#if !defined(NDEBUG)
-        using std::isnan;
-
-        if (!isnan(lower) && !isnan(upper)) {
-            assert(upper >= lower); // LCOV_EXCL_LINE
-        }
-#endif
-    }
-};
-
-// NOTE: see https://en.wikipedia.org/wiki/Interval_arithmetic.
-template <typename T>
-ival<T> operator+(ival<T> a, ival<T> b)
-{
-    return ival<T>(a.lower + b.lower, a.upper + b.upper);
-}
-
-template <typename T>
-ival<T> operator*(ival<T> a, ival<T> b)
-{
-    const auto tmp1 = a.lower * b.lower;
-    const auto tmp2 = a.lower * b.upper;
-    const auto tmp3 = a.upper * b.lower;
-    const auto tmp4 = a.upper * b.upper;
-
-    const auto l = std::min(std::min(tmp1, tmp2), std::min(tmp3, tmp4));
-    const auto u = std::max(std::max(tmp1, tmp2), std::max(tmp3, tmp4));
-
-    return ival<T>(l, u);
 }
 
 // Implementation of event detection.
@@ -698,7 +829,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
         return;
     }
 
-    assert(order >= 2u);
+    assert(order >= 2u); // LCOV_EXCL_LINE
 
     // NOTE: trigger the creation of the poly cache
     // *before* triggering the creation of the other
@@ -718,14 +849,15 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
 
     // Fetch the JITted functions.
     auto j_funcs = get_ed_jit_functions<T>(order);
-    auto pt = j_funcs.first;
-    auto rtscc = j_funcs.second;
+    auto pt = std::get<0>(j_funcs);
+    auto rtscc = std::get<1>(j_funcs);
+    auto fex_check = std::get<2>(j_funcs);
 
     // Temporary polynomials used in the bisection loop.
     pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
 
-    // Interval version of h, for use in the fast exclusion check.
-    const auto h_int = (h >= 0) ? ival<T>(0, h) : ival<T>(h, 0);
+    // Determine if we are integrating backwards in time.
+    const std::uint32_t back_int = h < 0;
 
     // Helper to run event detection on a vector of events
     // (terminal or not). 'out' is the vector of detected
@@ -748,26 +880,10 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // detection altogether without a warning. This is ok,
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
-            {
-                // Run Horner's scheme using interval
-                // arithmetic.
-                ival<T> acc(ptr[order]);
-
-                for (std::uint32_t j = 1; j <= order; ++j) {
-                    acc = ival<T>(ptr[order - j]) + acc * h_int;
-                }
-
-                // Check if zero is contained within the
-                // resulting interval.
-                // NOTE: here we are checking the closed interval [0, h],
-                // even though throughout the event detection loop we are
-                // actually determining roots in the half-open interval
-                // [0, h). This is fine, as if there are no zeroes in
-                // [0, h], there are also no zeroes in [0, h).
-                const auto s_lower = sgn(acc.lower), s_upper = sgn(acc.upper);
-                if (s_lower == s_upper && s_lower != 0) {
-                    continue;
-                }
+            std::uint32_t fex_check_result;
+            fex_check(ptr, &h, &back_int, &fex_check_result);
+            if (fex_check_result) {
+                continue;
             }
 
             // Clear out the list of isolating intervals.
@@ -905,8 +1021,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // it invalid) but it will immediately be revived at the
             // first iteration of the do/while loop. Thus, when we get
             // here again, tmp will be again in a well-formed state.
-            assert(!tmp.v.empty());
-            assert(tmp.v.size() - 1u == order);
+            assert(!tmp.v.empty());             // LCOV_EXCL_LINE
+            assert(tmp.v.size() - 1u == order); // LCOV_EXCL_LINE
             poly_rescale(tmp.v.data(), ptr, h, order);
 
             // Place the first element in the working list.
@@ -1061,7 +1177,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                         // NOTE: this should be ensured by the fact that
                         // we ensure above (lb_offset < mid) that we don't
                         // end up with an invalid interval.
-                        assert(lb < ub);
+                        assert(lb < ub); // LCOV_EXCL_LINE
 
                         // Check if the interval still contains a zero.
                         const auto f_lb = poly_eval(tmp1.v.data(), lb, order);
@@ -1205,6 +1321,25 @@ template <>
 mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
 {
     return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+#endif
+
+llvm::Function *llvm_add_fex_check_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_fex_check_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<mppp::real128>(s, n, batch_size);
 }
 
 #endif

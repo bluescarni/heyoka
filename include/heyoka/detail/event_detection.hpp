@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <optional>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -24,7 +25,9 @@
 #endif
 
 #include <heyoka/detail/fwd_decl.hpp>
+#include <heyoka/detail/llvm_fwd.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 
 namespace heyoka::detail
 {
@@ -47,6 +50,33 @@ template <>
 mppp::real128 taylor_deduce_cooldown(mppp::real128, mppp::real128);
 
 #endif
+
+// Machinery to add a fast event exclusion check function to an llvm_state. Public for
+// testing purposes.
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check_dbl(llvm_state &, std::uint32_t, std::uint32_t);
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check_ldbl(llvm_state &, std::uint32_t, std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_fex_check_f128(llvm_state &, std::uint32_t, std::uint32_t);
+
+#endif
+
+template <typename T>
+inline llvm::Function *llvm_add_fex_check(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    if constexpr (std::is_same_v<T, double>) {
+        return llvm_add_fex_check_dbl(s, n, batch_size);
+    } else if constexpr (std::is_same_v<T, long double>) {
+        return llvm_add_fex_check_ldbl(s, n, batch_size);
+#if defined(HEYOKA_HAVE_REAL128)
+    } else if constexpr (std::is_same_v<T, mppp::real128>) {
+        return llvm_add_fex_check_f128(s, n, batch_size);
+#endif
+    } else {
+        static_assert(always_false_v<T>, "Unhandled type.");
+    }
+}
 
 template <typename T>
 void taylor_detect_events(std::vector<std::tuple<std::uint32_t, T, bool, int, T>> &,

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono> // NOTE: needed for the spdlog stopwatch.
+#include <cmath>
 #include <cstdint>
 #include <deque>
 #include <initializer_list>
@@ -1405,5 +1406,156 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
 }
 
 #undef HEYOKA_TAYLOR_OUTCOME_STREAM_CASE
+
+namespace detail
+{
+
+template <typename T>
+nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+{
+}
+
+template <typename T>
+void nt_event_impl<T>::finalise_ctor(event_direction d)
+{
+    if (!callback) {
+        throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
+    }
+
+    if (d < event_direction::negative || d > event_direction::positive) {
+        throw std::invalid_argument("Invalid value selected for the direction of a non-terminal event");
+    }
+    dir = d;
+}
+
+template <typename T>
+nt_event_impl<T>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
+{
+}
+
+template <typename T>
+nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
+
+template <typename T>
+nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = nt_event_impl(o);
+    }
+
+    return *this;
+}
+
+template <typename T>
+nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
+
+template <typename T>
+nt_event_impl<T>::~nt_event_impl() = default;
+
+template <typename T>
+const expression &nt_event_impl<T>::get_expression() const
+{
+    return eq;
+}
+
+template <typename T>
+const typename nt_event_impl<T>::callback_t &nt_event_impl<T>::get_callback() const
+{
+    return callback;
+}
+
+template <typename T>
+event_direction nt_event_impl<T>::get_direction() const
+{
+    return dir;
+}
+
+template <typename T>
+t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
+{
+}
+
+template <typename T>
+void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
+{
+    using std::isfinite;
+
+    callback = std::move(cb);
+
+    if (!isfinite(cd)) {
+        throw std::invalid_argument("Cannot set a non-finite cooldown value for a terminal event");
+    }
+    cooldown = cd;
+
+    if (d < event_direction::negative || d > event_direction::positive) {
+        throw std::invalid_argument("Invalid value selected for the direction of a terminal event");
+    }
+    dir = d;
+}
+
+template <typename T>
+t_event_impl<T>::t_event_impl(const t_event_impl &o)
+    : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
+{
+}
+
+template <typename T>
+t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
+
+template <typename T>
+t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
+{
+    if (this != &o) {
+        *this = t_event_impl(o);
+    }
+
+    return *this;
+}
+
+template <typename T>
+t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;
+
+template <typename T>
+t_event_impl<T>::~t_event_impl() = default;
+
+template <typename T>
+const expression &t_event_impl<T>::get_expression() const
+{
+    return eq;
+}
+
+template <typename T>
+const typename t_event_impl<T>::callback_t &t_event_impl<T>::get_callback() const
+{
+    return callback;
+}
+
+template <typename T>
+event_direction t_event_impl<T>::get_direction() const
+{
+    return dir;
+}
+
+template <typename T>
+T t_event_impl<T>::get_cooldown() const
+{
+    return cooldown;
+}
+
+// Explicit instantiation of the implementation classes/functions.
+template class nt_event_impl<double>;
+template class t_event_impl<double>;
+
+template class nt_event_impl<long double>;
+template class t_event_impl<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class nt_event_impl<mppp::real128>;
+template class t_event_impl<mppp::real128>;
+
+#endif
+
+} // namespace detail
 
 } // namespace heyoka
