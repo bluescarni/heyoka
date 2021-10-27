@@ -2445,6 +2445,8 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     m_d_out.resize(m_state.size());
 
     // Init the event data structure if needed.
+    // NOTE: this can be done in parallel with the rest of the constructor,
+    // once we have m_order/m_dim and we are done using tes/ntes.
     if (with_events) {
         m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
     }

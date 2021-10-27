@@ -575,7 +575,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
     // Struct implementing the data/logic for event detection.
-    struct ed_data {
+    struct HEYOKA_DLL_PUBLIC ed_data {
         // The polynomial cache type. Each entry is a polynomial
         // represented as a vector of coefficients.
         using poly_cache_t = std::vector<std::vector<T>>;
@@ -1324,10 +1324,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 // NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
 // not support class templates.
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 template <typename T>
@@ -1346,8 +1343,6 @@ struct version<heyoka::taylor_adaptive_batch<T>> {
     BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
 };
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 #endif

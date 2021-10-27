@@ -15,7 +15,6 @@
 #include <initializer_list>
 #include <iterator>
 #include <limits>
-#include <optional>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -710,7 +709,6 @@ taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_impl<T>> tes, std:
                                   "or the state size is too large");
     }
     // LCOV_EXCL_STOP
-
     m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u));
 
     // Setup the vector of cooldowns.
