@@ -18,6 +18,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -573,8 +574,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
-    // Structure implementing the data/logic for event detection.
-    struct ed_data {
+    // Class implementing the data/logic for event detection.
+    class ed_data
+    {
         // The polynomial cache type. Each entry is a polynomial
         // represented as a vector of coefficients.
         using poly_cache_t = std::vector<std::vector<T>>;

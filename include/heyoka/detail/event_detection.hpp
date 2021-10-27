@@ -12,11 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <cstdint>
-#include <optional>
-#include <tuple>
 #include <type_traits>
-#include <utility>
-#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
