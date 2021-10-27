@@ -1288,12 +1288,12 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
 // Instantiate the book-keeping structure for event detection
 // in the scalar integrator.
-template class taylor_adaptive_impl<double>::ed_data;
-template class taylor_adaptive_impl<long double>::ed_data;
+template struct taylor_adaptive_impl<double>::ed_data;
+template struct taylor_adaptive_impl<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class taylor_adaptive_impl<mppp::real128>::ed_data;
+template struct taylor_adaptive_impl<mppp::real128>::ed_data;
 
 #endif
 

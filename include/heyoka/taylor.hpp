@@ -574,9 +574,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
-    // Class implementing the data/logic for event detection.
-    class ed_data
-    {
+    // Struct implementing the data/logic for event detection.
+    struct ed_data {
         // The polynomial cache type. Each entry is a polynomial
         // represented as a vector of coefficients.
         using poly_cache_t = std::vector<std::vector<T>>;
