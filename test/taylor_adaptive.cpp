@@ -1617,3 +1617,34 @@ TEST_CASE("cm simpl repeat fail")
                                       {0.1, 0.2, 0.3, 0.4},
                                       kw::compact_mode = true};
 }
+
+// Test error codepaths when there are no events defined.
+TEST_CASE("no events error")
+{
+    using Catch::Matchers::Message;
+
+    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+
+    using t_ev_t = t_event<double>;
+
+    {
+        auto tad
+            = taylor_adaptive<double>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}, kw::t_events = {t_ev_t("x_0"_var)}};
+
+        REQUIRE(tad.with_events());
+    }
+
+    {
+        auto tad = taylor_adaptive<double>{sys, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}};
+
+        REQUIRE(!tad.with_events());
+        REQUIRE_THROWS_MATCHES(tad.get_t_events(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+    }
+}
