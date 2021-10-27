@@ -27,11 +27,12 @@ int main(int argc, char *argv[])
     namespace po = boost::program_options;
 
     double tol;
+    bool disable_event = false;
 
     po::options_description desc("Options");
 
     desc.add_options()("help", "produce help message")("tol", po::value<double>(&tol)->default_value(1e-15),
-                                                       "tolerance");
+                                                       "tolerance")("disable_event", "disable event detection");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -40,6 +41,10 @@ int main(int argc, char *argv[])
     if (vm.count("help")) {
         std::cout << desc << "\n";
         return 0;
+    }
+
+    if (vm.count("disable_event")) {
+        disable_event = true;
     }
 
     warmup();
@@ -59,11 +64,15 @@ int main(int argc, char *argv[])
     // The event.
     auto ev = nt_event<double>(x, cb, kw::direction = event_direction::positive);
 
-    taylor_adaptive<double> ta{
-        {prime(vx) = -x - 2. * x * y, prime(vy) = y * y - y - x * x, prime(x) = vx, prime(y) = vy},
-        ic,
-        kw::tol = tol,
-        kw::nt_events = {ev}};
+    auto ta = disable_event ? taylor_adaptive<double>{{prime(vx) = -x - 2. * x * y, prime(vy) = y * y - y - x * x,
+                                                       prime(x) = vx, prime(y) = vy},
+                                                      ic,
+                                                      kw::tol = tol}
+                            : taylor_adaptive<double>{{prime(vx) = -x - 2. * x * y, prime(vy) = y * y - y - x * x,
+                                                       prime(x) = vx, prime(y) = vy},
+                                                      ic,
+                                                      kw::tol = tol,
+                                                      kw::nt_events = {ev}};
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -75,8 +84,12 @@ int main(int argc, char *argv[])
 
     std::cout << "Runtime: " << elapsed << "μs\n";
     std::cout << "Outcome: " << oc << '\n';
-    std::cout << "Number of intersections: " << ix_vals.size() << '\n';
-    std::cout.precision(16);
-    std::cout << "First 3 crossings:" << ix_vals[0] << ", " << ix_vals[1] << ", " << ix_vals[2] << '\n';
+
+    if (!disable_event) {
+        std::cout << "Number of intersections: " << ix_vals.size() << '\n';
+        std::cout.precision(16);
+        std::cout << "First 3 crossings: " << ix_vals[0] << ", " << ix_vals[1] << ", " << ix_vals[2] << '\n';
+    }
+
     return 0;
 }
