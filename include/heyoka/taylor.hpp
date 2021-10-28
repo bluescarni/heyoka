@@ -15,8 +15,10 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -572,6 +574,82 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
+    // Struct implementing the data/logic for event detection.
+    struct HEYOKA_DLL_PUBLIC ed_data {
+        // The polynomial cache type. Each entry is a polynomial
+        // represented as a vector of coefficients.
+        using poly_cache_t = std::vector<std::vector<T>>;
+        // A RAII helper to extract polys from a cache and
+        // return them to the cache upon destruction.
+        class pwrap;
+        // The working list type used during real root isolation.
+        using wlist_t = std::vector<std::tuple<T, T, pwrap>>;
+        // The type used to store the list of isolating intervals.
+        using isol_t = std::vector<std::tuple<T, T>>;
+        // Polynomial translation function type.
+        using pt_t = void (*)(T *, const T *);
+        // rtscc function type.
+        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+        // fex_check function type.
+        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+
+        // The vector of terminal events.
+        std::vector<t_event_impl<T>> m_tes;
+        // The vector of non-terminal events.
+        std::vector<nt_event_impl<T>> m_ntes;
+        // The jet of derivatives for the state variables
+        // and the events.
+        std::vector<T> m_ev_jet;
+        // Vector of detected terminal events.
+        std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
+        // The vector of cooldowns for the terminal events.
+        // If an event is on cooldown, the corresponding optional
+        // in this vector will contain the total time elapsed
+        // since the cooldown started and the absolute value
+        // of the cooldown duration.
+        std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
+        // Vector of detected non-terminal events.
+        std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
+        // The LLVM state.
+        llvm_state m_state;
+        // The JIT compiled functions used during root finding.
+        // NOTE: use default member initializers to ensure that
+        // these are zero-inited by the default constructor
+        // (which is defaulted).
+        pt_t m_pt = nullptr;
+        rtscc_t m_rtscc = nullptr;
+        fex_check_t m_fex_check = nullptr;
+        // The working list.
+        wlist_t m_wlist;
+        // The list of isolating intervals.
+        isol_t m_isol;
+        // The polynomial cache.
+        poly_cache_t m_poly_cache;
+
+        // Constructors.
+        ed_data(std::vector<t_event_impl<T>>, std::vector<nt_event_impl<T>>, std::uint32_t, std::uint32_t);
+        ed_data(const ed_data &);
+        ~ed_data();
+
+        // Delete unused bits.
+        ed_data(ed_data &&) = delete;
+        ed_data &operator=(const ed_data &) = delete;
+        ed_data &operator=(ed_data &&) = delete;
+
+        // The event detection function.
+        void detect_events(T, std::uint32_t, std::uint32_t, T);
+
+    private:
+        // Serialisation.
+        // NOTE: the def ctor is used only during deserialisation
+        // via pointer.
+        ed_data();
+        friend class boost::serialization::access;
+        void save(boost::archive::binary_oarchive &, unsigned) const;
+        void load(boost::archive::binary_iarchive &, unsigned);
+        BOOST_SERIALIZATION_SPLIT_MEMBER()
+    };
+
 public:
     using nt_event_t = nt_event<T>;
     using t_event_t = t_event<T>;
@@ -606,24 +684,8 @@ private:
     d_out_f_t m_d_out_f;
     // The vector for the dense output.
     std::vector<T> m_d_out;
-    // The vector of terminal events.
-    std::vector<t_event_t> m_tes;
-    // The vector of non-terminal events.
-    std::vector<nt_event_t> m_ntes;
-    // The jet of derivatives for the state variables
-    // and the events. This is used only if there
-    // are events, otherwise it stays empty.
-    std::vector<T> m_ev_jet;
-    // Vector of detected terminal events.
-    std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
-    // The vector of cooldowns for the terminal events.
-    // If an event is on cooldown, the corresponding optional
-    // in this vector will contain the total time elapsed
-    // since the cooldown started and the absolute value
-    // of the cooldown duration.
-    std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
-    // Vector of detected non-terminal events.
-    std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
+    // Auxiliary data/functions for event detection.
+    std::unique_ptr<ed_data> m_ed_data;
 
     // Serialization.
     template <typename Archive>
@@ -777,18 +839,34 @@ public:
     }
     const std::vector<T> &update_d_output(T, bool = false);
 
+    bool with_events() const
+    {
+        return static_cast<bool>(m_ed_data);
+    }
     void reset_cooldowns();
     const std::vector<t_event_t> &get_t_events() const
     {
-        return m_tes;
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_tes;
     }
     const auto &get_te_cooldowns() const
     {
-        return m_te_cooldowns;
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_te_cooldowns;
     }
     const std::vector<nt_event_t> &get_nt_events() const
     {
-        return m_ntes;
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_ntes;
     }
 
     std::tuple<taylor_outcome, T> step(bool = false);
@@ -1246,10 +1324,7 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const taylor_adaptive
 
 // NOTE: copy the implementation of the BOOST_CLASS_VERSION macro, as it does
 // not support class templates.
-namespace boost
-{
-
-namespace serialization
+namespace boost::serialization
 {
 
 template <typename T>
@@ -1268,8 +1343,6 @@ struct version<heyoka::taylor_adaptive_batch<T>> {
     BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
 };
 
-} // namespace serialization
-
-} // namespace boost
+} // namespace boost::serialization
 
 #endif

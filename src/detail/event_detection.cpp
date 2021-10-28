@@ -15,7 +15,6 @@
 #include <initializer_list>
 #include <iterator>
 #include <limits>
-#include <optional>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -55,6 +54,7 @@
 #include <heyoka/detail/type_traits.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -74,75 +74,6 @@ namespace heyoka::detail
 
 namespace
 {
-
-// The polynomial cache type.
-template <typename T>
-using poly_cache_t = std::vector<std::vector<std::vector<T>>>;
-
-// Helper to fetch the per-thread poly cache.
-template <typename T>
-poly_cache_t<T> &get_poly_cache()
-{
-    thread_local poly_cache_t<T> ret;
-
-    return ret;
-}
-
-// Extract a poly of order n from the cache (or create a new one).
-template <typename T>
-auto get_poly_from_cache(poly_cache_t<T> &cache, std::uint32_t n)
-{
-    // Look if we have inited the cache for order n.
-    if (n >= cache.size()) {
-        // The cache was never used for polynomials of order
-        // n, add the necessary entries.
-
-        // NOTE: no overflow check needed here, cause the order
-        // is always overflow checked in the integrator machinery.
-        cache.resize(boost::numeric_cast<decltype(cache.size())>(n + 1u));
-    }
-
-    auto &pcache = cache[n];
-
-    if (pcache.empty()) {
-        // No polynomials are available, create a new one.
-        return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(n + 1u));
-    } else {
-        // Extract an existing polynomial from the cache.
-        auto retval = std::move(pcache.back());
-        pcache.pop_back();
-
-        return retval;
-    }
-}
-
-// Insert a poly into the cache.
-template <typename T>
-void put_poly_in_cache(poly_cache_t<T> &cache, std::vector<T> &&v)
-{
-    // Fetch the order of the polynomial.
-    // NOTE: the order is the size - 1.
-    assert(!v.empty()); // LCOV_EXCL_LINE
-    const auto n = v.size() - 1u;
-
-    // Look if we have inited the cache for order n.
-    if (n >= cache.size()) {
-        // NOTE: this is currently never reached
-        // because we always look in the cache
-        // before the first invocation of this function.
-        // LCOV_EXCL_START
-        // The cache was never used for polynomials of order
-        // n, add the necessary entries.
-        if (n == std::numeric_limits<decltype(cache.size())>::max()) {
-            throw std::overflow_error("An overflow was detected in the polynomial cache");
-        }
-        cache.resize(n + 1u);
-        // LCOV_EXCL_STOP
-    }
-
-    // Move v in.
-    cache[n].push_back(std::move(v));
-}
 
 // Given an input polynomial a(x), substitute
 // x with x_1 * h and write to ret the resulting
@@ -214,66 +145,10 @@ auto poly_eval(InputIt a, T x, std::uint32_t n)
     return ret;
 }
 
-// A RAII helper to extract polys from the cache and
-// return them to the cache upon destruction.
-template <typename T>
-class pwrap
-{
-    void back_to_cache()
-    {
-        // NOTE: the cache does not allow empty vectors.
-        if (!v.empty()) {
-            put_poly_in_cache(pc, std::move(v));
-        }
-    }
-
-public:
-    explicit pwrap(poly_cache_t<T> &cache, std::uint32_t n) : pc(cache), v(get_poly_from_cache<T>(pc, n)) {}
-
-    pwrap(pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
-    {
-        // Make sure we moved from a valid pwrap.
-        assert(!v.empty()); // LCOV_EXCL_LINE
-    }
-    pwrap &operator=(pwrap &&other) noexcept
-    {
-        // Disallow self move.
-        assert(this != &other); // LCOV_EXCL_LINE
-
-        // Make sure the polyomial caches match.
-        assert(&pc == &other.pc); // LCOV_EXCL_LINE
-
-        // Make sure we are not moving from an
-        // invalid pwrap.
-        assert(!other.v.empty()); // LCOV_EXCL_LINE
-
-        // Put the current v in the cache.
-        back_to_cache();
-
-        // Do the move-assignment.
-        v = std::move(other.v);
-
-        return *this;
-    }
-
-    // Delete copy semantics.
-    pwrap(const pwrap &) = delete;
-    pwrap &operator=(const pwrap &) = delete;
-
-    ~pwrap()
-    {
-        // Put the current v in the cache.
-        back_to_cache();
-    }
-
-    poly_cache_t<T> &pc;
-    std::vector<T> v;
-};
-
 // Find the only existing root for the polynomial poly of the given order
 // existing in [lb, ub).
 template <typename T>
-std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order, T lb, T ub)
+std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb, T ub)
 {
     using std::isfinite;
     using std::nextafter;
@@ -307,8 +182,8 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
     errno = 0;
 
     // Run the root finder.
-    const auto p = boost::math::tools::toms748_solve([d = poly.v.data(), order](T x) { return poly_eval(d, x, order); },
-                                                     lb, ub, boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
+    const auto p = boost::math::tools::toms748_solve([poly, order](T x) { return poly_eval(poly, x, order); }, lb, ub,
+                                                     boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
     const auto ret = (p.first + p.second) / 2;
 
     SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
@@ -331,25 +206,6 @@ std::tuple<T, int> bracketed_root_find(const pwrap<T> &poly, std::uint32_t order
         return std::tuple{ret, -1};
         // LCOV_EXCL_STOP
     }
-}
-
-// Helper to fetch the per-thread working list used in
-// poly root finding.
-template <typename T>
-auto &get_wlist()
-{
-    thread_local std::vector<std::tuple<T, T, pwrap<T>>> w_list;
-
-    return w_list;
-}
-
-// Helper to fetch the per-thread list of isolating intervals.
-template <typename T>
-auto &get_isol()
-{
-    thread_local std::vector<std::tuple<T, T>> isol;
-
-    return isol;
 }
 
 // Helper to detect events of terminal type.
@@ -743,64 +599,295 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     return f;
 }
 
-// Fetch the JITted functions used in the event detection implementation.
+// Helper to automatically deduce the cooldown
+// for a terminal event. g_eps is the maximum
+// absolute error on the Taylor series of the event
+// equation (which depends on the integrator tolerance
+// and the infinity norm of the state vector/event equations),
+// abs_der is the absolute value of the time derivative of the
+// event equation at the zero.
 template <typename T>
-auto get_ed_jit_functions(std::uint32_t order)
+T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
 {
-    // Polynomial translation function type.
-    using pt_t = void (*)(T *, const T *);
-    // rtscc function type.
-    using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
-    // fex_check function type.
-    using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+    using std::isfinite;
 
-    thread_local std::unordered_map<std::uint32_t, std::pair<llvm_state, std::tuple<pt_t, rtscc_t, fex_check_t>>>
-        tf_map;
+    // LCOV_EXCL_START
+    assert(isfinite(g_eps));
+    assert(isfinite(abs_der));
+    assert(g_eps >= 0);
+    assert(abs_der >= 0);
+    // LCOV_EXCL_STOP
 
-    auto it = tf_map.find(order);
+    // NOTE: the * 10 is a safety factor composed of:
+    // - 2 is the original factor from theoretical considerations,
+    // - 2 factor to deal with very small values of the derivative,
+    // - 2 factor to deal with the common case of event equation
+    //   flipping around after the event (e.g., for collisions).
+    // The rest is additional safety.
+    auto ret = g_eps / abs_der * 10;
 
-    if (it == tf_map.end()) {
-        // Cache miss, we need to create
-        // a new LLVM state and functions.
-        llvm_state s;
-
-        // Add the rtscc function. This will also indirectly
-        // add the translator function.
-        add_poly_rtscc<T>(s, order, 1);
-
-        // Add the function for the fast exclusion check.
-        llvm_add_fex_check<T>(s, order, 1);
-
-        // Run the optimisation pass.
-        s.optimise();
-
-        // Compile.
-        s.compile();
-
-        // Fetch the functions.
-        auto pt = reinterpret_cast<pt_t>(s.jit_lookup("poly_translate_1"));
-        auto rtscc = reinterpret_cast<rtscc_t>(s.jit_lookup("poly_rtscc"));
-        auto fex_check = reinterpret_cast<fex_check_t>(s.jit_lookup("fex_check"));
-
-        // Insert state and functions into the cache.
-        [[maybe_unused]] const auto ret
-            = tf_map.try_emplace(order, std::pair{std::move(s), std::tuple{pt, rtscc, fex_check}});
-        assert(ret.second); // LCOV_EXCL_LINE
-
-        return std::tuple{pt, rtscc, fex_check};
+    if (isfinite(ret)) {
+        return ret;
+        // LCOV_EXCL_START
     } else {
-        // Cache hit, return the function.
-        return it->second.second;
+        get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
+                           "heuristic produced a non-finite value of {}",
+                           ret);
+
+        return 0;
     }
+    // LCOV_EXCL_STOP
 }
+
+} // namespace
+
+template <>
+double taylor_deduce_cooldown(double g_eps, double abs_der)
+{
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+template <>
+long double taylor_deduce_cooldown(long double g_eps, long double abs_der)
+{
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
+{
+    return taylor_deduce_cooldown_impl(g_eps, abs_der);
+}
+
+#endif
+
+llvm::Function *llvm_add_fex_check_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_fex_check_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_fex_check_impl<mppp::real128>(s, n, batch_size);
+}
+
+#endif
+
+// NOTE: the def ctor is used only for serialisation purposes.
+template <typename T>
+taylor_adaptive_impl<T>::ed_data::ed_data() = default;
+
+template <typename T>
+taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_impl<T>> tes, std::vector<nt_event_impl<T>> ntes,
+                                          std::uint32_t order, std::uint32_t dim)
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
+{
+    // NOTE: the numeric cast will also ensure that we can
+    // index into the events using 32-bit ints.
+    const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
+    const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
+
+    // Setup m_ev_jet.
+    // NOTE: check that we can represent
+    // the requested size for m_ev_jet using
+    // both its size type and std::uint32_t.
+    // LCOV_EXCL_START
+    if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes || order == std::numeric_limits<std::uint32_t>::max()
+        || dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
+        || dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (order + 1u)
+        || dim + (n_tes + n_ntes) > std::numeric_limits<decltype(m_ev_jet.size())>::max() / (order + 1u)) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
+                                  "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+    m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u));
+
+    // Setup the vector of cooldowns.
+    m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
+
+    // Setup the JIT-compiled functions.
+
+    // Add the rtscc function. This will also indirectly
+    // add the translator function.
+    add_poly_rtscc<T>(m_state, order, 1);
+
+    // Add the function for the fast exclusion check.
+    llvm_add_fex_check<T>(m_state, order, 1);
+
+    // Run the optimisation pass.
+    m_state.optimise();
+
+    // Compile.
+    m_state.compile();
+
+    // Fetch the function pointers.
+    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
+    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
+    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::ed_data::ed_data(const ed_data &o)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state),
+      m_poly_cache(o.m_poly_cache)
+{
+    // For the vector of detected events, just reserve the same amount of space.
+    // These vectors are cleared out anyway during event detection.
+    m_d_tes.reserve(o.m_d_tes.capacity());
+    m_d_ntes.reserve(o.m_d_ntes.capacity());
+
+    // Reserve space in m_wlist and m_isol.
+    m_wlist.reserve(o.m_wlist.capacity());
+    m_isol.reserve(o.m_isol.capacity());
+
+    // Fetch the function pointers from the copied LLVM state.
+    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
+    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
+    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
+}
+
+template <typename T>
+taylor_adaptive_impl<T>::ed_data::~ed_data() = default;
+
+template <typename T>
+void taylor_adaptive_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_tes;
+    ar << m_ntes;
+    ar << m_ev_jet;
+    ar << m_te_cooldowns;
+    ar << m_state;
+    ar << m_poly_cache;
+
+    // Save the capacities of the vectors of detected events and
+    // the root finding structures.
+    ar << m_d_tes.capacity();
+    ar << m_d_ntes.capacity();
+    ar << m_wlist.capacity();
+    ar << m_isol.capacity();
+}
+
+template <typename T>
+void taylor_adaptive_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_tes;
+    ar >> m_ntes;
+    ar >> m_ev_jet;
+    ar >> m_te_cooldowns;
+    ar >> m_state;
+    ar >> m_poly_cache;
+
+    // Fetch the capacities.
+    decltype(m_d_tes.capacity()) d_tes_cap{};
+    ar >> d_tes_cap;
+    decltype(m_d_ntes.capacity()) d_ntes_cap{};
+    ar >> d_ntes_cap;
+    decltype(m_wlist.capacity()) wlist_cap{};
+    ar >> wlist_cap;
+    decltype(m_isol.capacity()) isol_cap{};
+    ar >> isol_cap;
+
+    // Clear and reserve the capacities.
+    m_d_tes.clear();
+    m_d_tes.reserve(d_tes_cap);
+    m_d_ntes.clear();
+    m_d_ntes.reserve(d_ntes_cap);
+    m_wlist.clear();
+    m_wlist.reserve(wlist_cap);
+    m_isol.clear();
+    m_isol.reserve(isol_cap);
+
+    // Fetch the function pointers from the LLVM state.
+    m_pt = reinterpret_cast<pt_t>(m_state.jit_lookup("poly_translate_1"));
+    m_rtscc = reinterpret_cast<rtscc_t>(m_state.jit_lookup("poly_rtscc"));
+    m_fex_check = reinterpret_cast<fex_check_t>(m_state.jit_lookup("fex_check"));
+}
+
+// A RAII helper to extract polys from a cache and
+// return them to the cache upon destruction.
+template <typename T>
+class taylor_adaptive_impl<T>::ed_data::pwrap
+{
+    auto get_poly_from_cache(std::uint32_t n)
+    {
+        if (pc.empty()) {
+            // No polynomials are available, create a new one.
+            return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(n + 1u));
+        } else {
+            // Extract an existing polynomial from the cache.
+            auto retval = std::move(pc.back());
+            pc.pop_back();
+
+            return retval;
+        }
+    }
+
+    void back_to_cache()
+    {
+        // NOTE: the cache does not allow empty vectors.
+        if (!v.empty()) {
+            assert(pc.empty() || pc[0].size() == v.size());
+
+            // Move v into the cache.
+            pc.push_back(std::move(v));
+        }
+    }
+
+public:
+    explicit pwrap(poly_cache_t &cache, std::uint32_t n) : pc(cache), v(get_poly_from_cache(n)) {}
+
+    pwrap(pwrap &&other) noexcept : pc(other.pc), v(std::move(other.v))
+    {
+        // Make sure we moved from a valid pwrap.
+        assert(!v.empty()); // LCOV_EXCL_LINE
+    }
+    pwrap &operator=(pwrap &&other) noexcept
+    {
+        // Disallow self move.
+        assert(this != &other); // LCOV_EXCL_LINE
+
+        // Make sure the polyomial caches match.
+        assert(&pc == &other.pc); // LCOV_EXCL_LINE
+
+        // Make sure we are not moving from an
+        // invalid pwrap.
+        assert(!other.v.empty()); // LCOV_EXCL_LINE
+
+        // Put the current v in the cache.
+        back_to_cache();
+
+        // Do the move-assignment.
+        v = std::move(other.v);
+
+        return *this;
+    }
+
+    // Delete copy semantics.
+    pwrap(const pwrap &) = delete;
+    pwrap &operator=(const pwrap &) = delete;
+
+    ~pwrap()
+    {
+        // Put the current v in the cache.
+        back_to_cache();
+    }
+
+    poly_cache_t &pc;
+    std::vector<T> v;
+};
 
 // Implementation of event detection.
 template <typename T>
-void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, int, T>> &d_tes,
-                               std::vector<std::tuple<std::uint32_t, T, int>> &d_ntes,
-                               const std::vector<t_event<T>> &tes, const std::vector<nt_event<T>> &ntes,
-                               const std::vector<std::optional<std::pair<T, T>>> &cooldowns, T h,
-                               const std::vector<T> &ev_jet, std::uint32_t order, std::uint32_t dim, T g_eps)
+void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, std::uint32_t dim, T g_eps)
 {
     using std::abs;
     using std::isfinite;
@@ -808,8 +895,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
     // Clear the vectors of detected events.
     // NOTE: do it here as this is always necessary,
     // regardless of issues with h/g_eps.
-    d_tes.clear();
-    d_ntes.clear();
+    m_d_tes.clear();
+    m_d_ntes.clear();
 
     // LCOV_EXCL_START
     if (!isfinite(h)) {
@@ -831,30 +918,8 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
 
     assert(order >= 2u); // LCOV_EXCL_LINE
 
-    // NOTE: trigger the creation of the poly cache
-    // *before* triggering the creation of the other
-    // thread-local variables. This is important because
-    // the working list contains pwrap objects, which in turn
-    // interact with the poly cache. If we don't do this,
-    // the poly cache will be destroyed before the working
-    // list, and the destructors in the working list will
-    // interact with invalid memory.
-    auto &pc = get_poly_cache<T>();
-
-    // Fetch a reference to the list of isolating intervals.
-    auto &isol = get_isol<T>();
-
-    // Fetch a reference to the wlist.
-    auto &wl = get_wlist<T>();
-
-    // Fetch the JITted functions.
-    auto j_funcs = get_ed_jit_functions<T>(order);
-    auto pt = std::get<0>(j_funcs);
-    auto rtscc = std::get<1>(j_funcs);
-    auto fex_check = std::get<2>(j_funcs);
-
     // Temporary polynomials used in the bisection loop.
-    pwrap<T> tmp1(pc, order), tmp2(pc, order), tmp(pc, order);
+    pwrap tmp1(m_poly_cache, order), tmp2(m_poly_cache, order), tmp(m_poly_cache, order);
 
     // Determine if we are integrating backwards in time.
     const std::uint32_t back_int = h < 0;
@@ -870,7 +935,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // Extract the pointer to the Taylor polynomial for the
             // current event.
             const auto ptr
-                = ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : tes.size())) * (order + 1u);
+                = m_ev_jet.data() + (i + dim + (is_terminal_event_v<ev_type> ? 0u : m_tes.size())) * (order + 1u);
 
             // Run the fast exclusion check to detect sign changes via
             // interval arithmetics.
@@ -881,16 +946,16 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
             std::uint32_t fex_check_result;
-            fex_check(ptr, &h, &back_int, &fex_check_result);
+            m_fex_check(ptr, &h, &back_int, &fex_check_result);
             if (fex_check_result) {
                 continue;
             }
 
             // Clear out the list of isolating intervals.
-            isol.clear();
+            m_isol.clear();
 
             // Reset the working list.
-            wl.clear();
+            m_wlist.clear();
 
             // Helper to add a detected event to out.
             // NOTE: the root here is expected to be already rescaled
@@ -986,13 +1051,13 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // to the end of the cooldown.
             const auto lb_offset = [&]() {
                 if constexpr (is_terminal_event_v<ev_type>) {
-                    if (cooldowns[i]) {
+                    if (m_te_cooldowns[i]) {
                         // NOTE: need to distinguish between forward
                         // and backward integration.
                         if (h >= 0) {
-                            return (cooldowns[i]->second - cooldowns[i]->first) / abs(h);
+                            return (m_te_cooldowns[i]->second - m_te_cooldowns[i]->first) / abs(h);
                         } else {
-                            return (cooldowns[i]->second + cooldowns[i]->first) / abs(h);
+                            return (m_te_cooldowns[i]->second + m_te_cooldowns[i]->first) / abs(h);
                         }
                     }
                 }
@@ -1017,7 +1082,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             // becomes [0, 1), and write the resulting polynomial into tmp.
             // NOTE: at the first iteration (i.e., for the first event),
             // tmp has been constructed correctly outside this function.
-            // Below, tmp will first be moved into wl (thus rendering
+            // Below, tmp will first be moved into m_wlist (thus rendering
             // it invalid) but it will immediately be revived at the
             // first iteration of the do/while loop. Thus, when we get
             // here again, tmp will be again in a well-formed state.
@@ -1026,11 +1091,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             poly_rescale(tmp.v.data(), ptr, h, order);
 
             // Place the first element in the working list.
-            wl.emplace_back(0, 1, std::move(tmp));
+            m_wlist.emplace_back(0, 1, std::move(tmp));
 
 #if !defined(NDEBUG)
-            auto max_wl_size = wl.size();
-            auto max_isol_size = isol.size();
+            auto max_wl_size = m_wlist.size();
+            auto max_isol_size = m_isol.size();
 #endif
 
             // Flag to signal that the do-while loop below failed.
@@ -1043,12 +1108,12 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // NOTE: q(x) is the transformed polynomial whose roots in the x range [0, 1) we will
                 // be looking for. lb and ub represent what 0 and 1 correspond to in the *original*
                 // [0, 1) range.
-                auto lb = std::get<0>(wl.back());
-                auto ub = std::get<1>(wl.back());
+                auto lb = std::get<0>(m_wlist.back());
+                auto ub = std::get<1>(m_wlist.back());
                 // NOTE: this will either revive an invalid tmp (first iteration),
                 // or it will replace it with one of the bisecting polynomials.
-                tmp = std::move(std::get<2>(wl.back()));
-                wl.pop_back();
+                tmp = std::move(std::get<2>(m_wlist.back()));
+                m_wlist.pop_back();
 
                 // Check for an event at the lower bound, which occurs
                 // if the constant term of the polynomial is zero. We also
@@ -1085,11 +1150,11 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // Reverse tmp into tmp1, translate tmp1 by 1 with output
                 // in tmp2, and count the sign changes in tmp2.
                 std::uint32_t n_sc;
-                rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
+                m_rtscc(tmp1.v.data(), tmp2.v.data(), &n_sc, tmp.v.data());
 
                 if (n_sc == 1u) {
                     // Found isolating interval, add it to isol.
-                    isol.emplace_back(lb, ub);
+                    m_isol.emplace_back(lb, ub);
                 } else if (n_sc > 1u) {
                     // No isolating interval found, bisect.
 
@@ -1097,17 +1162,17 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                     // into tmp1.
                     poly_rescale_p2(tmp1.v.data(), tmp.v.data(), order);
                     // Then we take tmp1 and translate it to produce 2**n * q((x+1)/2).
-                    pt(tmp2.v.data(), tmp1.v.data());
+                    m_pt(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
                     const auto mid = (lb + ub) / 2;
                     // NOTE: don't add the lower range if it falls
                     // entirely within the cooldown range.
                     if (lb_offset < mid) {
-                        wl.emplace_back(lb, mid, std::move(tmp1));
+                        m_wlist.emplace_back(lb, mid, std::move(tmp1));
 
                         // Revive tmp1.
-                        tmp1 = pwrap<T>(pc, order);
+                        tmp1 = pwrap(m_poly_cache, order);
                     } else {
                         // LCOV_EXCL_START
                         SPDLOG_LOGGER_DEBUG(
@@ -1115,15 +1180,15 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                             "ignoring lower interval in a bisection that would fall entirely in the cooldown period");
                         // LCOV_EXCL_STOP
                     }
-                    wl.emplace_back(mid, ub, std::move(tmp2));
+                    m_wlist.emplace_back(mid, ub, std::move(tmp2));
 
                     // Revive tmp2.
-                    tmp2 = pwrap<T>(pc, order);
+                    tmp2 = pwrap(m_poly_cache, order);
                 }
 
 #if !defined(NDEBUG)
-                max_wl_size = std::max(max_wl_size, wl.size());
-                max_isol_size = std::max(max_isol_size, isol.size());
+                max_wl_size = std::max(max_wl_size, m_wlist.size());
+                max_isol_size = std::max(max_isol_size, m_isol.size());
 #endif
 
                 // We want to put limits in order to avoid an endless loop when the algorithm fails.
@@ -1131,25 +1196,25 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 // on heuristic observation of the algorithm's behaviour in pathological
                 // cases. The second check is that we cannot possibly find more isolating
                 // intervals than the degree of the polynomial.
-                if (wl.size() > 250u || isol.size() > order) {
+                if (m_wlist.size() > 250u || m_isol.size() > order) {
                     get_logger()->warn(
                         "the polynomial root isolation algorithm failed during event detection: the working "
                         "list size is {} and the number of isolating intervals is {}",
-                        wl.size(), isol.size());
+                        m_wlist.size(), m_isol.size());
 
                     loop_failed = true;
 
                     break;
                 }
 
-            } while (!wl.empty());
+            } while (!m_wlist.empty());
 
 #if !defined(NDEBUG)
             SPDLOG_LOGGER_DEBUG(get_logger(), "max working list size: {}", max_wl_size);
             SPDLOG_LOGGER_DEBUG(get_logger(), "max isol list size   : {}", max_isol_size);
 #endif
 
-            if (isol.empty() || loop_failed) {
+            if (m_isol.empty() || loop_failed) {
                 // Don't do root finding for this event if the loop failed,
                 // or if the list of isolating intervals is empty. Just
                 // move to the next event.
@@ -1165,7 +1230,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
             poly_rescale(tmp1.v.data(), ptr, h, order);
 
             // Run the root finding in the isolating intervals.
-            for (auto &[lb, ub] : isol) {
+            for (auto &[lb, ub] : m_isol) {
                 if constexpr (is_terminal_event_v<ev_type>) {
                     // NOTE: if we are dealing with a terminal event
                     // subject to cooldown, we need to ensure that
@@ -1191,7 +1256,7 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
                 }
 
                 // Run the root finding.
-                const auto [root, cflag] = bracketed_root_find(tmp1, order, lb, ub);
+                const auto [root, cflag] = bracketed_root_find(tmp1.v.data(), order, lb, ub);
 
                 if (cflag == 0) {
                     // Root finding finished successfully, record the event.
@@ -1215,132 +1280,18 @@ void taylor_detect_events_impl(std::vector<std::tuple<std::uint32_t, T, bool, in
         }
     };
 
-    run_detection(d_tes, tes);
-    run_detection(d_ntes, ntes);
+    run_detection(m_d_tes, m_tes);
+    run_detection(m_d_ntes, m_ntes);
 }
 
-} // namespace
-
-template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, double, bool, int, double>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, double, int>> &d_ntes,
-                          const std::vector<t_event<double>> &tes, const std::vector<nt_event<double>> &ntes,
-                          const std::vector<std::optional<std::pair<double, double>>> &cooldowns, double h,
-                          const std::vector<double> &ev_jet, std::uint32_t order, std::uint32_t dim, double g_eps)
-{
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
-}
-
-template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, long double, bool, int, long double>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, long double, int>> &d_ntes,
-                          const std::vector<t_event<long double>> &tes, const std::vector<nt_event<long double>> &ntes,
-                          const std::vector<std::optional<std::pair<long double, long double>>> &cooldowns,
-                          long double h, const std::vector<long double> &ev_jet, std::uint32_t order, std::uint32_t dim,
-                          long double g_eps)
-{
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
-}
+// Instantiate the book-keeping structure for event detection
+// in the scalar integrator.
+template struct taylor_adaptive_impl<double>::ed_data;
+template struct taylor_adaptive_impl<long double>::ed_data;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template <>
-void taylor_detect_events(std::vector<std::tuple<std::uint32_t, mppp::real128, bool, int, mppp::real128>> &d_tes,
-                          std::vector<std::tuple<std::uint32_t, mppp::real128, int>> &d_ntes,
-                          const std::vector<t_event<mppp::real128>> &tes,
-                          const std::vector<nt_event<mppp::real128>> &ntes,
-                          const std::vector<std::optional<std::pair<mppp::real128, mppp::real128>>> &cooldowns,
-                          mppp::real128 h, const std::vector<mppp::real128> &ev_jet, std::uint32_t order,
-                          std::uint32_t dim, mppp::real128 g_eps)
-{
-    taylor_detect_events_impl(d_tes, d_ntes, tes, ntes, cooldowns, h, ev_jet, order, dim, g_eps);
-}
-
-#endif
-
-namespace
-{
-
-// Helper to automatically deduce the cooldown
-// for a terminal event. g_eps is the maximum
-// absolute error on the Taylor series of the event
-// equation (which depends on the integrator tolerance
-// and the infinity norm of the state vector/event equations),
-// abs_der is the absolute value of the time derivative of the
-// event equation at the zero.
-template <typename T>
-T taylor_deduce_cooldown_impl(T g_eps, T abs_der)
-{
-    using std::isfinite;
-
-    // LCOV_EXCL_START
-    assert(isfinite(g_eps));
-    assert(isfinite(abs_der));
-    assert(g_eps >= 0);
-    assert(abs_der >= 0);
-    // LCOV_EXCL_STOP
-
-    // NOTE: the * 10 is a safety factor composed of:
-    // - 2 is the original factor from theoretical considerations,
-    // - 2 factor to deal with very small values of the derivative,
-    // - 2 factor to deal with the common case of event equation
-    //   flipping around after the event (e.g., for collisions).
-    // The rest is additional safety.
-    auto ret = g_eps / abs_der * 10;
-
-    if (isfinite(ret)) {
-        return ret;
-        // LCOV_EXCL_START
-    } else {
-        get_logger()->warn("deducing a cooldown of zero for a terminal event because the automatic deduction "
-                           "heuristic produced a non-finite value of {}",
-                           ret);
-
-        return 0;
-    }
-    // LCOV_EXCL_STOP
-}
-
-} // namespace
-
-template <>
-double taylor_deduce_cooldown(double g_eps, double abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
-
-template <>
-long double taylor_deduce_cooldown(long double g_eps, long double abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-mppp::real128 taylor_deduce_cooldown(mppp::real128 g_eps, mppp::real128 abs_der)
-{
-    return taylor_deduce_cooldown_impl(g_eps, abs_der);
-}
-
-#endif
-
-llvm::Function *llvm_add_fex_check_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_fex_check_impl<double>(s, n, batch_size);
-}
-
-llvm::Function *llvm_add_fex_check_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_fex_check_impl<long double>(s, n, batch_size);
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
-{
-    return llvm_add_fex_check_impl<mppp::real128>(s, n, batch_size);
-}
+template struct taylor_adaptive_impl<mppp::real128>::ed_data;
 
 #endif
 

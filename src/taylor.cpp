@@ -2327,8 +2327,6 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     m_state = std::move(state);
     m_time = dfloat<T>(time);
     m_pars = std::move(pars);
-    m_tes = std::move(tes);
-    m_ntes = std::move(ntes);
 
     // Check input params.
     if (std::any_of(m_state.begin(), m_state.end(), [](const auto &x) { return !isfinite(x); })) {
@@ -2355,38 +2353,29 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
                 tol));
     }
 
-    // NOTE: we need to be able to index into the events
-    // using 32-bit ints.
-    // LCOV_EXCL_START
-    if (m_tes.size() > std::numeric_limits<std::uint32_t>::max()
-        || m_ntes.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw std::invalid_argument("The number of events is too large, and it results in an overflow condition");
-    }
-    // LCOV_EXCL_STOP
-
     // Store the tolerance.
     m_tol = tol;
 
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Do we have events?
+    const auto with_events = !tes.empty() || !ntes.empty();
+
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the d_out.
     std::optional<opt_disabler> od(m_llvm);
-
-    // Do we have events?
-    const auto with_events = !m_tes.empty() || !m_ntes.empty();
 
     // Add the stepper function.
     if (with_events) {
         std::vector<expression> ee;
         // NOTE: no need for deep copies of the expressions: ee is never mutated
         // and we will be deep-copying it anyway when we do the decomposition.
-        for (const auto &ev : m_tes) {
+        for (const auto &ev : tes) {
             ee.push_back(ev.get_expression());
         }
-        for (const auto &ev : m_ntes) {
+        for (const auto &ev : ntes) {
             ee.push_back(ev.get_expression());
         }
 
@@ -2455,32 +2444,12 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
     // Setup the vector for the dense output.
     m_d_out.resize(m_state.size());
 
-    // If we have events, we need to setup
-    // m_ev_jet.
+    // Init the event data structure if needed.
+    // NOTE: this can be done in parallel with the rest of the constructor,
+    // once we have m_order/m_dim and we are done using tes/ntes.
     if (with_events) {
-        const auto n_tes = static_cast<std::uint32_t>(m_tes.size());
-        const auto n_ntes = static_cast<std::uint32_t>(m_ntes.size());
-
-        // NOTE: check that we can represent
-        // the requested size for m_ev_jet using
-        // both its size type and std::uint32_t.
-        // LCOV_EXCL_START
-        if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes
-            || m_order == std::numeric_limits<std::uint32_t>::max()
-            || m_dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
-            || m_dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (m_order + 1u)
-            || m_dim + (n_tes + n_ntes) > std::numeric_limits<decltype(m_ev_jet.size())>::max() / (m_order + 1u)) {
-            throw std::overflow_error(
-                "Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                "or the state size is too large");
-        }
-        // LCOV_EXCL_STOP
-
-        m_ev_jet.resize((m_dim + (n_tes + n_ntes)) * (m_order + 1u));
+        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
     }
-
-    // Setup the vector of cooldowns.
-    m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(m_tes.size()));
 }
 
 template <typename T>
@@ -2491,11 +2460,9 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl()
 
 template <typename T>
 taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
-    // NOTE: make a manual copy of all members, apart from the function pointers
-    // and the vectors of detected events.
     : m_state(other.m_state), m_time(other.m_time), m_llvm(other.m_llvm), m_dim(other.m_dim), m_order(other.m_order),
       m_tol(other.m_tol), m_pars(other.m_pars), m_tc(other.m_tc), m_last_h(other.m_last_h), m_d_out(other.m_d_out),
-      m_tes(other.m_tes), m_ntes(other.m_ntes), m_ev_jet(other.m_ev_jet), m_te_cooldowns(other.m_te_cooldowns)
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
     m_dc.reserve(other.m_dc.size());
@@ -2503,17 +2470,12 @@ taylor_adaptive_impl<T>::taylor_adaptive_impl(const taylor_adaptive_impl &other)
         m_dc.emplace_back(copy(ex), deps);
     }
 
-    if (m_tes.empty() && m_ntes.empty()) {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-    } else {
+    if (m_ed_data) {
         m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     }
-
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-
-    // NOTE: instead of copying these, reserve the capacity.
-    m_d_tes.reserve(other.m_d_tes.capacity());
-    m_d_ntes.reserve(other.m_d_ntes.capacity());
 }
 
 template <typename T>
@@ -2540,8 +2502,6 @@ template <typename T>
 template <typename Archive>
 void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
 {
-    // NOTE: save all members, apart from the function pointers
-    // and the vectors of detected events.
     ar << m_state;
     ar << m_time;
     ar << m_llvm;
@@ -2553,15 +2513,7 @@ void taylor_adaptive_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_tc;
     ar << m_last_h;
     ar << m_d_out;
-    ar << m_tes;
-    ar << m_ntes;
-    ar << m_ev_jet;
-    ar << m_te_cooldowns;
-
-    // Save the capacities of the vectors
-    // of detected events.
-    ar << m_d_tes.capacity();
-    ar << m_d_ntes.capacity();
+    ar << m_ed_data;
 }
 
 template <typename T>
@@ -2585,32 +2537,15 @@ void taylor_adaptive_impl<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_tc;
     ar >> m_last_h;
     ar >> m_d_out;
-    ar >> m_tes;
-    ar >> m_ntes;
-    ar >> m_ev_jet;
-    ar >> m_te_cooldowns;
-
-    // Load the capacities of the vectors
-    // of detected events.
-    decltype(m_d_tes.capacity()) d_tes_cap{};
-    ar >> d_tes_cap;
-    decltype(m_d_ntes.capacity()) d_ntes_cap{};
-    ar >> d_ntes_cap;
+    ar >> m_ed_data;
 
     // Recover the function pointers.
-    if (m_tes.empty() && m_ntes.empty()) {
-        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
-    } else {
+    if (m_ed_data) {
         m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
     }
-
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
-
-    // Clear and reserve the capacities.
-    m_d_tes.clear();
-    m_d_tes.reserve(d_tes_cap);
-    m_d_ntes.clear();
-    m_d_ntes.reserve(d_ntes_cap);
 }
 
 template <typename T>
@@ -2649,7 +2584,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
     auto h = max_delta_t;
 
     if (m_step_f.index() == 0u) {
-        assert(m_tes.empty() && m_ntes.empty());
+        assert(!m_ed_data); // LCOV_EXCL_LINE
 
         // Invoke the vanilla stepper.
         std::get<0>(m_step_f)(m_state.data(), m_pars.data(), &m_time.hi, &h, wtc ? m_tc.data() : nullptr);
@@ -2669,12 +2604,14 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
     } else {
-        assert(!m_tes.empty() || !m_ntes.empty());
+        assert(m_ed_data); // LCOV_EXCL_LINE
+
+        auto &ed_data = *m_ed_data;
 
         // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
         // event equations at the beginning of the timestep for later use.
         T max_abs_state;
-        std::get<1>(m_step_f)(m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
+        std::get<1>(m_step_f)(ed_data.m_ev_jet.data(), m_state.data(), m_pars.data(), &m_time.hi, &h, &max_abs_state);
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
@@ -2707,10 +2644,10 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         }
 
         // Write unconditionally the tcs.
-        std::copy(m_ev_jet.data(), m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
+        std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u), m_tc.data());
 
         // Do the event detection.
-        taylor_detect_events<T>(m_d_tes, m_d_ntes, m_tes, m_ntes, m_te_cooldowns, h, m_ev_jet, m_order, m_dim, g_eps);
+        ed_data.detect_events(h, m_order, m_dim, g_eps);
 
         // NOTE: before this point, we did not alter
         // any user-visible data in the integrator (just
@@ -2727,13 +2664,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // NOTE: the checks inside taylor_detect_events() ensure
         // that we can safely sort the events' times.
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
-        std::sort(m_d_tes.begin(), m_d_tes.end(), cmp);
-        std::sort(m_d_ntes.begin(), m_d_ntes.end(), cmp);
+        std::sort(ed_data.m_d_tes.begin(), ed_data.m_d_tes.end(), cmp);
+        std::sort(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), cmp);
 
         // If we have terminal events we need
         // to update the value of h.
-        if (!m_d_tes.empty()) {
-            h = std::get<1>(m_d_tes[0]);
+        if (!ed_data.m_d_tes.empty()) {
+            h = std::get<1>(ed_data.m_d_tes[0]);
         }
 
         // If we don't have terminal events, we will invoke the callbacks
@@ -2741,13 +2678,13 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // out which non-terminal events do not happen because their time
         // coordinate is past the the first terminal event.
         const auto ntes_end_it
-            = m_d_tes.empty()
-                  ? m_d_ntes.end()
-                  : std::lower_bound(m_d_ntes.begin(), m_d_ntes.end(), h,
+            = ed_data.m_d_tes.empty()
+                  ? ed_data.m_d_ntes.end()
+                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
                                      [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
         // Update the state.
-        m_d_out_f(m_state.data(), m_ev_jet.data(), &h);
+        m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), &h);
 
         // Update the time.
         m_time += h;
@@ -2767,7 +2704,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         }
 
         // Update the cooldowns.
-        for (auto &cd : m_te_cooldowns) {
+        for (auto &cd : ed_data.m_te_cooldowns) {
             if (cd) {
                 // Check if the timestep we just took
                 // brought this event outside the cooldown.
@@ -2787,9 +2724,9 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
-        for (auto it = m_d_ntes.begin(); it != ntes_end_it; ++it) {
+        for (auto it = ed_data.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
-            const auto &cb = m_ntes[std::get<0>(t)].get_callback();
+            const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
             assert(cb);
             cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
@@ -2799,36 +2736,37 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // unused if there are no terminal events.
         bool te_cb_ret = false;
 
-        if (!m_d_tes.empty()) {
+        if (!ed_data.m_d_tes.empty()) {
             // Fetch the first terminal event.
-            const auto te_idx = std::get<0>(m_d_tes[0]);
-            assert(te_idx < m_tes.size());
-            const auto &te = m_tes[te_idx];
+            const auto te_idx = std::get<0>(ed_data.m_d_tes[0]);
+            assert(te_idx < ed_data.m_tes.size());
+            const auto &te = ed_data.m_tes[te_idx];
 
             // Set the corresponding cooldown.
             if (te.get_cooldown() >= 0) {
                 // Cooldown explicitly provided by the user, use it.
-                m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
+                ed_data.m_te_cooldowns[te_idx].emplace(0, te.get_cooldown());
             } else {
                 // Deduce the cooldown automatically.
                 // NOTE: if g_eps is not finite, we skipped event detection
                 // altogether and thus we never end up here. If the derivative
                 // of the event equation is not finite, the event is also skipped.
-                m_te_cooldowns[te_idx].emplace(0, taylor_deduce_cooldown(g_eps, std::get<4>(m_d_tes[0])));
+                ed_data.m_te_cooldowns[te_idx].emplace(0,
+                                                       taylor_deduce_cooldown(g_eps, std::get<4>(ed_data.m_d_tes[0])));
             }
 
             // Invoke the callback of the first terminal event, if it has one.
             if (te.get_callback()) {
-                te_cb_ret = te.get_callback()(*this, std::get<2>(m_d_tes[0]), std::get<3>(m_d_tes[0]));
+                te_cb_ret = te.get_callback()(*this, std::get<2>(ed_data.m_d_tes[0]), std::get<3>(ed_data.m_d_tes[0]));
             }
         }
 
-        if (m_d_tes.empty()) {
+        if (ed_data.m_d_tes.empty()) {
             // No terminal events detected, return success or time limit.
             return std::tuple{h == max_delta_t ? taylor_outcome::time_limit : taylor_outcome::success, h};
         } else {
             // Terminal event detected. Fetch its index.
-            const auto ev_idx = static_cast<std::int64_t>(std::get<0>(m_d_tes[0]));
+            const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[0]));
 
             // NOTE: if te_cb_ret is true, it means that the terminal event has
             // a callback and its invocation returned true (meaning that the
@@ -2871,7 +2809,11 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step(T max_delta_t, bool 
 template <typename T>
 void taylor_adaptive_impl<T>::reset_cooldowns()
 {
-    for (auto &cd : m_te_cooldowns) {
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    for (auto &cd : m_ed_data->m_te_cooldowns) {
         cd.reset();
     }
 }

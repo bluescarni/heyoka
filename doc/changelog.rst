@@ -17,6 +17,8 @@ New
 Changes
 ~~~~~~~
 
+- Internal refactoring of the event detection code
+  (`#213 <https://github.com/bluescarni/heyoka/pull/213>`__).
 - During event detection, improve the performance of the
   fast exclusion check via JIT compilation
   (`#212 <https://github.com/bluescarni/heyoka/pull/212>`__).
