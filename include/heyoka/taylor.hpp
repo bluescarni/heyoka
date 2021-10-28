@@ -364,7 +364,7 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
     return std::tuple{high_accuracy, tol, compact_mode, std::move(pars)};
 }
 
-template <typename T>
+template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC nt_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
@@ -430,8 +430,8 @@ public:
     event_direction get_direction() const;
 };
 
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T> &)
+template <typename T, bool B>
+inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -439,19 +439,19 @@ inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, false> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, false> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, false> &);
 
 #endif
 
-template <typename T>
+template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC t_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
@@ -537,8 +537,8 @@ public:
     T get_cooldown() const;
 };
 
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T> &)
+template <typename T, bool B>
+inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -546,25 +546,25 @@ inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, false> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, false> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, false> &);
 
 #endif
 
 } // namespace detail
 
 template <typename T>
-using nt_event = detail::nt_event_impl<T>;
+using nt_event = detail::nt_event_impl<T, false>;
 
 template <typename T>
-using t_event = detail::t_event_impl<T>;
+using t_event = detail::t_event_impl<T, false>;
 
 namespace detail
 {
@@ -594,9 +594,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
 
         // The vector of terminal events.
-        std::vector<t_event_impl<T>> m_tes;
+        std::vector<t_event<T>> m_tes;
         // The vector of non-terminal events.
-        std::vector<nt_event_impl<T>> m_ntes;
+        std::vector<nt_event<T>> m_ntes;
         // The jet of derivatives for the state variables
         // and the events.
         std::vector<T> m_ev_jet;
@@ -627,7 +627,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         poly_cache_t m_poly_cache;
 
         // Constructors.
-        ed_data(std::vector<t_event_impl<T>>, std::vector<nt_event_impl<T>>, std::uint32_t, std::uint32_t);
+        ed_data(std::vector<t_event<T>>, std::vector<nt_event<T>>, std::uint32_t, std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 

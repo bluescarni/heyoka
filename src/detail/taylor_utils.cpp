@@ -1319,13 +1319,13 @@ std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, e
 } // namespace
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<double> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, false> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
@@ -1333,7 +1333,7 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double> &e)
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e)
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, false> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
@@ -1341,13 +1341,13 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128> &e
 #endif
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<double> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<long double> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
@@ -1355,7 +1355,7 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<long double> &e)
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128> &e)
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, false> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
@@ -1412,13 +1412,13 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
 namespace detail
 {
 
-template <typename T>
-nt_event_impl<T>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+template <typename T, bool B>
+nt_event_impl<T, B>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
 {
 }
 
-template <typename T>
-void nt_event_impl<T>::finalise_ctor(event_direction d)
+template <typename T, bool B>
+void nt_event_impl<T, B>::finalise_ctor(event_direction d)
 {
     if (!callback) {
         throw std::invalid_argument("Cannot construct a non-terminal event with an empty callback");
@@ -1430,16 +1430,16 @@ void nt_event_impl<T>::finalise_ctor(event_direction d)
     dir = d;
 }
 
-template <typename T>
-nt_event_impl<T>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
+template <typename T, bool B>
+nt_event_impl<T, B>::nt_event_impl(const nt_event_impl &o) : eq(copy(o.eq)), callback(o.callback), dir(o.dir)
 {
 }
 
-template <typename T>
-nt_event_impl<T>::nt_event_impl(nt_event_impl &&) noexcept = default;
+template <typename T, bool B>
+nt_event_impl<T, B>::nt_event_impl(nt_event_impl &&) noexcept = default;
 
-template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
+template <typename T, bool B>
+nt_event_impl<T, B> &nt_event_impl<T, B>::operator=(const nt_event_impl &o)
 {
     if (this != &o) {
         *this = nt_event_impl(o);
@@ -1448,37 +1448,37 @@ nt_event_impl<T> &nt_event_impl<T>::operator=(const nt_event_impl<T> &o)
     return *this;
 }
 
-template <typename T>
-nt_event_impl<T> &nt_event_impl<T>::operator=(nt_event_impl<T> &&) noexcept = default;
+template <typename T, bool B>
+nt_event_impl<T, B> &nt_event_impl<T, B>::operator=(nt_event_impl &&) noexcept = default;
 
-template <typename T>
-nt_event_impl<T>::~nt_event_impl() = default;
+template <typename T, bool B>
+nt_event_impl<T, B>::~nt_event_impl() = default;
 
-template <typename T>
-const expression &nt_event_impl<T>::get_expression() const
+template <typename T, bool B>
+const expression &nt_event_impl<T, B>::get_expression() const
 {
     return eq;
 }
 
-template <typename T>
-const typename nt_event_impl<T>::callback_t &nt_event_impl<T>::get_callback() const
+template <typename T, bool B>
+const typename nt_event_impl<T, B>::callback_t &nt_event_impl<T, B>::get_callback() const
 {
     return callback;
 }
 
-template <typename T>
-event_direction nt_event_impl<T>::get_direction() const
+template <typename T, bool B>
+event_direction nt_event_impl<T, B>::get_direction() const
 {
     return dir;
 }
 
-template <typename T>
-t_event_impl<T>::t_event_impl() : t_event_impl(expression{})
+template <typename T, bool B>
+t_event_impl<T, B>::t_event_impl() : t_event_impl(expression{})
 {
 }
 
-template <typename T>
-void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
+template <typename T, bool B>
+void t_event_impl<T, B>::finalise_ctor(callback_t cb, T cd, event_direction d)
 {
     using std::isfinite;
 
@@ -1495,17 +1495,17 @@ void t_event_impl<T>::finalise_ctor(callback_t cb, T cd, event_direction d)
     dir = d;
 }
 
-template <typename T>
-t_event_impl<T>::t_event_impl(const t_event_impl &o)
+template <typename T, bool B>
+t_event_impl<T, B>::t_event_impl(const t_event_impl &o)
     : eq(copy(o.eq)), callback(o.callback), cooldown(o.cooldown), dir(o.dir)
 {
 }
 
-template <typename T>
-t_event_impl<T>::t_event_impl(t_event_impl &&) noexcept = default;
+template <typename T, bool B>
+t_event_impl<T, B>::t_event_impl(t_event_impl &&) noexcept = default;
 
-template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
+template <typename T, bool B>
+t_event_impl<T, B> &t_event_impl<T, B>::operator=(const t_event_impl &o)
 {
     if (this != &o) {
         *this = t_event_impl(o);
@@ -1514,47 +1514,47 @@ t_event_impl<T> &t_event_impl<T>::operator=(const t_event_impl<T> &o)
     return *this;
 }
 
-template <typename T>
-t_event_impl<T> &t_event_impl<T>::operator=(t_event_impl<T> &&) noexcept = default;
+template <typename T, bool B>
+t_event_impl<T, B> &t_event_impl<T, B>::operator=(t_event_impl &&) noexcept = default;
 
-template <typename T>
-t_event_impl<T>::~t_event_impl() = default;
+template <typename T, bool B>
+t_event_impl<T, B>::~t_event_impl() = default;
 
-template <typename T>
-const expression &t_event_impl<T>::get_expression() const
+template <typename T, bool B>
+const expression &t_event_impl<T, B>::get_expression() const
 {
     return eq;
 }
 
-template <typename T>
-const typename t_event_impl<T>::callback_t &t_event_impl<T>::get_callback() const
+template <typename T, bool B>
+const typename t_event_impl<T, B>::callback_t &t_event_impl<T, B>::get_callback() const
 {
     return callback;
 }
 
-template <typename T>
-event_direction t_event_impl<T>::get_direction() const
+template <typename T, bool B>
+event_direction t_event_impl<T, B>::get_direction() const
 {
     return dir;
 }
 
-template <typename T>
-T t_event_impl<T>::get_cooldown() const
+template <typename T, bool B>
+T t_event_impl<T, B>::get_cooldown() const
 {
     return cooldown;
 }
 
 // Explicit instantiation of the implementation classes/functions.
-template class nt_event_impl<double>;
-template class t_event_impl<double>;
+template class nt_event_impl<double, false>;
+template class t_event_impl<double, false>;
 
-template class nt_event_impl<long double>;
-template class t_event_impl<long double>;
+template class nt_event_impl<long double, false>;
+template class t_event_impl<long double, false>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template class nt_event_impl<mppp::real128>;
-template class t_event_impl<mppp::real128>;
+template class nt_event_impl<mppp::real128, false>;
+template class t_event_impl<mppp::real128, false>;
 
 #endif
 

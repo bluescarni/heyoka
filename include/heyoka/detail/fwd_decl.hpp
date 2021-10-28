@@ -36,10 +36,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl;
 template <typename>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl;
 
-template <typename>
+template <typename, bool>
 class HEYOKA_DLL_PUBLIC nt_event_impl;
 
-template <typename>
+template <typename, bool>
 class HEYOKA_DLL_PUBLIC t_event_impl;
 
 } // namespace detail
