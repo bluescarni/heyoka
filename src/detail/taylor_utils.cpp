@@ -1289,115 +1289,6 @@ std::ostream &operator<<(std::ostream &os, const taylor_adaptive_batch_impl<mppp
 
 #endif
 
-namespace
-{
-
-// Implementation of stream insertion for the non-terminal event class.
-std::ostream &nt_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
-{
-    os << "Event type     : non-terminal\n";
-    os << "Event equation : " << eq << '\n';
-    os << "Event direction: " << dir << '\n';
-
-    return os;
-}
-
-// Implementation of stream insertion for the terminal event class.
-template <typename C, typename T>
-std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
-                                       const T &cooldown)
-{
-    os << "Event type     : terminal\n";
-    os << "Event equation : " << eq << '\n';
-    os << "Event direction: " << dir << '\n';
-    os << "With callback  : " << (callback ? "yes" : "no") << '\n';
-    os << "Cooldown       : " << (cooldown < 0 ? "auto" : "{}"_format(cooldown)) << '\n';
-
-    return os;
-}
-
-} // namespace
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, true> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, false> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, true> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, false> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, true> &e)
-{
-    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
-}
-
-#endif
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<double, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, false> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-template <>
-std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, true> &e)
-{
-    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
-}
-
-#endif
-
 } // namespace detail
 
 #define HEYOKA_TAYLOR_ENUM_STREAM_CASE(val)                                                                            \
@@ -1596,6 +1487,115 @@ T t_event_impl<T, B>::get_cooldown() const
 {
     return cooldown;
 }
+
+namespace
+{
+
+// Implementation of stream insertion for the non-terminal event class.
+std::ostream &nt_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir)
+{
+    os << "Event type     : non-terminal\n";
+    os << "Event equation : " << eq << '\n';
+    os << "Event direction: " << dir << '\n';
+
+    return os;
+}
+
+// Implementation of stream insertion for the terminal event class.
+template <typename C, typename T>
+std::ostream &t_event_impl_stream_impl(std::ostream &os, const expression &eq, event_direction dir, const C &callback,
+                                       const T &cooldown)
+{
+    os << "Event type     : terminal\n";
+    os << "Event equation : " << eq << '\n';
+    os << "Event direction: " << dir << '\n';
+    os << "With callback  : " << (callback ? "yes" : "no") << '\n';
+    os << "Cooldown       : " << (cooldown < 0 ? "auto" : "{}"_format(cooldown)) << '\n';
+
+    return os;
+}
+
+} // namespace
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, true> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, true> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, true> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+#endif
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<double, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+#endif
 
 // Explicit instantiation of the implementation classes/functions.
 template class nt_event_impl<double, false>;
