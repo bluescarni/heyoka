@@ -370,7 +370,8 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
+    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_impl<T> &, T, int, std::uint32_t),
+                                                   void(taylor_adaptive_impl<T> &, T, int)>>;
 
 private:
     expression eq;
@@ -440,14 +441,20 @@ inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, true> &);
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, true> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, true> &);
 
 #endif
 
@@ -457,7 +464,8 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
+    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_impl<T> &, bool, int, std::uint32_t),
+                                                   bool(taylor_adaptive_impl<T> &, bool, int)>>;
 
 private:
     expression eq;
@@ -547,14 +555,20 @@ inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, true> &);
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, true> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, true> &);
 
 #endif
 
@@ -565,6 +579,12 @@ using nt_event = detail::nt_event_impl<T, false>;
 
 template <typename T>
 using t_event = detail::t_event_impl<T, false>;
+
+template <typename T>
+using nt_batch_event = detail::nt_event_impl<T, true>;
+
+template <typename T>
+using t_batch_event = detail::t_event_impl<T, true>;
 
 namespace detail
 {

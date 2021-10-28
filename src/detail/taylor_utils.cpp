@@ -1325,7 +1325,19 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, false> &e
 }
 
 template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<double, true> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, true> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
@@ -1334,6 +1346,12 @@ std::ostream &operator<<(std::ostream &os, const nt_event_impl<long double, fals
 
 template <>
 std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, false> &e)
+{
+    return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const nt_event_impl<mppp::real128, true> &e)
 {
     return nt_event_impl_stream_impl(os, e.get_expression(), e.get_direction());
 }
@@ -1347,7 +1365,19 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<double, false> &e)
 }
 
 template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<double, true> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, true> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
@@ -1356,6 +1386,12 @@ std::ostream &operator<<(std::ostream &os, const t_event_impl<long double, false
 
 template <>
 std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, false> &e)
+{
+    return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const t_event_impl<mppp::real128, true> &e)
 {
     return t_event_impl_stream_impl(os, e.get_expression(), e.get_direction(), e.get_callback(), e.get_cooldown());
 }
@@ -1412,8 +1448,25 @@ std::ostream &operator<<(std::ostream &os, event_direction dir)
 namespace detail
 {
 
+namespace
+{
+
+// Helper to create the callback used in the default
+// constructor of a non-terminal event.
 template <typename T, bool B>
-nt_event_impl<T, B>::nt_event_impl() : nt_event_impl(expression{}, [](taylor_adaptive_impl<T> &, T, int) {})
+auto nt_event_def_cb()
+{
+    if constexpr (B) {
+        return [](taylor_adaptive_impl<T> &, T, int, std::uint32_t) {};
+    } else {
+        return [](taylor_adaptive_impl<T> &, T, int) {};
+    }
+}
+
+} // namespace
+
+template <typename T, bool B>
+nt_event_impl<T, B>::nt_event_impl() : nt_event_impl(expression{}, nt_event_def_cb<T, B>())
 {
 }
 
@@ -1548,13 +1601,22 @@ T t_event_impl<T, B>::get_cooldown() const
 template class nt_event_impl<double, false>;
 template class t_event_impl<double, false>;
 
+template class nt_event_impl<double, true>;
+template class t_event_impl<double, true>;
+
 template class nt_event_impl<long double, false>;
 template class t_event_impl<long double, false>;
+
+template class nt_event_impl<long double, true>;
+template class t_event_impl<long double, true>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class nt_event_impl<mppp::real128, false>;
 template class t_event_impl<mppp::real128, false>;
+
+template class nt_event_impl<mppp::real128, true>;
+template class t_event_impl<mppp::real128, true>;
 
 #endif
 
