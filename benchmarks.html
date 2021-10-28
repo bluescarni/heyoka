@@ -277,6 +277,11 @@
    The outer Solar System
   </a>
  </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#event-detection">
+   Event detection
+  </a>
+ </li>
 </ul>
 
             </nav>
@@ -295,23 +300,23 @@ ODE integration packages. Specifically, we compare heyoka to:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>, a popular Julia
 library implementing several ODE solvers. In these benchmarks, we will be using
-the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> explicit Runge-Kutta solver (which is the
-<a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">recommended solver</a>
-for low-tolerance integrations of non-stiff problems in double precision);</p></li>
+explicit Runge-Kutta solvers such as <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and <code class="docutils literal notranslate"><span class="pre">DP8</span></code> (see
+<a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">here</a> for a list of
+ODE solvers available in DifferentialEquations.jl);</p></li>
 <li><p><a class="reference external" href="https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html">Boost.ODEInt</a>,
 a C++ package implementing various algorithms for the solution of systems of ODEs. In these
 benchmarks, we will be using the explicit Runge-Kutta-Fehlberg 78 solver;</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>,
+<li><p>the <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>,
 a popular N-body integration package. Like heyoka, <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is a high-precision
 non-symplectic integrator with adaptive timestepping capable of conserving the
 dynamical invariants over billions of dynamical timescales. Note, however, that
 <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is not a general-purpose integrator, and thus we will be able to use
 it only in benchmarks involving gravitational N-body systems.</p></li>
 </ul>
-<p>Note that the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> integrator from <a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a> by default
-enables dense output, which however incurs in a heavy computational cost. While heyoka also supports
+<p>Note that the integrators from DifferentialEquations.jl by default
+enable dense output, which however incurs in a heavy computational cost. While heyoka also supports
 <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>, this feature is opt-in and its performance impact is much more limited.
-In these benchmarks, we will be testing both heyoka and <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> with and without dense output.</p>
+In these benchmarks, we will be testing both with and without dense output.</p>
 <p>All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
 <a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.
 The benchmarks’ source code is available in the <a class="reference external" href="https://github.com/bluescarni/heyoka/tree/master/benchmark">github repository</a>.</p>
@@ -331,7 +336,7 @@ with the result of a numerical integration in quadruple precision with a toleran
 <p>We can see how, without dense output, heyoka is about 3 times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. When dense output is requested,
 heyoka’s runtime increases by a modest <span class="math notranslate nohighlight">\(\sim 24\%\)</span>, whereas for <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> the runtime increases by a factor of
 <span class="math notranslate nohighlight">\(\sim 3\)</span>, so that, with dense output, heyoka is about <span class="math notranslate nohighlight">\(\sim 7\)</span> times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. Performance-wise,
-Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that Boost.ODEInt does not support dense output).</p>
+Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that the RKF78 integrator from Boost.ODEInt does not support dense output).</p>
 <p>From the point of view of the integration accuracy, we can see how the RMS of the error across the components of the state
 vector with respect to the quadruple-precision integration is of the order of <span class="math notranslate nohighlight">\(10^{-9}\)</span> for heyoka, while for both
 <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and Boost.ODEInt the error is about <span class="math notranslate nohighlight">\(\sim 35\)</span> times larger.</p>
@@ -354,7 +359,50 @@ The initial conditions are taken from <a class="reference external" href="https:
 <p>For this benchmark, we will be comparing heyoka to the <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>.</p>
 <p>Here are the results:</p>
 <a class="reference internal image-reference" href="_images/outer_ss_bench.png"><img alt="Outer Solar System benchmark" class="align-center" src="_images/outer_ss_bench.png" style="width: 576.0px; height: 360.0px;" /></a>
-<p>We can see how heyoka is about 5 times faster than <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> in this specific test.</p>
+<p>We can see how heyoka is about 5 times faster than <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> in this specific test. A detailed performance comparison with <code class="docutils literal notranslate"><span class="pre">IAS15</span></code>
+is available in the <a class="reference external" href="https://arxiv.org/abs/2105.00800">heyoka paper</a>.</p>
+</div>
+<div class="section" id="event-detection">
+<h2>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h2>
+<p>In this benchmark we measure the overhead of heyoka’s <a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">event detection</span></a> system and compare it to
+the <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and <code class="docutils literal notranslate"><span class="pre">DP8</span></code> integrators from DifferentialEquations.jl.
+We consider the dynamical system studied by Hénon and Heiles in a
+<a class="reference external" href="https://ui.adsabs.harvard.edu/abs/1964AJ.....69...73H/abstract">famous numerical experiment</a> investigating
+the existence of additional integrals of motion in axisymmetric potentials. The differential equations are:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+v_x^\prime &amp;= -x-2xy \\
+v_y^\prime &amp;= y^2-y-x^2 \\
+x^\prime &amp;= v_x \\
+y^\prime &amp;= v_y
+\end{cases},\end{split}\]</div>
+<p>with initial conditions</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\begin{cases}
+v_x\left(0\right) &amp;= -0.2525875586263492  \\
+v_y\left(0\right) &amp;= -0.2178423952983717  \\
+x\left(0\right) &amp;= 0  \\
+y\left(0\right) &amp;=  0.2587703282931232 \\
+\end{cases}.\end{split}\]</div>
+<p>Our objective is to compute the <a class="reference external" href="https://en.wikipedia.org/wiki/Poincar%C3%A9_map">Poincaré section</a>
+of the solution on the <span class="math notranslate nohighlight">\(\left( y,v_y \right)\)</span> plane. This can be accomplished by setting up the event equation</p>
+<div class="math notranslate nohighlight">
+\[x = 0\]</div>
+<p>to detect when the solution crosses the <span class="math notranslate nohighlight">\(\left( y,v_y \right)\)</span> plane. Like in the original paper,
+we impose the additional constraint that the event direction must be <em>positive</em> (i.e., we only detect
+crossing of the plane from below). The total integration time is <span class="math notranslate nohighlight">\(2000\)</span> time units and the tolerance
+is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>. For both heyoka and the DifferentialEquations.jl integrators, we measure the runtime
+both with and without event detection.</p>
+<p>Here are the results:</p>
+<img alt="Event detection benchmark" class="align-center" src="_images/event_det.png" />
+<p>We can see how heyoka’s event detection system has a much lower overhead than the event detection system in
+DifferentialEquations.jl. heyoka’s event detection system combines the free dense output from Taylor’s method
+with state-of-the-art polynomial root finding techniques to provide an event-detection methodology which is
+both rigorous and computationally efficient. By contrast, DifferentialEquations.jl adopts the approach
+of checking for sign changes in the event equation using the interpolant of the solution
+within a timestep at discrete points. Note that
+this approach is not rigorous, in the sense that if the event equation has two zeroes between the interpolation
+points the event will be missed. By contrast, heyoka’s approach does not suffer from this issue.</p>
 </div>
 </div>
 
