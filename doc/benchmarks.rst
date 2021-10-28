@@ -8,23 +8,23 @@ ODE integration packages. Specifically, we compare heyoka to:
 
 - `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__, a popular Julia
   library implementing several ODE solvers. In these benchmarks, we will be using
-  the ``Vern9`` explicit Runge-Kutta solver (which is the
-  `recommended solver <https://diffeq.sciml.ai/stable/solvers/ode_solve/>`__
-  for low-tolerance integrations of non-stiff problems in double precision);
+  explicit Runge-Kutta solvers such as ``Vern9`` and ``DP8`` (see
+  `here <https://diffeq.sciml.ai/stable/solvers/ode_solve/>`__ for a list of
+  ODE solvers available in DifferentialEquations.jl);
 - `Boost.ODEInt <https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html>`__,
   a C++ package implementing various algorithms for the solution of systems of ODEs. In these
   benchmarks, we will be using the explicit Runge-Kutta-Fehlberg 78 solver;
-- The ``IAS15`` integrator from `REBOUND <https://github.com/hannorein/rebound>`__,
+- the ``IAS15`` integrator from `REBOUND <https://github.com/hannorein/rebound>`__,
   a popular N-body integration package. Like heyoka, ``IAS15`` is a high-precision
   non-symplectic integrator with adaptive timestepping capable of conserving the
   dynamical invariants over billions of dynamical timescales. Note, however, that
   ``IAS15`` is not a general-purpose integrator, and thus we will be able to use
   it only in benchmarks involving gravitational N-body systems.
 
-Note that the ``Vern9`` integrator from `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__ by default
-enables dense output, which however incurs in a heavy computational cost. While heyoka also supports
+Note that the integrators from DifferentialEquations.jl by default
+enable dense output, which however incurs in a heavy computational cost. While heyoka also supports
 :ref:`dense output <tut_d_output>`, this feature is opt-in and its performance impact is much more limited.
-In these benchmarks, we will be testing both heyoka and ``Vern9`` with and without dense output.
+In these benchmarks, we will be testing both with and without dense output.
 
 All benchmarks were run on an Intel Xeon Platinum 8360Y CPU. More benchmark results are available in the
 `heyoka paper <https://arxiv.org/abs/2105.00800>`__.
@@ -53,7 +53,7 @@ Let us see first the results for an error tolerance of :math:`10^{-15}`:
 We can see how, without dense output, heyoka is about 3 times faster than ``Vern9``. When dense output is requested,
 heyoka's runtime increases by a modest :math:`\sim 24\%`, whereas for ``Vern9`` the runtime increases by a factor of
 :math:`\sim 3`, so that, with dense output, heyoka is about :math:`\sim 7` times faster than ``Vern9``. Performance-wise,
-Boost.ODEint is comparable to ``Vern9`` (note that Boost.ODEInt does not support dense output).
+Boost.ODEint is comparable to ``Vern9`` (note that the RKF78 integrator from Boost.ODEInt does not support dense output).
 
 From the point of view of the integration accuracy, we can see how the RMS of the error across the components of the state
 vector with respect to the quadruple-precision integration is of the order of :math:`10^{-9}` for heyoka, while for both
@@ -92,4 +92,62 @@ Here are the results:
   :align: center
   :alt: Outer Solar System benchmark
 
-We can see how heyoka is about 5 times faster than ``IAS15`` in this specific test.
+We can see how heyoka is about 5 times faster than ``IAS15`` in this specific test. A detailed performance comparison with ``IAS15``
+is available in the `heyoka paper <https://arxiv.org/abs/2105.00800>`__.
+
+Event detection
+---------------
+
+In this benchmark we measure the overhead of heyoka's :ref:`event detection <tut_events>` system and compare it to
+the ``Vern9`` and ``DP8`` integrators from DifferentialEquations.jl.
+We consider the dynamical system studied by Hénon and Heiles in a
+`famous numerical experiment <https://ui.adsabs.harvard.edu/abs/1964AJ.....69...73H/abstract>`__ investigating
+the existence of additional integrals of motion in axisymmetric potentials. The differential equations are:
+
+.. math::
+
+   \begin{cases}
+   v_x^\prime &= -x-2xy \\
+   v_y^\prime &= y^2-y-x^2 \\
+   x^\prime &= v_x \\
+   y^\prime &= v_y
+   \end{cases},
+
+with initial conditions
+
+.. math::
+
+   \begin{cases}
+   v_x\left(0\right) &= -0.2525875586263492  \\
+   v_y\left(0\right) &= -0.2178423952983717  \\
+   x\left(0\right) &= 0  \\
+   y\left(0\right) &=  0.2587703282931232 \\
+   \end{cases}.
+
+Our objective is to compute the `Poincaré section <https://en.wikipedia.org/wiki/Poincar%C3%A9_map>`__
+of the solution on the :math:`\left( y,v_y \right)` plane. This can be accomplished by setting up the event equation
+
+.. math::
+
+   x = 0
+
+to detect when the solution crosses the :math:`\left( y,v_y \right)` plane. Like in the original paper,
+we impose the additional constraint that the event direction must be *positive* (i.e., we only detect
+crossing of the plane from below). The total integration time is :math:`2000` time units and the tolerance
+is set to :math:`10^{-15}`. For both heyoka and the DifferentialEquations.jl integrators, we measure the runtime
+both with and without event detection.
+
+Here are the results:
+
+.. image:: images/event_det.png
+  :align: center
+  :alt: Event detection benchmark
+
+We can see how heyoka's event detection system has a much lower overhead than the event detection system in
+DifferentialEquations.jl. heyoka's event detection system combines the free dense output from Taylor's method
+with state-of-the-art polynomial root finding techniques to provide an event-detection methodology which is
+both rigorous and computationally efficient. By contrast, DifferentialEquations.jl adopts the approach
+of checking for sign changes in the event equation using the interpolant of the solution
+within a timestep at discrete points. Note that
+this approach is not rigorous, in the sense that if the event equation has two zeroes between the interpolation
+points the event will be missed. By contrast, heyoka's approach does not suffer from this issue.
