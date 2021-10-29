@@ -3649,6 +3649,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 {
     using std::isfinite;
 
+    // LCOV_EXCL_START
     // Check preconditions.
     assert(max_delta_ts.size() == m_batch_size);
     assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
@@ -3658,6 +3659,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 
     // Sanity check.
     assert(m_step_res.size() == m_batch_size);
+    // LCOV_EXCL_STOP
 
     // Copy max_delta_ts to the tmp buffer.
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
