@@ -1019,14 +1019,22 @@ private:
         using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
         // fex_check function type.
         using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+#endif
 
         // The vector of terminal events.
-        std::vector<t_event<T>> m_tes;
+        std::vector<t_event_t> m_tes;
         // The vector of non-terminal events.
-        std::vector<nt_event<T>> m_ntes;
+        std::vector<nt_event_t> m_ntes;
         // The jet of derivatives for the state variables
         // and the events.
         std::vector<T> m_ev_jet;
+        // The vector to store the norm infinity of the state
+        // vector when using the stepper with events.
+        std::vector<T> m_max_abs_state;
+        // The vector to store the the maximum absolute error
+        // on the Taylor series of the event equations.
+        std::vector<T> m_g_eps;
+#if 0
         // Vector of detected terminal events.
         std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
         // The vector of cooldowns for the terminal events.
@@ -1055,7 +1063,7 @@ private:
 #endif
 
         // Constructors.
-        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
+        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 

@@ -3464,9 +3464,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
 
     // Init the event data structure if needed.
     // NOTE: this can be done in parallel with the rest of the constructor,
-    // once we have m_order/m_dim and we are done using tes/ntes.
+    // once we have m_order/m_dim/m_batch_size and we are done using tes/ntes.
     if (with_events) {
-        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim);
+        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim, m_batch_size);
     }
 }
 
@@ -3664,10 +3664,6 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
     // Copy max_delta_ts to the tmp buffer.
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
 
-    // Invoke the stepper.
-    std::get<0>(m_step_f)(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
-                          wtc ? m_tc.data() : nullptr);
-
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
     auto check_nf_batch = [this](std::uint32_t batch_idx) {
@@ -3679,27 +3675,81 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
         return false;
     };
 
-    // Update the times and the last timesteps, and write out the result.
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        // The timestep that was actually used for
-        // this batch element.
-        const auto h = m_delta_ts[i];
+    if (m_step_f.index() == 0u) {
+        assert(!m_ed_data); // LCOV_EXCL_LINE
 
-        // Compute the new time in double-length arithmetic.
-        const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
-        m_time_hi[i] = new_time.hi;
-        m_time_lo[i] = new_time.lo;
+        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
+                              wtc ? m_tc.data() : nullptr);
 
-        // Update the size of the last timestep.
-        m_last_h[i] = h;
+        // Update the times and the last timesteps, and write out the result.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // The timestep that was actually used for
+            // this batch element.
+            const auto h = m_delta_ts[i];
 
-        if (!isfinite(new_time) || check_nf_batch(i)) {
-            // Either the new time or state contain non-finite values,
-            // return an error condition.
-            m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
-        } else {
-            m_step_res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            // Compute the new time in double-length arithmetic.
+            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            m_time_hi[i] = new_time.hi;
+            m_time_lo[i] = new_time.lo;
+
+            // Update the size of the last timestep.
+            m_last_h[i] = h;
+
+            if (!isfinite(new_time) || check_nf_batch(i)) {
+                // Either the new time or state contain non-finite values,
+                // return an error condition.
+                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+            } else {
+                m_step_res[i]
+                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            }
         }
+    } else {
+        assert(m_ed_data); // LCOV_EXCL_LINE
+
+        auto &ed_data = *m_ed_data;
+
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
+        // event equations at the beginning of the timestep for later use.
+        std::get<1>(m_step_f)(ed_data.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
+                              m_delta_ts.data(), ed_data.m_max_abs_state.data());
+
+        // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
+        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
+        // in ed_data.detect_events() we skip event detection altogether.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto max_abs_state = ed_data.m_max_abs_state[i];
+
+            if (isfinite(max_abs_state)) {
+                // Are we in absolute or relative error control mode?
+                const auto abs_or_rel = max_abs_state < 1;
+
+                // Estimate the size of the largest remainder in the Taylor
+                // series of both the dynamical equations and the events.
+                const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // integration error cannot be too small due to floating-point truncation.
+                // This is the case for instance if we use sub-epsilon integration tolerances
+                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+                // using eps * max_abs_state as an estimation of the smallest number
+                // that can be resolved with the current floating-point type.
+                // NOTE: the if condition in the next line is equivalent, in relative
+                // error control mode, to:
+                // if (m_tol < std::numeric_limits<T>::epsilon())
+                if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
+                    ed_data.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
+                } else {
+                    ed_data.m_g_eps[i] = max_r_size;
+                }
+            } else {
+                ed_data.m_g_eps[i] = std::numeric_limits<T>::infinity();
+            }
+        }
+
+        // Write unconditionally the tcs.
+        std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size,
+                  m_tc.data());
     }
 }
 

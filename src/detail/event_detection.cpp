@@ -1303,12 +1303,45 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data() = default;
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
-                                                std::uint32_t order, std::uint32_t dim)
+                                                std::uint32_t order, std::uint32_t dim, std::uint32_t batch_size)
+    : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
+    assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
+    assert(batch_size != 0u);                  // LCOV_EXCL_LINE
+
+    // NOTE: the numeric cast will also ensure that we can
+    // index into the events using 32-bit ints.
+    const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
+    const auto n_ntes = boost::numeric_cast<std::uint32_t>(m_ntes.size());
+
+    // Setup m_ev_jet.
+    // NOTE: check that we can represent
+    // the requested size for m_ev_jet using
+    // both its size type and std::uint32_t.
+    // LCOV_EXCL_START
+    if (n_tes > std::numeric_limits<std::uint32_t>::max() - n_ntes || order == std::numeric_limits<std::uint32_t>::max()
+        || dim > std::numeric_limits<std::uint32_t>::max() - (n_tes + n_ntes)
+        || dim + (n_tes + n_ntes) > std::numeric_limits<std::uint32_t>::max() / (order + 1u)
+        || (dim + (n_tes + n_ntes)) * (order + 1u) > std::numeric_limits<std::uint32_t>::max() / batch_size
+        || (dim + (n_tes + n_ntes)) * (order + 1u)
+               > std::numeric_limits<decltype(m_ev_jet.size())>::max() / batch_size) {
+        throw std::overflow_error(
+            "Overflow detected in the initialisation of an adaptive Taylor integrator in batch mode: the order "
+            "or the state size is too large");
+    }
+    // LCOV_EXCL_STOP
+    m_ev_jet.resize((dim + (n_tes + n_ntes)) * (order + 1u) * batch_size);
+
+    // Prepare m_max_abs_state.
+    m_max_abs_state.resize(batch_size);
+
+    // Prepare m_g_eps.
+    m_g_eps.resize(batch_size);
 }
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::ed_data::ed_data(const ed_data &o)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps)
 {
 }
 
@@ -1318,11 +1351,21 @@ taylor_adaptive_batch_impl<T>::ed_data::~ed_data() = default;
 template <typename T>
 void taylor_adaptive_batch_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
 {
+    ar << m_tes;
+    ar << m_ntes;
+    ar << m_ev_jet;
+    ar << m_max_abs_state;
+    ar << m_g_eps;
 }
 
 template <typename T>
 void taylor_adaptive_batch_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
 {
+    ar >> m_tes;
+    ar >> m_ntes;
+    ar >> m_ev_jet;
+    ar >> m_max_abs_state;
+    ar >> m_g_eps;
 }
 
 // Instantiate the book-keeping structure for event detection
