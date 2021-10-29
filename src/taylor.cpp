@@ -3353,22 +3353,28 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     const auto npars = n_pars_in_dc(m_dc);
     // LCOV_EXCL_START
     if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
-        throw std::overflow_error(
-            "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
+        throw std::overflow_error("Overflow detected when computing the size of the parameter array in an adaptive "
+                                  "Taylor integrator in batch mode");
     }
     // LCOV_EXCL_STOP
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
-        throw std::invalid_argument(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
-            "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
+        throw std::invalid_argument("Excessive number of parameter values passed to the constructor of an adaptive "
+                                    "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
+                                    "system contains only {} parameters "
+                                    "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
     }
+
+    // Log runtimes in trace mode.
+    spdlog::stopwatch sw;
 
     // Add the function for the computation of
     // the dense output.
     taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size, high_accuracy);
+
+    get_logger()->trace("Taylor batch dense output runtime: {}", sw);
+    sw.reset();
 
     // Restore the original optimisation level in s.
     od.reset();
@@ -3376,8 +3382,13 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
+    get_logger()->trace("Taylor batch global opt pass runtime: {}", sw);
+    sw.reset();
+
     // Run the jit.
     m_llvm.compile();
+
+    get_logger()->trace("Taylor batch LLVM compilation runtime: {}", sw);
 
     // Fetch the stepper.
     m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
@@ -3389,8 +3400,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // LCOV_EXCL_START
     if (m_order == std::numeric_limits<std::uint32_t>::max()
         || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
+        throw std::overflow_error(
+            "Overflow detected in the initialisation of an adaptive Taylor integrator in batch mode: the order "
+            "or the state size is too large");
     }
     // LCOV_EXCL_STOP
 

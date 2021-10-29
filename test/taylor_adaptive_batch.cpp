@@ -692,15 +692,15 @@ TEST_CASE("param too many")
 
     auto [x, v] = make_vars("x", "v");
 
-    REQUIRE_THROWS_MATCHES(
-        (void)(taylor_adaptive_batch<double>{{prime(x) = v + par[0], prime(v) = -9.8 * sin(x)},
-                                             {0.05, 0.06, 0.025, 0.026},
-                                             2u,
-                                             kw::pars = std::vector{1., 2., 3.}}),
-        std::invalid_argument,
-        Message("Excessive number of parameter values passed to the constructor of an adaptive "
-                "Taylor integrator: 3 parameter values were passed, but the ODE system contains only 1 parameters "
-                "(in batches of 2)"));
+    REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v + par[0], prime(v) = -9.8 * sin(x)},
+                                                                {0.05, 0.06, 0.025, 0.026},
+                                                                2u,
+                                                                kw::pars = std::vector{1., 2., 3.}}),
+                           std::invalid_argument,
+                           Message("Excessive number of parameter values passed to the constructor of an adaptive "
+                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
+                                   "system contains only 1 parameters "
+                                   "(in batches of 2)"));
 }
 
 template <typename Oa, typename Ia>
