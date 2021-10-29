@@ -742,7 +742,7 @@ taylor_adaptive_impl<T>::ed_data::ed_data(const ed_data &o)
     : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_te_cooldowns(o.m_te_cooldowns), m_state(o.m_state),
       m_poly_cache(o.m_poly_cache)
 {
-    // For the vector of detected events, just reserve the same amount of space.
+    // For the vectors of detected events, just reserve the same amount of space.
     // These vectors are cleared out anyway during event detection.
     m_d_tes.reserve(o.m_d_tes.capacity());
     m_d_ntes.reserve(o.m_d_ntes.capacity());
