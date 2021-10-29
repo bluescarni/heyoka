@@ -3594,6 +3594,7 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_t_dir;
     ar >> m_rem_time;
     ar >> m_d_out_time;
+    ar >> m_ed_data;
 
     // Recover the function pointers.
     if (m_ed_data) {
