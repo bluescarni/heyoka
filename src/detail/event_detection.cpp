@@ -691,6 +691,8 @@ taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vecto
                                           std::uint32_t dim)
     : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
+    assert(!m_tes.empty() || !m_ntes.empty()); // LCOV_EXCL_LINE
+
     // NOTE: the numeric cast will also ensure that we can
     // index into the events using 32-bit ints.
     const auto n_tes = boost::numeric_cast<std::uint32_t>(m_tes.size());
