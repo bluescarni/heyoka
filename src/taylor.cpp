@@ -2615,7 +2615,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in taylor_detect_events we skip event detection altogether.
+        // in ed_data.detect_events() we skip event detection altogether.
         T g_eps;
         if (isfinite(max_abs_state)) {
             // Are we in absolute or relative error control mode?
@@ -2661,7 +2661,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // for backward integration, thus we compare using
         // abs() so that the first events are those which
         // happen closer to the beginning of the timestep.
-        // NOTE: the checks inside taylor_detect_events() ensure
+        // NOTE: the checks inside ed_data.detect_events() ensure
         // that we can safely sort the events' times.
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(ed_data.m_d_tes.begin(), ed_data.m_d_tes.end(), cmp);
