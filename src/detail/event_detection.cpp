@@ -1295,4 +1295,43 @@ template struct taylor_adaptive_impl<mppp::real128>::ed_data;
 
 #endif
 
+// NOTE: the def ctor is used only for serialisation purposes.
+template <typename T>
+taylor_adaptive_batch_impl<T>::ed_data::ed_data() = default;
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                                std::uint32_t order, std::uint32_t dim)
+{
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::ed_data::ed_data(const ed_data &o)
+{
+}
+
+template <typename T>
+taylor_adaptive_batch_impl<T>::ed_data::~ed_data() = default;
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::ed_data::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::ed_data::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+}
+
+// Instantiate the book-keeping structure for event detection
+// in the batch integrator.
+template struct taylor_adaptive_batch_impl<double>::ed_data;
+template struct taylor_adaptive_batch_impl<long double>::ed_data;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template struct taylor_adaptive_batch_impl<mppp::real128>::ed_data;
+
+#endif
+
 } // namespace heyoka::detail
