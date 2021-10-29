@@ -3750,6 +3750,9 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
         // Write unconditionally the tcs.
         std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size,
                   m_tc.data());
+
+        // Do the event detection.
+        ed_data.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
     }
 }
 

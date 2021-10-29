@@ -1337,12 +1337,39 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std:
 
     // Prepare m_g_eps.
     m_g_eps.resize(batch_size);
+
+    // Prepare m_d_tes.
+    m_d_tes.resize(boost::numeric_cast<decltype(m_d_tes.size())>(batch_size));
+
+    // Setup the vector of cooldowns.
+    m_te_cooldowns.resize(boost::numeric_cast<decltype(m_te_cooldowns.size())>(batch_size));
+    for (auto &v : m_te_cooldowns) {
+        v.resize(boost::numeric_cast<decltype(v.size())>(m_tes.size()));
+    }
+
+    // Prepare m_d_ntes.
+    m_d_ntes.resize(boost::numeric_cast<decltype(m_d_ntes.size())>(batch_size));
 }
 
 template <typename T>
 taylor_adaptive_batch_impl<T>::ed_data::ed_data(const ed_data &o)
-    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps)
+    : m_tes(o.m_tes), m_ntes(o.m_ntes), m_ev_jet(o.m_ev_jet), m_max_abs_state(o.m_max_abs_state), m_g_eps(o.m_g_eps),
+      m_te_cooldowns(o.m_te_cooldowns)
 {
+    // Fetch the batch size.
+    const auto batch_size = static_cast<std::uint32_t>(o.m_d_tes.size());
+
+    // Prepare m_d_tes with the correct size and capacities.
+    m_d_tes.resize(batch_size);
+    for (std::uint32_t i = 0; i < batch_size; ++i) {
+        m_d_tes[i].reserve(o.m_d_tes[i].capacity());
+    }
+
+    // Prepare m_d_ntes with the correct size and capacities.
+    m_d_ntes.resize(batch_size);
+    for (std::uint32_t i = 0; i < batch_size; ++i) {
+        m_d_ntes[i].reserve(o.m_d_ntes[i].capacity());
+    }
 }
 
 template <typename T>
@@ -1356,6 +1383,20 @@ void taylor_adaptive_batch_impl<T>::ed_data::save(boost::archive::binary_oarchiv
     ar << m_ev_jet;
     ar << m_max_abs_state;
     ar << m_g_eps;
+    ar << m_te_cooldowns;
+
+    // Save the batch size.
+    ar << static_cast<std::uint32_t>(m_d_tes.size());
+
+    // Save the capacities of m_d_tes.
+    for (const auto &v : m_d_tes) {
+        ar << v.capacity();
+    }
+
+    // Save the capacities of m_d_ntes.
+    for (const auto &v : m_d_ntes) {
+        ar << v.capacity();
+    }
 }
 
 template <typename T>
@@ -1366,6 +1407,43 @@ void taylor_adaptive_batch_impl<T>::ed_data::load(boost::archive::binary_iarchiv
     ar >> m_ev_jet;
     ar >> m_max_abs_state;
     ar >> m_g_eps;
+    ar >> m_te_cooldowns;
+
+    // Recover the batch size.
+    std::uint32_t batch_size{};
+    ar >> batch_size;
+
+    // Recover m_d_tes.
+    m_d_tes.resize(batch_size);
+    for (auto &v : m_d_tes) {
+        decltype(v.capacity()) cap{};
+        ar >> cap;
+        v.clear();
+        v.reserve(cap);
+    }
+
+    // Recover m_d_mtes.
+    m_d_ntes.resize(batch_size);
+    for (auto &v : m_d_ntes) {
+        decltype(v.capacity()) cap{};
+        ar >> cap;
+        v.clear();
+        v.reserve(cap);
+    }
+}
+
+// Implementation of event detection.
+template <typename T>
+void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::uint32_t order, std::uint32_t dim,
+                                                           std::uint32_t batch_size)
+{
+    // Clear the vectors of detected events.
+    for (std::uint32_t i = 0; i < batch_size; ++i) {
+        m_d_tes[i].clear();
+        m_d_ntes[i].clear();
+    }
+
+    assert(order >= 2u); // LCOV_EXCL_LINE
 }
 
 // Instantiate the book-keeping structure for event detection

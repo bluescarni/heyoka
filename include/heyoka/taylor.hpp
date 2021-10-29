@@ -1034,17 +1034,17 @@ private:
         // The vector to store the the maximum absolute error
         // on the Taylor series of the event equations.
         std::vector<T> m_g_eps;
-#if 0
         // Vector of detected terminal events.
-        std::vector<std::tuple<std::uint32_t, T, bool, int, T>> m_d_tes;
+        std::vector<std::vector<std::tuple<std::uint32_t, T, bool, int, T>>> m_d_tes;
         // The vector of cooldowns for the terminal events.
         // If an event is on cooldown, the corresponding optional
         // in this vector will contain the total time elapsed
         // since the cooldown started and the absolute value
         // of the cooldown duration.
-        std::vector<std::optional<std::pair<T, T>>> m_te_cooldowns;
+        std::vector<std::vector<std::optional<std::pair<T, T>>>> m_te_cooldowns;
         // Vector of detected non-terminal events.
-        std::vector<std::tuple<std::uint32_t, T, int>> m_d_ntes;
+        std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
+#if 0
         // The LLVM state.
         llvm_state m_state;
         // The JIT compiled functions used during root finding.
@@ -1073,7 +1073,7 @@ private:
         ed_data &operator=(ed_data &&) = delete;
 
         // The event detection function.
-        // void detect_events(T, std::uint32_t, std::uint32_t, T);
+        void detect_events(const T *, std::uint32_t, std::uint32_t, std::uint32_t);
 
     private:
         // Serialisation.
