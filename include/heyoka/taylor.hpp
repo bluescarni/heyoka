@@ -594,6 +594,11 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
+public:
+    using nt_event_t = nt_event<T>;
+    using t_event_t = t_event<T>;
+
+private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
         // The polynomial cache type. Each entry is a polynomial
@@ -614,9 +619,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
 
         // The vector of terminal events.
-        std::vector<t_event<T>> m_tes;
+        std::vector<t_event_t> m_tes;
         // The vector of non-terminal events.
-        std::vector<nt_event<T>> m_ntes;
+        std::vector<nt_event_t> m_ntes;
         // The jet of derivatives for the state variables
         // and the events.
         std::vector<T> m_ev_jet;
@@ -647,7 +652,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         poly_cache_t m_poly_cache;
 
         // Constructors.
-        ed_data(std::vector<t_event<T>>, std::vector<nt_event<T>>, std::uint32_t, std::uint32_t);
+        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 
@@ -670,11 +675,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         BOOST_SERIALIZATION_SPLIT_MEMBER()
     };
 
-public:
-    using nt_event_t = nt_event<T>;
-    using t_event_t = t_event<T>;
-
-private:
     // State vector.
     std::vector<T> m_state;
     // Time.
@@ -747,10 +747,6 @@ private:
 
             auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
-
-            // NOTE: perhaps the handling of the events kwargs can end up in
-            // taylor_adaptive_common_ops()
-            // once we implement event detection in the batch integrator too.
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {

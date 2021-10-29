@@ -687,8 +687,8 @@ template <typename T>
 taylor_adaptive_impl<T>::ed_data::ed_data() = default;
 
 template <typename T>
-taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event<T>> tes, std::vector<nt_event<T>> ntes,
-                                          std::uint32_t order, std::uint32_t dim)
+taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vector<nt_event_t> ntes, std::uint32_t order,
+                                          std::uint32_t dim)
     : m_tes(std::move(tes)), m_ntes(std::move(ntes))
 {
     // NOTE: the numeric cast will also ensure that we can
