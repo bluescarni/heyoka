@@ -589,6 +589,18 @@ using t_batch_event = detail::t_event_impl<T, true>;
 namespace detail
 {
 
+// Polynomial cache type. Each entry is a polynomial
+// represented as a vector of coefficients. Used
+// during event detection.
+template <typename T>
+using taylor_poly_cache = std::vector<std::vector<T>>;
+
+// A RAII helper to extract polys from a cache and
+// return them to the cache upon destruction. Used
+// during event detection.
+template <typename>
+class taylor_pwrap;
+
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
@@ -601,14 +613,8 @@ public:
 private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
-        // The polynomial cache type. Each entry is a polynomial
-        // represented as a vector of coefficients.
-        using poly_cache_t = std::vector<std::vector<T>>;
-        // A RAII helper to extract polys from a cache and
-        // return them to the cache upon destruction.
-        class pwrap;
         // The working list type used during real root isolation.
-        using wlist_t = std::vector<std::tuple<T, T, pwrap>>;
+        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
@@ -649,7 +655,7 @@ private:
         // The list of isolating intervals.
         isol_t m_isol;
         // The polynomial cache.
-        poly_cache_t m_poly_cache;
+        taylor_poly_cache<T> m_poly_cache;
 
         // Constructors.
         ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
@@ -1002,15 +1008,8 @@ public:
 private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
-#if 0
-        // The polynomial cache type. Each entry is a polynomial
-        // represented as a vector of coefficients.
-        using poly_cache_t = std::vector<std::vector<T>>;
-        // A RAII helper to extract polys from a cache and
-        // return them to the cache upon destruction.
-        class pwrap;
         // The working list type used during real root isolation.
-        using wlist_t = std::vector<std::tuple<T, T, pwrap>>;
+        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
@@ -1019,7 +1018,6 @@ private:
         using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
         // fex_check function type.
         using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
-#endif
 
         // The vector of terminal events.
         std::vector<t_event_t> m_tes;
@@ -1044,9 +1042,12 @@ private:
         std::vector<std::vector<std::optional<std::pair<T, T>>>> m_te_cooldowns;
         // Vector of detected non-terminal events.
         std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
-#if 0
         // The LLVM state.
         llvm_state m_state;
+        // Flags to signal if we are integrating backwards in time.
+        std::vector<std::uint32_t> m_back_int;
+        // Output of the fast exclusion check.
+        std::vector<std::uint32_t> m_fex_check_res;
         // The JIT compiled functions used during root finding.
         // NOTE: use default member initializers to ensure that
         // these are zero-inited by the default constructor
@@ -1059,8 +1060,7 @@ private:
         // The list of isolating intervals.
         isol_t m_isol;
         // The polynomial cache.
-        poly_cache_t m_poly_cache;
-#endif
+        taylor_poly_cache<T> m_poly_cache;
 
         // Constructors.
         ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
