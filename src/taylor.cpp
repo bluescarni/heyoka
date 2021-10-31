@@ -2673,16 +2673,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             h = std::get<1>(ed_data.m_d_tes[0]);
         }
 
-        // If we don't have terminal events, we will invoke the callbacks
-        // of *all* the non-terminal events. Otherwise, we need to figure
-        // out which non-terminal events do not happen because their time
-        // coordinate is past the the first terminal event.
-        const auto ntes_end_it
-            = ed_data.m_d_tes.empty()
-                  ? ed_data.m_d_ntes.end()
-                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
-                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
-
         // Update the state.
         m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), &h);
 
@@ -2721,6 +2711,16 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
                 }
             }
         }
+
+        // If we don't have terminal events, we will invoke the callbacks
+        // of *all* the non-terminal events. Otherwise, we need to figure
+        // out which non-terminal events do not happen because their time
+        // coordinate is past the the first terminal event.
+        const auto ntes_end_it
+            = ed_data.m_d_tes.empty()
+                  ? ed_data.m_d_ntes.end()
+                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
+                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
