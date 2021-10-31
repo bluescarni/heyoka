@@ -7,14 +7,18 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <iostream>
+#include <limits>
 #include <tuple>
 #include <vector>
 
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -182,5 +186,479 @@ TEST_CASE("single step te")
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
         tester(opt_level);
+    }
+}
+
+// Test for an event triggering exactly at the end of a timestep.
+TEST_CASE("linear box")
+{
+    using ev_t = taylor_adaptive_batch<double>::nt_event_t;
+
+    auto [x] = make_vars("x");
+
+    auto counter = 0u;
+
+    auto ta_ev = taylor_adaptive_batch<double>{
+        {prime(x) = par[0]},
+        {0., 0., 0., 0.},
+        4,
+        kw::nt_events = {ev_t(x - 1.,
+                              [&counter](taylor_adaptive_batch<double> &tint, double tm, int, std::uint32_t batch_idx) {
+                                  REQUIRE(tm == approximately(1 / tint.get_pars()[batch_idx]));
+                                  ++counter;
+                              })},
+        kw::pars = {1., 2., 4., 8.}};
+
+    // Check that the event triggers at the beginning of the second step.
+    ta_ev.step({1., 1 / 2., 1 / 4., 1 / 8.});
+
+    REQUIRE(counter == 0u);
+    REQUIRE(std::all_of(ta_ev.get_step_res().begin(), ta_ev.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    ta_ev.step({1., 1 / 2., 1 / 4., 1 / 8.});
+    REQUIRE(counter == 4u);
+    REQUIRE(std::all_of(ta_ev.get_step_res().begin(), ta_ev.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+}
+
+TEST_CASE("glancing blow test")
+{
+    std::cout << "Starting glancing blow test...\n";
+
+    // NOTE: in this test two spherical particles are
+    // "colliding" in a glancing fashion, meaning that
+    // the polynomial representing the evolution in time
+    // of the mutual distance has a repeated root at
+    // t = collision time.
+    using fp_t = double;
+
+    auto [x0, vx0, x1, vx1] = make_vars("x0", "vx0", "x1", "vx1");
+    auto [y0, vy0, y1, vy1] = make_vars("y0", "vy0", "y1", "vy1");
+
+    using ev_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+
+    auto counter = 0u;
+
+    // First setup: one particle still, the other moving with uniform velocity.
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x0) = vx0, prime(y0) = vy0, prime(x1) = vx1, prime(y1) = vy1, prime(vx0) = 0_dbl, prime(vy0) = 0_dbl,
+         prime(vx1) = 0_dbl, prime(vy1) = 0_dbl},
+        {0.,   0.,   0.,   0.,   //
+         0.,   0.,   0.,   0.,   //
+         -10., -10., -10., -10., //
+         6.,   2,    7.,   8.,   // Glancer on batch index 1.
+         0.,   0.,   0.,   0.,   //
+         0.,   0.,   0.,   0.,   //
+         1.,   1.,   1.,   1.,   //
+         0.,   0.,   0.,   0.},
+        4,
+        kw::nt_events
+        = {ev_t(square(x0 - x1) + square(y0 - y1) - 4., [&counter](auto &, fp_t t, int, std::uint32_t batch_idx) {
+              REQUIRE((t - 10.) * (t - 10.) <= std::numeric_limits<fp_t>::epsilon());
+              REQUIRE(batch_idx == 1u);
+
+              ++counter;
+          })}};
+
+    for (auto i = 0; i < 20; ++i) {
+        ta.step({1.3, 1.3, 1.3, 1.3});
+
+        REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                            [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+    }
+
+    // Any number of events up to 2 is acceptable here.
+    REQUIRE(counter <= 2u);
+
+    counter = 0;
+
+    // Second setup: one particle still, the other accelerating towards positive
+    // x direction with constant acceleration.
+    ta = taylor_adaptive_batch<fp_t>{{prime(x0) = vx0, prime(y0) = vy0, prime(x1) = vx1, prime(y1) = vy1,
+                                      prime(vx0) = 0_dbl, prime(vy0) = 0_dbl, prime(vx1) = .1_dbl, prime(vy1) = 0_dbl},
+                                     {0.,   0.,   0.,   0.,   //
+                                      0.,   0.,   0.,   0.,   //
+                                      -10., -10., -10., -10., //
+                                      6.,   2,    7.,   8.,   // Glancer on batch index 1.
+                                      0.,   0.,   0.,   0.,   //
+                                      0.,   0.,   0.,   0.,   //
+                                      1.,   1.,   1.,   1.,   //
+                                      0.,   0.,   0.,   0.},
+                                     4,
+                                     kw::nt_events = {ev_t(square(x0 - x1) + square(y0 - y1) - 4.,
+                                                           [&counter](auto &, fp_t, int, std::uint32_t batch_idx) {
+                                                               REQUIRE(batch_idx == 1u);
+                                                               ++counter;
+                                                           })}};
+
+    for (auto i = 0; i < 20; ++i) {
+        ta.step({1.3, 1.3, 1.3, 1.3});
+
+        REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                            [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+    }
+
+    REQUIRE(counter <= 2u);
+
+    std::cout << "Glancing blow test finished\n";
+}
+
+TEST_CASE("nte multizero")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using ev_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+
+    auto counter = std::vector{0u, 0u, 0u, 0u};
+
+    // In this test, we define two events:
+    // - the velocity is smaller in absolute
+    //   value than a small limit,
+    // - the velocity is exactly zero.
+    // It is likely that both events are going to fire
+    // in the same timestep, with the first event
+    // firing twice. The sequence of events must
+    // be 0 1 0 repeated a few times.
+
+    auto cur_time = std::vector{0., 0., 0., 0.};
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::nt_events = {ev_t(v * v - 1e-10,
+                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                  using std::abs;
+
+                                  // Make sure the callbacks are called in order.
+                                  REQUIRE(t > cur_time[batch_idx]);
+
+                                  // Ensure the state of ta has
+                                  // been propagated until after the
+                                  // event.
+                                  REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                  REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
+
+                                  ta.update_d_output({t, t, t, t});
+
+                                  const auto v = ta.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                  ++counter[batch_idx];
+
+                                  cur_time[batch_idx] = t;
+                              }),
+                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                             using std::abs;
+
+                             // Make sure the callbacks are called in order.
+                             REQUIRE(t > cur_time[batch_idx]);
+
+                             // Ensure the state of ta has
+                             // been propagated until after the
+                             // event.
+                             REQUIRE(ta.get_time()[batch_idx] > t);
+
+                             REQUIRE((counter[batch_idx] % 3u == 1u));
+
+                             ta.update_d_output({t, t, t, t});
+
+                             const auto v = ta.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                             ++counter[batch_idx];
+
+                             cur_time[batch_idx] = t;
+                         })}};
+
+    ta.propagate_until({4., 4., 4., 4.});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+        REQUIRE(counter[i] == 12u);
+    }
+
+    std::fill(counter.begin(), counter.end(), 0u);
+    std::fill(cur_time.begin(), cur_time.end(), 0.);
+
+    // Run the same test with sub-eps tolerance too.
+    ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
+        kw::nt_events = {ev_t(v * v - 1e-10,
+                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                  using std::abs;
+
+                                  // Make sure the callbacks are called in order.
+                                  REQUIRE(t > cur_time[batch_idx]);
+
+                                  // Ensure the state of ta has
+                                  // been propagated until after the
+                                  // event.
+                                  REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                  REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
+
+                                  ta.update_d_output({t, t, t, t});
+
+                                  const auto v = ta.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                  ++counter[batch_idx];
+
+                                  cur_time[batch_idx] = t;
+                              }),
+                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                             using std::abs;
+
+                             // Make sure the callbacks are called in order.
+                             REQUIRE(t > cur_time[batch_idx]);
+
+                             // Ensure the state of ta has
+                             // been propagated until after the
+                             // event.
+                             REQUIRE(ta.get_time()[batch_idx] > t);
+
+                             REQUIRE((counter[batch_idx] % 3u == 1u));
+
+                             ta.update_d_output({t, t, t, t});
+
+                             const auto v = ta.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                             ++counter[batch_idx];
+
+                             cur_time[batch_idx] = t;
+                         })}};
+
+    ta.propagate_until({4., 4., 4., 4.});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+        REQUIRE(counter[i] == 12u);
+    }
+
+    std::fill(counter.begin(), counter.end(), 0u);
+    std::fill(cur_time.begin(), cur_time.end(), 0.);
+
+    // We re-run the test, but this time we want to detect
+    // only when the velocity goes from positive to negative.
+    // Thus the sequence of events will be:
+    // - 0 1 0
+    // - 0 0
+    // - 0 1 0
+    // - 0 0
+
+    ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                     {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                     4,
+                                     kw::nt_events
+                                     = {ev_t(v * v - 1e-10,
+                                             [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                                 using std::abs;
+
+                                                 // Make sure the callbacks are called in order.
+                                                 REQUIRE(t > cur_time[batch_idx]);
+
+                                                 // Ensure the state of ta has
+                                                 // been propagated until after the
+                                                 // event.
+                                                 REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                                 REQUIRE((counter[batch_idx] == 0u
+                                                          || (counter[batch_idx] >= 2u && counter[batch_idx] <= 6u)
+                                                          || (counter[batch_idx] >= 7u && counter[batch_idx] <= 9u)));
+
+                                                 ta.update_d_output({t, t, t, t});
+
+                                                 const auto v = ta.get_d_output()[4u + batch_idx];
+                                                 REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                                 ++counter[batch_idx];
+
+                                                 cur_time[batch_idx] = t;
+                                             }),
+                                        ev_t(
+                                            v,
+                                            [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                                using std::abs;
+
+                                                // Make sure the callbacks are called in order.
+                                                REQUIRE(t > cur_time[batch_idx]);
+
+                                                // Ensure the state of ta has
+                                                // been propagated until after the
+                                                // event.
+                                                REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                                REQUIRE((counter[batch_idx] == 1u || counter[batch_idx] == 6u));
+
+                                                ta.update_d_output({t, t, t, t});
+
+                                                const auto v = ta.get_d_output()[4u + batch_idx];
+                                                REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                                ++counter[batch_idx];
+
+                                                cur_time[batch_idx] = t;
+                                            },
+                                            kw::direction = event_direction::negative)}};
+
+    ta.propagate_until({4., 4., 4., 4.});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+        REQUIRE(counter[i] == 10u);
+    }
+
+    std::fill(counter.begin(), counter.end(), 0u);
+    std::fill(cur_time.begin(), cur_time.end(), 0.);
+
+    // Sub-eps tolerance too.
+    ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                     {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                     4,
+                                     kw::tol = std::numeric_limits<fp_t>::epsilon() / 100,
+                                     kw::nt_events
+                                     = {ev_t(v * v - 1e-10,
+                                             [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                                 using std::abs;
+
+                                                 // Make sure the callbacks are called in order.
+                                                 REQUIRE(t > cur_time[batch_idx]);
+
+                                                 // Ensure the state of ta has
+                                                 // been propagated until after the
+                                                 // event.
+                                                 REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                                 REQUIRE((counter[batch_idx] == 0u
+                                                          || (counter[batch_idx] >= 2u && counter[batch_idx] <= 6u)
+                                                          || (counter[batch_idx] >= 7u && counter[batch_idx] <= 9u)));
+
+                                                 ta.update_d_output({t, t, t, t});
+
+                                                 const auto v = ta.get_d_output()[4u + batch_idx];
+                                                 REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                                 ++counter[batch_idx];
+
+                                                 cur_time[batch_idx] = t;
+                                             }),
+                                        ev_t(
+                                            v,
+                                            [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                                using std::abs;
+
+                                                // Make sure the callbacks are called in order.
+                                                REQUIRE(t > cur_time[batch_idx]);
+
+                                                // Ensure the state of ta has
+                                                // been propagated until after the
+                                                // event.
+                                                REQUIRE(ta.get_time()[batch_idx] > t);
+
+                                                REQUIRE((counter[batch_idx] == 1u || counter[batch_idx] == 6u));
+
+                                                ta.update_d_output({t, t, t, t});
+
+                                                const auto v = ta.get_d_output()[4u + batch_idx];
+                                                REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                                                ++counter[batch_idx];
+
+                                                cur_time[batch_idx] = t;
+                                            },
+                                            kw::direction = event_direction::negative)}};
+
+    ta.propagate_until({4., 4., 4., 4.});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+        REQUIRE(counter[i] == 10u);
+    }
+}
+
+TEST_CASE("nte multizero negative timestep")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using ev_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+
+    auto counter = std::vector{0u, 0u, 0u, 0u};
+
+    auto cur_time = std::vector{0., 0., 0., 0.};
+
+    // In this test, we define two events:
+    // - the velocity is smaller in absolute
+    //   value than a small limit,
+    // - the velocity is exactly zero.
+    // It is likely that both events are going to fire
+    // in the same timestep, with the first event
+    // firing twice. The sequence of events must
+    // be 0 1 0 repeated a few times.
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::nt_events = {ev_t(v * v - 1e-10,
+                              [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                                  using std::abs;
+
+                                  // Make sure the callbacks are called in order.
+                                  REQUIRE(t < cur_time[batch_idx]);
+
+                                  // Ensure the state of ta has
+                                  // been propagated until after the
+                                  // event.
+                                  REQUIRE(ta.get_time()[batch_idx] < t);
+
+                                  REQUIRE((counter[batch_idx] % 3u == 0u || counter[batch_idx] % 3u == 2u));
+
+                                  ta.update_d_output({t, t, t, t});
+
+                                  const auto v = ta.get_d_output()[4u + batch_idx];
+                                  REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                  ++counter[batch_idx];
+
+                                  cur_time[batch_idx] = t;
+                              }),
+                         ev_t(v, [&counter, &cur_time](auto &ta, fp_t t, int, std::uint32_t batch_idx) {
+                             using std::abs;
+
+                             // Make sure the callbacks are called in order.
+                             REQUIRE(t < cur_time[batch_idx]);
+
+                             // Ensure the state of ta has
+                             // been propagated until after the
+                             // event.
+                             REQUIRE(ta.get_time()[batch_idx] < t);
+
+                             REQUIRE((counter[batch_idx] % 3u == 1u));
+
+                             ta.update_d_output({t, t, t, t});
+
+                             const auto v = ta.get_d_output()[4u + batch_idx];
+                             REQUIRE(abs(v) <= std::numeric_limits<fp_t>::epsilon() * 100);
+
+                             ++counter[batch_idx];
+
+                             cur_time[batch_idx] = t;
+                         })}};
+
+    ta.propagate_until({-4., -4., -4., -4.});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+        REQUIRE(counter[i] == 12u);
     }
 }
