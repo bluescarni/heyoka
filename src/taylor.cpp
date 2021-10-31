@@ -2579,7 +2579,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 #if !defined(NDEBUG)
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
-    assert(!isnan(max_delta_t));
+    assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
 #endif
 
     auto h = max_delta_t;
@@ -2728,7 +2728,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         for (auto it = ed_data.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
-            assert(cb);
+            assert(cb); // LCOV_EXCL_LINE
             cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
 
@@ -2740,7 +2740,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         if (!ed_data.m_d_tes.empty()) {
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(ed_data.m_d_tes[0]);
-            assert(te_idx < ed_data.m_tes.size());
+            assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
             const auto &te = ed_data.m_tes[te_idx];
 
             // Set the corresponding cooldown.
@@ -2878,7 +2878,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // and we keep on decreasing its magnitude at the following iterations.
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir);
+        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
@@ -2916,7 +2916,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // res == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
+            assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
 
@@ -3115,7 +3115,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // and we keep on decreasing its magnitude at the following iterations.
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir);
+        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         const auto [res, h] = step_impl(static_cast<T>(dt_limit), true);
@@ -3162,7 +3162,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // not going exactly to zero due to numerical issues. A zero rem_time
         // will also force the processing of all remaining grid points.
         if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
+            assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             rem_time = dfloat<T>(T(0));
         } else {
             rem_time = grid.back() - m_time;
@@ -3847,7 +3847,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             for (auto it = ed_data.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
                 const auto &t = *it;
                 const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
-                assert(cb);
+                assert(cb); // LCOV_EXCL_LINE
                 try {
                     cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
                 } catch (...) {
@@ -3865,7 +3865,7 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
             if (!ed_data.m_d_tes[i].empty()) {
                 // Fetch the first terminal event.
                 const auto te_idx = std::get<0>(ed_data.m_d_tes[i][0]);
-                assert(te_idx < ed_data.m_tes.size());
+                assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
                 const auto &te = ed_data.m_tes[te_idx];
 
                 // Set the corresponding cooldown.
@@ -3985,7 +3985,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
     // NOTE: this function is called from either the other propagate_until() overload,
     // or propagate_for(). In both cases, we have already set up correctly the dimension of ts.
-    assert(ts.size() == m_batch_size);
+    assert(ts.size() == m_batch_size); // LCOV_EXCL_LINE
 
     // Check the current times.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
@@ -4045,7 +4045,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0));
+            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
 
             // Compute the time limit.
             const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_ts[i]), m_rem_time[i])
@@ -4156,7 +4156,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             // will end up being repeatedly set to zero here. This
             // should be harmless.
             if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit);
+                assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
                 m_rem_time[i] = dfloat<T>(T(0));
             } else {
                 m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
@@ -4178,7 +4178,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
     }
 
     // NOTE: re-use m_pfor_ts as tmp storage.
-    assert(m_pfor_ts.size() == m_batch_size);
+    assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_pfor_ts[i] = dfloat<T>(ts[i]);
     }
@@ -4445,7 +4445,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                         retval[gidx * m_batch_size * m_dim + j * m_batch_size + i] = m_d_out[j * m_batch_size + i];
                     }
 
-                    assert(cur_grid_idx[i] < n_grid_points);
+                    assert(cur_grid_idx[i] < n_grid_points); // LCOV_EXCL_LINE
                     ++cur_grid_idx[i];
                 }
             }
@@ -4473,7 +4473,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             const auto max_delta_t = max_delta_ts[i];
 
             // Compute the step limit for the current batch element.
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0));
+            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
             const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_t), m_rem_time[i])
                                              : std::max(dfloat<T>(-max_delta_t), m_rem_time[i]);
 
@@ -4518,7 +4518,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             // will end up being repeatedly set to zero here. This
             // should be harmless.
             if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit);
+                assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
                 m_rem_time[i] = dfloat<T>(T(0));
             } else {
                 m_rem_time[i]
@@ -4757,10 +4757,10 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     const auto &dc = td_res.first;
     const auto &sv_funcs_dc = td_res.second;
 
-    assert(sv_funcs_dc.size() == n_sv_funcs);
+    assert(sv_funcs_dc.size() == n_sv_funcs); // LCOV_EXCL_LINE
 
     // Compute the number of u variables.
-    assert(dc.size() > n_eq);
+    assert(dc.size() > n_eq); // LCOV_EXCL_LINE
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
@@ -4769,7 +4769,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
@@ -4798,7 +4798,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives.
@@ -4889,7 +4889,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
             // state variables and sv_funcs (not all u vars), hence the indexing is
             // n_eq + j.
             const auto arr_idx = n_eq + j;
-            assert(arr_idx < diff_arr.size());
+            assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
             const auto val = diff_arr[arr_idx];
 
             // Index in the output array.
@@ -4906,7 +4906,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                 // state variables and sv_funcs (not all u vars), hence the indexing is
                 // cur_order * (n_eq + n_sv_funcs) + j.
                 const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
-                assert(arr_idx < diff_arr.size());
+                assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 const auto val = diff_arr[arr_idx];
 
                 // Index in the output array.
@@ -4919,7 +4919,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
             for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
                 const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + n_eq + j;
-                assert(arr_idx < diff_arr.size());
+                assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 const auto val = diff_arr[arr_idx];
 
                 const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + (n_eq + j) * batch_size;
