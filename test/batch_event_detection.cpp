@@ -90,8 +90,8 @@ TEST_CASE("single step nte")
 
             REQUIRE(trig_times.size() == trig_times_batch[i].size());
             for (decltype(trig_times.size()) j = 0; j < trig_times.size(); ++j) {
-                REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j]));
-                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j]));
+                REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j], 1000.));
+                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 1000.));
             }
         }
     };
@@ -174,8 +174,8 @@ TEST_CASE("single step te")
             REQUIRE(trig_times.size() == ex_n_trig[i]);
             REQUIRE(trig_times.size() == trig_times_batch[i].size());
             for (decltype(trig_times.size()) j = 0; j < trig_times.size(); ++j) {
-                REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j]));
-                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j]));
+                REQUIRE(trig_times[j] == approximately(trig_times_batch[i][j], 1000.));
+                REQUIRE(v_vals[j] == approximately(v_vals_batch[i][j], 1000.));
             }
         }
     };
