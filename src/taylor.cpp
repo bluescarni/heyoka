@@ -4086,7 +4086,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
             // Update min_h/max_h only if the outcome is success (otherwise
             // the step was artificially clamped either by a time limit or
-            // by a terminal event).
+            // by a continuing terminal event).
             if (res == taylor_outcome::success) {
                 const auto abs_h = abs(h);
                 m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
@@ -4131,14 +4131,12 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // then this condition will never trigger as by this point we are
         // sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            // We reached the max_steps limit: the outcome for each batch element must be
-            // either step_limit or time_limit.
-            // NOTE: how does the outcome logic change with events?
+            // We reached the max_steps limit: set the outcome for all batch elements
+            // to step_limit.
+            // NOTE: this is the same logic adopted when the integration is stopped
+            // by the callback (see above).
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i]
-                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                       : taylor_outcome::time_limit,
-                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return;
@@ -4527,7 +4525,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
 
             // Update min_h/max_h, but only if the outcome is success (otherwise
             // the step was artificially clamped either by a time limit or
-            // by a terminal event).
+            // by a continuing terminal event).
             if (res == taylor_outcome::success) {
                 const auto abs_h = abs(h);
                 m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
@@ -4551,13 +4549,12 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
         // then this condition will never trigger as by this point we are
         // sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            // We reached the max_steps limit: the outcome for each batch element must be
-            // either step_limit or time_limit.
+            // We reached the max_steps limit: set the outcome for all batch elements
+            // to step_limit.
+            // NOTE: this is the same logic adopted when the integration is stopped
+            // by the callback (see above).
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i]
-                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                       : taylor_outcome::time_limit,
-                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return retval;
