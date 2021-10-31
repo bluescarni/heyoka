@@ -370,7 +370,7 @@ class HEYOKA_DLL_PUBLIC nt_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_impl<T> &, T, int, std::uint32_t),
+    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_batch_impl<T> &, T, int, std::uint32_t),
                                                    void(taylor_adaptive_impl<T> &, T, int)>>;
 
 private:
@@ -464,7 +464,7 @@ class HEYOKA_DLL_PUBLIC t_event_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_impl<T> &, bool, int, std::uint32_t),
+    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_batch_impl<T> &, bool, int, std::uint32_t),
                                                    bool(taylor_adaptive_impl<T> &, bool, int)>>;
 
 private:
@@ -1288,6 +1288,9 @@ public:
         return m_d_out;
     }
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
+
+    void reset_cooldowns();
+    void reset_cooldowns(std::uint32_t);
 
     void step(bool = false);
     void step_backward(bool = false);

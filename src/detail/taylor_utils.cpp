@@ -1348,7 +1348,7 @@ template <typename T, bool B>
 auto nt_event_def_cb()
 {
     if constexpr (B) {
-        return [](taylor_adaptive_impl<T> &, T, int, std::uint32_t) {};
+        return [](taylor_adaptive_batch_impl<T> &, T, int, std::uint32_t) {};
     } else {
         return [](taylor_adaptive_impl<T> &, T, int) {};
     }

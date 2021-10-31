@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <map>
@@ -3647,6 +3648,7 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    using std::abs;
     using std::isfinite;
 
     // LCOV_EXCL_START
@@ -3753,6 +3755,167 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 
         // Do the event detection.
         ed_data.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
+
+        // NOTE: before this point, we did not alter
+        // any user-visible data in the integrator (just
+        // temporary memory). From here until we start invoking
+        // the callbacks, everything is noexcept, so we don't
+        // risk leaving the integrator in a half-baked state.
+
+        // Sort the events by time.
+        // NOTE: the time coordinates in m_d_(n)tes is relative
+        // to the beginning of the timestep. It will be negative
+        // for backward integration, thus we compare using
+        // abs() so that the first events are those which
+        // happen closer to the beginning of the timestep.
+        // NOTE: the checks inside ed_data.detect_events() ensure
+        // that we can safely sort the events' times.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
+            std::sort(ed_data.m_d_tes[i].begin(), ed_data.m_d_tes[i].end(), cmp);
+            std::sort(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), cmp);
+
+            // If we have terminal events we need
+            // to update the value of h.
+            if (!ed_data.m_d_tes[i].empty()) {
+                m_delta_ts[i] = std::get<1>(ed_data.m_d_tes[i][0]);
+            }
+        }
+
+        // Update the state.
+        m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), m_delta_ts.data());
+
+        // We will use this to capture the first exception thrown
+        // by a callback, if any.
+        std::exception_ptr eptr;
+
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto h = m_delta_ts[i];
+
+            // Compute the new time in double-length arithmetic.
+            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            m_time_hi[i] = new_time.hi;
+            m_time_lo[i] = new_time.lo;
+
+            // Store the last timestep.
+            m_last_h[i] = h;
+
+            // Check if the time or the state vector are non-finite at the
+            // end of the timestep.
+            if (!isfinite(new_time) || check_nf_batch(i)) {
+                // Let's also reset the cooldown values for this batch index,
+                // as at this point they have become useless.
+                reset_cooldowns(i);
+
+                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+
+                // Move to the next batch element.
+                continue;
+            }
+
+            // Update the cooldowns.
+            for (auto &cd : ed_data.m_te_cooldowns[i]) {
+                if (cd) {
+                    // Check if the timestep we just took
+                    // brought this event outside the cooldown.
+                    auto tmp = cd->first + h;
+
+                    if (abs(tmp) >= cd->second) {
+                        // We are now outside the cooldown period
+                        // for this event, reset cd.
+                        cd.reset();
+                    } else {
+                        // Still in cooldown, update the
+                        // time spent in cooldown.
+                        cd->first = tmp;
+                    }
+                }
+            }
+
+            // If we don't have terminal events, we will invoke the callbacks
+            // of *all* the non-terminal events. Otherwise, we need to figure
+            // out which non-terminal events do not happen because their time
+            // coordinate is past the the first terminal event.
+            const auto ntes_end_it
+                = ed_data.m_d_tes[i].empty()
+                      ? ed_data.m_d_ntes[i].end()
+                      : std::lower_bound(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), h,
+                                         [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+
+            // Invoke the callbacks of the non-terminal events, which are guaranteed
+            // to happen before the first terminal event.
+            for (auto it = ed_data.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
+                const auto &t = *it;
+                const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
+                assert(cb);
+                try {
+                    cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
+                } catch (...) {
+                    if (!eptr) {
+                        eptr = std::current_exception();
+                    }
+                }
+            }
+
+            // The return value of the first
+            // terminal event's callback. It will be
+            // unused if there are no terminal events.
+            bool te_cb_ret = false;
+
+            if (!ed_data.m_d_tes[i].empty()) {
+                // Fetch the first terminal event.
+                const auto te_idx = std::get<0>(ed_data.m_d_tes[i][0]);
+                assert(te_idx < ed_data.m_tes.size());
+                const auto &te = ed_data.m_tes[te_idx];
+
+                // Set the corresponding cooldown.
+                if (te.get_cooldown() >= 0) {
+                    // Cooldown explicitly provided by the user, use it.
+                    ed_data.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
+                } else {
+                    // Deduce the cooldown automatically.
+                    // NOTE: if m_g_eps[i] is not finite, we skipped event detection
+                    // altogether and thus we never end up here. If the derivative
+                    // of the event equation is not finite, the event is also skipped.
+                    ed_data.m_te_cooldowns[i][te_idx].emplace(
+                        0, taylor_deduce_cooldown(ed_data.m_g_eps[i], std::get<4>(ed_data.m_d_tes[i][0])));
+                }
+
+                // Invoke the callback of the first terminal event, if it has one.
+                if (te.get_callback()) {
+                    try {
+                        te_cb_ret = te.get_callback()(*this, std::get<2>(ed_data.m_d_tes[i][0]),
+                                                      std::get<3>(ed_data.m_d_tes[i][0]), i);
+                    } catch (...) {
+                        if (!eptr) {
+                            eptr = std::current_exception();
+                        }
+                    }
+                }
+            }
+
+            if (ed_data.m_d_tes[i].empty()) {
+                // No terminal events detected, return success or time limit.
+                m_step_res[i]
+                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            } else {
+                // Terminal event detected. Fetch its index.
+                const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[i][0]));
+
+                // NOTE: if te_cb_ret is true, it means that the terminal event has
+                // a callback and its invocation returned true (meaning that the
+                // integration should continue). Otherwise, either the terminal event
+                // has no callback or its callback returned false, meaning that the
+                // integration must stop.
+                m_step_res[i] = std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
+            }
+        }
+
+        // Check if any callback threw an exception, and re-throw
+        // it in case.
+        if (eptr) {
+            std::rethrow_exception(eptr);
+        }
     }
 }
 
@@ -4474,6 +4637,32 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
     m_d_out_f(m_d_out.data(), m_tc.data(), m_d_out_time.data());
 
     return m_d_out;
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::reset_cooldowns()
+{
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        reset_cooldowns(i);
+    }
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::reset_cooldowns(std::uint32_t i)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (i >= m_batch_size) {
+        throw std::invalid_argument(
+            "Cannot reset the cooldowns at batch index {}: the batch size for this integrator is only {}"_format(
+                i, m_batch_size));
+    }
+
+    for (auto &cd : m_ed_data->m_te_cooldowns[i]) {
+        cd.reset();
+    }
 }
 
 // Explicit instantiation of the batch implementation classes.
