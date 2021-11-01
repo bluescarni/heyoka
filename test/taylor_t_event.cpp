@@ -284,6 +284,7 @@ TEST_CASE("taylor te basic")
             taylor_outcome oc;
             while (true) {
                 oc = std::get<0>(ta.step());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -297,6 +298,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -313,6 +315,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step_backward());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -326,6 +329,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step_backward());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
