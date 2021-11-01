@@ -662,3 +662,95 @@ TEST_CASE("nte multizero negative timestep")
         REQUIRE(counter[i] == 12u);
     }
 }
+
+TEST_CASE("nte basic")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using ev_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+
+    auto counter = std::vector{0u, 0u, 0u, 0u};
+    const std::vector periods
+        = {2.0149583072955119566777324135479727911105583481363, 2.015602866455777600694040810649276304933055944554756,
+           2.0162731039077591887007722648120652760856018525920970125217,
+           2.01696906642817313582861191326257261662145101139954930969969};
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {-0.25, -0.26, -0.27, -0.28, 0., 0., 0., 0.},
+                                          4,
+                                          kw::nt_events
+                                          = {ev_t(v, [&counter, &periods](auto &, fp_t t, int, std::uint32_t idx) {
+                                                // Check that the first event detection happens at t == 0.
+                                                if (counter[idx] == 0u) {
+                                                    REQUIRE(t == 0);
+                                                }
+
+                                                // Make sure the 3rd event detection corresponds
+                                                // to a full period.
+                                                if (counter[idx] == 2u) {
+                                                    REQUIRE(t == approximately(periods[idx], 1000.));
+                                                }
+
+                                                ++counter[idx];
+                                            })}};
+
+    for (auto i = 0; i < 20; ++i) {
+        ta.step();
+
+        REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                            [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
+    }
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(counter[i] == 3u);
+    }
+}
+
+TEST_CASE("nte dir test")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    bool fwd = true;
+
+    std::vector<std::vector<double>> tlist(4u);
+
+    std::vector<std::vector<double>::reverse_iterator> rit(4u);
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {-0.25, -0.26, -0.27, -0.28, 0., 0., 0., 0.},
+                                            4,
+                                            kw::nt_events = {nt_batch_event<double>(
+                                                v,
+                                                [&fwd, &tlist, &rit](auto &, double t, int d_sgn, std::uint32_t idx) {
+                                                    REQUIRE(d_sgn == 1);
+
+                                                    if (fwd) {
+                                                        tlist[idx].push_back(t);
+                                                    } else if (rit[idx] != tlist[idx].rend()) {
+                                                        REQUIRE(*rit[idx] == approximately(t));
+
+                                                        ++rit[idx];
+                                                    }
+                                                },
+                                                kw::direction = event_direction::positive)}};
+
+    ta.propagate_until({20, 20, 20, 20});
+
+    fwd = false;
+    for (auto i = 0u; i < 4u; ++i) {
+        rit[i] = tlist[i].rbegin();
+    }
+
+    ta.propagate_until({0, 0, 0, 0});
+}
+
+TEST_CASE("nte def ctor")
+{
+    nt_batch_event<double> nte;
+
+    REQUIRE(nte.get_expression() == 0_dbl);
+    REQUIRE(nte.get_callback());
+    REQUIRE(nte.get_direction() == event_direction::any);
+}
