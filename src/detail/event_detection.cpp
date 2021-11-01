@@ -1266,18 +1266,18 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // The found root needs to be rescaled by h.
                     add_d_event(root * h);
                 } else {
+                    // LCOV_EXCL_START
                     // Root finding encountered some issue. Ignore the
                     // event and log the issue.
                     if (cflag == -1) {
-                        // LCOV_EXCL_START
                         get_logger()->warn(
                             "polynomial root finding during event detection failed due to too many iterations");
-                        // LCOV_EXCL_STOP
                     } else {
                         get_logger()->warn(
                             "polynomial root finding during event detection returned a nonzero errno with message '{}'",
                             std::strerror(cflag));
                     }
+                    // LCOV_EXCL_STOP
                 }
             }
         }
@@ -1908,19 +1908,19 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // The found root needs to be rescaled by h.
                         add_d_event(root * h);
                     } else {
+                        // LCOV_EXCL_START
                         // Root finding encountered some issue. Ignore the
                         // event and log the issue.
                         if (cflag == -1) {
-                            // LCOV_EXCL_START
                             get_logger()->warn("polynomial root finding during event detection failed due to too many "
                                                "iterations at the batch index {}",
                                                j);
-                            // LCOV_EXCL_STOP
                         } else {
                             get_logger()->warn("polynomial root finding during event detection at the batch index {} "
                                                "returned a nonzero errno with message '{}'",
                                                j, std::strerror(cflag));
                         }
+                        // LCOV_EXCL_STOP
                     }
                 }
             }
