@@ -1258,3 +1258,54 @@ TEST_CASE("te close")
     REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
 }
+
+TEST_CASE("te retrigger")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    t_ev_t ev(x - (par[0] - std::numeric_limits<fp_t>::epsilon() * 6));
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {1., 1.01, 1.02, 1.03, 0., 0.01, 0.02, 0.03},
+                                          4,
+                                          kw::t_events = {ev},
+                                          kw::pars = std::vector<fp_t>{1., 1.01, 1.02, 1.03}};
+
+    // First timestep triggers the event immediately.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return static_cast<std::int64_t>(std::get<0>(t)) == -1; }));
+    REQUIRE(std::all_of(ta.get_time().begin(), ta.get_time().end(), [](const auto &t) { return t != 0; }));
+
+    // Step until re-trigger.
+    auto n_trig = 0u;
+    auto max_delta_t = std::vector<fp_t>(4u, std::numeric_limits<fp_t>::infinity());
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(static_cast<std::int64_t>(oc) == -1);
+                ++n_trig;
+                max_delta_t[i] = 0;
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+
+    // Another step will immediately retrigger.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return static_cast<std::int64_t>(std::get<0>(t)) == -1; }));
+}
