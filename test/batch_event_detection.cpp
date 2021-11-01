@@ -12,14 +12,18 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <tuple>
+#include <typeinfo>
 #include <vector>
 
+#include <heyoka/callable.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/square.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
@@ -28,7 +32,63 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
-TEST_CASE("single step nte")
+TEST_CASE("nte deep copy semantics")
+{
+    using ev_t = taylor_adaptive_batch<double>::nt_event_t;
+
+    auto [v] = make_vars("v");
+
+    auto ex = v + 3_dbl;
+
+    // Expression is copied on construction.
+    ev_t ev(ex, [](auto &, double, int, std::uint32_t) {});
+    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+
+    // Deep copy ctor.
+    auto ev2 = ev;
+
+    REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
+            != std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Self assignment.
+    auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
+    ev2 = *&ev2;
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Deep copy assignment.
+    ev2 = ev;
+    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+}
+
+TEST_CASE("te deep copy semantics")
+{
+    using ev_t = taylor_adaptive_batch<double>::t_event_t;
+
+    auto [v] = make_vars("v");
+
+    auto ex = v + 3_dbl;
+
+    // Expression is copied on construction.
+    ev_t ev(ex);
+    REQUIRE(std::get<func>(ex.value()).get_ptr() != std::get<func>(ev.get_expression().value()).get_ptr());
+
+    // Deep copy ctor.
+    auto ev2 = ev;
+
+    REQUIRE(std::get<func>(ev.get_expression().value()).get_ptr()
+            != std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Self assignment.
+    auto orig_id = std::get<func>(ev2.get_expression().value()).get_ptr();
+    ev2 = *&ev2;
+    REQUIRE(orig_id == std::get<func>(ev2.get_expression().value()).get_ptr());
+
+    // Deep copy assignment.
+    ev2 = ev;
+    REQUIRE(orig_id != std::get<func>(ev2.get_expression().value()).get_ptr());
+}
+
+TEST_CASE("nte single step")
 {
     auto tester = [](unsigned opt_level) {
         using fp_t = double;
@@ -105,7 +165,7 @@ TEST_CASE("single step nte")
     }
 }
 
-TEST_CASE("single step te")
+TEST_CASE("te single step")
 {
     auto tester = [](unsigned opt_level) {
         using fp_t = double;
@@ -190,7 +250,7 @@ TEST_CASE("single step te")
 }
 
 // Test for an event triggering exactly at the end of a timestep.
-TEST_CASE("linear box")
+TEST_CASE("nte linear box")
 {
     using ev_t = taylor_adaptive_batch<double>::nt_event_t;
 
@@ -198,16 +258,16 @@ TEST_CASE("linear box")
 
     auto counter = 0u;
 
-    auto ta_ev = taylor_adaptive_batch<double>{
-        {prime(x) = par[0]},
-        {0., 0., 0., 0.},
-        4,
-        kw::nt_events = {ev_t(x - 1.,
-                              [&counter](taylor_adaptive_batch<double> &tint, double tm, int, std::uint32_t batch_idx) {
-                                  REQUIRE(tm == approximately(1 / tint.get_pars()[batch_idx]));
-                                  ++counter;
-                              })},
-        kw::pars = {1., 2., 4., 8.}};
+    auto ta_ev = taylor_adaptive_batch<double>{{prime(x) = par[0]},
+                                               {0., 0., 0., 0.},
+                                               4,
+                                               kw::nt_events
+                                               = {ev_t(x - 1.,
+                                                       [&counter](auto &tint, double tm, int, std::uint32_t batch_idx) {
+                                                           REQUIRE(tm == approximately(1 / tint.get_pars()[batch_idx]));
+                                                           ++counter;
+                                                       })},
+                                               kw::pars = {1., 2., 4., 8.}};
 
     // Check that the event triggers at the beginning of the second step.
     ta_ev.step({1., 1 / 2., 1 / 4., 1 / 8.});
@@ -222,7 +282,42 @@ TEST_CASE("linear box")
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
 }
 
-TEST_CASE("glancing blow test")
+// Test for an event triggering exactly at the end of a timestep.
+TEST_CASE("te linear box")
+{
+    using ev_t = taylor_adaptive_batch<double>::t_event_t;
+
+    auto [x] = make_vars("x");
+
+    auto counter = 0u;
+
+    auto ta_ev = taylor_adaptive_batch<double>{{prime(x) = par[0]},
+                                               {0., 0., 0., 0.},
+                                               4,
+                                               kw::t_events = {ev_t(
+                                                   x - 1., kw::callback =
+                                                               [&counter](auto &, bool, int, std::uint32_t) {
+                                                                   ++counter;
+                                                                   return true;
+                                                               })},
+                                               kw::pars = {1., 2., 4., 8.}};
+
+    // Check that the event triggers at the beginning of the second step.
+    ta_ev.step({1., 1 / 2., 1 / 4., 1 / 8.});
+
+    REQUIRE(counter == 0u);
+    REQUIRE(std::all_of(ta_ev.get_step_res().begin(), ta_ev.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    ta_ev.step({1., 1 / 2., 1 / 4., 1 / 8.});
+    REQUIRE(counter == 4u);
+    REQUIRE(std::all_of(ta_ev.get_step_res().begin(), ta_ev.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; }));
+    REQUIRE(std::all_of(ta_ev.get_step_res().begin(), ta_ev.get_step_res().end(),
+                        [](const auto &t) { return std::get<1>(t) == approximately(0.); }));
+}
+
+TEST_CASE("nte glancing blow test")
 {
     std::cout << "Starting glancing blow test...\n";
 
@@ -753,4 +848,49 @@ TEST_CASE("nte def ctor")
     REQUIRE(nte.get_expression() == 0_dbl);
     REQUIRE(nte.get_callback());
     REQUIRE(nte.get_direction() == event_direction::any);
+}
+
+struct s11n_nte_callback {
+    template <typename I, typename T>
+    void operator()(I &, T, int, std::uint32_t) const
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nte_callback, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t)
+
+TEST_CASE("nte s11n")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    nt_batch_event<fp_t> ev(v, s11n_nte_callback{}, kw::direction = event_direction::positive);
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ev;
+    }
+
+    ev = nt_batch_event<fp_t>(v + x, [](auto &, fp_t, int, std::uint32_t) {});
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ev;
+    }
+
+    REQUIRE(ev.get_expression() == v);
+    REQUIRE(ev.get_direction() == event_direction::positive);
+    REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_nte_callback));
 }
