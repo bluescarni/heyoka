@@ -1309,3 +1309,477 @@ TEST_CASE("te retrigger")
     REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
                         [](const auto &t) { return static_cast<std::int64_t>(std::get<0>(t)) == -1; }));
 }
+
+TEST_CASE("te dir")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    t_ev_t ev(
+        v,
+        kw::callback =
+            [](auto &, bool mr, int d_sgn, std::uint32_t) {
+                REQUIRE(!mr);
+                REQUIRE(d_sgn == 1);
+                return true;
+            },
+        kw::direction = event_direction::positive);
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {1., 1.01, 1.02, 1.03, 0., 0., 0., 0.}, 4, kw::t_events = {ev}};
+
+    // First timestep must not trigger the event (derivative is negative).
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
+
+    // Step until trigger.
+    while (true) {
+        ta.step();
+        if (std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; })) {
+            break;
+        }
+    }
+
+    REQUIRE(ta.get_state()[0] == approximately(-1.));
+    REQUIRE(ta.get_state()[1] == approximately(-1.01));
+    REQUIRE(ta.get_state()[2] == approximately(-1.02));
+    REQUIRE(ta.get_state()[3] == approximately(-1.03));
+
+    // Other direction.
+    auto ev1 = t_ev_t(
+        v,
+        kw::callback =
+            [](auto &, bool mr, int d_sgn, std::uint32_t) {
+                REQUIRE(!mr);
+                REQUIRE(d_sgn == -1);
+                return true;
+            },
+        kw::direction = event_direction::negative);
+
+    ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {1., 1.01, 1.02, 1.03, 0., 0., 0., 0.}, 4, kw::t_events = {ev1}};
+
+    // Check that zero timestep does not detect anything.
+    ta.step({0., 0., 0., 0.});
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+    // Now it must trigger immediately.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; }));
+
+    // The next timestep must not trigger due to cooldown.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
+
+    // Step until trigger.
+    while (true) {
+        ta.step();
+        if (std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; })) {
+            break;
+        }
+    }
+
+    REQUIRE(ta.get_state()[0] == approximately(1.));
+    REQUIRE(ta.get_state()[1] == approximately(1.01));
+    REQUIRE(ta.get_state()[2] == approximately(1.02));
+    REQUIRE(ta.get_state()[3] == approximately(1.03));
+}
+
+TEST_CASE("te custom cooldown")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    t_ev_t ev(
+        v * v - std::numeric_limits<fp_t>::epsilon() * 4,
+        kw::callback =
+            [](auto &, bool mr, int, std::uint32_t) {
+                REQUIRE(mr);
+                return true;
+            },
+        kw::cooldown = fp_t(1e-1));
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev}};
+
+    // Step until trigger.
+    auto n_trig = 0u;
+    auto max_delta_t = std::vector<fp_t>(4u, std::numeric_limits<fp_t>::infinity());
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(static_cast<std::int64_t>(oc) == 0);
+                ++n_trig;
+                max_delta_t[i] = 0;
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+}
+
+TEST_CASE("te propagate_for")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    std::vector<unsigned> counter(4u, 0u);
+
+    t_ev_t ev(
+        v, kw::callback = [&counter](auto &, bool mr, int, std::uint32_t idx) {
+            ++counter[idx];
+            REQUIRE(!mr);
+            return true;
+        });
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev}};
+
+    ta.propagate_for({100, 100, 100, 100});
+
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+    REQUIRE(std::all_of(ta.get_time().begin(), ta.get_time().end(), [](const auto &t) { return t == 100.; }));
+    REQUIRE(std::all_of(counter.begin(), counter.end(), [](const auto &t) { return t == 100u; }));
+
+    t_ev_t ev1(v);
+
+    ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev1}};
+
+    ta.propagate_for({100, 100, 100, 100});
+
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return static_cast<std::int64_t>(std::get<0>(t)) == -1; }));
+}
+
+TEST_CASE("te propagate_grid")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    std::vector<unsigned> counter(4u, 0u);
+
+    t_ev_t ev(
+        v, kw::callback = [&counter](auto &, bool mr, int, std::uint32_t idx) {
+            ++counter[idx];
+            REQUIRE(!mr);
+            return true;
+        });
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev}};
+
+    std::vector<fp_t> grid;
+    for (auto i = 0; i < 101; ++i) {
+        for (std::uint32_t _ = 0; _ < 4u; ++_) {
+            grid.emplace_back(i);
+        }
+    }
+
+    auto out = ta.propagate_grid(grid);
+
+    REQUIRE(out.size() == 202u * 4u);
+    REQUIRE(std::all_of(out.begin() + 1, out.end(), [](const auto &v) { return v != 0; }));
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(counter[i] == 100u);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[i]) == taylor_outcome::time_limit);
+    }
+
+    t_ev_t ev1(v);
+
+    ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.02, 0.03, .25, .26, .27, .28}, 4, kw::t_events = {ev1}};
+
+    out = ta.propagate_grid(grid);
+
+    REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return v == 0; }));
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(static_cast<std::int64_t>(std::get<0>(ta.get_propagate_res()[i])) == -1);
+    }
+}
+
+// Test for a bug in propagate_grid() in which the
+// integration would stop at the first step, in case
+// a terminal event triggers immediately.
+TEST_CASE("te propagate_grid first step bug")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = taylor_adaptive_batch<double>::t_event_t;
+
+    std::vector<double> grid;
+    for (auto i = 0; i < 100; ++i) {
+        for (std::uint32_t _ = 0; _ < 4u; ++_) {
+            grid.emplace_back(5 / 100. * i);
+        }
+    }
+
+    {
+        t_ev_t ev(
+            v, kw::callback = [](auto &, bool mr, int, std::uint32_t) {
+                REQUIRE(!mr);
+                return true;
+            });
+
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                {0.05, 0.051, 0.052, 0.053, 0.025, 0.0251, 0.0252, 0.0253},
+                                                4,
+                                                kw::t_events = {ev}};
+
+        auto out = ta.propagate_grid(grid);
+
+        REQUIRE(out.size() == 200u * 4u);
+        REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v != 0; }));
+    }
+
+    {
+        t_ev_t ev(v);
+
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                {0.05, 0.051, 0.052, 0.053, 0.025, 0.0251, 0.0252, 0.0253},
+                                                4,
+                                                kw::t_events = {ev}};
+
+        auto out = ta.propagate_grid(grid);
+
+        REQUIRE(out.size() == 200u * 4u);
+        REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return v == 0; }));
+    }
+}
+
+TEST_CASE("te damped pendulum")
+{
+    using t_ev_t = taylor_adaptive_batch<double>::t_event_t;
+
+    auto [x, v] = make_vars("x", "v");
+
+    std::vector<std::vector<double>> zero_vel_times(4u);
+
+    auto callback = [&zero_vel_times](auto &ta, bool, int, std::uint32_t idx) {
+        const auto tm = ta.get_time()[idx];
+
+        if (ta.get_pars()[idx] == 0) {
+            ta.get_pars_data()[idx] = 1;
+        } else {
+            ta.get_pars_data()[idx] = 0;
+        }
+
+        zero_vel_times[idx].push_back(tm);
+
+        return true;
+    };
+
+    t_ev_t ev(v, kw::callback = callback);
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x) - par[0] * v},
+                                            {0.05, 0.051, 0.052, 0.053, 0.025, 0.0251, 0.0252, 0.0253},
+                                            4,
+                                            kw::t_events = {ev}};
+
+    ta.propagate_until({100, 100, 100, 100});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(zero_vel_times[i].size() == 99u);
+    }
+
+    ta.step();
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(zero_vel_times[i].size() == 100u);
+    }
+
+    // Mix use of step() and propagate like in the tutorial.
+    ta.set_time({0, 0, 0, 0});
+    for (auto i = 0u; i < 4u; ++i) {
+        zero_vel_times[i].clear();
+        ta.get_state_data()[i] = 0.05 + i * 0.001;
+        ta.get_state_data()[4u + i] = 0.025 + i * 0.0001;
+    }
+
+    do {
+        ta.step();
+    } while (std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                         [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
+
+    ta.propagate_until({100, 100, 100, 100});
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(zero_vel_times[i].size() == 99u);
+    }
+
+    ta.step();
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(zero_vel_times[i].size() == 100u);
+    }
+}
+
+TEST_CASE("te boolean callback")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    std::vector<unsigned> counter_t(4u, 0u);
+    std::vector<fp_t> cur_time(4u);
+    bool direction = true;
+
+    auto ta = taylor_adaptive_batch<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::t_events = {t_ev_t(
+            v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta, bool mr, int, std::uint32_t idx) {
+                const auto &t = ta.get_time();
+
+                REQUIRE(!mr);
+
+                if (direction) {
+                    REQUIRE(t[idx] > cur_time[idx]);
+                } else {
+                    REQUIRE(t[idx] < cur_time[idx]);
+                }
+
+                const auto v = ta.get_state()[4u + idx];
+                REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+
+                ++counter_t[idx];
+
+                cur_time[idx] = t[idx];
+
+                if (counter_t[idx] == 5u) {
+                    return false;
+                } else {
+                    return true;
+                }
+            })}};
+
+    // First we integrate up to the first
+    // occurrence of the terminal event.
+    while (true) {
+        ta.step();
+
+        if (std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; })) {
+            break;
+        }
+    }
+
+    // Then we propagate for an amount of time large enough
+    // to trigger the stopping terminal event.
+    ta.propagate_until({1000., 1000., 1000., 1000.});
+
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
+
+    // Reset counter_t and invert direction.
+    std::fill(counter_t.begin(), counter_t.end(), 0u);
+    direction = false;
+
+    while (true) {
+        ta.step_backward();
+
+        if (std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{0}; })) {
+            break;
+        }
+    }
+
+    ta.propagate_until({-1000., -1000., -1000., -1000.});
+
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
+}
+
+// Test a terminal event exactly at the end of a timestep.
+TEST_CASE("te step end")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<double>::t_event_t;
+
+    std::vector<unsigned> counter(4u);
+
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)},
+        {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+        4,
+        kw::t_events = {t_ev_t(
+            heyoka::time - 1., kw::callback = [&counter](auto &ta, bool, int, std::uint32_t idx) {
+                ++counter[idx];
+                REQUIRE(ta.get_time()[idx] == 1.);
+                return true;
+            })}};
+
+    ta.propagate_until({10., 10., 10., 10.}, kw::max_delta_t = {0.005, 0.005, 0.005, 0.005});
+
+    REQUIRE(std::all_of(counter.begin(), counter.end(), [](auto c) { return c == 1u; }));
+}
+
+// Bug: mr always being true for an
+// event with zero cooldown.
+TEST_CASE("te zero cd mr bug")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<double>::t_event_t;
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                            {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                            4,
+                                            kw::t_events = {
+                                                t_ev_t(
+                                                    v,
+                                                    kw::callback =
+                                                        [](auto &, bool mr, int, std::uint32_t) {
+                                                            REQUIRE(!mr);
+
+                                                            return false;
+                                                        },
+                                                    kw::cooldown = 0),
+                                            }};
+
+    ta.propagate_until({10., 10., 10., 10.});
+
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
+}
