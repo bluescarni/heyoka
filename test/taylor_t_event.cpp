@@ -1049,7 +1049,7 @@ TEST_CASE("step end")
 
 // Bug: mr always being true for an
 // event with zero cooldown.
-TEST_CASE("taylor zero cd mor bug")
+TEST_CASE("taylor zero cd mr bug")
 {
     auto [x, v] = make_vars("x", "v");
 
