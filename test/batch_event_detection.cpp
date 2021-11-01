@@ -803,6 +803,175 @@ TEST_CASE("nte basic")
     }
 }
 
+TEST_CASE("te basic")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+    using nt_ev_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+
+    // NOTE: test also sub-eps tolerance.
+    for (auto cur_tol : {std::numeric_limits<fp_t>::epsilon(), std::numeric_limits<fp_t>::epsilon() / 100}) {
+        std::vector<unsigned> counter_nt(4u, 0u), counter_t(4u, 0u);
+        std::vector<fp_t> cur_time(4u, 0.);
+        bool direction = true;
+
+        auto ta = taylor_adaptive_batch<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+            4,
+            kw::tol = cur_tol,
+            kw::nt_events = {nt_ev_t(v * v - 1e-10,
+                                     [&counter_nt, &cur_time, &direction](auto &ta, fp_t t, int, std::uint32_t idx) {
+                                         // Make sure the callbacks are called in order.
+                                         if (direction) {
+                                             REQUIRE(t > cur_time[idx]);
+                                         } else {
+                                             REQUIRE(t < cur_time[idx]);
+                                         }
+
+                                         ta.update_d_output({t, t, t, t});
+
+                                         const auto v = ta.get_d_output()[4u + idx];
+                                         REQUIRE(abs(v * v - 1e-10) < std::numeric_limits<fp_t>::epsilon());
+
+                                         ++counter_nt[idx];
+
+                                         cur_time[idx] = t;
+                                     })},
+            kw::t_events = {t_ev_t(
+                v, kw::callback = [&counter_t, &cur_time, &direction](auto &ta, bool mr, int, std::uint32_t idx) {
+                    const auto &t = ta.get_time();
+
+                    REQUIRE(!mr);
+
+                    if (direction) {
+                        REQUIRE(t[idx] > cur_time[idx]);
+                    } else {
+                        REQUIRE(t[idx] < cur_time[idx]);
+                    }
+
+                    const auto v = ta.get_state()[4u + idx];
+                    REQUIRE(abs(v) < std::numeric_limits<fp_t>::epsilon() * 100);
+
+                    ++counter_t[idx];
+
+                    cur_time[idx] = t[idx];
+
+                    return true;
+                })}};
+
+        // Propagate all batches up to the first trigger of the terminal event.
+        auto n_trig = 0u;
+        std::vector<fp_t> max_delta_t(4u, std::numeric_limits<fp_t>::infinity());
+        while (true) {
+            ta.step(max_delta_t);
+            for (std::uint32_t i = 0; i < 4u; ++i) {
+                const auto oc = std::get<0>(ta.get_step_res()[i]);
+                if (oc > taylor_outcome::success) {
+                    REQUIRE(oc >= taylor_outcome{0});
+                    ++n_trig;
+                    max_delta_t[i] = 0;
+                } else {
+                    REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+                }
+            }
+
+            if (n_trig >= 4u) {
+                break;
+            }
+        }
+
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            REQUIRE(counter_nt[i] == 1u);
+            REQUIRE(counter_t[i] == 1u);
+        }
+
+        // Again.
+        n_trig = 0;
+        max_delta_t = std::vector<fp_t>(4u, std::numeric_limits<fp_t>::infinity());
+        while (true) {
+            ta.step(max_delta_t);
+            for (std::uint32_t i = 0; i < 4u; ++i) {
+                const auto oc = std::get<0>(ta.get_step_res()[i]);
+                if (oc > taylor_outcome::success) {
+                    REQUIRE(oc >= taylor_outcome{0});
+                    ++n_trig;
+                    max_delta_t[i] = 0;
+                } else {
+                    REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+                }
+            }
+
+            if (n_trig >= 4u) {
+                break;
+            }
+        }
+
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            REQUIRE(counter_nt[i] == 3u);
+            REQUIRE(counter_t[i] == 2u);
+        }
+
+        // Move backwards.
+        direction = false;
+        n_trig = 0;
+        std::fill(max_delta_t.begin(), max_delta_t.end(), -std::numeric_limits<fp_t>::infinity());
+        while (true) {
+            ta.step(max_delta_t);
+            for (std::uint32_t i = 0; i < 4u; ++i) {
+                const auto oc = std::get<0>(ta.get_step_res()[i]);
+                if (oc > taylor_outcome::success) {
+                    REQUIRE(oc >= taylor_outcome{0});
+                    ++n_trig;
+                    max_delta_t[i] = 0;
+                } else {
+                    REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+                }
+            }
+
+            if (n_trig >= 4u) {
+                break;
+            }
+        }
+
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            REQUIRE(counter_nt[i] == 5u);
+            REQUIRE(counter_t[i] == 3u);
+        }
+
+        // Again.
+        n_trig = 0;
+        std::fill(max_delta_t.begin(), max_delta_t.end(), -std::numeric_limits<fp_t>::infinity());
+        while (true) {
+            ta.step(max_delta_t);
+            for (std::uint32_t i = 0; i < 4u; ++i) {
+                const auto oc = std::get<0>(ta.get_step_res()[i]);
+                if (oc > taylor_outcome::success) {
+                    REQUIRE(oc >= taylor_outcome{0});
+                    ++n_trig;
+                    max_delta_t[i] = 0;
+                } else {
+                    REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+                }
+            }
+
+            if (n_trig >= 4u) {
+                break;
+            }
+        }
+
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            REQUIRE(counter_nt[i] == 7u);
+            REQUIRE(counter_t[i] == 4u);
+        }
+    }
+}
+
 TEST_CASE("nte dir test")
 {
     auto [x, v] = make_vars("x", "v");
@@ -893,4 +1062,199 @@ TEST_CASE("nte s11n")
     REQUIRE(ev.get_expression() == v);
     REQUIRE(ev.get_direction() == event_direction::positive);
     REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_nte_callback));
+}
+
+TEST_CASE("te identical")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    t_ev_t ev(v);
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                          4,
+                                          kw::t_events = {ev, ev}};
+
+    while (true) {
+        ta.step();
+
+        if (std::any_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) > taylor_outcome::success; })) {
+            break;
+        }
+    }
+
+    std::vector<std::int64_t> ev_idx(4u, 0);
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        const auto oc = std::get<0>(ta.get_step_res()[i]);
+        REQUIRE(oc > taylor_outcome::success);
+        auto first_ev = -static_cast<std::int64_t>(oc) - 1;
+        REQUIRE((first_ev == 0 || first_ev == 1));
+        ev_idx[i] = first_ev;
+    }
+
+    // Taking a further step, we might either detect the second event,
+    // or it may end up being ignored due to numerics.
+    ta.step();
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        const auto oc = std::get<0>(ta.get_step_res()[i]);
+        if (oc > taylor_outcome::success) {
+            auto second_ev = -static_cast<std::int64_t>(oc) - 1;
+            REQUIRE((second_ev == 0 || second_ev == 1));
+            REQUIRE(second_ev != ev_idx[i]);
+        } else {
+            REQUIRE(oc == taylor_outcome::success);
+        }
+    }
+}
+
+TEST_CASE("te close")
+{
+    using std::abs;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using t_ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    t_ev_t ev1(x);
+    t_ev_t ev2(
+        x - std::numeric_limits<fp_t>::epsilon() * 2, kw::callback = [](auto &, bool mr, int, std::uint32_t) {
+            REQUIRE(!mr);
+            return true;
+        });
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0.1, 0.11, 0.12, 0.13, .25, .26, .27, .28},
+                                          4,
+                                          kw::t_events = {ev1, ev2}};
+
+    // Propagate all batches up to the first trigger of a terminal event.
+    auto n_trig = 0u;
+    std::vector<fp_t> max_delta_t(4u, std::numeric_limits<fp_t>::infinity());
+    std::vector<std::int64_t> trig_idx(4u, 0);
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(oc >= taylor_outcome{0});
+                ++n_trig;
+                max_delta_t[i] = 0;
+                trig_idx[i] = static_cast<std::int64_t>(oc);
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+
+    // The second event must have triggered first.
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(trig_idx[i] == 1);
+    }
+
+    // Next step the first event must trigger.
+    n_trig = 0u;
+    max_delta_t = std::vector<fp_t>(4u, std::numeric_limits<fp_t>::infinity());
+    trig_idx = std::vector<std::int64_t>(4u, 0);
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(oc < taylor_outcome{0});
+                ++n_trig;
+                max_delta_t[i] = 0;
+                trig_idx[i] = static_cast<std::int64_t>(oc);
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(trig_idx[i] == -1);
+    }
+
+    // Next step no event must trigger: event 0 is now on cooldown
+    // as it just happened, and event 1 is still close enough to be
+    // on cooldown too.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
+
+    // Go back.
+    n_trig = 0u;
+    max_delta_t = std::vector<fp_t>(4u, -std::numeric_limits<fp_t>::infinity());
+    trig_idx = std::vector<std::int64_t>(4u, 0);
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(oc < taylor_outcome{0});
+                ++n_trig;
+                max_delta_t[i] = 0;
+                trig_idx[i] = static_cast<std::int64_t>(oc);
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(trig_idx[i] == -1);
+    }
+
+    n_trig = 0u;
+    max_delta_t = std::vector<fp_t>(4u, -std::numeric_limits<fp_t>::infinity());
+    trig_idx = std::vector<std::int64_t>(4u, 0);
+    while (true) {
+        ta.step(max_delta_t);
+        for (std::uint32_t i = 0; i < 4u; ++i) {
+            const auto oc = std::get<0>(ta.get_step_res()[i]);
+            if (oc > taylor_outcome::success) {
+                REQUIRE(oc >= taylor_outcome{0});
+                ++n_trig;
+                max_delta_t[i] = 0;
+                trig_idx[i] = static_cast<std::int64_t>(oc);
+            } else {
+                REQUIRE((oc == taylor_outcome::success || oc == taylor_outcome::time_limit));
+            }
+        }
+
+        if (n_trig >= 4u) {
+            break;
+        }
+    }
+
+    for (std::uint32_t i = 0; i < 4u; ++i) {
+        REQUIRE(trig_idx[i] == 1);
+    }
+
+    // Taking the step forward will skip event zero as it is still
+    // on cooldown.
+    ta.step();
+    REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome::success; }));
 }
