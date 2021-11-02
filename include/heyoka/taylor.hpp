@@ -581,10 +581,10 @@ template <typename T>
 using t_event = detail::t_event_impl<T, false>;
 
 template <typename T>
-using nt_batch_event = detail::nt_event_impl<T, true>;
+using nt_event_batch = detail::nt_event_impl<T, true>;
 
 template <typename T>
-using t_batch_event = detail::t_event_impl<T, true>;
+using t_event_batch = detail::t_event_impl<T, true>;
 
 namespace detail
 {
@@ -1002,8 +1002,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using nt_event_t = nt_batch_event<T>;
-    using t_event_t = t_batch_event<T>;
+    using nt_event_t = nt_event_batch<T>;
+    using t_event_t = t_event_batch<T>;
 
 private:
     // Struct implementing the data/logic for event detection.

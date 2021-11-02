@@ -322,7 +322,7 @@ TEST_CASE("propagate grid")
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
                                        {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
                                        4,
-                                       kw::t_events = {t_batch_event<double>(v - 0.999)}};
+                                       kw::t_events = {t_event_batch<double>(v - 0.999)}};
     auto out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
     REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v == 0; }));
@@ -332,7 +332,7 @@ TEST_CASE("propagate grid")
     ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
                                        {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
                                        4,
-                                       kw::t_events = {t_batch_event<double>(v - 0.999)},
+                                       kw::t_events = {t_event_batch<double>(v - 0.999)},
                                        kw::callback = [](auto &, bool, int, std::uint32_t) { return false; }};
     out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
@@ -732,7 +732,7 @@ TEST_CASE("param too many")
                                                                 {0.05, 0.06, 0.025, 0.026},
                                                                 2u,
                                                                 kw::pars = std::vector{1., 2., 3.},
-                                                                kw::t_events = {t_batch_event<double>(v - par[0])}}),
+                                                                kw::t_events = {t_event_batch<double>(v - par[0])}}),
                            std::invalid_argument,
                            Message("Excessive number of parameter values passed to the constructor of an adaptive "
                                    "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
@@ -751,7 +751,7 @@ TEST_CASE("param deduction from events")
         auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                                 {0.05, 0.06, 0.025, 0.026},
                                                 2,
-                                                kw::t_events = {t_batch_event<double>(v - par[0])}};
+                                                kw::t_events = {t_event_batch<double>(v - par[0])}};
 
         REQUIRE(ta.get_pars().size() == 2u);
     }
@@ -762,7 +762,7 @@ TEST_CASE("param deduction from events")
             {prime(x) = v, prime(v) = -9.8 * sin(x)},
             {0.05, 0.06, 0.025, 0.026},
             2,
-            kw::nt_events = {nt_batch_event<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
+            kw::nt_events = {nt_event_batch<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
 
         REQUIRE(ta.get_pars().size() == 4u);
     }
@@ -773,8 +773,8 @@ TEST_CASE("param deduction from events")
             {prime(x) = v, prime(v) = -9.8 * sin(x)},
             {0.05, 0.06, 0.025, 0.026},
             2,
-            kw::t_events = {t_batch_event<double>(v - par[10])},
-            kw::nt_events = {nt_batch_event<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
+            kw::t_events = {t_event_batch<double>(v - par[10])},
+            kw::nt_events = {nt_event_batch<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
 
         REQUIRE(ta.get_pars().size() == 22u);
     }
@@ -882,8 +882,8 @@ void s11n_test_impl()
         auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                                 {0., 0.01, 0.5, 0.51},
                                                 2,
-                                                kw::t_events = {t_batch_event<double>(v, kw::callback = s11n_t_cb{})},
-                                                kw::nt_events = {nt_batch_event<double>(v - par[0], s11n_nt_cb{})},
+                                                kw::t_events = {t_event_batch<double>(v, kw::callback = s11n_t_cb{})},
+                                                kw::nt_events = {nt_event_batch<double>(v - par[0], s11n_nt_cb{})},
                                                 kw::pars = std::vector<double>{-1e-4, -1e-5}};
 
         REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
@@ -907,7 +907,7 @@ void s11n_test_impl()
                                            {0.123, 0.124},
                                            2,
                                            kw::tol = 1e-3,
-                                           kw::t_events = {t_batch_event<double>(x, kw::callback = s11n_t_cb{})}};
+                                           kw::t_events = {t_event_batch<double>(x, kw::callback = s11n_t_cb{})}};
 
         {
             Ia ia(ss);
@@ -995,8 +995,8 @@ TEST_CASE("stream output")
             REQUIRE(!boost::algorithm::contains(oss.str(), "events"));
         }
 
-        using t_ev_t = t_batch_event<fp_t>;
-        using nt_ev_t = nt_batch_event<fp_t>;
+        using t_ev_t = t_event_batch<fp_t>;
+        using nt_ev_t = nt_event_batch<fp_t>;
 
         {
             auto tad = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
@@ -1078,8 +1078,8 @@ TEST_CASE("taylor move")
 
     auto init_state = std::vector{-1., -1.1, 0., 0.1};
     auto pars = std::vector{9.8, 9.9};
-    auto tes = std::vector{t_batch_event<double>(v)};
-    auto ntes = std::vector{nt_batch_event<double>(v, [](auto &, double, int, std::uint32_t) {})};
+    auto tes = std::vector{t_event_batch<double>(v)};
+    auto ntes = std::vector{nt_event_batch<double>(v, [](auto &, double, int, std::uint32_t) {})};
 
     auto s_data = init_state.data();
     auto p_data = pars.data();
@@ -1105,8 +1105,8 @@ TEST_CASE("events error")
 
     auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
 
-    using t_ev_t = t_batch_event<double>;
-    using nt_ev_t = nt_batch_event<double>;
+    using t_ev_t = t_event_batch<double>;
+    using nt_ev_t = nt_event_batch<double>;
 
     {
         auto tad
@@ -1165,7 +1165,7 @@ TEST_CASE("ev inf state")
     auto [x] = make_vars("x");
 
     auto ta = taylor_adaptive_batch<double>{
-        {prime(x) = 1_dbl}, {0., 0., 0., 0.}, 4, kw::t_events = {t_batch_event<double>(x - 5.)}};
+        {prime(x) = 1_dbl}, {0., 0., 0., 0.}, 4, kw::t_events = {t_event_batch<double>(x - 5.)}};
 
     ta.get_state_data()[2] = std::numeric_limits<double>::infinity();
 

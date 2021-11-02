@@ -115,7 +115,7 @@ TEST_CASE("nte single step")
                           },
                           kw::direction = event_direction::negative};
         std::vector<std::vector<fp_t>> trig_times_batch(batch_size), v_vals_batch(batch_size);
-        nt_batch_event<fp_t> ev_batch{
+        nt_event_batch<fp_t> ev_batch{
             ev_eq,
             [&trig_times_batch, batch_size, &v_vals_batch](auto &tint, fp_t tm, int, std::uint32_t batch_idx) {
                 trig_times_batch[batch_idx].push_back(tm);
@@ -196,7 +196,7 @@ TEST_CASE("te single step")
                              },
                          kw::direction = event_direction::negative};
         std::vector<std::vector<fp_t>> trig_times_batch(batch_size), v_vals_batch(batch_size);
-        t_batch_event<fp_t> ev_batch{
+        t_event_batch<fp_t> ev_batch{
             ev_eq,
             kw::callback =
                 [&trig_times_batch, batch_size, &v_vals_batch](auto &tint, bool, int, std::uint32_t batch_idx) {
@@ -985,7 +985,7 @@ TEST_CASE("nte dir test")
     auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
                                             {-0.25, -0.26, -0.27, -0.28, 0., 0., 0., 0.},
                                             4,
-                                            kw::nt_events = {nt_batch_event<double>(
+                                            kw::nt_events = {nt_event_batch<double>(
                                                 v,
                                                 [&fwd, &tlist, &rit](auto &, double t, int d_sgn, std::uint32_t idx) {
                                                     REQUIRE(d_sgn == 1);
@@ -1012,7 +1012,7 @@ TEST_CASE("nte dir test")
 
 TEST_CASE("nte def ctor")
 {
-    nt_batch_event<double> nte;
+    nt_event_batch<double> nte;
 
     REQUIRE(nte.get_expression() == 0_dbl);
     REQUIRE(nte.get_callback());
@@ -1041,7 +1041,7 @@ TEST_CASE("nte s11n")
 
     auto [x, v] = make_vars("x", "v");
 
-    nt_batch_event<fp_t> ev(v, s11n_nte_callback{}, kw::direction = event_direction::positive);
+    nt_event_batch<fp_t> ev(v, s11n_nte_callback{}, kw::direction = event_direction::positive);
 
     std::stringstream ss;
 
@@ -1051,7 +1051,7 @@ TEST_CASE("nte s11n")
         oa << ev;
     }
 
-    ev = nt_batch_event<fp_t>(v + x, [](auto &, fp_t, int, std::uint32_t) {});
+    ev = nt_event_batch<fp_t>(v + x, [](auto &, fp_t, int, std::uint32_t) {});
 
     {
         boost::archive::binary_iarchive ia(ss);
@@ -1807,7 +1807,7 @@ TEST_CASE("te s11n")
 
     auto [x, v] = make_vars("x", "v");
 
-    t_batch_event<fp_t> ev(v, kw::callback = s11n_te_callback{}, kw::direction = event_direction::positive,
+    t_event_batch<fp_t> ev(v, kw::callback = s11n_te_callback{}, kw::direction = event_direction::positive,
                            kw::cooldown = fp_t(100));
 
     std::stringstream ss;
@@ -1818,7 +1818,7 @@ TEST_CASE("te s11n")
         oa << ev;
     }
 
-    ev = t_batch_event<fp_t>(v + x);
+    ev = t_event_batch<fp_t>(v + x);
 
     {
         boost::archive::binary_iarchive ia(ss);
@@ -1834,7 +1834,7 @@ TEST_CASE("te s11n")
 
 TEST_CASE("te def ctor")
 {
-    t_batch_event<double> te;
+    t_event_batch<double> te;
 
     REQUIRE(te.get_expression() == 0_dbl);
     REQUIRE(!te.get_callback());
