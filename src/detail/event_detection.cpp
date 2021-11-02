@@ -1807,7 +1807,9 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         m_pt(tmp2.v.data(), tmp1.v.data());
 
                         // Finally we add tmp1 and tmp2 to the working list.
-                        const auto mid = (lb + ub) / 2;
+                        // NOTE: not sure why this is not picked up by the code
+                        // coverage tool.
+                        const auto mid = (lb + ub) / 2; // LCOV_EXCL_LINE
                         // NOTE: don't add the lower range if it falls
                         // entirely within the cooldown range.
                         if (lb_offset < mid) {
@@ -1839,6 +1841,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                     // on heuristic observation of the algorithm's behaviour in pathological
                     // cases. The second check is that we cannot possibly find more isolating
                     // intervals than the degree of the polynomial.
+                    // LCOV_EXCL_START
                     if (m_wlist.size() > 250u || m_isol.size() > order) {
                         get_logger()->warn("the polynomial root isolation algorithm failed during event detection at "
                                            "the batch index {}: the working "
@@ -1849,6 +1852,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
 
                         break;
                     }
+                    // LCOV_EXCL_STOP
 
                 } while (!m_wlist.empty());
 

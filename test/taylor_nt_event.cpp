@@ -15,6 +15,7 @@
 #include <limits>
 #include <sstream>
 #include <tuple>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <variant>
@@ -168,55 +169,61 @@ TEST_CASE("taylor nte")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        using Catch::Matchers::Message;
+        auto btup = std::make_tuple(std::true_type{}, std::false_type{});
 
-        auto [v] = make_vars("v");
+        auto inner = [](auto bflag) {
+            using Catch::Matchers::Message;
 
-        using ev_t = typename taylor_adaptive<fp_t>::nt_event_t;
+            auto [v] = make_vars("v");
 
-        std::ostringstream oss;
-        oss << ev_t(v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {});
-        REQUIRE(boost::algorithm::contains(oss.str(), "direction::any"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
-        oss.str("");
+            using ev_t = detail::nt_event_impl<fp_t, decltype(bflag)::value>;
 
-        oss << ev_t(
-            v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::direction = event_direction::positive);
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
-        oss.str("");
+            std::ostringstream oss;
+            oss << ev_t(v * v - 1e-10, [](auto &, fp_t, int, auto...) {});
+            REQUIRE(boost::algorithm::contains(oss.str(), "direction::any"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+            oss.str("");
 
-        oss << ev_t(
-            v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::direction = event_direction::negative);
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
-        oss.str("");
+            oss << ev_t(
+                v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+            oss.str("");
 
-        // Check the assignment operators.
-        ev_t ev0(v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}),
-            ev1(
-                v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::direction = event_direction::negative),
-            ev2(
-                v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::direction = event_direction::positive);
-        ev0 = ev1;
-        oss << ev0;
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
-        oss.str("");
+            oss << ev_t(
+                v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::negative);
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+            oss.str("");
 
-        ev0 = std::move(ev2);
-        oss << ev0;
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
-        oss.str("");
+            // Check the assignment operators.
+            ev_t ev0(v * v - 1e-10, [](auto &, fp_t, int, auto...) {}),
+                ev1(
+                    v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::negative),
+                ev2(
+                    v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction::positive);
+            ev0 = ev1;
+            oss << ev0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+            oss.str("");
 
-        // Failure modes.
-        REQUIRE_THROWS_MATCHES(ev_t(v * v - 1e-10, typename ev_t::callback_t{}), std::invalid_argument,
-                               Message("Cannot construct a non-terminal event with an empty callback"));
-        REQUIRE_THROWS_MATCHES(
-            ev_t(
-                v * v - 1e-10, [](taylor_adaptive<fp_t> &, fp_t, int) {}, kw::direction = event_direction{50}),
-            std::invalid_argument, Message("Invalid value selected for the direction of a non-terminal event"));
+            ev0 = std::move(ev2);
+            oss << ev0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "non-terminal"));
+            oss.str("");
+
+            // Failure modes.
+            REQUIRE_THROWS_MATCHES(ev_t(v * v - 1e-10, typename ev_t::callback_t{}), std::invalid_argument,
+                                   Message("Cannot construct a non-terminal event with an empty callback"));
+            REQUIRE_THROWS_MATCHES(
+                ev_t(
+                    v * v - 1e-10, [](auto &, fp_t, int, auto...) {}, kw::direction = event_direction{50}),
+                std::invalid_argument, Message("Invalid value selected for the direction of a non-terminal event"));
+        };
+
+        tuple_for_each(btup, inner);
     };
 
     tuple_for_each(fp_types, tester);
