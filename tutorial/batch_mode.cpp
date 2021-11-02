@@ -147,12 +147,12 @@ int main()
         v,
         // The callback.
         [](auto &ta, double time, int, std::uint32_t batch_idx) {
-            // Compute the state of the system when the
-            // event triggered and print the value of t and x.
+            // Compute the state of the system when the event triggered and
+            // print the value of t and x for the batch element batch_idx.
             ta.update_d_output({time, time, time, time});
 
             std::cout << "Zero velocity time and angle for batch element " << batch_idx << ": " << time << ", "
-                      << ta.get_state()[batch_idx] << '\n';
+                      << ta.get_d_output()[batch_idx] << '\n';
         });
 
     // Create the integrator object.
