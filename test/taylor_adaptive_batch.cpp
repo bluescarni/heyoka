@@ -1159,3 +1159,89 @@ TEST_CASE("events error")
                                Message("No events were defined for this integrator"));
     }
 }
+
+TEST_CASE("ev inf state")
+{
+    auto [x] = make_vars("x");
+
+    auto ta = taylor_adaptive_batch<double>{
+        {prime(x) = 1_dbl}, {0., 0., 0., 0.}, 4, kw::t_events = {t_batch_event<double>(x - 5.)}};
+
+    ta.get_state_data()[2] = std::numeric_limits<double>::infinity();
+
+    ta.step({10., 10., 10., 10.});
+
+    REQUIRE(std::get<0>(ta.get_step_res()[0]) == taylor_outcome{-1});
+    REQUIRE(std::get<0>(ta.get_step_res()[1]) == taylor_outcome{-1});
+    REQUIRE(std::get<0>(ta.get_step_res()[2]) == taylor_outcome::err_nf_state);
+    REQUIRE(std::get<0>(ta.get_step_res()[3]) == taylor_outcome{-1});
+}
+
+TEST_CASE("ev exception callback")
+{
+    using Catch::Matchers::Message;
+
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using nte_t = typename taylor_adaptive_batch<fp_t>::nt_event_t;
+    using te_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    {
+        auto ta = taylor_adaptive_batch<fp_t>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+            4,
+            kw::nt_events = {nte_t(
+                v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) { throw std::invalid_argument("hello world 0"); })},
+            kw::t_events = {te_t(
+                v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                    throw std::invalid_argument("hello world 1");
+                })}};
+
+        REQUIRE_THROWS_MATCHES(ta.propagate_until({4., 4., 4., 4.}), std::invalid_argument, Message("hello world 0"));
+    }
+
+    {
+        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                              {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                              4,
+                                              kw::nt_events
+                                              = {nte_t(v * v - 1e-10, [](auto &, fp_t, int, std::uint32_t) {})},
+                                              kw::t_events = {te_t(
+                                                  v, kw::callback = [](auto &, bool, int, std::uint32_t) -> bool {
+                                                      throw std::invalid_argument("hello world 1");
+                                                  })}};
+
+        REQUIRE_THROWS_MATCHES(ta.propagate_until({4., 4., 4., 4.}), std::invalid_argument, Message("hello world 1"));
+    }
+}
+
+TEST_CASE("reset cooldowns")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    using te_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+
+    auto ta
+        = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                      {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                      4,
+                                      kw::t_events = {te_t(
+                                          v, kw::callback = [](auto &, bool, int, std::uint32_t) { return false; })}};
+
+    ta.propagate_until({100., 100., 100., 100.});
+
+    REQUIRE(std::any_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &v) {
+        return std::any_of(v.begin(), v.end(), [](const auto &x) { return static_cast<bool>(x); });
+    }));
+
+    ta.reset_cooldowns();
+
+    REQUIRE(std::all_of(ta.get_te_cooldowns().begin(), ta.get_te_cooldowns().end(), [](const auto &v) {
+        return std::all_of(v.begin(), v.end(), [](const auto &x) { return !static_cast<bool>(x); });
+    }));
+}
