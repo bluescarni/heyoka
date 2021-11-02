@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Event detection is now available also in batch mode
+  (`#214 <https://github.com/bluescarni/heyoka/pull/214>`__).
 - Add a sum of squares primitive
   (`#209 <https://github.com/bluescarni/heyoka/pull/209>`__).
 - Add new benchmarks and benchmark results to the documentation

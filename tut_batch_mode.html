@@ -287,6 +287,11 @@
      Dense output
     </a>
    </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#event-detection">
+     Event detection
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toc-h2 nav-item toc-entry">
@@ -678,6 +683,89 @@ at different time coordinates:</p>
 </pre></div>
 </div>
 </div>
+<div class="section" id="event-detection">
+<h3>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h3>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.16.0.</span></p>
+</div>
+<p><a class="reference internal" href="tut_events.html#tut-events"><span class="std std-ref">Event detection</span></a> in also available in batch mode. The API is similar
+to the scalar mode API, with the following differences:</p>
+<ul class="simple">
+<li><p>the event classes in batch mode are called <code class="docutils literal notranslate"><span class="pre">nt_event_batch</span></code> and <code class="docutils literal notranslate"><span class="pre">t_event_batch</span></code>
+(for non-terminal and terminal events respectively), rather than <code class="docutils literal notranslate"><span class="pre">nt_event</span></code> and <code class="docutils literal notranslate"><span class="pre">t_event</span></code>;</p></li>
+<li><p>with respect to scalar mode, the callback signatures in batch mode feature an extra trailing argument
+of type <code class="docutils literal notranslate"><span class="pre">std::uint32_t</span></code> that indicates in which element of the batch the event was detected.</p></li>
+</ul>
+<p>Let us see a concrete example: we will be integrating in batch mode the simple pendulum with slightly
+different sets of initial conditions for each batch element, and we want to detect via
+a non-terminal event when the bob’s velocity is zero.
+When the event triggers, we will be printing to screen the time and the value of the angle
+coordinate for the batch element in which the event triggered.</p>
+<p>We begin with the creation of a non-terminal event in batch mode:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the event object for the detection</span>
+<span class="w">    </span><span class="c1">// of &#39;v == 0&#39;.</span>
+<span class="w">    </span><span class="n">nt_event_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The left-hand side of the event equation</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="p">[](</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">batch_idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Compute the state of the system when the event triggered and</span>
+<span class="w">            </span><span class="c1">// print the value of t and x for the batch element batch_idx.</span>
+<span class="w">            </span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">({</span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">});</span><span class="w"></span>
+
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Zero velocity time and angle for batch element &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">batch_idx</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, &quot;</span><span class="w"></span>
+<span class="w">                      </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="n">batch_idx</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Next, we create the integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the integrator object.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                       </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                       </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                       </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// Batches of initial conditions</span>
+<span class="w">                                       </span><span class="c1">// for x and v.</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.01</span><span class="p">,</span><span class="w"> </span><span class="mf">0.02</span><span class="p">,</span><span class="w"> </span><span class="mf">0.03</span><span class="p">,</span><span class="w"> </span><span class="mf">.25</span><span class="p">,</span><span class="w"> </span><span class="mf">.26</span><span class="p">,</span><span class="w"> </span><span class="mf">.27</span><span class="p">,</span><span class="w"> </span><span class="mf">.28</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// The batch size.</span>
+<span class="w">                                       </span><span class="n">batch_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// The non-terminal events.</span>
+<span class="w">                                       </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>We can now propagate for a few time units:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate all batch elements for</span>
+<span class="w">    </span><span class="c1">// a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">});</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Zero velocity time and angle for batch element 0: 0.501973, 0.0798808</span>
+<span class="go">Zero velocity time and angle for batch element 1: 0.463715, 0.0836782</span>
+<span class="go">Zero velocity time and angle for batch element 2: 0.429231, 0.0885657</span>
+<span class="go">Zero velocity time and angle for batch element 3: 0.398675, 0.0943745</span>
+<span class="go">Zero velocity time and angle for batch element 1: 1.4677, -0.0836782</span>
+<span class="go">Zero velocity time and angle for batch element 2: 1.43327, -0.0885657</span>
+<span class="go">Zero velocity time and angle for batch element 3: 1.40278, -0.0943745</span>
+<span class="go">Zero velocity time and angle for batch element 0: 1.50592, -0.0798808</span>
+<span class="go">Zero velocity time and angle for batch element 0: 2.50986, 0.0798808</span>
+<span class="go">Zero velocity time and angle for batch element 1: 2.47168, 0.0836782</span>
+<span class="go">Zero velocity time and angle for batch element 2: 2.43731, 0.0885657</span>
+<span class="go">Zero velocity time and angle for batch element 3: 2.40688, 0.0943745</span>
+<span class="go">Zero velocity time and angle for batch element 0: 3.51381, -0.0798808</span>
+<span class="go">Zero velocity time and angle for batch element 1: 3.47567, -0.0836782</span>
+<span class="go">Zero velocity time and angle for batch element 2: 3.44134, -0.0885657</span>
+<span class="go">Zero velocity time and angle for batch element 3: 3.41099, -0.0943745</span>
+<span class="go">Zero velocity time and angle for batch element 0: 4.51775, 0.0798808</span>
+<span class="go">Zero velocity time and angle for batch element 1: 4.47965, 0.0836782</span>
+<span class="go">Zero velocity time and angle for batch element 2: 4.44538, 0.0885657</span>
+<span class="go">Zero velocity time and angle for batch element 3: 4.41509, 0.0943745</span>
+</pre></div>
+</div>
+<p>We can see how the event triggered 5 times for each batch element, and how
+the oscillation period is roughly 1 for all batch elements. This is of course
+expected due to the isochronicity property of the pendulum in the small oscillation
+regime.</p>
+</div>
 </div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
@@ -814,6 +902,38 @@ at different time coordinates:</p>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">d_out_arr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xt</span><span class="o">::</span><span class="n">adapt</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">({</span><span class="mf">20.1</span><span class="p">,</span><span class="w"> </span><span class="mf">21.1</span><span class="p">,</span><span class="w"> </span><span class="mf">22.1</span><span class="p">,</span><span class="w"> </span><span class="mf">23.1</span><span class="p">}),</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">batch_size</span><span class="p">});</span><span class="w"></span>
 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Dense output:</span><span class="se">\n</span><span class="s">&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">d_out_arr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Create the event object for the detection</span>
+<span class="w">    </span><span class="c1">// of &#39;v == 0&#39;.</span>
+<span class="w">    </span><span class="n">nt_event_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ev</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The left-hand side of the event equation</span>
+<span class="w">        </span><span class="n">v</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// The callback.</span>
+<span class="w">        </span><span class="p">[](</span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">batch_idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="c1">// Compute the state of the system when the event triggered and</span>
+<span class="w">            </span><span class="c1">// print the value of t and x for the batch element batch_idx.</span>
+<span class="w">            </span><span class="n">ta</span><span class="p">.</span><span class="n">update_d_output</span><span class="p">({</span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">,</span><span class="w"> </span><span class="n">time</span><span class="p">});</span><span class="w"></span>
+
+<span class="w">            </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Zero velocity time and angle for batch element &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">batch_idx</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, &quot;</span><span class="w"></span>
+<span class="w">                      </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_d_output</span><span class="p">()[</span><span class="n">batch_idx</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">});</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Create the integrator object.</span>
+<span class="w">    </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive_batch</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                       </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                       </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                       </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// Batches of initial conditions</span>
+<span class="w">                                       </span><span class="c1">// for x and v.</span>
+<span class="w">                                       </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.01</span><span class="p">,</span><span class="w"> </span><span class="mf">0.02</span><span class="p">,</span><span class="w"> </span><span class="mf">0.03</span><span class="p">,</span><span class="w"> </span><span class="mf">.25</span><span class="p">,</span><span class="w"> </span><span class="mf">.26</span><span class="p">,</span><span class="w"> </span><span class="mf">.27</span><span class="p">,</span><span class="w"> </span><span class="mf">.28</span><span class="p">},</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// The batch size.</span>
+<span class="w">                                       </span><span class="n">batch_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">// The non-terminal events.</span>
+<span class="w">                                       </span><span class="n">kw</span><span class="o">::</span><span class="n">nt_events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">ev</span><span class="p">}};</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Propagate all batch elements for</span>
+<span class="w">    </span><span class="c1">// a few time units.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">,</span><span class="w"> </span><span class="mf">5.</span><span class="p">});</span><span class="w"></span>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
