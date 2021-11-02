@@ -139,4 +139,36 @@ int main()
     auto d_out_arr = xt::adapt(ta.update_d_output({20.1, 21.1, 22.1, 23.1}), {2, batch_size});
 
     std::cout << "\nDense output:\n" << d_out_arr << "\n\n";
+
+    // Create the event object for the detection
+    // of 'v == 0'.
+    nt_event_batch<double> ev(
+        // The left-hand side of the event equation
+        v,
+        // The callback.
+        [](auto &ta, double time, int, std::uint32_t batch_idx) {
+            // Compute the state of the system when the event triggered and
+            // print the value of t and x for the batch element batch_idx.
+            ta.update_d_output({time, time, time, time});
+
+            std::cout << "Zero velocity time and angle for batch element " << batch_idx << ": " << time << ", "
+                      << ta.get_d_output()[batch_idx] << '\n';
+        });
+
+    // Create the integrator object.
+    ta = taylor_adaptive_batch<double>{// Definition of the ODE system:
+                                       // x' = v
+                                       // v' = -9.8 * sin(x)
+                                       {prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                       // Batches of initial conditions
+                                       // for x and v.
+                                       {0, 0.01, 0.02, 0.03, .25, .26, .27, .28},
+                                       // The batch size.
+                                       batch_size,
+                                       // The non-terminal events.
+                                       kw::nt_events = {ev}};
+
+    // Propagate all batch elements for
+    // a few time units.
+    ta.propagate_for({5., 5., 5., 5.});
 }

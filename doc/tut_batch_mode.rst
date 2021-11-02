@@ -336,6 +336,71 @@ at different time coordinates:
    {{ 1.934202,  2.879367,  3.389288,  6.151962},
     { 1.289941,  0.411166, -0.134188,  0.776195}}
 
+Event detection
+^^^^^^^^^^^^^^^
+
+.. versionadded:: 0.16.0
+
+:ref:`Event detection <tut_events>` in also available in batch mode. The API is similar
+to the scalar mode API, with the following differences:
+
+* the event classes in batch mode are called ``nt_event_batch`` and ``t_event_batch``
+  (for non-terminal and terminal events respectively), rather than ``nt_event`` and ``t_event``;
+* with respect to scalar mode, the callback signatures in batch mode feature an extra trailing argument
+  of type ``std::uint32_t`` that indicates in which element of the batch the event was detected.
+
+Let us see a concrete example: we will be integrating in batch mode the simple pendulum with slightly
+different sets of initial conditions for each batch element, and we want to detect via
+a non-terminal event when the bob's velocity is zero.
+When the event triggers, we will be printing to screen the time and the value of the angle
+coordinate for the batch element in which the event triggered.
+
+We begin with the creation of a non-terminal event in batch mode:
+
+.. literalinclude:: ../tutorial/batch_mode.cpp
+   :language: c++
+   :lines: 143-156
+
+Next, we create the integrator object:
+
+.. literalinclude:: ../tutorial/batch_mode.cpp
+   :language: c++
+   :lines: 158-169
+
+We can now propagate for a few time units:
+
+.. literalinclude:: ../tutorial/batch_mode.cpp
+   :language: c++
+   :lines: 171-173
+
+.. code-block:: console
+
+   Zero velocity time and angle for batch element 0: 0.501973, 0.0798808
+   Zero velocity time and angle for batch element 1: 0.463715, 0.0836782
+   Zero velocity time and angle for batch element 2: 0.429231, 0.0885657
+   Zero velocity time and angle for batch element 3: 0.398675, 0.0943745
+   Zero velocity time and angle for batch element 1: 1.4677, -0.0836782
+   Zero velocity time and angle for batch element 2: 1.43327, -0.0885657
+   Zero velocity time and angle for batch element 3: 1.40278, -0.0943745
+   Zero velocity time and angle for batch element 0: 1.50592, -0.0798808
+   Zero velocity time and angle for batch element 0: 2.50986, 0.0798808
+   Zero velocity time and angle for batch element 1: 2.47168, 0.0836782
+   Zero velocity time and angle for batch element 2: 2.43731, 0.0885657
+   Zero velocity time and angle for batch element 3: 2.40688, 0.0943745
+   Zero velocity time and angle for batch element 0: 3.51381, -0.0798808
+   Zero velocity time and angle for batch element 1: 3.47567, -0.0836782
+   Zero velocity time and angle for batch element 2: 3.44134, -0.0885657
+   Zero velocity time and angle for batch element 3: 3.41099, -0.0943745
+   Zero velocity time and angle for batch element 0: 4.51775, 0.0798808
+   Zero velocity time and angle for batch element 1: 4.47965, 0.0836782
+   Zero velocity time and angle for batch element 2: 4.44538, 0.0885657
+   Zero velocity time and angle for batch element 3: 4.41509, 0.0943745
+
+We can see how the event triggered 5 times for each batch element, and how
+the oscillation period is roughly 1 for all batch elements. This is of course
+expected due to the isochronicity property of the pendulum in the small oscillation
+regime.
+
 Full code listing
 -----------------
 

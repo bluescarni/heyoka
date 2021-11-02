@@ -364,13 +364,14 @@ inline auto taylor_adaptive_common_ops(KwArgs &&...kw_args)
     return std::tuple{high_accuracy, tol, compact_mode, std::move(pars)};
 }
 
-template <typename T>
+template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC nt_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<void(taylor_adaptive_impl<T> &, T, int)>;
+    using callback_t = callable<std::conditional_t<B, void(taylor_adaptive_batch_impl<T> &, T, int, std::uint32_t),
+                                                   void(taylor_adaptive_impl<T> &, T, int)>>;
 
 private:
     expression eq;
@@ -430,8 +431,8 @@ public:
     event_direction get_direction() const;
 };
 
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T> &)
+template <typename T, bool B>
+inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T, B> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -439,25 +440,32 @@ inline std::ostream &operator<<(std::ostream &os, const nt_event_impl<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<double, true> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<long double, true> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const nt_event_impl<mppp::real128, true> &);
 
 #endif
 
-template <typename T>
+template <typename T, bool B>
 class HEYOKA_DLL_PUBLIC t_event_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
 public:
-    using callback_t = callable<bool(taylor_adaptive_impl<T> &, bool, int)>;
+    using callback_t = callable<std::conditional_t<B, bool(taylor_adaptive_batch_impl<T> &, bool, int, std::uint32_t),
+                                                   bool(taylor_adaptive_impl<T> &, bool, int)>>;
 
 private:
     expression eq;
@@ -537,8 +545,8 @@ public:
     T get_cooldown() const;
 };
 
-template <typename T>
-inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T> &)
+template <typename T, bool B>
+inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T, B> &)
 {
     static_assert(always_false_v<T>, "Unhandled type.");
 
@@ -546,44 +554,67 @@ inline std::ostream &operator<<(std::ostream &os, const t_event_impl<T> &)
 }
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<double, true> &);
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<long double, true> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template <>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128> &);
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, false> &);
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const t_event_impl<mppp::real128, true> &);
 
 #endif
 
 } // namespace detail
 
 template <typename T>
-using nt_event = detail::nt_event_impl<T>;
+using nt_event = detail::nt_event_impl<T, false>;
 
 template <typename T>
-using t_event = detail::t_event_impl<T>;
+using t_event = detail::t_event_impl<T, false>;
+
+template <typename T>
+using nt_event_batch = detail::nt_event_impl<T, true>;
+
+template <typename T>
+using t_event_batch = detail::t_event_impl<T, true>;
 
 namespace detail
 {
+
+// Polynomial cache type. Each entry is a polynomial
+// represented as a vector of coefficients. Used
+// during event detection.
+template <typename T>
+using taylor_poly_cache = std::vector<std::vector<T>>;
+
+// A RAII helper to extract polys from a cache and
+// return them to the cache upon destruction. Used
+// during event detection.
+template <typename>
+class taylor_pwrap;
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
+public:
+    using nt_event_t = nt_event<T>;
+    using t_event_t = t_event<T>;
+
+private:
     // Struct implementing the data/logic for event detection.
     struct HEYOKA_DLL_PUBLIC ed_data {
-        // The polynomial cache type. Each entry is a polynomial
-        // represented as a vector of coefficients.
-        using poly_cache_t = std::vector<std::vector<T>>;
-        // A RAII helper to extract polys from a cache and
-        // return them to the cache upon destruction.
-        class pwrap;
         // The working list type used during real root isolation.
-        using wlist_t = std::vector<std::tuple<T, T, pwrap>>;
+        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
@@ -594,9 +625,9 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
 
         // The vector of terminal events.
-        std::vector<t_event_impl<T>> m_tes;
+        std::vector<t_event_t> m_tes;
         // The vector of non-terminal events.
-        std::vector<nt_event_impl<T>> m_ntes;
+        std::vector<nt_event_t> m_ntes;
         // The jet of derivatives for the state variables
         // and the events.
         std::vector<T> m_ev_jet;
@@ -624,10 +655,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         // The list of isolating intervals.
         isol_t m_isol;
         // The polynomial cache.
-        poly_cache_t m_poly_cache;
+        taylor_poly_cache<T> m_poly_cache;
 
         // Constructors.
-        ed_data(std::vector<t_event_impl<T>>, std::vector<nt_event_impl<T>>, std::uint32_t, std::uint32_t);
+        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
         ed_data(const ed_data &);
         ~ed_data();
 
@@ -650,11 +681,6 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_impl
         BOOST_SERIALIZATION_SPLIT_MEMBER()
     };
 
-public:
-    using nt_event_t = nt_event<T>;
-    using t_event_t = t_event<T>;
-
-private:
     // State vector.
     std::vector<T> m_state;
     // Time.
@@ -727,10 +753,6 @@ private:
 
             auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
-
-            // NOTE: perhaps the handling of the events kwargs can end up in
-            // taylor_adaptive_common_ops()
-            // once we implement event detection in the batch integrator too.
 
             // Extract the terminal events, if any.
             auto tes = [&p]() -> std::vector<t_event_t> {
@@ -979,6 +1001,91 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
 {
     static_assert(is_supported_fp_v<T>, "Unhandled type.");
 
+public:
+    using nt_event_t = nt_event_batch<T>;
+    using t_event_t = t_event_batch<T>;
+
+private:
+    // Struct implementing the data/logic for event detection.
+    struct HEYOKA_DLL_PUBLIC ed_data {
+        // The working list type used during real root isolation.
+        using wlist_t = std::vector<std::tuple<T, T, taylor_pwrap<T>>>;
+        // The type used to store the list of isolating intervals.
+        using isol_t = std::vector<std::tuple<T, T>>;
+        // Polynomial translation function type.
+        using pt_t = void (*)(T *, const T *);
+        // rtscc function type.
+        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+        // fex_check function type.
+        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+
+        // The vector of terminal events.
+        std::vector<t_event_t> m_tes;
+        // The vector of non-terminal events.
+        std::vector<nt_event_t> m_ntes;
+        // The jet of derivatives for the state variables
+        // and the events.
+        std::vector<T> m_ev_jet;
+        // The vector to store the norm infinity of the state
+        // vector when using the stepper with events.
+        std::vector<T> m_max_abs_state;
+        // The vector to store the the maximum absolute error
+        // on the Taylor series of the event equations.
+        std::vector<T> m_g_eps;
+        // Vector of detected terminal events.
+        std::vector<std::vector<std::tuple<std::uint32_t, T, bool, int, T>>> m_d_tes;
+        // The vector of cooldowns for the terminal events.
+        // If an event is on cooldown, the corresponding optional
+        // in this vector will contain the total time elapsed
+        // since the cooldown started and the absolute value
+        // of the cooldown duration.
+        std::vector<std::vector<std::optional<std::pair<T, T>>>> m_te_cooldowns;
+        // Vector of detected non-terminal events.
+        std::vector<std::vector<std::tuple<std::uint32_t, T, int>>> m_d_ntes;
+        // The LLVM state.
+        llvm_state m_state;
+        // Flags to signal if we are integrating backwards in time.
+        std::vector<std::uint32_t> m_back_int;
+        // Output of the fast exclusion check.
+        std::vector<std::uint32_t> m_fex_check_res;
+        // The JIT compiled functions used during root finding.
+        // NOTE: use default member initializers to ensure that
+        // these are zero-inited by the default constructor
+        // (which is defaulted).
+        pt_t m_pt = nullptr;
+        rtscc_t m_rtscc = nullptr;
+        fex_check_t m_fex_check = nullptr;
+        // The working list.
+        wlist_t m_wlist;
+        // The list of isolating intervals.
+        isol_t m_isol;
+        // The polynomial cache.
+        taylor_poly_cache<T> m_poly_cache;
+
+        // Constructors.
+        ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);
+        ed_data(const ed_data &);
+        ~ed_data();
+
+        // Delete unused bits.
+        ed_data(ed_data &&) = delete;
+        ed_data &operator=(const ed_data &) = delete;
+        ed_data &operator=(ed_data &&) = delete;
+
+        // The event detection function.
+        void detect_events(const T *, std::uint32_t, std::uint32_t, std::uint32_t);
+
+    private:
+        // Serialisation.
+        // NOTE: the def ctor is used only during deserialisation
+        // via pointer.
+        ed_data();
+        friend class boost::serialization::access;
+        void save(boost::archive::binary_oarchive &, unsigned) const;
+        void load(boost::archive::binary_iarchive &, unsigned);
+        BOOST_SERIALIZATION_SPLIT_MEMBER()
+    };
+
     // The batch size.
     std::uint32_t m_batch_size;
     // State vectors.
@@ -995,9 +1102,10 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::uint32_t m_order;
     // Tolerance.
     T m_tol;
-    // The stepper.
+    // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    step_f_t m_step_f;
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
+    std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
     // The vector for the Taylor coefficients.
@@ -1029,6 +1137,8 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     std::vector<dfloat<T>> m_rem_time;
     // Temporary vector used in the dense output implementation.
     std::vector<T> m_d_out_time;
+    // Auxiliary data/functions for event detection.
+    std::unique_ptr<ed_data> m_ed_data;
 
     // Serialization.
     template <typename Archive>
@@ -1046,7 +1156,7 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
     // Private implementation-detail constructor machinery.
     template <typename U>
     HEYOKA_DLL_PUBLIC void finalise_ctor_impl(const U &, std::vector<T>, std::uint32_t, std::vector<T>, T, bool, bool,
-                                              std::vector<T>);
+                                              std::vector<T>, std::vector<t_event_t>, std::vector<nt_event_t>);
     template <typename U, typename... KwArgs>
     void finalise_ctor(const U &sys, std::vector<T> state, std::uint32_t batch_size, KwArgs &&...kw_args)
     {
@@ -1069,8 +1179,26 @@ class HEYOKA_DLL_PUBLIC taylor_adaptive_batch_impl
             auto [high_accuracy, tol, compact_mode, pars]
                 = taylor_adaptive_common_ops<T>(std::forward<KwArgs>(kw_args)...);
 
+            // Extract the terminal events, if any.
+            auto tes = [&p]() -> std::vector<t_event_t> {
+                if constexpr (p.has(kw::t_events)) {
+                    return std::forward<decltype(p(kw::t_events))>(p(kw::t_events));
+                } else {
+                    return {};
+                }
+            }();
+
+            // Extract the non-terminal events, if any.
+            auto ntes = [&p]() -> std::vector<nt_event_t> {
+                if constexpr (p.has(kw::nt_events)) {
+                    return std::forward<decltype(p(kw::nt_events))>(p(kw::nt_events));
+                } else {
+                    return {};
+                }
+            }();
+
             finalise_ctor_impl(sys, std::move(state), batch_size, std::move(time), tol, high_accuracy, compact_mode,
-                               std::move(pars));
+                               std::move(pars), std::move(tes), std::move(ntes));
         }
     }
 
@@ -1160,6 +1288,37 @@ public:
         return m_d_out;
     }
     const std::vector<T> &update_d_output(const std::vector<T> &, bool = false);
+
+    bool with_events() const
+    {
+        return static_cast<bool>(m_ed_data);
+    }
+    void reset_cooldowns();
+    void reset_cooldowns(std::uint32_t);
+    const std::vector<t_event_t> &get_t_events() const
+    {
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_tes;
+    }
+    const auto &get_te_cooldowns() const
+    {
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_te_cooldowns;
+    }
+    const std::vector<nt_event_t> &get_nt_events() const
+    {
+        if (!m_ed_data) {
+            throw std::invalid_argument("No events were defined for this integrator");
+        }
+
+        return m_ed_data->m_ntes;
+    }
 
     void step(bool = false);
     void step_backward(bool = false);

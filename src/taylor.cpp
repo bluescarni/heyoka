@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <map>
@@ -2578,7 +2579,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 #if !defined(NDEBUG)
     // NOTE: this is the only precondition on max_delta_t.
     using std::isnan;
-    assert(!isnan(max_delta_t));
+    assert(!isnan(max_delta_t)); // LCOV_EXCL_LINE
 #endif
 
     auto h = max_delta_t;
@@ -2615,7 +2616,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
 
         // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
         // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
-        // in taylor_detect_events we skip event detection altogether.
+        // in ed_data.detect_events() we skip event detection altogether.
         T g_eps;
         if (isfinite(max_abs_state)) {
             // Are we in absolute or relative error control mode?
@@ -2661,7 +2662,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         // for backward integration, thus we compare using
         // abs() so that the first events are those which
         // happen closer to the beginning of the timestep.
-        // NOTE: the checks inside taylor_detect_events() ensure
+        // NOTE: the checks inside ed_data.detect_events() ensure
         // that we can safely sort the events' times.
         auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
         std::sort(ed_data.m_d_tes.begin(), ed_data.m_d_tes.end(), cmp);
@@ -2672,16 +2673,6 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         if (!ed_data.m_d_tes.empty()) {
             h = std::get<1>(ed_data.m_d_tes[0]);
         }
-
-        // If we don't have terminal events, we will invoke the callbacks
-        // of *all* the non-terminal events. Otherwise, we need to figure
-        // out which non-terminal events do not happen because their time
-        // coordinate is past the the first terminal event.
-        const auto ntes_end_it
-            = ed_data.m_d_tes.empty()
-                  ? ed_data.m_d_ntes.end()
-                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
-                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
 
         // Update the state.
         m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), &h);
@@ -2722,12 +2713,22 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
             }
         }
 
+        // If we don't have terminal events, we will invoke the callbacks
+        // of *all* the non-terminal events. Otherwise, we need to figure
+        // out which non-terminal events do not happen because their time
+        // coordinate is past the the first terminal event.
+        const auto ntes_end_it
+            = ed_data.m_d_tes.empty()
+                  ? ed_data.m_d_ntes.end()
+                  : std::lower_bound(ed_data.m_d_ntes.begin(), ed_data.m_d_ntes.end(), h,
+                                     [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+
         // Invoke the callbacks of the non-terminal events, which are guaranteed
         // to happen before the first terminal event.
         for (auto it = ed_data.m_d_ntes.begin(); it != ntes_end_it; ++it) {
             const auto &t = *it;
             const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
-            assert(cb);
+            assert(cb); // LCOV_EXCL_LINE
             cb(*this, static_cast<T>(m_time - m_last_h + std::get<1>(t)), std::get<2>(t));
         }
 
@@ -2739,7 +2740,7 @@ std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, 
         if (!ed_data.m_d_tes.empty()) {
             // Fetch the first terminal event.
             const auto te_idx = std::get<0>(ed_data.m_d_tes[0]);
-            assert(te_idx < ed_data.m_tes.size());
+            assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
             const auto &te = ed_data.m_tes[te_idx];
 
             // Set the corresponding cooldown.
@@ -2877,7 +2878,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // and we keep on decreasing its magnitude at the following iterations.
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir);
+        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
@@ -2915,7 +2916,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // res == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
+            assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter};
         }
 
@@ -3114,7 +3115,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // and we keep on decreasing its magnitude at the following iterations.
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
-        assert((rem_time >= T(0)) == t_dir);
+        assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         const auto [res, h] = step_impl(static_cast<T>(dt_limit), true);
@@ -3161,7 +3162,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // not going exactly to zero due to numerical issues. A zero rem_time
         // will also force the processing of all remaining grid points.
         if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit);
+            assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             rem_time = dfloat<T>(T(0));
         } else {
             rem_time = grid.back() - m_time;
@@ -3274,7 +3275,8 @@ template <typename T>
 template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
                                                        std::vector<T> time, T tol, bool high_accuracy,
-                                                       bool compact_mode, std::vector<T> pars)
+                                                       bool compact_mode, std::vector<T> pars,
+                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -3340,35 +3342,59 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Store the dimension of the system.
     m_dim = boost::numeric_cast<std::uint32_t>(sys.size());
 
+    // Do we have events?
+    const auto with_events = !tes.empty() || !ntes.empty();
+
     // Temporarily disable optimisations in s, so that
     // we don't optimise twice when adding the step
     // and then the d_out.
     std::optional<opt_disabler> od(m_llvm);
 
     // Add the stepper function.
-    std::tie(m_dc, m_order)
-        = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, m_batch_size, high_accuracy, compact_mode);
+    if (with_events) {
+        std::vector<expression> ee;
+        // NOTE: no need for deep copies of the expressions: ee is never mutated
+        // and we will be deep-copying it anyway when we do the decomposition.
+        for (const auto &ev : tes) {
+            ee.push_back(ev.get_expression());
+        }
+        for (const auto &ev : ntes) {
+            ee.push_back(ev.get_expression());
+        }
+
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
+            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy);
+    } else {
+        std::tie(m_dc, m_order)
+            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy, compact_mode);
+    }
 
     // Fix m_pars' size, if necessary.
     const auto npars = n_pars_in_dc(m_dc);
     // LCOV_EXCL_START
     if (npars > std::numeric_limits<std::uint32_t>::max() / m_batch_size) {
-        throw std::overflow_error(
-            "Overflow detected when computing the size of the parameter array in an adaptive Taylor integrator");
+        throw std::overflow_error("Overflow detected when computing the size of the parameter array in an adaptive "
+                                  "Taylor integrator in batch mode");
     }
     // LCOV_EXCL_STOP
     if (m_pars.size() < npars * m_batch_size) {
         m_pars.resize(boost::numeric_cast<decltype(m_pars.size())>(npars * m_batch_size));
     } else if (m_pars.size() > npars * m_batch_size) {
-        throw std::invalid_argument(
-            "Excessive number of parameter values passed to the constructor of an adaptive "
-            "Taylor integrator: {} parameter values were passed, but the ODE system contains only {} parameters "
-            "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
+        throw std::invalid_argument("Excessive number of parameter values passed to the constructor of an adaptive "
+                                    "Taylor integrator in batch mode: {} parameter values were passed, but the ODE "
+                                    "system contains only {} parameters "
+                                    "(in batches of {})"_format(m_pars.size(), npars, m_batch_size));
     }
+
+    // Log runtimes in trace mode.
+    spdlog::stopwatch sw;
 
     // Add the function for the computation of
     // the dense output.
     taylor_add_d_out_function<T>(m_llvm, m_dim, m_order, m_batch_size, high_accuracy);
+
+    get_logger()->trace("Taylor batch dense output runtime: {}", sw);
+    sw.reset();
 
     // Restore the original optimisation level in s.
     od.reset();
@@ -3376,11 +3402,20 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Run the optimisation pass manually.
     m_llvm.optimise();
 
+    get_logger()->trace("Taylor batch global opt pass runtime: {}", sw);
+    sw.reset();
+
     // Run the jit.
     m_llvm.compile();
 
+    get_logger()->trace("Taylor batch LLVM compilation runtime: {}", sw);
+
     // Fetch the stepper.
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    if (with_events) {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    }
 
     // Fetch the function to compute the dense output.
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
@@ -3389,8 +3424,9 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // LCOV_EXCL_START
     if (m_order == std::numeric_limits<std::uint32_t>::max()
         || m_state.size() > std::numeric_limits<decltype(m_tc.size())>::max() / (m_order + 1u)) {
-        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator: the order "
-                                  "or the state size is too large");
+        throw std::overflow_error(
+            "Overflow detected in the initialisation of an adaptive Taylor integrator in batch mode: the order "
+            "or the state size is too large");
     }
     // LCOV_EXCL_STOP
 
@@ -3426,6 +3462,13 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     m_rem_time.resize(m_batch_size);
 
     m_d_out_time.resize(m_batch_size);
+
+    // Init the event data structure if needed.
+    // NOTE: this can be done in parallel with the rest of the constructor,
+    // once we have m_order/m_dim/m_batch_size and we are done using tes/ntes.
+    if (with_events) {
+        m_ed_data = std::make_unique<ed_data>(std::move(tes), std::move(ntes), m_order, m_dim, m_batch_size);
+    }
 }
 
 template <typename T>
@@ -3443,7 +3486,8 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
       m_delta_ts(other.m_delta_ts), m_step_res(other.m_step_res), m_prop_res(other.m_prop_res),
       m_ts_count(other.m_ts_count), m_min_abs_h(other.m_min_abs_h), m_max_abs_h(other.m_max_abs_h),
       m_cur_max_delta_ts(other.m_cur_max_delta_ts), m_pfor_ts(other.m_pfor_ts), m_t_dir(other.m_t_dir),
-      m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time)
+      m_rem_time(other.m_rem_time), m_d_out_time(other.m_d_out_time),
+      m_ed_data(other.m_ed_data ? std::make_unique<ed_data>(*other.m_ed_data) : nullptr)
 {
     // NOTE: make explicit deep copy of the decomposition.
     m_dc.reserve(other.m_dc.size());
@@ -3451,7 +3495,11 @@ taylor_adaptive_batch_impl<T>::taylor_adaptive_batch_impl(const taylor_adaptive_
         m_dc.emplace_back(copy(ex), deps);
     }
 
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    if (m_ed_data) {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    }
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
 
@@ -3507,6 +3555,7 @@ void taylor_adaptive_batch_impl<T>::save_impl(Archive &ar, unsigned) const
     ar << m_t_dir;
     ar << m_rem_time;
     ar << m_d_out_time;
+    ar << m_ed_data;
 }
 
 template <typename T>
@@ -3546,9 +3595,14 @@ void taylor_adaptive_batch_impl<T>::load_impl(Archive &ar, unsigned version)
     ar >> m_t_dir;
     ar >> m_rem_time;
     ar >> m_d_out_time;
+    ar >> m_ed_data;
 
     // Recover the function pointers.
-    m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    if (m_ed_data) {
+        m_step_f = reinterpret_cast<step_f_e_t>(m_llvm.jit_lookup("step_e"));
+    } else {
+        m_step_f = reinterpret_cast<step_f_t>(m_llvm.jit_lookup("step"));
+    }
     m_d_out_f = reinterpret_cast<d_out_f_t>(m_llvm.jit_lookup("d_out_f"));
 }
 
@@ -3594,8 +3648,10 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
+    using std::abs;
     using std::isfinite;
 
+    // LCOV_EXCL_START
     // Check preconditions.
     assert(max_delta_ts.size() == m_batch_size);
     assert(std::none_of(max_delta_ts.begin(), max_delta_ts.end(), [](const auto &x) {
@@ -3605,12 +3661,10 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 
     // Sanity check.
     assert(m_step_res.size() == m_batch_size);
+    // LCOV_EXCL_STOP
 
     // Copy max_delta_ts to the tmp buffer.
     std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
-
-    // Invoke the stepper.
-    m_step_f(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(), wtc ? m_tc.data() : nullptr);
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -3623,26 +3677,244 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
         return false;
     };
 
-    // Update the times and the last timesteps, and write out the result.
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        // The timestep that was actually used for
-        // this batch element.
-        const auto h = m_delta_ts[i];
+    if (m_step_f.index() == 0u) {
+        assert(!m_ed_data); // LCOV_EXCL_LINE
 
-        // Compute the new time in double-length arithmetic.
-        const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
-        m_time_hi[i] = new_time.hi;
-        m_time_lo[i] = new_time.lo;
+        std::get<0>(m_step_f)(m_state.data(), m_pars.data(), m_time_hi.data(), m_delta_ts.data(),
+                              wtc ? m_tc.data() : nullptr);
 
-        // Update the size of the last timestep.
-        m_last_h[i] = h;
+        // Update the times and the last timesteps, and write out the result.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            // The timestep that was actually used for
+            // this batch element.
+            const auto h = m_delta_ts[i];
 
-        if (!isfinite(new_time) || check_nf_batch(i)) {
-            // Either the new time or state contain non-finite values,
-            // return an error condition.
-            m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
-        } else {
-            m_step_res[i] = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            // Compute the new time in double-length arithmetic.
+            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            m_time_hi[i] = new_time.hi;
+            m_time_lo[i] = new_time.lo;
+
+            // Update the size of the last timestep.
+            m_last_h[i] = h;
+
+            if (!isfinite(new_time) || check_nf_batch(i)) {
+                // Either the new time or state contain non-finite values,
+                // return an error condition.
+                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+            } else {
+                m_step_res[i]
+                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            }
+        }
+    } else {
+        assert(m_ed_data); // LCOV_EXCL_LINE
+
+        auto &ed_data = *m_ed_data;
+
+        // Invoke the stepper for event handling. We will record the norm infinity of the state vector +
+        // event equations at the beginning of the timestep for later use.
+        std::get<1>(m_step_f)(ed_data.m_ev_jet.data(), m_state.data(), m_pars.data(), m_time_hi.data(),
+                              m_delta_ts.data(), ed_data.m_max_abs_state.data());
+
+        // Compute the maximum absolute error on the Taylor series of the event equations, which we will use for
+        // automatic cooldown deduction. If max_abs_state is not finite, set it to inf so that
+        // in ed_data.detect_events() we skip event detection altogether.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto max_abs_state = ed_data.m_max_abs_state[i];
+
+            if (isfinite(max_abs_state)) {
+                // Are we in absolute or relative error control mode?
+                const auto abs_or_rel = max_abs_state < 1;
+
+                // Estimate the size of the largest remainder in the Taylor
+                // series of both the dynamical equations and the events.
+                const auto max_r_size = abs_or_rel ? m_tol : (m_tol * max_abs_state);
+
+                // NOTE: depending on m_tol, max_r_size is arbitrarily small, but the real
+                // integration error cannot be too small due to floating-point truncation.
+                // This is the case for instance if we use sub-epsilon integration tolerances
+                // to achieve Brouwer's law. In such a case, we cap the value of g_eps,
+                // using eps * max_abs_state as an estimation of the smallest number
+                // that can be resolved with the current floating-point type.
+                // NOTE: the if condition in the next line is equivalent, in relative
+                // error control mode, to:
+                // if (m_tol < std::numeric_limits<T>::epsilon())
+                if (max_r_size < std::numeric_limits<T>::epsilon() * max_abs_state) {
+                    ed_data.m_g_eps[i] = std::numeric_limits<T>::epsilon() * max_abs_state;
+                } else {
+                    ed_data.m_g_eps[i] = max_r_size;
+                }
+            } else {
+                ed_data.m_g_eps[i] = std::numeric_limits<T>::infinity();
+            }
+        }
+
+        // Write unconditionally the tcs.
+        std::copy(ed_data.m_ev_jet.data(), ed_data.m_ev_jet.data() + m_dim * (m_order + 1u) * m_batch_size,
+                  m_tc.data());
+
+        // Do the event detection.
+        ed_data.detect_events(m_delta_ts.data(), m_order, m_dim, m_batch_size);
+
+        // NOTE: before this point, we did not alter
+        // any user-visible data in the integrator (just
+        // temporary memory). From here until we start invoking
+        // the callbacks, everything is noexcept, so we don't
+        // risk leaving the integrator in a half-baked state.
+
+        // Sort the events by time.
+        // NOTE: the time coordinates in m_d_(n)tes is relative
+        // to the beginning of the timestep. It will be negative
+        // for backward integration, thus we compare using
+        // abs() so that the first events are those which
+        // happen closer to the beginning of the timestep.
+        // NOTE: the checks inside ed_data.detect_events() ensure
+        // that we can safely sort the events' times.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            auto cmp = [](const auto &ev0, const auto &ev1) { return abs(std::get<1>(ev0)) < abs(std::get<1>(ev1)); };
+            std::sort(ed_data.m_d_tes[i].begin(), ed_data.m_d_tes[i].end(), cmp);
+            std::sort(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), cmp);
+
+            // If we have terminal events we need
+            // to update the value of h.
+            if (!ed_data.m_d_tes[i].empty()) {
+                m_delta_ts[i] = std::get<1>(ed_data.m_d_tes[i][0]);
+            }
+        }
+
+        // Update the state.
+        m_d_out_f(m_state.data(), ed_data.m_ev_jet.data(), m_delta_ts.data());
+
+        // We will use this to capture the first exception thrown
+        // by a callback, if any.
+        std::exception_ptr eptr;
+
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto h = m_delta_ts[i];
+
+            // Compute the new time in double-length arithmetic.
+            const auto new_time = dfloat<T>(m_time_hi[i], m_time_lo[i]) + h;
+            m_time_hi[i] = new_time.hi;
+            m_time_lo[i] = new_time.lo;
+
+            // Store the last timestep.
+            m_last_h[i] = h;
+
+            // Check if the time or the state vector are non-finite at the
+            // end of the timestep.
+            if (!isfinite(new_time) || check_nf_batch(i)) {
+                // Let's also reset the cooldown values for this batch index,
+                // as at this point they have become useless.
+                reset_cooldowns(i);
+
+                m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
+
+                // Move to the next batch element.
+                continue;
+            }
+
+            // Update the cooldowns.
+            for (auto &cd : ed_data.m_te_cooldowns[i]) {
+                if (cd) {
+                    // Check if the timestep we just took
+                    // brought this event outside the cooldown.
+                    auto tmp = cd->first + h;
+
+                    if (abs(tmp) >= cd->second) {
+                        // We are now outside the cooldown period
+                        // for this event, reset cd.
+                        cd.reset();
+                    } else {
+                        // Still in cooldown, update the
+                        // time spent in cooldown.
+                        cd->first = tmp;
+                    }
+                }
+            }
+
+            // If we don't have terminal events, we will invoke the callbacks
+            // of *all* the non-terminal events. Otherwise, we need to figure
+            // out which non-terminal events do not happen because their time
+            // coordinate is past the the first terminal event.
+            const auto ntes_end_it
+                = ed_data.m_d_tes[i].empty()
+                      ? ed_data.m_d_ntes[i].end()
+                      : std::lower_bound(ed_data.m_d_ntes[i].begin(), ed_data.m_d_ntes[i].end(), h,
+                                         [](const auto &ev, const auto &t) { return abs(std::get<1>(ev)) < abs(t); });
+
+            // Invoke the callbacks of the non-terminal events, which are guaranteed
+            // to happen before the first terminal event.
+            for (auto it = ed_data.m_d_ntes[i].begin(); it != ntes_end_it; ++it) {
+                const auto &t = *it;
+                const auto &cb = ed_data.m_ntes[std::get<0>(t)].get_callback();
+                assert(cb); // LCOV_EXCL_LINE
+                try {
+                    cb(*this, static_cast<T>(new_time - m_last_h[i] + std::get<1>(t)), std::get<2>(t), i);
+                } catch (...) {
+                    if (!eptr) {
+                        eptr = std::current_exception();
+                    }
+                }
+            }
+
+            // The return value of the first
+            // terminal event's callback. It will be
+            // unused if there are no terminal events.
+            bool te_cb_ret = false;
+
+            if (!ed_data.m_d_tes[i].empty()) {
+                // Fetch the first terminal event.
+                const auto te_idx = std::get<0>(ed_data.m_d_tes[i][0]);
+                assert(te_idx < ed_data.m_tes.size()); // LCOV_EXCL_LINE
+                const auto &te = ed_data.m_tes[te_idx];
+
+                // Set the corresponding cooldown.
+                if (te.get_cooldown() >= 0) {
+                    // Cooldown explicitly provided by the user, use it.
+                    ed_data.m_te_cooldowns[i][te_idx].emplace(0, te.get_cooldown());
+                } else {
+                    // Deduce the cooldown automatically.
+                    // NOTE: if m_g_eps[i] is not finite, we skipped event detection
+                    // altogether and thus we never end up here. If the derivative
+                    // of the event equation is not finite, the event is also skipped.
+                    ed_data.m_te_cooldowns[i][te_idx].emplace(
+                        0, taylor_deduce_cooldown(ed_data.m_g_eps[i], std::get<4>(ed_data.m_d_tes[i][0])));
+                }
+
+                // Invoke the callback of the first terminal event, if it has one.
+                if (te.get_callback()) {
+                    try {
+                        te_cb_ret = te.get_callback()(*this, std::get<2>(ed_data.m_d_tes[i][0]),
+                                                      std::get<3>(ed_data.m_d_tes[i][0]), i);
+                    } catch (...) {
+                        if (!eptr) {
+                            eptr = std::current_exception();
+                        }
+                    }
+                }
+            }
+
+            if (ed_data.m_d_tes[i].empty()) {
+                // No terminal events detected, return success or time limit.
+                m_step_res[i]
+                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+            } else {
+                // Terminal event detected. Fetch its index.
+                const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[i][0]));
+
+                // NOTE: if te_cb_ret is true, it means that the terminal event has
+                // a callback and its invocation returned true (meaning that the
+                // integration should continue). Otherwise, either the terminal event
+                // has no callback or its callback returned false, meaning that the
+                // integration must stop.
+                m_step_res[i] = std::tuple{taylor_outcome{te_cb_ret ? ev_idx : (-ev_idx - 1)}, h};
+            }
+        }
+
+        // Check if any callback threw an exception, and re-throw
+        // it in case.
+        if (eptr) {
+            std::rethrow_exception(eptr);
         }
     }
 }
@@ -3713,7 +3985,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
     // NOTE: this function is called from either the other propagate_until() overload,
     // or propagate_for(). In both cases, we have already set up correctly the dimension of ts.
-    assert(ts.size() == m_batch_size);
+    assert(ts.size() == m_batch_size); // LCOV_EXCL_LINE
 
     // Check the current times.
     if (std::any_of(m_time_hi.begin(), m_time_hi.end(), [](const auto &t) { return !isfinite(t); })
@@ -3773,7 +4045,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // If some non-finite state/time is generated in
         // the step function, the integration will be stopped.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0));
+            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
 
             // Compute the time limit.
             const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_ts[i]), m_rem_time[i])
@@ -3814,7 +4086,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
             // Update min_h/max_h only if the outcome is success (otherwise
             // the step was artificially clamped either by a time limit or
-            // by a terminal event).
+            // by a continuing terminal event).
             if (res == taylor_outcome::success) {
                 const auto abs_h = abs(h);
                 m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
@@ -3859,14 +4131,12 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // then this condition will never trigger as by this point we are
         // sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            // We reached the max_steps limit: the outcome for each batch element must be
-            // either step_limit or time_limit.
-            // NOTE: how does the outcome logic change with events?
+            // We reached the max_steps limit: set the outcome for all batch elements
+            // to step_limit.
+            // NOTE: this is the same logic adopted when the integration is stopped
+            // by the callback (see above).
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i]
-                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                       : taylor_outcome::time_limit,
-                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return;
@@ -3884,7 +4154,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             // will end up being repeatedly set to zero here. This
             // should be harmless.
             if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit);
+                assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
                 m_rem_time[i] = dfloat<T>(T(0));
             } else {
                 m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
@@ -3906,7 +4176,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
     }
 
     // NOTE: re-use m_pfor_ts as tmp storage.
-    assert(m_pfor_ts.size() == m_batch_size);
+    assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         m_pfor_ts[i] = dfloat<T>(ts[i]);
     }
@@ -4173,7 +4443,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                         retval[gidx * m_batch_size * m_dim + j * m_batch_size + i] = m_d_out[j * m_batch_size + i];
                     }
 
-                    assert(cur_grid_idx[i] < n_grid_points);
+                    assert(cur_grid_idx[i] < n_grid_points); // LCOV_EXCL_LINE
                     ++cur_grid_idx[i];
                 }
             }
@@ -4201,7 +4471,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             const auto max_delta_t = max_delta_ts[i];
 
             // Compute the step limit for the current batch element.
-            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0));
+            assert((m_rem_time[i] >= T(0)) == m_t_dir[i] || m_rem_time[i] == T(0)); // LCOV_EXCL_LINE
             const auto dt_limit = m_t_dir[i] ? std::min(dfloat<T>(max_delta_t), m_rem_time[i])
                                              : std::max(dfloat<T>(-max_delta_t), m_rem_time[i]);
 
@@ -4246,7 +4516,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             // will end up being repeatedly set to zero here. This
             // should be harmless.
             if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit);
+                assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
                 m_rem_time[i] = dfloat<T>(T(0));
             } else {
                 m_rem_time[i]
@@ -4255,7 +4525,7 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
 
             // Update min_h/max_h, but only if the outcome is success (otherwise
             // the step was artificially clamped either by a time limit or
-            // by a terminal event).
+            // by a continuing terminal event).
             if (res == taylor_outcome::success) {
                 const auto abs_h = abs(h);
                 m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
@@ -4279,13 +4549,12 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
         // then this condition will never trigger as by this point we are
         // sure iter_counter is at least 1.
         if (iter_counter == max_steps) {
-            // We reached the max_steps limit: the outcome for each batch element must be
-            // either step_limit or time_limit.
+            // We reached the max_steps limit: set the outcome for all batch elements
+            // to step_limit.
+            // NOTE: this is the same logic adopted when the integration is stopped
+            // by the callback (see above).
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i]
-                    = std::tuple{std::get<0>(m_step_res[i]) == taylor_outcome::success ? taylor_outcome::step_limit
-                                                                                       : taylor_outcome::time_limit,
-                                 m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return retval;
@@ -4367,30 +4636,53 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
     return m_d_out;
 }
 
+template <typename T>
+void taylor_adaptive_batch_impl<T>::reset_cooldowns()
+{
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        reset_cooldowns(i);
+    }
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::reset_cooldowns(std::uint32_t i)
+{
+    if (!m_ed_data) {
+        throw std::invalid_argument("No events were defined for this integrator");
+    }
+
+    if (i >= m_batch_size) {
+        throw std::invalid_argument(
+            "Cannot reset the cooldowns at batch index {}: the batch size for this integrator is only {}"_format(
+                i, m_batch_size));
+    }
+
+    for (auto &cd : m_ed_data->m_te_cooldowns[i]) {
+        cd.reset();
+    }
+}
+
 // Explicit instantiation of the batch implementation classes.
 template class taylor_adaptive_batch_impl<double>;
 
-template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(const std::vector<expression> &,
-                                                                                       std::vector<double>,
-                                                                                       std::uint32_t,
-                                                                                       std::vector<double>, double,
-                                                                                       bool, bool, std::vector<double>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, double, bool, bool,
+    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
-                                                       std::vector<double>, std::uint32_t, std::vector<double>, double,
-                                                       bool, bool, std::vector<double>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
+    const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
+    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template class taylor_adaptive_batch_impl<long double>;
 
-template HEYOKA_DLL_PUBLIC void
-taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
-                                                            std::uint32_t, std::vector<long double>, long double, bool,
-                                                            bool, std::vector<long double>);
+template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
+    const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
+    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
-    std::vector<long double>, long double, bool, bool, std::vector<long double>);
+    std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
+    std::vector<nt_event_t>);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -4398,11 +4690,12 @@ template class taylor_adaptive_batch_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    mppp::real128, bool, bool, std::vector<mppp::real128>);
+    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
-    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>);
+    std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
+    std::vector<nt_event_t>);
 
 #endif
 
@@ -4461,10 +4754,10 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     const auto &dc = td_res.first;
     const auto &sv_funcs_dc = td_res.second;
 
-    assert(sv_funcs_dc.size() == n_sv_funcs);
+    assert(sv_funcs_dc.size() == n_sv_funcs); // LCOV_EXCL_LINE
 
     // Compute the number of u variables.
-    assert(dc.size() > n_eq);
+    assert(dc.size() > n_eq); // LCOV_EXCL_LINE
     const auto n_uvars = boost::numeric_cast<std::uint32_t>(dc.size() - n_eq);
 
     // Prepare the function prototype. The first argument is a float pointer to the in/out array,
@@ -4473,7 +4766,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(s.context())));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &s.module());
     if (f == nullptr) {
@@ -4502,7 +4795,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(s.context(), "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Compute the jet of derivatives.
@@ -4593,7 +4886,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
             // state variables and sv_funcs (not all u vars), hence the indexing is
             // n_eq + j.
             const auto arr_idx = n_eq + j;
-            assert(arr_idx < diff_arr.size());
+            assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
             const auto val = diff_arr[arr_idx];
 
             // Index in the output array.
@@ -4610,7 +4903,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                 // state variables and sv_funcs (not all u vars), hence the indexing is
                 // cur_order * (n_eq + n_sv_funcs) + j.
                 const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
-                assert(arr_idx < diff_arr.size());
+                assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 const auto val = diff_arr[arr_idx];
 
                 // Index in the output array.
@@ -4623,7 +4916,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
             for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
                 const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + n_eq + j;
-                assert(arr_idx < diff_arr.size());
+                assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 const auto val = diff_arr[arr_idx];
 
                 const auto out_idx = (n_eq + n_sv_funcs) * batch_size * cur_order + (n_eq + j) * batch_size;

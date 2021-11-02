@@ -14,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <variant>
@@ -116,101 +117,107 @@ TEST_CASE("taylor te")
     auto tester = [](auto fp_x) {
         using fp_t = decltype(fp_x);
 
-        using Catch::Matchers::Message;
+        auto btup = std::make_tuple(std::true_type{}, std::false_type{});
 
-        auto [v] = make_vars("v");
+        auto inner = [](auto bflag) {
+            using Catch::Matchers::Message;
 
-        using ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+            auto [v] = make_vars("v");
 
-        std::ostringstream oss;
-        oss << ev_t(v * v - 1e-10);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::any"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " no"));
-        oss.str("");
+            using ev_t = detail::t_event_impl<fp_t, decltype(bflag)::value>;
 
-        oss << ev_t(v * v - 1e-10, kw::direction = event_direction::positive);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::positive"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " no"));
-        oss.str("");
+            std::ostringstream oss;
+            oss << ev_t(v * v - 1e-10);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::any"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " no"));
+            oss.str("");
 
-        oss << ev_t(v * v - 1e-10, kw::direction = event_direction::negative);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " no"));
-        oss.str("");
+            oss << ev_t(v * v - 1e-10, kw::direction = event_direction::positive);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::positive"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " no"));
+            oss.str("");
 
-        oss << ev_t(v * v - 1e-10, kw::direction = event_direction::negative);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " no"));
-        oss.str("");
+            oss << ev_t(v * v - 1e-10, kw::direction = event_direction::negative);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " no"));
+            oss.str("");
 
-        oss << ev_t(
-            v * v - 1e-10, kw::direction = event_direction::negative,
-            kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; });
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
-        oss.str("");
+            oss << ev_t(v * v - 1e-10, kw::direction = event_direction::negative);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " no"));
+            oss.str("");
 
-        oss << ev_t(
-            v * v - 1e-10, kw::direction = event_direction::negative,
-            kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; }, kw::cooldown = -5);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
-        oss.str("");
+            oss << ev_t(
+                v * v - 1e-10, kw::direction = event_direction::negative,
+                kw::callback = [](auto &, bool, int, auto...) { return true; });
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
+            oss.str("");
 
-        oss << ev_t(
-            v * v - 1e-10, kw::direction = event_direction::negative,
-            kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; }, kw::cooldown = 1);
-        REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
-        oss.str("");
+            oss << ev_t(
+                v * v - 1e-10, kw::direction = event_direction::negative,
+                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = -5);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " auto"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
+            oss.str("");
 
-        // Check the assignment operators.
-        ev_t ev0(
-            v * v - 1e-10, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; }),
-            ev1(
-                v * v - 1e-10, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; },
-                kw::direction = event_direction::negative),
-            ev2(
-                v * v - 1e-10, kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; },
-                kw::direction = event_direction::positive);
-        ev0 = ev1;
-        oss << ev0;
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        oss.str("");
+            oss << ev_t(
+                v * v - 1e-10, kw::direction = event_direction::negative,
+                kw::callback = [](auto &, bool, int, auto...) { return true; }, kw::cooldown = 1);
+            REQUIRE(boost::algorithm::contains(oss.str(), " event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " 1"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " yes"));
+            oss.str("");
 
-        ev0 = std::move(ev2);
-        oss << ev0;
-        REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
-        REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
-        oss.str("");
+            // Check the assignment operators.
+            ev_t ev0(
+                v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; }),
+                ev1(
+                    v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; },
+                    kw::direction = event_direction::negative),
+                ev2(
+                    v * v - 1e-10, kw::callback = [](auto &, bool, int, auto...) { return true; },
+                    kw::direction = event_direction::positive);
+            ev0 = ev1;
+            oss << ev0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::negative"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            oss.str("");
 
-        // Failure modes.
-        REQUIRE_THROWS_MATCHES(ev_t(
-                                   v * v - 1e-10, kw::direction = event_direction::negative,
-                                   kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; },
-                                   kw::cooldown = std::numeric_limits<fp_t>::quiet_NaN()),
-                               std::invalid_argument,
-                               Message("Cannot set a non-finite cooldown value for a terminal event"));
-        REQUIRE_THROWS_MATCHES(ev_t(
-                                   v * v - 1e-10, kw::direction = event_direction{50},
-                                   kw::callback = [](taylor_adaptive<fp_t> &, bool, int) { return true; }),
-                               std::invalid_argument,
-                               Message("Invalid value selected for the direction of a terminal event"));
+            ev0 = std::move(ev2);
+            oss << ev0;
+            REQUIRE(boost::algorithm::contains(oss.str(), "event_direction::positive"));
+            REQUIRE(boost::algorithm::contains(oss.str(), " terminal"));
+            oss.str("");
+
+            // Failure modes.
+            REQUIRE_THROWS_MATCHES(ev_t(
+                                       v * v - 1e-10, kw::direction = event_direction::negative,
+                                       kw::callback = [](auto &, bool, int, auto...) { return true; },
+                                       kw::cooldown = std::numeric_limits<fp_t>::quiet_NaN()),
+                                   std::invalid_argument,
+                                   Message("Cannot set a non-finite cooldown value for a terminal event"));
+            REQUIRE_THROWS_MATCHES(ev_t(
+                                       v * v - 1e-10, kw::direction = event_direction{50},
+                                       kw::callback = [](auto &, bool, int, auto...) { return true; }),
+                                   std::invalid_argument,
+                                   Message("Invalid value selected for the direction of a terminal event"));
+        };
+
+        tuple_for_each(btup, inner);
     };
 
     tuple_for_each(fp_types, tester);
@@ -284,6 +291,7 @@ TEST_CASE("taylor te basic")
             taylor_outcome oc;
             while (true) {
                 oc = std::get<0>(ta.step());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -297,6 +305,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -313,6 +322,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step_backward());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -326,6 +336,7 @@ TEST_CASE("taylor te basic")
 
             while (true) {
                 oc = std::get<0>(ta.step_backward());
+                REQUIRE((oc == taylor_outcome::success || static_cast<std::int64_t>(oc) >= 0));
                 if (oc > taylor_outcome::success) {
                     break;
                 }
@@ -1045,7 +1056,7 @@ TEST_CASE("step end")
 
 // Bug: mr always being true for an
 // event with zero cooldown.
-TEST_CASE("taylor zero cd mor bug")
+TEST_CASE("taylor zero cd mr bug")
 {
     auto [x, v] = make_vars("x", "v");
 
