@@ -1783,3 +1783,61 @@ TEST_CASE("te zero cd mr bug")
     REQUIRE(std::all_of(ta.get_step_res().begin(), ta.get_step_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 }
+
+struct s11n_te_callback {
+    template <typename I>
+    bool operator()(I &, bool, int, std::uint32_t) const
+    {
+        return true;
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_te_callback, bool, taylor_adaptive_batch<double> &, bool, int, std::uint32_t)
+
+TEST_CASE("te s11n")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    t_batch_event<fp_t> ev(v, kw::callback = s11n_te_callback{}, kw::direction = event_direction::positive,
+                           kw::cooldown = fp_t(100));
+
+    std::stringstream ss;
+
+    {
+        boost::archive::binary_oarchive oa(ss);
+
+        oa << ev;
+    }
+
+    ev = t_batch_event<fp_t>(v + x);
+
+    {
+        boost::archive::binary_iarchive ia(ss);
+
+        ia >> ev;
+    }
+
+    REQUIRE(ev.get_expression() == v);
+    REQUIRE(ev.get_direction() == event_direction::positive);
+    REQUIRE(ev.get_callback().get_type_index() == typeid(s11n_te_callback));
+    REQUIRE(ev.get_cooldown() == fp_t(100));
+}
+
+TEST_CASE("te def ctor")
+{
+    t_batch_event<double> te;
+
+    REQUIRE(te.get_expression() == 0_dbl);
+    REQUIRE(!te.get_callback());
+    REQUIRE(te.get_direction() == event_direction::any);
+    REQUIRE(te.get_cooldown() == -1.);
+}

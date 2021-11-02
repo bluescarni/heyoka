@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -31,11 +32,13 @@
 
 #endif
 
+#include <heyoka/callable.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/math/cos.hpp>
 #include <heyoka/math/sin.hpp>
 #include <heyoka/math/time.hpp>
+#include <heyoka/nbody.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -313,6 +316,29 @@ TEST_CASE("propagate grid")
             REQUIRE(ret[8u * i + j + 4u] == approximately((1 + j / 10.) * std::cos(grid[i * 4u + j]), 800000.));
         }
     }
+
+    // A case in which the initial propagate_until() to bring the system
+    // to grid[0] interrupts the integration.
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
+                                       {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
+                                       4,
+                                       kw::t_events = {t_batch_event<double>(v - 0.999)}};
+    auto out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
+    REQUIRE(out.size() == 16u);
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v == 0; }));
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
+
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
+                                       {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
+                                       4,
+                                       kw::t_events = {t_batch_event<double>(v - 0.999)},
+                                       kw::callback = [](auto &, bool, int, std::uint32_t) { return false; }};
+    out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
+    REQUIRE(out.size() == 16u);
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v == 0; }));
+    REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
+                        [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 }
 
 // A test to make sure the propagate functions deal correctly
@@ -701,7 +727,91 @@ TEST_CASE("param too many")
                                    "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
                                    "system contains only 1 parameters "
                                    "(in batches of 2)"));
+
+    REQUIRE_THROWS_MATCHES((void)(taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                                {0.05, 0.06, 0.025, 0.026},
+                                                                2u,
+                                                                kw::pars = std::vector{1., 2., 3.},
+                                                                kw::t_events = {t_batch_event<double>(v - par[0])}}),
+                           std::invalid_argument,
+                           Message("Excessive number of parameter values passed to the constructor of an adaptive "
+                                   "Taylor integrator in batch mode: 3 parameter values were passed, but the ODE "
+                                   "system contains only 1 parameters "
+                                   "(in batches of 2)"));
 }
+
+// Test case for bug: parameters in event equations are ignored
+// in the determination of the total number of params in a system.
+TEST_CASE("param deduction from events")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    // Terminal events.
+    {
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                {0.05, 0.06, 0.025, 0.026},
+                                                2,
+                                                kw::t_events = {t_batch_event<double>(v - par[0])}};
+
+        REQUIRE(ta.get_pars().size() == 2u);
+    }
+
+    // Non-terminal events.
+    {
+        auto ta = taylor_adaptive_batch<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0.05, 0.06, 0.025, 0.026},
+            2,
+            kw::nt_events = {nt_batch_event<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
+
+        REQUIRE(ta.get_pars().size() == 4u);
+    }
+
+    // Both.
+    {
+        auto ta = taylor_adaptive_batch<double>{
+            {prime(x) = v, prime(v) = -9.8 * sin(x)},
+            {0.05, 0.06, 0.025, 0.026},
+            2,
+            kw::t_events = {t_batch_event<double>(v - par[10])},
+            kw::nt_events = {nt_batch_event<double>(v - par[1], [](auto &, double, int, std::uint32_t) {})}};
+
+        REQUIRE(ta.get_pars().size() == 22u);
+    }
+}
+
+struct s11n_nt_cb {
+    template <typename I>
+    void operator()(I &, double, int, std::uint32_t) const
+    {
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_nt_cb, void, taylor_adaptive_batch<double> &, double, int, std::uint32_t);
+
+struct s11n_t_cb {
+    template <typename T>
+    bool operator()(T &, bool, int, std::uint32_t) const
+    {
+        return false;
+    }
+
+private:
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive &, unsigned)
+    {
+    }
+};
+
+HEYOKA_S11N_CALLABLE_EXPORT(s11n_t_cb, bool, taylor_adaptive_batch<double> &, bool, int, std::uint32_t);
 
 template <typename Oa, typename Ia>
 void s11n_test_impl()
@@ -766,6 +876,79 @@ void s11n_test_impl()
 
         REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
     }
+
+    // A test with events.
+    {
+        auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                                {0., 0.01, 0.5, 0.51},
+                                                2,
+                                                kw::t_events = {t_batch_event<double>(v, kw::callback = s11n_t_cb{})},
+                                                kw::nt_events = {nt_batch_event<double>(v - par[0], s11n_nt_cb{})},
+                                                kw::pars = std::vector<double>{-1e-4, -1e-5}};
+
+        REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
+
+        // Perform a few steps.
+        ta.step();
+        ta.step();
+        ta.step();
+        ta.step();
+
+        std::stringstream ss;
+
+        {
+            Oa oa(ss);
+
+            oa << ta;
+        }
+
+        auto ta_copy = ta;
+        ta = taylor_adaptive_batch<double>{{prime(x) = x},
+                                           {0.123, 0.124},
+                                           2,
+                                           kw::tol = 1e-3,
+                                           kw::t_events = {t_batch_event<double>(x, kw::callback = s11n_t_cb{})}};
+
+        {
+            Ia ia(ss);
+
+            ia >> ta;
+        }
+
+        REQUIRE(ta.get_llvm_state().get_ir() == ta_copy.get_llvm_state().get_ir());
+        REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
+        REQUIRE(ta.get_order() == ta_copy.get_order());
+        REQUIRE(ta.get_tol() == ta_copy.get_tol());
+        REQUIRE(ta.get_dim() == ta_copy.get_dim());
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_pars() == ta_copy.get_pars());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
+        REQUIRE(ta.get_t_events()[0].get_callback().get_type_index()
+                == ta_copy.get_t_events()[0].get_callback().get_type_index());
+        REQUIRE(ta.get_t_events()[0].get_cooldown() == ta_copy.get_t_events()[0].get_cooldown());
+        REQUIRE(ta.get_te_cooldowns() == ta_copy.get_te_cooldowns());
+
+        REQUIRE(ta.get_nt_events()[0].get_callback().get_type_index()
+                == ta_copy.get_nt_events()[0].get_callback().get_type_index());
+
+        // Take a step in ta and in ta_copy.
+        ta.step(true);
+        ta_copy.step(true);
+
+        REQUIRE(ta.get_time() == ta_copy.get_time());
+        REQUIRE(ta.get_state() == ta_copy.get_state());
+        REQUIRE(ta.get_tc() == ta_copy.get_tc());
+        REQUIRE(ta.get_last_h() == ta_copy.get_last_h());
+
+        ta.update_d_output({-.1, -.1}, true);
+        ta_copy.update_d_output({-.1, -.1}, true);
+
+        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+    }
 }
 
 TEST_CASE("s11n")
@@ -795,19 +978,78 @@ TEST_CASE("stream output")
 
         auto [x, v] = make_vars("x", "v");
 
-        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
+        {
+            auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
+                                                  {0., 0.01, 0.5, 0.51},
+                                                  2u,
+                                                  kw::pars = std::vector<fp_t>{-1e-4, -1.1e-4}};
+
+            std::ostringstream oss;
+
+            oss << ta;
+
+            REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "Parameters"));
+            REQUIRE(!boost::algorithm::contains(oss.str(), "events"));
+        }
+
+        using t_ev_t = t_batch_event<fp_t>;
+        using nt_ev_t = nt_batch_event<fp_t>;
+
+        {
+            auto tad = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
+                                                   {0., 0.01, 0.5, 0.51},
+                                                   2u,
+                                                   kw::t_events = {t_ev_t(x)}};
+
+            std::ostringstream oss;
+
+            oss << tad;
+
+            REQUIRE(!oss.str().empty());
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(!boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+        }
+
+        {
+            auto tad
+                = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
                                               {0., 0.01, 0.5, 0.51},
                                               2u,
-                                              kw::pars = std::vector<fp_t>{-1e-4, -1.1e-4}};
+                                              kw::nt_events = {nt_ev_t(x, [](auto &, fp_t, int, std::uint32_t) {})}};
 
-        std::ostringstream oss;
+            std::ostringstream oss;
 
-        oss << ta;
+            oss << tad;
 
-        REQUIRE(boost::algorithm::contains(oss.str(), "Tolerance"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "Dimension"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "Batch size"));
-        REQUIRE(boost::algorithm::contains(oss.str(), "Parameters"));
+            REQUIRE(!oss.str().empty());
+            REQUIRE(!boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+        }
+
+        {
+            auto tad
+                = taylor_adaptive_batch<fp_t>{{prime(x) = v - par[1], prime(v) = -9.8 * sin(x + par[0])},
+                                              {0., 0.01, 0.5, 0.51},
+                                              2u,
+                                              kw::t_events = {t_ev_t(x)},
+                                              kw::nt_events = {nt_ev_t(x, [](auto &, fp_t, int, std::uint32_t) {})}};
+
+            std::ostringstream oss;
+
+            oss << tad;
+
+            REQUIRE(!oss.str().empty());
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of terminal events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), ": 1"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "N of non-terminal events"));
+
+            std::cout << tad << '\n';
+        }
     };
 
     tuple_for_each(fp_types, tester);
@@ -827,3 +1069,93 @@ TEST_CASE("ppc long double")
 }
 
 #endif
+
+// A test to check that vector data passed to the constructor
+// is moved into the integrator (and not just copied)
+TEST_CASE("taylor move")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto init_state = std::vector{-1., -1.1, 0., 0.1};
+    auto pars = std::vector{9.8, 9.9};
+    auto tes = std::vector{t_batch_event<double>(v)};
+    auto ntes = std::vector{nt_batch_event<double>(v, [](auto &, double, int, std::uint32_t) {})};
+
+    auto s_data = init_state.data();
+    auto p_data = pars.data();
+    auto tes_data = tes.data();
+    auto ntes_data = ntes.data();
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -par[0] * sin(x)},
+                                            std::move(init_state),
+                                            2,
+                                            kw::pars = std::move(pars),
+                                            kw::t_events = std::move(tes),
+                                            kw::nt_events = std::move(ntes)};
+
+    REQUIRE(s_data == ta.get_state().data());
+    REQUIRE(p_data == ta.get_pars().data());
+    REQUIRE(tes_data == ta.get_t_events().data());
+    REQUIRE(ntes_data == ta.get_nt_events().data());
+}
+
+TEST_CASE("events error")
+{
+    using Catch::Matchers::Message;
+
+    auto sys = make_nbody_sys(2, kw::masses = {1., 0.});
+
+    using t_ev_t = t_batch_event<double>;
+    using nt_ev_t = nt_batch_event<double>;
+
+    {
+        auto tad
+            = taylor_adaptive_batch<double>{sys,
+                                            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
+                                            2,
+                                            kw::t_events = {t_ev_t("x_0"_var)}};
+
+        REQUIRE(tad.with_events());
+        REQUIRE_THROWS_MATCHES(
+            tad.reset_cooldowns(2), std::invalid_argument,
+            Message("Cannot reset the cooldowns at batch index 2: the batch size for this integrator is only 2"));
+    }
+
+    // Check reset cooldowns works when there are no terminal events defined.
+    {
+        auto tad = taylor_adaptive_batch<double>{
+            sys,
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0},
+            2,
+            kw::nt_events = {nt_ev_t("x_0"_var, [](auto &, double, int, std::uint32_t) {})}};
+
+        REQUIRE(tad.with_events());
+        REQUIRE(std::all_of(tad.get_te_cooldowns().begin(), tad.get_te_cooldowns().end(),
+                            [](const auto &v) { return v.empty(); }));
+        tad.reset_cooldowns();
+        tad.reset_cooldowns(0);
+        tad.reset_cooldowns(1);
+        REQUIRE_THROWS_MATCHES(
+            tad.reset_cooldowns(2), std::invalid_argument,
+            Message("Cannot reset the cooldowns at batch index 2: the batch size for this integrator is only 2"));
+    }
+
+    {
+        auto tad = taylor_adaptive_batch<double>{
+            sys, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0}, 2};
+
+        REQUIRE(!tad.with_events());
+        REQUIRE_THROWS_MATCHES(tad.get_t_events(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.get_te_cooldowns(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.get_nt_events(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+        REQUIRE_THROWS_MATCHES(tad.reset_cooldowns(2), std::invalid_argument,
+                               Message("No events were defined for this integrator"));
+    }
+}

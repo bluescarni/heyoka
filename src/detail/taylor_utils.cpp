@@ -1240,6 +1240,16 @@ std::ostream &taylor_adaptive_batch_stream_impl(std::ostream &os, const taylor_a
         oss << "]\n";
     }
 
+    if (ta.with_events()) {
+        if (!ta.get_t_events().empty()) {
+            oss << "N of terminal events    : " << ta.get_t_events().size() << '\n';
+        }
+
+        if (!ta.get_nt_events().empty()) {
+            oss << "N of non-terminal events: " << ta.get_nt_events().size() << '\n';
+        }
+    }
+
     return os << oss.str();
 }
 
