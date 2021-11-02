@@ -1555,6 +1555,12 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
 
             // Run event detection on all the batch elements.
             for (std::uint32_t j = 0; j < batch_size; ++j) {
+                // See if the fast exclusion check was positive
+                // for the current batch element.
+                if (m_fex_check_res[j]) {
+                    continue;
+                }
+
                 // Start by running the checks that are
                 // run at the very beginning of the scalar event detection
                 // function.
