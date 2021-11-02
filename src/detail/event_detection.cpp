@@ -1548,6 +1548,8 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
             // and non-finite Taylor coefficients will be caught in the
             // step() implementations anyway.
             m_fex_check(batch_ptr, h_ptr, m_back_int.data(), m_fex_check_res.data());
+            // NOTE: remove this check, or does this provide any performance
+            // benefit wrt just checking in the next for loop?
             if (std::all_of(m_fex_check_res.begin(), m_fex_check_res.end(),
                             [](auto f) { return static_cast<bool>(f); })) {
                 continue;
