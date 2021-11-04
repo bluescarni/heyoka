@@ -684,7 +684,7 @@ TEST_CASE("cb interrupt")
         auto res = ta.propagate_grid(
             {10., 10.1, 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
-        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return x == 0; }));
+        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return std::isnan(x); }));
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
