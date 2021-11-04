@@ -4292,7 +4292,9 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                                   "adaptive Taylor integrator in batch mode");
     }
     // LCOV_EXCL_STOP
-    retval.resize(grid.size() * get_dim());
+    // NOTE: fill with NaNs, so that the missing entries
+    // are signalled with NaN if we exit early.
+    retval.resize(grid.size() * get_dim(), std::numeric_limits<T>::quiet_NaN());
 
     // Propagate the system up to the first batch of grid points.
     // NOTE: this will *not* write the TCs, but because we know that
@@ -4364,20 +4366,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
     // Vector of flags to keep track of the batch elements
     // we can compute dense output for.
     std::vector<unsigned> dflags(boost::numeric_cast<std::vector<unsigned>::size_type>(m_batch_size));
-
-    // Helper to fill the data for unreached grid points
-    // with NaN, in case of an early exit.
-    auto fill_missing = [&]() {
-        const auto nan_val = std::numeric_limits<T>::quiet_NaN();
-
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            for (auto gidx = cur_grid_idx[i]; gidx < n_grid_points; ++gidx) {
-                for (std::uint32_t j = 0; j < m_dim; ++j) {
-                    retval[gidx * m_batch_size * m_dim + j * m_batch_size + i] = nan_val;
-                }
-            }
-        }
-    };
 
     // NOTE: loop until we have processed all grid points
     // for all batch elements.
@@ -4505,9 +4493,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                 m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            // Fill up the missing grid points.
-            fill_missing();
-
             return retval;
         }
 
@@ -4558,9 +4543,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                 m_prop_res[i] = std::tuple{taylor_outcome::cb_stop, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            // Fill up the missing grid points.
-            fill_missing();
-
             return retval;
         }
 
@@ -4576,9 +4558,6 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
                 m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
-
-            // Fill up the missing grid points.
-            fill_missing();
 
             return retval;
         }
