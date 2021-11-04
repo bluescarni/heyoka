@@ -4292,7 +4292,9 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
                                   "adaptive Taylor integrator in batch mode");
     }
     // LCOV_EXCL_STOP
-    retval.resize(grid.size() * get_dim());
+    // NOTE: fill with NaNs, so that the missing entries
+    // are signalled with NaN if we exit early.
+    retval.resize(grid.size() * get_dim(), std::numeric_limits<T>::quiet_NaN());
 
     // Propagate the system up to the first batch of grid points.
     // NOTE: this will *not* write the TCs, but because we know that

@@ -325,7 +325,7 @@ TEST_CASE("propagate grid")
                                        kw::t_events = {t_event_batch<double>(v - 0.999)}};
     auto out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v == 0; }));
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return std::isnan(v); }));
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 
@@ -336,7 +336,7 @@ TEST_CASE("propagate grid")
                                        kw::callback = [](auto &, bool, int, std::uint32_t) { return false; }};
     out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
-    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return v == 0; }));
+    REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return std::isnan(v); }));
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 }
@@ -684,7 +684,7 @@ TEST_CASE("cb interrupt")
         auto res = ta.propagate_grid(
             {10., 10.1, 11., 11.1, 12., 12.1}, kw::callback = [](auto &) { return false; });
 
-        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return x == 0; }));
+        REQUIRE(std::all_of(res.begin() + 4, res.end(), [](double x) { return std::isnan(x); }));
 
         REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
         REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);

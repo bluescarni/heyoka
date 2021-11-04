@@ -249,6 +249,14 @@ Let's see a couple of examples:
    Time array:
    { 20.,  21.,  22.,  23.}
 
+An important difference with respect to scalar mode is that the vector returned
+by ``propagate_grid()`` in batch mode always contains values for *all* grid points,
+event if the integration is terminated early (e.g., due to errors or to terminal
+events triggering). In scalar mode, by contrast, in case of early termination
+``propagate_grid()`` returns only the output values for the grid points that
+could be computed before the early exit. In batch mode, the values for the grid
+points that could not be reached due to early exit are filled with NaNs.
+
 Dense output
 ^^^^^^^^^^^^
 

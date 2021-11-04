@@ -1526,7 +1526,7 @@ TEST_CASE("te propagate_grid")
 
     out = ta.propagate_grid(grid);
 
-    REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return v == 0; }));
+    REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return std::isnan(v); }));
 
     for (std::uint32_t i = 0; i < 4u; ++i) {
         REQUIRE(static_cast<std::int64_t>(std::get<0>(ta.get_propagate_res()[i])) == -1);
@@ -1578,7 +1578,7 @@ TEST_CASE("te propagate_grid first step bug")
         auto out = ta.propagate_grid(grid);
 
         REQUIRE(out.size() == 200u * 4u);
-        REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return v == 0; }));
+        REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return std::isnan(v); }));
     }
 }
 
