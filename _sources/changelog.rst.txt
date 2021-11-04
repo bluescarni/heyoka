@@ -19,6 +19,9 @@ New
 Changes
 ~~~~~~~
 
+- If ``propagate_grid()`` exits early in batch mode,
+  the missing values are now set to NaN instead of zero
+  (`#215 <https://github.com/bluescarni/heyoka/pull/215>`__).
 - Internal refactoring of the event detection code
   (`#213 <https://github.com/bluescarni/heyoka/pull/213>`__).
 - During event detection, improve the performance of the

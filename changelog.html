@@ -600,6 +600,9 @@
 <div class="section" id="changes">
 <h3>Changes<a class="headerlink" href="#changes" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
+<li><p>If <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> exits early in batch mode,
+the missing values are now set to NaN instead of zero
+(<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/215">#215</a>).</p></li>
 <li><p>Internal refactoring of the event detection code
 (<a class="reference external" href="https://github.com/bluescarni/heyoka/pull/213">#213</a>).</p></li>
 <li><p>During event detection, improve the performance of the
