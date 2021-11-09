@@ -62,6 +62,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -2196,12 +2197,14 @@ template class continuous_output<mppp::real128>;
 
 #endif
 
-template std::ostream &operator<<<double>(std::ostream &, const continuous_output<double> &);
-template std::ostream &operator<<<long double>(std::ostream &, const continuous_output<long double> &);
+template HEYOKA_DLL_PUBLIC std::ostream &operator<<<double>(std::ostream &, const continuous_output<double> &);
+template HEYOKA_DLL_PUBLIC std::ostream &operator<<<long double>(std::ostream &,
+                                                                 const continuous_output<long double> &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template std::ostream &operator<<<mppp::real128>(std::ostream &, const continuous_output<mppp::real128> &);
+template HEYOKA_DLL_PUBLIC std::ostream &operator<<<mppp::real128>(std::ostream &,
+                                                                   const continuous_output<mppp::real128> &);
 
 #endif
 
