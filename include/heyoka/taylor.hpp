@@ -134,6 +134,12 @@ taylor_c_diff_func_name_args(llvm::LLVMContext &c, const std::string &name, std:
     return taylor_c_diff_func_name_args_impl(c, name, val_t, n_uvars, args, n_hidden_deps);
 }
 
+// Add a function for computing the dense output
+// via polynomial evaluation.
+template <typename T>
+void taylor_add_d_out_function(llvm_state &, std::uint32_t, std::uint32_t, std::uint32_t, bool, bool = true,
+                               bool = true);
+
 } // namespace detail
 
 HEYOKA_DLL_PUBLIC std::pair<taylor_dc_t, std::vector<std::uint32_t>> taylor_decompose(const std::vector<expression> &,
@@ -306,6 +312,7 @@ IGOR_MAKE_NAMED_ARGUMENT(direction);
 IGOR_MAKE_NAMED_ARGUMENT(max_steps);
 IGOR_MAKE_NAMED_ARGUMENT(max_delta_t);
 IGOR_MAKE_NAMED_ARGUMENT(write_tc);
+IGOR_MAKE_NAMED_ARGUMENT(c_output);
 
 } // namespace kw
 
@@ -586,6 +593,47 @@ using nt_event_batch = detail::nt_event_impl<T, true>;
 template <typename T>
 using t_event_batch = detail::t_event_impl<T, true>;
 
+template <typename T>
+class HEYOKA_DLL_PUBLIC continuous_output
+{
+    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
+
+    template <typename>
+    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_impl;
+
+    llvm_state m_llvm_state;
+    std::vector<T> m_tcs;
+    std::vector<T> m_times_hi, m_times_lo;
+    std::vector<T> m_output;
+    using fptr_t = void (*)(T *, T, const T *, const T *, const T *);
+    fptr_t m_f_ptr = nullptr;
+
+    HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t);
+    void call_impl(T);
+
+public:
+    continuous_output();
+    explicit continuous_output(llvm_state &&);
+    continuous_output(const continuous_output &);
+    continuous_output(continuous_output &&) noexcept;
+    ~continuous_output();
+
+    continuous_output &operator=(const continuous_output &);
+    continuous_output &operator=(continuous_output &&) noexcept;
+
+    const llvm_state &get_llvm_state() const;
+
+    const std::vector<T> &operator()(T tm)
+    {
+        call_impl(tm);
+        return m_output;
+    }
+    const std::vector<T> &get_output() const
+    {
+        return m_output;
+    }
+};
+
 namespace detail
 {
 
@@ -695,6 +743,10 @@ private:
     std::uint32_t m_order;
     // Tolerance.
     T m_tol;
+    // High accuracy.
+    bool m_high_accuracy;
+    // Compact mode.
+    bool m_compact_mode;
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
@@ -808,6 +860,8 @@ public:
 
     std::uint32_t get_order() const;
     T get_tol() const;
+    bool get_high_accuracy() const;
+    bool get_compact_mode() const;
     std::uint32_t get_dim() const;
 
     T get_time() const
@@ -897,7 +951,7 @@ public:
 
 private:
     // Parser for the common kwargs options for the propagate_*() functions.
-    template <typename... KwArgs>
+    template <bool Grid, typename... KwArgs>
     static auto propagate_common_ops(KwArgs &&...kw_args)
     {
         igor::parser p{kw_args...};
@@ -944,13 +998,26 @@ private:
                 }
             }();
 
-            return std::tuple{max_steps, max_delta_t, std::move(cb), write_tc};
+            if constexpr (Grid) {
+                return std::tuple{max_steps, max_delta_t, std::move(cb), write_tc};
+            } else {
+                // Continuous output (defaults to false).
+                auto with_c_out = [&p]() -> bool {
+                    if constexpr (p.has(kw::c_output)) {
+                        return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    } else {
+                        return false;
+                    }
+                }();
+
+                return std::tuple{max_steps, max_delta_t, std::move(cb), write_tc, with_c_out};
+            }
         }
     }
 
     // Implementations of the propagate_*() functions.
-    std::tuple<taylor_outcome, T, T, std::size_t>
-    propagate_until_impl(const dfloat<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>, bool);
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
+    propagate_until_impl(const dfloat<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>, bool, bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
     propagate_grid_impl(const std::vector<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>);
 
@@ -961,28 +1028,33 @@ public:
     // - max abs(timestep),
     // - total number of nonzero steps
     //   successfully undertaken,
-    // - grid of state vectors (only for propagate_grid()).
+    // - grid of state vectors (only for propagate_grid()),
+    // - continuous output, if requested (only for propagate_for/until()).
     // NOTE: the min/max timesteps are well-defined
     // only if at least 1-2 steps were taken successfully.
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_until(T t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
+    propagate_until(T t, KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, write_tc] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
+            = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, std::move(cb), write_tc);
+        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t> propagate_for(T delta_t, KwArgs &&...kw_args)
+    std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
+    propagate_for(T delta_t, KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, write_tc] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
+            = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb), write_tc);
+        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &grid,
                                                                                  KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_t, cb, _] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_t, cb, _] = propagate_common_ops<true>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_grid_impl(grid, max_steps, max_delta_t, std::move(cb));
     }
@@ -1102,6 +1174,10 @@ private:
     std::uint32_t m_order;
     // Tolerance.
     T m_tol;
+    // High accuracy.
+    bool m_high_accuracy;
+    // Compact mode.
+    bool m_compact_mode;
     // The steppers.
     using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
     using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
@@ -1235,6 +1311,8 @@ public:
     std::uint32_t get_batch_size() const;
     std::uint32_t get_order() const;
     T get_tol() const;
+    bool get_high_accuracy() const;
+    bool get_compact_mode() const;
     std::uint32_t get_dim() const;
 
     const std::vector<T> &get_time() const
@@ -1488,18 +1566,18 @@ namespace boost::serialization
 
 template <typename T>
 struct version<heyoka::taylor_adaptive<T>> {
-    typedef mpl::int_<1> type;
+    typedef mpl::int_<2> type;
     typedef mpl::integral_c_tag tag;
     BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<2>, boost::mpl::int_<256>>));
 };
 
 template <typename T>
 struct version<heyoka::taylor_adaptive_batch<T>> {
-    typedef mpl::int_<1> type;
+    typedef mpl::int_<2> type;
     typedef mpl::integral_c_tag tag;
     BOOST_STATIC_CONSTANT(int, value = version::type::value);
-    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<1>, boost::mpl::int_<256>>));
+    BOOST_MPL_ASSERT((boost::mpl::less<boost::mpl::int_<2>, boost::mpl::int_<256>>));
 };
 
 } // namespace boost::serialization
