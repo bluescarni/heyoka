@@ -608,7 +608,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     using fptr_t = void (*)(T *, T, const T *, const T *, const T *);
     fptr_t m_f_ptr = nullptr;
 
-    HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t);
+    HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
     void call_impl(T);
 
 public:

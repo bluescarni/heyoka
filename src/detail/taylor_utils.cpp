@@ -1829,7 +1829,7 @@ template void taylor_add_d_out_function<mppp::real128>(llvm_state &, std::uint32
 } // namespace detail
 
 template <typename T>
-void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim)
+void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
     // Overflow check: we want to be able to index into the arrays of
     // times and Taylor coefficients using 32-bit ints.
@@ -1848,8 +1848,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto orig_bb = builder.GetInsertBlock();
 
     // Add the function for the computation of the dense output.
-    // TODO high accuracy?
-    detail::taylor_add_d_out_function<T>(m_llvm_state, dim, order, 1, false, false, false);
+    detail::taylor_add_d_out_function<T>(m_llvm_state, dim, order, 1, high_accuracy, false, false);
 
     // Fetch it.
     auto d_out_f = md.getFunction("d_out_f");

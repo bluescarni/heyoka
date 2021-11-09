@@ -2745,7 +2745,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
             ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim));
 
             // Add the continuous output function.
-            ret.add_c_out_function(m_order, m_dim);
+            ret.add_c_out_function(m_order, m_dim, m_high_accuracy);
 
             return std::optional{std::move(ret)};
         } else {
