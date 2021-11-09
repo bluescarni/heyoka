@@ -62,7 +62,6 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
-#include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -2161,8 +2160,11 @@ std::size_t continuous_output<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() - 1u);
 }
 
+namespace detail
+{
+
 template <typename T>
-std::ostream &operator<<(std::ostream &os, const continuous_output<T> &co)
+std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co)
 {
     std::ostringstream oss;
     oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
@@ -2188,6 +2190,8 @@ std::ostream &operator<<(std::ostream &os, const continuous_output<T> &co)
     return os << oss.str();
 }
 
+} // namespace detail
+
 template class continuous_output<double>;
 template class continuous_output<long double>;
 
@@ -2197,14 +2201,25 @@ template class continuous_output<mppp::real128>;
 
 #endif
 
-template HEYOKA_DLL_PUBLIC std::ostream &operator<<<double>(std::ostream &, const continuous_output<double> &);
-template HEYOKA_DLL_PUBLIC std::ostream &operator<<<long double>(std::ostream &,
-                                                                 const continuous_output<long double> &);
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output<double> &co)
+{
+    return detail::c_out_stream_impl(os, co);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output<long double> &co)
+{
+    return detail::c_out_stream_impl(os, co);
+}
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC std::ostream &operator<<<mppp::real128>(std::ostream &,
-                                                                   const continuous_output<mppp::real128> &);
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real128> &co)
+{
+    return detail::c_out_stream_impl(os, co);
+}
 
 #endif
 

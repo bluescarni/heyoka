@@ -596,8 +596,13 @@ using t_event_batch = detail::t_event_impl<T, true>;
 template <typename>
 class HEYOKA_DLL_PUBLIC continuous_output;
 
+namespace detail
+{
+
 template <typename T>
-HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<T> &);
+std::ostream &c_out_stream_impl(std::ostream &, const continuous_output<T> &);
+
+}
 
 template <typename T>
 class HEYOKA_DLL_PUBLIC continuous_output
@@ -607,7 +612,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     template <typename>
     friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_impl;
 
-    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<<T>(std::ostream &, const continuous_output<T> &);
+    friend std::ostream &detail::c_out_stream_impl<T>(std::ostream &, const continuous_output<T> &);
 
     llvm_state m_llvm_state;
     std::vector<T> m_tcs;
@@ -658,6 +663,27 @@ public:
     std::pair<T, T> get_bounds() const;
     std::size_t get_n_steps() const;
 };
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const continuous_output<T> &)
+{
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<mppp::real128> &);
+
+#endif
 
 namespace detail
 {
