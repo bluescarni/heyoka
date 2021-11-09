@@ -17,7 +17,6 @@
 #include <cstdint>
 #include <exception>
 #include <functional>
-#include <iterator>
 #include <limits>
 #include <map>
 #include <optional>
@@ -2773,9 +2772,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
             }
 #endif
 
-            // NOTE: back insertion is not very efficient,
-            // consider something else if performance here matters.
-            std::copy(m_tc.begin(), m_tc.end(), std::back_inserter(c_out_tcs));
+            c_out_tcs.insert(c_out_tcs.end(), m_tc.begin(), m_tc.end());
         }
     };
 
