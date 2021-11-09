@@ -182,6 +182,18 @@ inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
     }
 }
 
+// Double-length primitives.
+
+// Addition.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
+                                                    llvm::Value *);
+
+// Less-than.
+llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
+// Greater-than.
+llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
 } // namespace heyoka::detail
 
 #endif

@@ -203,6 +203,8 @@ public:
     void compile();
 
     std::uintptr_t jit_lookup(const std::string &);
+
+    llvm_state make_similar() const;
 };
 
 } // namespace heyoka

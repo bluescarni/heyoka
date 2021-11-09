@@ -42,6 +42,7 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
@@ -1570,6 +1571,114 @@ llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
 }
 
 #endif
+
+namespace
+{
+
+// RAII helper to temporarily disable fast
+// math flags in a builder.
+class fmf_disabler
+{
+    ir_builder &m_builder;
+    llvm::FastMathFlags m_orig_fmf;
+
+public:
+    explicit fmf_disabler(ir_builder &b) : m_builder(b), m_orig_fmf(m_builder.getFastMathFlags())
+    {
+        // Reset the fast math flags.
+        m_builder.setFastMathFlags(llvm::FastMathFlags{});
+    }
+    ~fmf_disabler()
+    {
+        // Restore the original fast math flags.
+        m_builder.setFastMathFlags(m_orig_fmf);
+    }
+
+    fmf_disabler(const fmf_disabler &) = delete;
+    fmf_disabler(fmf_disabler &&) = delete;
+
+    fmf_disabler &operator=(const fmf_disabler &) = delete;
+    fmf_disabler &operator=(fmf_disabler &&) = delete;
+};
+
+} // namespace
+
+// NOTE: see the code in dfloat.hpp for the double-length primitives.
+
+// Addition.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto S = builder.CreateFAdd(x_hi, y_hi);
+    auto T = builder.CreateFAdd(x_lo, y_lo);
+    auto e = builder.CreateFSub(S, x_hi);
+    auto f = builder.CreateFSub(T, x_lo);
+
+    auto t1 = builder.CreateFSub(S, e);
+    t1 = builder.CreateFSub(x_hi, t1);
+    auto s = builder.CreateFSub(y_hi, e);
+    s = builder.CreateFAdd(s, t1);
+
+    t1 = builder.CreateFSub(T, f);
+    t1 = builder.CreateFSub(x_lo, t1);
+    auto t = builder.CreateFSub(y_lo, f);
+    t = builder.CreateFAdd(t, t1);
+
+    s = builder.CreateFAdd(s, T);
+    auto H = builder.CreateFAdd(S, s);
+    auto h = builder.CreateFSub(S, H);
+    h = builder.CreateFAdd(h, s);
+
+    h = builder.CreateFAdd(h, t);
+    e = builder.CreateFAdd(H, h);
+    f = builder.CreateFSub(H, e);
+    f = builder.CreateFAdd(f, h);
+
+    return {e, f};
+}
+
+// Less-than.
+llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto cond1 = builder.CreateFCmpOLT(x_hi, y_hi);
+    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
+    auto cond3 = builder.CreateFCmpOLT(x_lo, y_lo);
+    // NOTE: this is a logical AND.
+    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    // NOTE: this is a logical OR.
+    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+
+    return cond;
+}
+
+// Greater-than.
+llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto cond1 = builder.CreateFCmpOGT(x_hi, y_hi);
+    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
+    auto cond3 = builder.CreateFCmpOGT(x_lo, y_lo);
+    // NOTE: this is a logical AND.
+    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    // NOTE: this is a logical OR.
+    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+
+    return cond;
+}
 
 } // namespace heyoka::detail
 
