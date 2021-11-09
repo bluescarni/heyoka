@@ -209,7 +209,7 @@ TEST_CASE("kepE stark")
     auto ic_E = ta.get_state()[3];
     ta.get_state_data()[3] = ic_E - sqrt(1 - ic_G * ic_G / (ic_L * ic_L)) * sin(ic_E);
 
-    auto [oc, _1, _2, _3] = ta.propagate_until(250.);
+    auto [oc, _1, _2, _3, _4] = ta.propagate_until(250.);
 
     REQUIRE(oc == taylor_outcome::time_limit);
 
