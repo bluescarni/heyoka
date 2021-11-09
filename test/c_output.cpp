@@ -60,6 +60,8 @@ TEST_CASE("scalar")
         // Basic testing.
         continuous_output<fp_t> co;
         REQUIRE(co.get_output().empty());
+        REQUIRE(co.get_times().empty());
+        REQUIRE(co.get_tcs().empty());
         REQUIRE_THROWS_MATCHES(co(0.), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output object"));
         REQUIRE_THROWS_MATCHES(co.get_bounds(), std::invalid_argument,
@@ -84,6 +86,8 @@ TEST_CASE("scalar")
 
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u);
+        REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+        REQUIRE(!d_out->get_tcs().empty());
 
         oss.str("");
         oss << *d_out;
@@ -136,6 +140,9 @@ TEST_CASE("scalar")
         ta.set_time(0);
 
         d_out = std::get<4>(ta.propagate_until(-10., kw::c_output = true));
+
+        REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+        REQUIRE(!d_out->get_tcs().empty());
 
         REQUIRE(d_out.has_value());
 

@@ -646,6 +646,14 @@ public:
     {
         return m_output;
     }
+    const std::vector<T> &get_times() const
+    {
+        return m_times_hi;
+    }
+    const std::vector<T> &get_tcs() const
+    {
+        return m_tcs;
+    }
 
     std::pair<T, T> get_bounds() const;
     std::size_t get_n_steps() const;
