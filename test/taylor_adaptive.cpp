@@ -304,6 +304,8 @@ TEST_CASE("streaming op")
 
             REQUIRE(!oss.str().empty());
             REQUIRE(!boost::algorithm::contains(oss.str(), "events"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "High accuracy"));
+            REQUIRE(boost::algorithm::contains(oss.str(), "Compact mode"));
 
             oss.str("");
         }
@@ -1459,9 +1461,13 @@ void s11n_test_impl()
                                           {0., 0.5},
                                           kw::t_events = {t_event<double>(v, kw::callback = s11n_t_cb{})},
                                           kw::nt_events = {nt_event<double>(v - par[0], s11n_nt_cb{})},
-                                          kw::pars = std::vector<double>{-1e-4}};
+                                          kw::pars = std::vector<double>{-1e-4},
+                                          kw::high_accuracy = true,
+                                          kw::compact_mode = true};
 
         REQUIRE(ta.get_tol() == std::numeric_limits<double>::epsilon());
+        REQUIRE(ta.get_high_accuracy());
+        REQUIRE(ta.get_compact_mode());
 
         auto oc = std::get<0>(ta.step(true));
         while (oc == taylor_outcome::success) {
@@ -1479,6 +1485,8 @@ void s11n_test_impl()
         auto ta_copy = ta;
         ta = taylor_adaptive<double>{
             {prime(x) = x}, {0.123}, kw::tol = 1e-3, kw::t_events = {t_event<double>(x, kw::callback = s11n_t_cb{})}};
+        REQUIRE(!ta.get_high_accuracy());
+        REQUIRE(!ta.get_compact_mode());
 
         {
             Ia ia(ss);
@@ -1490,6 +1498,8 @@ void s11n_test_impl()
         REQUIRE(ta.get_decomposition() == ta_copy.get_decomposition());
         REQUIRE(ta.get_order() == ta_copy.get_order());
         REQUIRE(ta.get_tol() == ta_copy.get_tol());
+        REQUIRE(ta.get_high_accuracy() == ta_copy.get_high_accuracy());
+        REQUIRE(ta.get_compact_mode() == ta_copy.get_compact_mode());
         REQUIRE(ta.get_dim() == ta_copy.get_dim());
         REQUIRE(ta.get_time() == ta_copy.get_time());
         REQUIRE(ta.get_state() == ta_copy.get_state());
@@ -1588,9 +1598,44 @@ TEST_CASE("def ctor")
 
         REQUIRE(ta.get_state() == std::vector{fp_t(0)});
         REQUIRE(ta.get_time() == 0);
+        REQUIRE(ta.get_high_accuracy() == false);
+        REQUIRE(ta.get_compact_mode() == false);
     };
 
     tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("copy semantics")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                    {0., 0.5},
+                                    kw::t_events = {t_event<fp_t>(v, kw::callback = s11n_t_cb{})},
+                                    kw::nt_events = {nt_event<fp_t>(v - par[0], s11n_nt_cb{})},
+                                    kw::pars = std::vector<fp_t>{-1e-4},
+                                    kw::high_accuracy = true,
+                                    kw::compact_mode = true,
+                                    kw::tol = 1e-11};
+
+    auto ta_copy = ta;
+
+    REQUIRE(ta_copy.get_nt_events().size() == 1u);
+    REQUIRE(ta_copy.get_t_events().size() == 1u);
+    REQUIRE(ta_copy.get_tol() == ta.get_tol());
+    REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
+    REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
+
+    ta_copy = taylor_adaptive<fp_t>{};
+    ta_copy = ta;
+
+    REQUIRE(ta_copy.get_nt_events().size() == 1u);
+    REQUIRE(ta_copy.get_t_events().size() == 1u);
+    REQUIRE(ta_copy.get_tol() == ta.get_tol());
+    REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
+    REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
 }
 
 #if defined(HEYOKA_ARCH_PPC)
