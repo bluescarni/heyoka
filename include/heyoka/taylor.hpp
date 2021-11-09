@@ -593,6 +593,12 @@ using nt_event_batch = detail::nt_event_impl<T, true>;
 template <typename T>
 using t_event_batch = detail::t_event_impl<T, true>;
 
+template <typename>
+class HEYOKA_DLL_PUBLIC continuous_output;
+
+template <typename T>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output<T> &);
+
 template <typename T>
 class HEYOKA_DLL_PUBLIC continuous_output
 {
@@ -600,6 +606,8 @@ class HEYOKA_DLL_PUBLIC continuous_output
 
     template <typename>
     friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_impl;
+
+    friend HEYOKA_DLL_PUBLIC std::ostream &operator<<<T>(std::ostream &, const continuous_output<T> &);
 
     llvm_state m_llvm_state;
     std::vector<T> m_tcs;
@@ -610,6 +618,12 @@ class HEYOKA_DLL_PUBLIC continuous_output
 
     HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
     void call_impl(T);
+
+    // Serialisation.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
     continuous_output();
@@ -632,6 +646,9 @@ public:
     {
         return m_output;
     }
+
+    std::pair<T, T> get_bounds() const;
+    std::size_t get_n_steps() const;
 };
 
 namespace detail

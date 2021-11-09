@@ -12,6 +12,7 @@
 #include <cassert>
 #include <chrono> // NOTE: needed for the spdlog stopwatch.
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <initializer_list>
@@ -65,6 +66,7 @@
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
 #include <heyoka/param.hpp>
+#include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
 
@@ -1915,6 +1917,8 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     builder.SetInsertPoint(bb);
 
     // Create the variable in which we will store the timestep size.
+    // This is necessary because the d_out_f function requires a pointer
+    // to the timestep.
     auto h_ptr = builder.CreateAlloca(fp_t);
 
     // Look for the index in the times vector corresponding to
@@ -2108,12 +2112,96 @@ const llvm_state &continuous_output<T>::get_llvm_state() const
     return m_llvm_state;
 }
 
+template <typename T>
+void continuous_output<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_llvm_state;
+    ar << m_tcs;
+    ar << m_times_hi;
+    ar << m_times_lo;
+    ar << m_output;
+}
+
+template <typename T>
+void continuous_output<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_llvm_state;
+    ar >> m_tcs;
+    ar >> m_times_hi;
+    ar >> m_times_lo;
+    ar >> m_output;
+
+    // NOTE: if m_output is not empty, it means the archived
+    // object had been initialised.
+    if (m_output.empty()) {
+        m_f_ptr = nullptr;
+    } else {
+        m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
+    }
+}
+
+template <typename T>
+std::pair<T, T> continuous_output<T>::get_bounds() const
+{
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output object");
+    }
+
+    return {m_times_hi[0], m_times_hi.back()};
+}
+
+template <typename T>
+std::size_t continuous_output<T>::get_n_steps() const
+{
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output object");
+    }
+
+    return boost::numeric_cast<std::size_t>(m_times_hi.size() - 1u);
+}
+
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const continuous_output<T> &co)
+{
+    std::ostringstream oss;
+    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    oss.imbue(std::locale::classic());
+    oss << std::showpoint;
+    oss.precision(std::numeric_limits<T>::max_digits10);
+
+    if (co.get_output().empty()) {
+        oss << "Default-constructed continuous_output";
+    } else {
+        const detail::dfloat<T> df_t_start(co.m_times_hi[0], co.m_times_lo[0]),
+            df_t_end(co.m_times_hi.back(), co.m_times_lo.back());
+        const auto dir = df_t_start < df_t_end;
+
+        oss << "Direction : " << (dir ? "forward" : "backward") << '\n';
+        oss << "Time range: "
+            << (dir ? "[{}, {})"_format(co.m_times_hi[0], co.m_times_hi.back())
+                    : "({}, {}]"_format(co.m_times_hi.back(), co.m_times_hi[0]))
+            << '\n';
+        oss << "N of steps: " << (co.m_times_hi.size() - 1u) << '\n';
+    }
+
+    return os << oss.str();
+}
+
 template class continuous_output<double>;
 template class continuous_output<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class continuous_output<mppp::real128>;
+
+#endif
+
+template std::ostream &operator<<<double>(std::ostream &, const continuous_output<double> &);
+template std::ostream &operator<<<long double>(std::ostream &, const continuous_output<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template std::ostream &operator<<<mppp::real128>(std::ostream &, const continuous_output<mppp::real128> &);
 
 #endif
 
