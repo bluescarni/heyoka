@@ -283,3 +283,28 @@ TEST_CASE("s11n")
         REQUIRE(jet[3] == approximately(5.));
     }
 }
+
+TEST_CASE("make_similar")
+{
+    auto [x, y] = make_vars("x", "y");
+
+    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::inline_functions = false};
+    taylor_add_jet<double>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, true, false);
+
+    s.compile();
+
+    REQUIRE(s.module_name() == "sample state");
+    REQUIRE(s.opt_level() == 2u);
+    REQUIRE(s.fast_math());
+    REQUIRE(s.inline_functions() == false);
+    REQUIRE(s.is_compiled());
+
+    auto s2 = s.make_similar();
+
+    REQUIRE(s2.module_name() == "sample state");
+    REQUIRE(s2.opt_level() == 2u);
+    REQUIRE(s2.fast_math());
+    REQUIRE(s2.inline_functions() == false);
+    REQUIRE(!s2.is_compiled());
+    REQUIRE(s.get_ir() != s2.get_ir());
+}
