@@ -1288,3 +1288,33 @@ TEST_CASE("copy semantics")
     REQUIRE(ta_copy.get_high_accuracy() == ta.get_high_accuracy());
     REQUIRE(ta_copy.get_compact_mode() == ta.get_compact_mode());
 }
+
+// Test case for the propagate_*() functions not considering
+// the last step in the step count if the integration is stopped
+// by a terminal event.
+TEST_CASE("propagate step count te stop bug")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0., 0., 0.5, 0.5001},
+                                          2,
+                                          kw::t_events = {t_event_batch<fp_t>(x - 1e-6)}};
+
+    ta.propagate_until({10., 10.});
+
+    REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
+    REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
+
+    ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                     {0., 0., 0.5, 0.5001},
+                                     2,
+                                     kw::t_events = {t_event_batch<fp_t>(x - 1e-6)}};
+
+    ta.propagate_grid({0., 0., 1., 1., 2., 2.});
+
+    REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
+    REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
+}

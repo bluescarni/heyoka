@@ -1693,3 +1693,27 @@ TEST_CASE("no events error")
                                Message("No events were defined for this integrator"));
     }
 }
+
+// Test case for the propagate_*() functions not considering
+// the last step in the step count if the integration is stopped
+// by a terminal event.
+TEST_CASE("propagate step count te stop bug")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0., 0.5}, kw::t_events = {t_event<fp_t>(x - 1e-6)}};
+
+    auto nsteps = std::get<3>(ta.propagate_until(10.));
+
+    REQUIRE(nsteps == 1u);
+
+    ta = taylor_adaptive<fp_t>{
+        {prime(x) = v, prime(v) = -9.8 * sin(x)}, {0., 0.5}, kw::t_events = {t_event<fp_t>(x - 1e-6)}};
+
+    nsteps = std::get<3>(ta.propagate_grid({0., 1., 2.}));
+
+    REQUIRE(nsteps == 1u);
+}

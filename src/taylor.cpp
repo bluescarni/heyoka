@@ -3040,6 +3040,13 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
             // a stopping terminal event.
+
+            if (res > taylor_outcome::success) {
+                // In case of a stopping terminal event, we still want to update
+                // the step counter.
+                step_counter += static_cast<std::size_t>(h != 0);
+            }
+
             return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
         }
 
@@ -4003,7 +4010,14 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             })) {
             // Setup m_prop_res before exiting.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                const auto [oc, h] = m_step_res[i];
+                if (oc > taylor_outcome::success) {
+                    // In case of a stopping terminal event, we still want to update
+                    // the step counter.
+                    m_ts_count[i] += static_cast<std::size_t>(h != 0);
+                }
+
+                m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return;
@@ -4426,7 +4440,14 @@ std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vec
             })) {
             // Setup m_prop_res before exiting.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i] = std::tuple{std::get<0>(m_step_res[i]), m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                const auto [oc, h] = m_step_res[i];
+                if (oc > taylor_outcome::success) {
+                    // In case of a stopping terminal event, we still want to update
+                    // the step counter.
+                    m_ts_count[i] += static_cast<std::size_t>(h != 0);
+                }
+
+                m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
             return retval;
