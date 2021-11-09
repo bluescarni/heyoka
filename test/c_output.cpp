@@ -88,6 +88,7 @@ TEST_CASE("scalar")
         REQUIRE(d_out->get_output().size() == 2u);
         REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
         REQUIRE(!d_out->get_tcs().empty());
+        REQUIRE(!d_out->get_llvm_state().get_ir().empty());
 
         oss.str("");
         oss << *d_out;
