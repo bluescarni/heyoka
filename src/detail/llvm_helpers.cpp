@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -215,6 +216,26 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
     }
+}
+
+// Gather a vector of type vec_tp from the vector of pointers ptrs. align is the alignment of the
+// scalar values stored in ptrs.
+llvm::Value *gather_vector_from_memory(ir_builder &builder, [[maybe_unused]] llvm::Type *vec_tp, llvm::Value *ptrs,
+                                       std::size_t align)
+{
+    return builder.CreateMaskedGather(
+#if LLVM_VERSION_MAJOR >= 13
+        // NOTE: new initial argument required since LLVM 13
+        // (the vector type to gather).
+        vec_tp,
+#endif
+        ptrs,
+#if LLVM_VERSION_MAJOR == 10
+        align
+#else
+        llvm::Align(align)
+#endif
+    );
 }
 
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
@@ -1183,20 +1204,9 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
-            auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(builder.CreateMaskedGather(
-#if LLVM_VERSION_MAJOR >= 13
-                                  // NOTE: new initial argument required since LLVM 13
-                                  // (the vector type to gather).
-                                  cur_cf->getType(),
-#endif
-                                  last_nz_ptr,
-#if LLVM_VERSION_MAJOR == 10
-                                  alignof(T)
-#else
-                                                                                                      llvm::Align(alignof(T))
-#endif
-                                      ))
-                                              : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+            auto last_nz_cf = batch_size > 1u
+                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, alignof(T))
+                                  : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
 
             // Compute the sign of the current coefficient(s).
             auto cur_sgn = llvm_sgn(s, cur_cf);
