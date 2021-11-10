@@ -1930,7 +1930,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     auto step = builder.CreateAlloca(builder.getInt32Ty());
     auto first = builder.CreateAlloca(builder.getInt32Ty());
 
-    // Count is inited with the size of the range.
+    // count is inited with the size of the range.
     builder.CreateStore(builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())), count);
     // first is inited to zero.
     builder.CreateStore(builder.getInt32(0), first);
