@@ -450,7 +450,7 @@ TEST_CASE("batch")
 
         d_out = ta.propagate_until(final_tm, kw::c_output = true);
 
-        // REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+        REQUIRE(d_out->get_times().size() == d_out->get_n_steps() * batch_size + 2u * batch_size);
         REQUIRE(d_out.has_value());
         REQUIRE(!d_out->get_tcs().empty());
 
