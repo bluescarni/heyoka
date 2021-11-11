@@ -2161,6 +2161,15 @@ std::size_t continuous_output<T>::get_n_steps() const
     return boost::numeric_cast<std::size_t>(m_times_hi.size() - 1u);
 }
 
+template class continuous_output<double>;
+template class continuous_output<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class continuous_output<mppp::real128>;
+
+#endif
+
 namespace detail
 {
 
@@ -2192,15 +2201,6 @@ std::ostream &c_out_stream_impl(std::ostream &os, const continuous_output<T> &co
 }
 
 } // namespace detail
-
-template class continuous_output<double>;
-template class continuous_output<long double>;
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-template class continuous_output<mppp::real128>;
-
-#endif
 
 template <>
 std::ostream &operator<<(std::ostream &os, const continuous_output<double> &co)
@@ -2480,6 +2480,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
 
 #if !defined(NDEBUG)
 
+    // In debug mode, invoke the index checking function.
     auto tc_idx_debug_ptr
         = builder.CreateInBoundsGEP(builder.CreateAlloca(llvm::ArrayType::get(builder.getInt32Ty(), m_batch_size)),
                                     {builder.getInt32(0), builder.getInt32(0)});
@@ -2651,7 +2652,7 @@ continuous_output_batch<T>::continuous_output_batch(llvm_state &&s) : m_llvm_sta
 template <typename T>
 continuous_output_batch<T>::continuous_output_batch(const continuous_output_batch &o)
     : m_batch_size(o.m_batch_size), m_llvm_state(o.m_llvm_state), m_tcs(o.m_tcs), m_times_hi(o.m_times_hi),
-      m_times_lo(o.m_times_lo), m_output(o.m_output)
+      m_times_lo(o.m_times_lo), m_output(o.m_output), m_tmp_tm(o.m_tmp_tm)
 {
     // If o is valid, fetch the function pointer from the copied state.
     // Otherwise, m_f_ptr will remain null.
@@ -2725,6 +2726,10 @@ void continuous_output_batch<T>::call_impl(const T *t)
 template <typename T>
 const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T> &tm)
 {
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output_batch object");
+    }
+
     if (tm.size() != m_batch_size) {
         throw std::invalid_argument(
             "An invalid time vector was passed to the call operator of continuous_output_batch: the "
@@ -2740,12 +2745,158 @@ const llvm_state &continuous_output_batch<T>::get_llvm_state() const
     return m_llvm_state;
 }
 
+template <typename T>
+std::uint32_t continuous_output_batch<T>::get_batch_size() const
+{
+    return m_batch_size;
+}
+
+template <typename T>
+void continuous_output_batch<T>::save(boost::archive::binary_oarchive &ar, unsigned) const
+{
+    ar << m_batch_size;
+    ar << m_llvm_state;
+    ar << m_tcs;
+    ar << m_times_hi;
+    ar << m_times_lo;
+    ar << m_output;
+    ar << m_tmp_tm;
+}
+
+template <typename T>
+void continuous_output_batch<T>::load(boost::archive::binary_iarchive &ar, unsigned)
+{
+    ar >> m_batch_size;
+    ar >> m_llvm_state;
+    ar >> m_tcs;
+    ar >> m_times_hi;
+    ar >> m_times_lo;
+    ar >> m_output;
+    ar >> m_tmp_tm;
+
+    // NOTE: if m_output is not empty, it means the archived
+    // object had been initialised.
+    if (m_output.empty()) {
+        m_f_ptr = nullptr;
+    } else {
+        m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
+    }
+}
+
+template <typename T>
+std::pair<std::vector<T>, std::vector<T>> continuous_output_batch<T>::get_bounds() const
+{
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output_batch object");
+    }
+
+    std::vector<T> lb, ub;
+    lb.resize(boost::numeric_cast<decltype(lb.size())>(m_batch_size));
+    ub.resize(boost::numeric_cast<decltype(ub.size())>(m_batch_size));
+
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        lb[i] = m_times_hi[i];
+        // NOTE: take into account the padding.
+        ub[i] = m_times_hi[m_times_hi.size() - 2u * m_batch_size + i];
+    }
+
+    return std::make_pair(std::move(lb), std::move(ub));
+}
+
+template <typename T>
+std::size_t continuous_output_batch<T>::get_n_steps() const
+{
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output_batch object");
+    }
+
+    // NOTE: account for padding.
+    return boost::numeric_cast<std::size_t>(m_times_hi.size() / m_batch_size - 2u);
+}
+
 template class continuous_output_batch<double>;
 template class continuous_output_batch<long double>;
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 template class continuous_output_batch<mppp::real128>;
+
+#endif
+
+namespace detail
+{
+
+template <typename T>
+std::ostream &c_out_batch_stream_impl(std::ostream &os, const continuous_output_batch<T> &co)
+{
+    std::ostringstream oss;
+    oss.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+    oss.imbue(std::locale::classic());
+    oss << std::showpoint;
+    oss.precision(std::numeric_limits<T>::max_digits10);
+
+    if (co.get_output().empty()) {
+        oss << "Default-constructed continuous_output_batch";
+    } else {
+        const auto batch_size = co.m_batch_size;
+
+        oss << "Directions : [";
+        for (std::uint32_t i = 0; i < batch_size; ++i) {
+            const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
+                df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
+                         co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
+            const auto dir = df_t_start < df_t_end;
+
+            oss << (dir ? "forward" : "backward");
+
+            if (i != batch_size - 1u) {
+                oss << ", ";
+            }
+        }
+        oss << "]\n";
+
+        oss << "Time ranges: [";
+        for (std::uint32_t i = 0; i < batch_size; ++i) {
+            const detail::dfloat<T> df_t_start(co.m_times_hi[i], co.m_times_lo[i]),
+                df_t_end(co.m_times_hi[co.m_times_hi.size() - 2u * batch_size + i],
+                         co.m_times_lo[co.m_times_lo.size() - 2u * batch_size + i]);
+            const auto dir = df_t_start < df_t_end;
+            oss << (dir ? "[{}, {})"_format(df_t_start.hi, df_t_end.hi)
+                        : "({}, {}]"_format(df_t_end.hi, df_t_start.hi));
+
+            if (i != batch_size - 1u) {
+                oss << ", ";
+            }
+        }
+        oss << "]\n";
+
+        oss << "N of steps : " << co.get_n_steps() << '\n';
+    }
+
+    return os << oss.str();
+}
+
+} // namespace detail
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output_batch<double> &co)
+{
+    return detail::c_out_batch_stream_impl(os, co);
+}
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output_batch<long double> &co)
+{
+    return detail::c_out_batch_stream_impl(os, co);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::real128> &co)
+{
+    return detail::c_out_batch_stream_impl(os, co);
+}
 
 #endif
 

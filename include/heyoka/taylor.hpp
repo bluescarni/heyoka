@@ -747,6 +747,8 @@ public:
     {
         return m_output;
     }
+    // NOTE: when documenting this function,
+    // we need to warn about the padding.
     const std::vector<T> &get_times() const
     {
         return m_times_hi;
@@ -755,10 +757,32 @@ public:
     {
         return m_tcs;
     }
+    std::uint32_t get_batch_size() const;
 
-    // std::pair<T, T> get_bounds() const;
-    // std::size_t get_n_steps() const;
+    std::pair<std::vector<T>, std::vector<T>> get_bounds() const;
+    std::size_t get_n_steps() const;
 };
+
+template <typename T>
+inline std::ostream &operator<<(std::ostream &os, const continuous_output_batch<T> &)
+{
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
+
+    return os;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<double> &);
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<long double> &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_output_batch<mppp::real128> &);
+
+#endif
 
 namespace detail
 {

@@ -20,6 +20,8 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+#include <fmt/format.h>
+
 #if defined(HEYOKA_HAVE_REAL128)
 
 #include <mp++/real128.hpp>
@@ -32,6 +34,18 @@
 
 #include "catch.hpp"
 #include "test_utils.hpp"
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+// NOTE: MSVC has issues with the other "using"
+// statement form.
+using namespace fmt::literals;
+
+#else
+
+using fmt::literals::operator""_format;
+
+#endif
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -259,29 +273,35 @@ TEST_CASE("batch")
     auto tester = [](auto fp_x, unsigned opt_level, bool ha, unsigned batch_size) {
         using fp_t = decltype(fp_x);
 
-#if 0
         std::stringstream oss;
 
+        // Vector to pass to the call operator of the
+        // continuous_output_batch objects.
+        std::vector<fp_t> loc_time(batch_size);
+
         // Basic testing.
-        continuous_output<fp_t> co;
+        continuous_output_batch<fp_t> co;
         REQUIRE(co.get_output().empty());
         REQUIRE(co.get_times().empty());
         REQUIRE(co.get_tcs().empty());
-        REQUIRE_THROWS_MATCHES(co(0.), std::invalid_argument,
-                               Message("Cannot use a default-constructed continuous_output object"));
+        REQUIRE(co.get_batch_size() == 0u);
+        REQUIRE_THROWS_MATCHES(co(loc_time), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
+        REQUIRE_THROWS_MATCHES(co(std::vector<fp_t>{}), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co.get_bounds(), std::invalid_argument,
-                               Message("Cannot use a default-constructed continuous_output object"));
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co.get_n_steps(), std::invalid_argument,
-                               Message("Cannot use a default-constructed continuous_output object"));
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
 
         auto co2 = co;
         REQUIRE(co2.get_output().empty());
-        REQUIRE_THROWS_MATCHES(co2(0.), std::invalid_argument,
-                               Message("Cannot use a default-constructed continuous_output object"));
+        REQUIRE(co2.get_batch_size() == 0u);
+        REQUIRE_THROWS_MATCHES(co2(loc_time), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
 
         oss << co;
-        REQUIRE(oss.str() == "Default-constructed continuous_output");
-#endif
+        REQUIRE(oss.str() == "Default-constructed continuous_output_batch");
 
         auto [x, v] = make_vars("x", "v");
 
@@ -330,14 +350,14 @@ TEST_CASE("batch")
         auto d_out = ta.propagate_until(final_tm, kw::c_output = true);
 
         REQUIRE(d_out.has_value());
-        // REQUIRE(d_out->get_output().size() == 2u);
-        // REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+        REQUIRE(d_out->get_output().size() == 2u * batch_size);
+        REQUIRE(d_out->get_times().size() == (d_out->get_n_steps() + 2u) * batch_size);
         REQUIRE(!d_out->get_tcs().empty());
         REQUIRE(!d_out->get_llvm_state().get_ir().empty());
 
-        // oss.str("");
-        // oss << *d_out;
-        // REQUIRE(boost::algorithm::contains(oss.str(), "forward"));
+        oss.str("");
+        oss << *d_out;
+        REQUIRE(boost::algorithm::contains(oss.str(), "forward"));
 
         // Reset time/state.
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
@@ -347,7 +367,6 @@ TEST_CASE("batch")
         auto grid_out = ta.propagate_grid(grid);
 
         // Compare the two.
-        std::vector<fp_t> loc_time(batch_size);
         for (auto i = 0u; i < n_points; ++i) {
             for (auto j = 0u; j < batch_size; ++j) {
                 loc_time[j] = grid[i * batch_size + j];
@@ -361,9 +380,13 @@ TEST_CASE("batch")
             }
         }
 
-        // REQUIRE(d_out->get_bounds().first == 0.);
-        // REQUIRE(d_out->get_bounds().second == approximately(fp_t(10)));
-        // REQUIRE(d_out->get_n_steps() > 0u);
+        REQUIRE(d_out->get_bounds().first.size() == batch_size);
+        REQUIRE(d_out->get_bounds().second.size() == batch_size);
+        for (std::size_t j = 0; j < batch_size; ++j) {
+            REQUIRE(d_out->get_bounds().first[j] == 0.);
+            REQUIRE(d_out->get_bounds().second[j] == approximately(final_tm[j]));
+        }
+        REQUIRE(d_out->get_n_steps() > 0u);
 
         // Try slightly outside the bounds.
         for (auto j = 0u; j < batch_size; ++j) {
@@ -388,10 +411,20 @@ TEST_CASE("batch")
         }
 
         // Try making a copy too.
-        // auto co3 = *d_out;
-        // co3(4.);
-        // REQUIRE(co3.get_output()[0] == grid_out[2u * 4u]);
-        // REQUIRE(co3.get_output()[1] == grid_out[2u * 4u + 1u]);
+        auto co3 = *d_out;
+        REQUIRE(co3.get_output().size() == batch_size * 2u);
+        for (auto i = 0u; i < n_points; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                loc_time[j] = grid[i * batch_size + j];
+            }
+
+            co3(loc_time);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(co3.get_output()[j] == grid_out[2u * i * batch_size + j]);
+                REQUIRE(co3.get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+            }
+        }
 
         // Limiting case in which not steps are taken.
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
@@ -421,9 +454,9 @@ TEST_CASE("batch")
         REQUIRE(d_out.has_value());
         REQUIRE(!d_out->get_tcs().empty());
 
-        // oss.str("");
-        // oss << *d_out;
-        // REQUIRE(boost::algorithm::contains(oss.str(), "backward"));
+        oss.str("");
+        oss << *d_out;
+        REQUIRE(boost::algorithm::contains(oss.str(), "backward"));
 
         // Reset the integrator state.
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
@@ -444,9 +477,13 @@ TEST_CASE("batch")
             }
         }
 
-        // REQUIRE(d_out->get_bounds().first == 0.);
-        // REQUIRE(d_out->get_bounds().second == approximately(fp_t(-10)));
-        // REQUIRE(d_out->get_n_steps() > 0u);
+        REQUIRE(d_out->get_bounds().first.size() == batch_size);
+        REQUIRE(d_out->get_bounds().second.size() == batch_size);
+        for (std::size_t j = 0; j < batch_size; ++j) {
+            REQUIRE(d_out->get_bounds().first[j] == 0.);
+            REQUIRE(d_out->get_bounds().second[j] == approximately(final_tm[j]));
+        }
+        REQUIRE(d_out->get_n_steps() > 0u);
 
         // Try slightly outside the bounds.
         for (auto j = 0u; j < batch_size; ++j) {
@@ -471,15 +508,35 @@ TEST_CASE("batch")
         }
 
         // Try making a copy too.
-        // co = *d_out;
-        // co(-4.);
-        // REQUIRE(co.get_output()[0] == grid_out[2u * 4u]);
-        // REQUIRE(co.get_output()[1] == grid_out[2u * 4u + 1u]);
+        co = *d_out;
+        REQUIRE(co.get_output().size() == batch_size * 2u);
+        for (auto i = 0u; i < n_points; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                loc_time[j] = grid[i * batch_size + j];
+            }
 
-        // co = *&co;
-        // co(-5.);
-        // REQUIRE(co.get_output()[0] == grid_out[2u * 5u]);
-        // REQUIRE(co.get_output()[1] == grid_out[2u * 5u + 1u]);
+            co(loc_time);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(co.get_output()[j] == grid_out[2u * i * batch_size + j]);
+                REQUIRE(co.get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+            }
+        }
+
+        co = *&co;
+        REQUIRE(co.get_output().size() == batch_size * 2u);
+        for (auto i = 0u; i < n_points; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                loc_time[j] = grid[i * batch_size + j];
+            }
+
+            co(loc_time);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(co.get_output()[j] == grid_out[2u * i * batch_size + j]);
+                REQUIRE(co.get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+            }
+        }
 
         // Limiting case in which not steps are taken.
         std::copy(ic.begin(), ic.end(), ta.get_state_data());
@@ -489,9 +546,9 @@ TEST_CASE("batch")
         d_out = ta.propagate_until(final_tm, kw::c_output = true);
         REQUIRE(!d_out.has_value());
 
-#if 0
         // Try with non-finite time.
-        REQUIRE_THROWS_AS(co(std::numeric_limits<fp_t>::infinity()), std::invalid_argument);
+        loc_time[0] = std::numeric_limits<fp_t>::infinity();
+        REQUIRE_THROWS_AS(co(loc_time), std::invalid_argument);
 
         // s11n testing.
         oss.str("");
@@ -501,20 +558,31 @@ TEST_CASE("batch")
             oa << co;
         }
 
-        co = continuous_output<fp_t>{};
+        co = continuous_output_batch<fp_t>{};
 
         {
             boost::archive::binary_iarchive ia(oss);
             ia >> co;
         }
 
-        REQUIRE(co.get_output()[0] == grid_out[2u * 5u]);
-        REQUIRE(co.get_output()[1] == grid_out[2u * 5u + 1u]);
+        REQUIRE(co.get_output().size() == batch_size * 2u);
+        for (auto i = 0u; i < n_points; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                loc_time[j] = grid[i * batch_size + j];
+            }
+
+            co(loc_time);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(co.get_output()[j] == grid_out[2u * i * batch_size + j]);
+                REQUIRE(co.get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+            }
+        }
 
         // Try with a def-cted object too.
         oss.str("");
 
-        continuous_output<fp_t> co4;
+        continuous_output_batch<fp_t> co4;
 
         {
             boost::archive::binary_oarchive oa(oss);
@@ -529,9 +597,14 @@ TEST_CASE("batch")
         }
 
         REQUIRE(co4.get_output().empty());
-        REQUIRE_THROWS_MATCHES(co4(0.), std::invalid_argument,
-                               Message("Cannot use a default-constructed continuous_output object"));
-#endif
+        REQUIRE_THROWS_MATCHES(co4(loc_time), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
+
+        // Try with an input vector to the call operator of the wrong size.
+        REQUIRE_THROWS_MATCHES(
+            co(std::vector<fp_t>{}), std::invalid_argument,
+            Message("An invalid time vector was passed to the call operator of continuous_output_batch: the "
+                    "vector size is 0, but a size of {} was expected instead"_format(batch_size)));
     };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {

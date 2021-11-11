@@ -4043,24 +4043,29 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
                 return;
             }
 
-            // TODO fix assertions.
-            // #if !defined(NDEBUG)
-            //             const dfloat<T> prev_time(c_out_times_hi.back(), c_out_times_lo.back());
-            // #endif
+#if !defined(NDEBUG)
+            std::vector<dfloat<T>> prev_times;
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                prev_times.emplace_back(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
+                                        c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
+            }
+#endif
 
             c_out_times_hi.insert(c_out_times_hi.end(), m_time_hi.begin(), m_time_hi.end());
             c_out_times_lo.insert(c_out_times_lo.end(), m_time_lo.begin(), m_time_lo.end());
 
-            // TODO fix assertions.
-            // #if !defined(NDEBUG)
-            //             const dfloat<T> new_time(c_out_times_hi.back(), c_out_times_lo.back());
-            //             assert(isfinite(new_time));
-            //             if (t_dir) {
-            //                 assert(!(new_time < prev_time));
-            //             } else {
-            //                 assert(!(new_time > prev_time));
-            //             }
-            // #endif
+#if !defined(NDEBUG)
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                const dfloat<T> new_time(c_out_times_hi[c_out_times_hi.size() - m_batch_size + i],
+                                         c_out_times_lo[c_out_times_lo.size() - m_batch_size + i]);
+                assert(isfinite(new_time));
+                if (m_t_dir[i]) {
+                    assert(!(new_time < prev_times[i]));
+                } else {
+                    assert(!(new_time > prev_times[i]));
+                }
+            }
+#endif
 
             c_out_tcs.insert(c_out_tcs.end(), m_tc.begin(), m_tc.end());
         }
