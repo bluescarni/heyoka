@@ -472,8 +472,9 @@ TEST_CASE("batch")
             (*d_out)(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(d_out->get_output()[j] == grid_out[2u * i * batch_size + j]);
-                REQUIRE(d_out->get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[batch_size + j]
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
             }
         }
 
