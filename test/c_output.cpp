@@ -521,8 +521,9 @@ TEST_CASE("batch")
             co(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
-                REQUIRE(co.get_output()[j] == grid_out[2u * i * batch_size + j]);
-                REQUIRE(co.get_output()[batch_size + j] == grid_out[2u * i * batch_size + batch_size + j]);
+                REQUIRE(co.get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(co.get_output()[batch_size + j]
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
             }
         }
 
