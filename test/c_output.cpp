@@ -287,6 +287,8 @@ TEST_CASE("batch")
         REQUIRE(co.get_batch_size() == 0u);
         REQUIRE_THROWS_MATCHES(co(loc_time), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output_batch object"));
+        REQUIRE_THROWS_MATCHES(co(loc_time.data()), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co(std::vector<fp_t>{}), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co.get_bounds(), std::invalid_argument,

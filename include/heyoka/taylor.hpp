@@ -1655,7 +1655,7 @@ public:
             = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out);
+                                    write_tc, with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
     std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &ts, KwArgs &&...kw_args)
@@ -1664,7 +1664,7 @@ public:
             = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_for_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb), write_tc,
-                                  with_c_out);
+                                  with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
     std::vector<T> propagate_grid(const std::vector<T> &grid, KwArgs &&...kw_args)
