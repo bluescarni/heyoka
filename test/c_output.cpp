@@ -142,10 +142,9 @@ TEST_CASE("scalar")
 
         d_out = std::get<4>(ta.propagate_until(-10., kw::c_output = true));
 
+        REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
         REQUIRE(!d_out->get_tcs().empty());
-
-        REQUIRE(d_out.has_value());
 
         oss.str("");
         oss << *d_out;
