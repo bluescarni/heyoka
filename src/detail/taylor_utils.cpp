@@ -62,6 +62,7 @@
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
+#include <heyoka/detail/visibility.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/number.hpp>
@@ -2220,6 +2221,531 @@ std::ostream &operator<<(std::ostream &os, const continuous_output<mppp::real128
 {
     return detail::c_out_stream_impl(os, co);
 }
+
+#endif
+
+#if !defined(NDEBUG)
+
+extern "C" {
+
+// Function to check, in debug mode, the indexing of the Taylor coefficients
+// in the batch mode continuous output implementation.
+HEYOKA_DLL_PUBLIC void heyoka_continuous_output_batch_tc_idx_debug(const std::uint32_t *tc_idx,
+                                                                   std::uint32_t times_size,
+                                                                   std::uint32_t batch_size) noexcept
+{
+    // LCOV_EXCL_START
+    assert(batch_size != 0u);
+    assert(times_size % batch_size == 0u);
+    assert(times_size / batch_size >= 3u);
+    // LCOV_EXCL_STOP
+
+    for (std::uint32_t i = 0; i < batch_size; ++i) {
+        assert(tc_idx[i] < times_size / batch_size - 2u); // LCOV_EXCL_LINE
+    }
+}
+}
+
+#endif
+
+// Continuous output for the batch integrator.
+template <typename T>
+void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
+{
+    // Overflow check: we want to be able to index into the arrays of
+    // times and Taylor coefficients using 32-bit ints.
+    // LCOV_EXCL_START
+    if (m_tcs.size() > std::numeric_limits<std::uint32_t>::max()
+        || m_times_hi.size() > std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error(
+            "Overflow detected while adding continuous output to a Taylor integrator in batch mode");
+    }
+    // LCOV_EXCL_STOP
+
+    auto &md = m_llvm_state.module();
+    auto &builder = m_llvm_state.builder();
+    auto &context = m_llvm_state.context();
+
+    // The function arguments:
+    // - the output pointer (read/write, used also for accumulation),
+    // - the pointer to the target time values (read-only),
+    // - the pointer to the Taylor coefficients (read-only),
+    // - the pointer to the hi times (read-only),
+    // - the pointer to the lo times (read-only).
+    // No overlap is allowed.
+    auto fp_t = detail::to_llvm_type<T>(context);
+    auto fp_vec_t = detail::make_vector_type(fp_t, m_batch_size);
+    auto ptr_t = llvm::PointerType::getUnqual(fp_t);
+    std::vector<llvm::Type *> fargs{ptr_t, ptr_t, ptr_t, ptr_t, ptr_t};
+    // The function does not return anything.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
+    // Now create the function.
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "c_out", &md);
+    // LCOV_EXCL_START
+    if (f == nullptr) {
+        throw std::invalid_argument("Unable to create a function for continuous output in a Taylor integrator");
+    }
+    // LCOV_EXCL_STOP
+
+    // Set the names/attributes of the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+
+    auto tm_ptr = f->args().begin() + 1;
+    tm_ptr->setName("tm_ptr");
+    tm_ptr->addAttr(llvm::Attribute::NoCapture);
+    tm_ptr->addAttr(llvm::Attribute::NoAlias);
+    tm_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto tc_ptr = f->args().begin() + 2;
+    tc_ptr->setName("tc_ptr");
+    tc_ptr->addAttr(llvm::Attribute::NoCapture);
+    tc_ptr->addAttr(llvm::Attribute::NoAlias);
+    tc_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto times_ptr_hi = f->args().begin() + 3;
+    times_ptr_hi->setName("times_ptr_hi");
+    times_ptr_hi->addAttr(llvm::Attribute::NoCapture);
+    times_ptr_hi->addAttr(llvm::Attribute::NoAlias);
+    times_ptr_hi->addAttr(llvm::Attribute::ReadOnly);
+
+    auto times_ptr_lo = f->args().begin() + 4;
+    times_ptr_lo->setName("times_ptr_lo");
+    times_ptr_lo->addAttr(llvm::Attribute::NoCapture);
+    times_ptr_lo->addAttr(llvm::Attribute::NoAlias);
+    times_ptr_lo->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    auto *bb = llvm::BasicBlock::Create(context, "entry", f);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
+    builder.SetInsertPoint(bb);
+
+    // Establish the time directions.
+    auto bool_vector_t = detail::make_vector_type(builder.getInt1Ty(), m_batch_size);
+    assert(bool_vector_t != nullptr); // LCOV_EXCL_LINE
+    llvm::Value *dir_vec{};
+    if (m_batch_size == 1u) {
+        // In scalar mode, the direction is a single value.
+        const detail::dfloat<T> df_t_start(m_times_hi[0], m_times_lo[0]),
+            // NOTE: we load from the padding values here.
+            df_t_end(m_times_hi.back(), m_times_lo.back());
+        const auto dir = df_t_start < df_t_end;
+
+        dir_vec = builder.getInt1(dir);
+    } else {
+        dir_vec = llvm::UndefValue::get(bool_vector_t);
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const detail::dfloat<T> df_t_start(m_times_hi[i], m_times_lo[i]),
+                // NOTE: we load from the padding values here.
+                df_t_end(m_times_hi[m_times_hi.size() - m_batch_size + i],
+                         m_times_lo[m_times_lo.size() - m_batch_size + i]);
+            const auto dir = df_t_start < df_t_end;
+
+            dir_vec = builder.CreateInsertElement(dir_vec, builder.getInt1(dir), i);
+        }
+    }
+
+    // Look for the index in the times vector corresponding to
+    // a time greater than tm (less than tm in backwards integration).
+    // This is essentially an implementation of std::upper_bound:
+    // https://en.cppreference.com/w/cpp/algorithm/upper_bound
+    auto int32_vec_t = detail::make_vector_type(builder.getInt32Ty(), m_batch_size);
+    auto tidx = builder.CreateAlloca(int32_vec_t);
+    auto count = builder.CreateAlloca(int32_vec_t);
+    auto step = builder.CreateAlloca(int32_vec_t);
+    auto first = builder.CreateAlloca(int32_vec_t);
+
+    // count is inited with the size of the range.
+    // NOTE: count includes the padding.
+    builder.CreateStore(
+        detail::vector_splat(builder, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size()) / m_batch_size),
+                             m_batch_size),
+        count);
+
+    // first is inited to zero.
+    auto zero_vec_i32 = detail::vector_splat(builder, builder.getInt32(0), m_batch_size);
+    builder.CreateStore(zero_vec_i32, first);
+
+    // Load the time value from tm_ptr.
+    auto tm = detail::load_vector_from_memory(builder, tm_ptr, m_batch_size);
+
+    // This is the vector [0, 1, 2, ..., (batch_size - 1)].
+    llvm::Value *batch_offset{};
+    if (m_batch_size == 1u) {
+        // In scalar mode, use a single value.
+        batch_offset = builder.getInt32(0);
+    } else {
+        batch_offset = llvm::UndefValue::get(int32_vec_t);
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            batch_offset = builder.CreateInsertElement(batch_offset, builder.getInt32(i), i);
+        }
+    }
+
+    // Splatted version of the batch size.
+    auto batch_splat = detail::vector_splat(builder, builder.getInt32(m_batch_size), m_batch_size);
+
+    // Splatted versions of the base pointers for the time data.
+    auto times_ptr_hi_vec = detail::vector_splat(builder, times_ptr_hi, m_batch_size);
+    auto times_ptr_lo_vec = detail::vector_splat(builder, times_ptr_lo, m_batch_size);
+
+    // fp vector of zeroes.
+    auto zero_vec_fp = detail::vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), m_batch_size);
+
+    // Vector of i32 ones.
+    auto one_vec_i32 = detail::vector_splat(builder, builder.getInt32(1), m_batch_size);
+
+    detail::llvm_while_loop(
+        m_llvm_state,
+        [&]() -> llvm::Value * {
+            // NOTE: the condition here is that any value in count is not zero.
+            auto cmp = builder.CreateICmpNE(builder.CreateLoad(count), zero_vec_i32);
+
+            // NOTE: in scalar mode, no reduction is needed.
+            return (m_batch_size == 1u) ? cmp : builder.CreateOrReduce(cmp);
+        },
+        [&]() {
+            // tidx = first.
+            builder.CreateStore(builder.CreateLoad(first), tidx);
+            // step = count / 2.
+            auto two_vec_i32 = detail::vector_splat(builder, builder.getInt32(2), m_batch_size);
+            builder.CreateStore(builder.CreateUDiv(builder.CreateLoad(count), two_vec_i32), step);
+            // tidx = tidx + step.
+            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(tidx), builder.CreateLoad(step)), tidx);
+
+            // Compute the indices for loading the times from the pointers.
+            auto tl_idx = builder.CreateAdd(builder.CreateMul(builder.CreateLoad(tidx), batch_splat), batch_offset);
+
+            // Compute the pointers for loading the time data.
+            auto tptr_hi = builder.CreateInBoundsGEP(times_ptr_hi_vec, {tl_idx});
+            auto tptr_lo = builder.CreateInBoundsGEP(times_ptr_lo_vec, {tl_idx});
+
+            // Gather the hi/lo values.
+            auto tidx_val_hi = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_hi, alignof(T));
+            auto tidx_val_lo = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_lo, alignof(T));
+
+            // Compute the two conditions !(tm < *tidx) and !(tm > *tidx).
+            auto cmp_lt
+                = builder.CreateNot(detail::llvm_dl_lt(m_llvm_state, tm, zero_vec_fp, tidx_val_hi, tidx_val_lo));
+            auto cmp_gt
+                = builder.CreateNot(detail::llvm_dl_gt(m_llvm_state, tm, zero_vec_fp, tidx_val_hi, tidx_val_lo));
+
+            // Select cmp_lt if integrating forward, cmp_gt when integrating backward.
+            auto cond = builder.CreateSelect(dir_vec, cmp_lt, cmp_gt);
+
+            // tidx += (1 or 0).
+            builder.CreateStore(
+                builder.CreateAdd(builder.CreateLoad(tidx), builder.CreateSelect(cond, one_vec_i32, zero_vec_i32)),
+                tidx);
+
+            // first = (tidx or first).
+            builder.CreateStore(builder.CreateSelect(cond, builder.CreateLoad(tidx), builder.CreateLoad(first)), first);
+
+            // count = count - (step or count).
+            auto old_count = builder.CreateLoad(count);
+            auto new_count
+                = builder.CreateSub(old_count, builder.CreateSelect(cond, builder.CreateLoad(step), old_count));
+
+            // count = count + (-1 or step).
+            new_count = builder.CreateAdd(
+                new_count, builder.CreateSelect(cond, builder.CreateNeg(one_vec_i32), builder.CreateLoad(step)));
+            builder.CreateStore(new_count, count);
+        });
+
+    // NOTE: the output of the std::upper_bound algorithm
+    // is in the 'first' variable.
+    llvm::Value *tc_idx = builder.CreateLoad(first);
+
+    // Normally, the TC index should be first - 1. The exceptions are:
+    // - first == 0, in which case TC index is also 0,
+    // - first == (range size - 1), in which case TC index is first - 2.
+    // These two exceptions arise when tm is outside the range of validity
+    // for the continuous output. In such cases, we will use either the first
+    // or the last possible set of TCs.
+    // NOTE: the second check is range size - 1 (rather than just range size
+    // like in the scalar case) due to padding.
+    // In order to vectorise the check, we compute:
+    // tc_idx = tc_idx - (tc_idx != 0) - (tc_idx == range size - 1).
+    auto tc_idx_cmp1 = builder.CreateZExt(builder.CreateICmpNE(tc_idx, zero_vec_i32), int32_vec_t);
+    auto tc_idx_cmp2 = builder.CreateZExt(
+        builder.CreateICmpEQ(
+            tc_idx, detail::vector_splat(
+                        builder, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size() / m_batch_size - 1u)),
+                        m_batch_size)),
+        int32_vec_t);
+    tc_idx = builder.CreateSub(tc_idx, tc_idx_cmp1);
+    tc_idx = builder.CreateSub(tc_idx, tc_idx_cmp2);
+
+#if !defined(NDEBUG)
+
+    auto tc_idx_debug_ptr
+        = builder.CreateInBoundsGEP(builder.CreateAlloca(llvm::ArrayType::get(builder.getInt32Ty(), m_batch_size)),
+                                    {builder.getInt32(0), builder.getInt32(0)});
+    detail::store_vector_to_memory(builder, tc_idx_debug_ptr, tc_idx);
+    detail::llvm_invoke_external(m_llvm_state, "heyoka_continuous_output_batch_tc_idx_debug", builder.getVoidTy(),
+                                 {tc_idx_debug_ptr, builder.getInt32(static_cast<std::uint32_t>(m_times_hi.size())),
+                                  builder.getInt32(m_batch_size)});
+
+#endif
+
+    // Convert tc_idx into an index for loading from the time vectors.
+    auto tc_l_idx = builder.CreateAdd(builder.CreateMul(tc_idx, batch_splat), batch_offset);
+
+    // Load the times corresponding to tc_idx.
+    auto start_tm_hi = detail::gather_vector_from_memory(
+        builder, fp_vec_t, builder.CreateInBoundsGEP(times_ptr_hi_vec, {tc_l_idx}), alignof(T));
+    auto start_tm_lo = detail::gather_vector_from_memory(
+        builder, fp_vec_t, builder.CreateInBoundsGEP(times_ptr_lo_vec, {tc_l_idx}), alignof(T));
+
+    // Compute the value of h = tm - start_tm.
+    auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, builder.CreateFNeg(start_tm_hi),
+                                 builder.CreateFNeg(start_tm_lo))
+                 .first;
+
+    // Compute the base pointers in the array of TC for the computation
+    // of Horner's scheme.
+    tc_idx = builder.CreateAdd(
+        builder.CreateMul(
+            tc_idx, detail::vector_splat(builder, builder.getInt32(dim * (order + 1u) * m_batch_size), m_batch_size)),
+        batch_offset);
+    // NOTE: each pointer in tc_ptrs points to the Taylor coefficient of
+    // order 0 for the first state variable in the timestep data block selected
+    // for that batch index.
+    auto tc_ptrs = builder.CreateInBoundsGEP(tc_ptr, {tc_idx});
+
+    // Run the Horner scheme.
+    if (high_accuracy) {
+        // Create the array for storing the running compensations.
+        auto array_type = llvm::ArrayType::get(fp_vec_t, dim);
+        auto comp_arr
+            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+
+        // Start by writing into out_ptr the zero-order coefficients
+        // and by filling with zeroes the running compensations.
+        detail::llvm_loop_u32(m_llvm_state, builder.getInt32(0), builder.getInt32(dim), [&](llvm::Value *cur_var_idx) {
+            // Load the coefficient from tc_ptrs. The index is:
+            // m_batch_size * (order + 1u) * cur_var_idx.
+            auto *load_idx = builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx);
+            auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                          builder.CreateInBoundsGEP(tc_ptrs, {load_idx}), alignof(T));
+
+            // Store it in out_ptr. The index is:
+            // m_batch_size * cur_var_idx.
+            auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
+            detail::store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tcs);
+
+            // Zero-init the element in comp_arr.
+            builder.CreateStore(zero_vec_fp, builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
+        });
+
+        // Init the running updater for the powers of h.
+        auto *cur_h = builder.CreateAlloca(h->getType());
+        builder.CreateStore(h, cur_h);
+
+        // Run the evaluation.
+        detail::llvm_loop_u32(
+            m_llvm_state, builder.getInt32(1), builder.getInt32(order + 1u), [&](llvm::Value *cur_order) {
+                // Load the current power of h.
+                auto *cur_h_val = builder.CreateLoad(cur_h);
+
+                detail::llvm_loop_u32(
+                    m_llvm_state, builder.getInt32(0), builder.getInt32(dim), [&](llvm::Value *cur_var_idx) {
+                        // Load the coefficient from tc_ptrs. The index is:
+                        // m_batch_size * (order + 1u) * cur_var_idx + m_batch_size * cur_order.
+                        auto *load_idx = builder.CreateAdd(
+                            builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
+                            builder.CreateMul(builder.getInt32(m_batch_size), cur_order));
+                        auto *cf = detail::gather_vector_from_memory(
+                            builder, fp_vec_t, builder.CreateInBoundsGEP(tc_ptrs, {load_idx}), alignof(T));
+                        auto *tmp = builder.CreateFMul(cf, cur_h_val);
+
+                        // Compute the quantities for the compensation.
+                        auto *comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                        auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
+                        auto *res_ptr = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                        auto *y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                        auto *cur_res = detail::load_vector_from_memory(builder, res_ptr, m_batch_size);
+                        auto *t = builder.CreateFAdd(cur_res, y);
+
+                        // Update the compensation and the return value.
+                        builder.CreateStore(builder.CreateFSub(builder.CreateFSub(t, cur_res), y), comp_ptr);
+                        detail::store_vector_to_memory(builder, res_ptr, t);
+                    });
+
+                // Update the value of h.
+                builder.CreateStore(builder.CreateFMul(cur_h_val, h), cur_h);
+            });
+    } else {
+        // Start by writing into out_ptr the coefficients of the highest-degree
+        // monomial in each polynomial.
+        detail::llvm_loop_u32(m_llvm_state, builder.getInt32(0), builder.getInt32(dim), [&](llvm::Value *cur_var_idx) {
+            // Load the coefficient from tc_ptrs. The index is:
+            // m_batch_size * (order + 1u) * cur_var_idx + m_batch_size * order.
+            auto *load_idx
+                = builder.CreateAdd(builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
+                                    builder.getInt32(m_batch_size * order));
+            auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                          builder.CreateInBoundsGEP(tc_ptrs, {load_idx}), alignof(T));
+
+            // Store it in out_ptr. The index is:
+            // m_batch_size * cur_var_idx.
+            auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
+            detail::store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tcs);
+        });
+
+        // Now let's run the Horner scheme.
+        detail::llvm_loop_u32(
+            m_llvm_state, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+            [&](llvm::Value *cur_order) {
+                detail::llvm_loop_u32(
+                    m_llvm_state, builder.getInt32(0), builder.getInt32(dim), [&](llvm::Value *cur_var_idx) {
+                        // Load the current Taylor coefficients from tc_ptrs.
+                        // NOTE: we are loading the coefficients backwards wrt the order, hence
+                        // we specify order - cur_order.
+                        // NOTE: the index is:
+                        // m_batch_size * (order + 1u) * cur_var_idx + m_batch_size * (order - cur_order).
+                        auto *load_idx = builder.CreateAdd(
+                            builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
+                            builder.CreateMul(builder.getInt32(m_batch_size),
+                                              builder.CreateSub(builder.getInt32(order), cur_order)));
+                        auto *tcs = detail::gather_vector_from_memory(
+                            builder, fp_vec_t, builder.CreateInBoundsGEP(tc_ptrs, {load_idx}), alignof(T));
+
+                        // Accumulate in out_ptr. The index is:
+                        // m_batch_size * cur_var_idx.
+                        auto *out_idx = builder.CreateMul(builder.getInt32(m_batch_size), cur_var_idx);
+                        auto *out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                        auto *cur_out = detail::load_vector_from_memory(builder, out_p, m_batch_size);
+                        detail::store_vector_to_memory(builder, out_p,
+                                                       builder.CreateFAdd(tcs, builder.CreateFMul(cur_out, h)));
+                    });
+            });
+    }
+
+    // Create the return value.
+    builder.CreateRetVoid();
+
+    // Verify the function.
+    m_llvm_state.verify_function(f);
+
+    // Run the optimisation pass.
+    m_llvm_state.optimise();
+
+    // Compile.
+    m_llvm_state.compile();
+
+    // Fetch the function pointer and assign it.
+    m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
+}
+
+template <typename T>
+continuous_output_batch<T>::continuous_output_batch() = default;
+
+template <typename T>
+continuous_output_batch<T>::continuous_output_batch(llvm_state &&s) : m_llvm_state(std::move(s))
+{
+}
+
+template <typename T>
+continuous_output_batch<T>::continuous_output_batch(const continuous_output_batch &o)
+    : m_batch_size(o.m_batch_size), m_llvm_state(o.m_llvm_state), m_tcs(o.m_tcs), m_times_hi(o.m_times_hi),
+      m_times_lo(o.m_times_lo), m_output(o.m_output)
+{
+    // If o is valid, fetch the function pointer from the copied state.
+    // Otherwise, m_f_ptr will remain null.
+    if (o.m_f_ptr != nullptr) {
+        m_f_ptr = reinterpret_cast<fptr_t>(m_llvm_state.jit_lookup("c_out"));
+    }
+}
+
+template <typename T>
+continuous_output_batch<T>::continuous_output_batch(continuous_output_batch &&) noexcept = default;
+
+template <typename T>
+continuous_output_batch<T>::~continuous_output_batch() = default;
+
+template <typename T>
+continuous_output_batch<T> &continuous_output_batch<T>::operator=(const continuous_output_batch &o)
+{
+    if (this != &o) {
+        *this = continuous_output_batch(o);
+    }
+
+    return *this;
+}
+
+template <typename T>
+continuous_output_batch<T> &continuous_output_batch<T>::operator=(continuous_output_batch &&) noexcept = default;
+
+template <typename T>
+void continuous_output_batch<T>::call_impl(const T *t)
+{
+    using std::isfinite;
+
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output_batch object");
+    }
+
+    // NOTE: run the assertions only after ensuring this
+    // is a valid object.
+
+    // LCOV_EXCL_START
+#if !defined(NDEBUG)
+    // The batch size must not be zero.
+    assert(m_batch_size != 0u);
+    // m_batch_size must divide m_output exactly.
+    assert(m_output.size() % m_batch_size == 0u);
+    // m_tmp_tm must be of size m_batch_size.
+    assert(m_tmp_tm.size() == m_batch_size);
+    // m_batch_size must divide the time and tcs vectors exactly.
+    assert(m_times_hi.size() % m_batch_size == 0u);
+    assert(m_tcs.size() % m_batch_size == 0u);
+    // Need at least 3 time points (2 + 1 for padding).
+    assert(m_times_hi.size() / m_batch_size >= 3u);
+    // hi/lo parts of times must have the same sizes.
+    assert(m_times_hi.size() == m_times_lo.size());
+#endif
+    // LCOV_EXCL_STOP
+
+    // Copy over the times to the temp buffer and check that they are finite.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        if (!isfinite(t[i])) {
+            throw std::invalid_argument("Cannot compute the continuous output in batch mode "
+                                        "for the batch index {} at the non-finite time {}"_format(i, t[i]));
+        }
+
+        m_tmp_tm[i] = t[i];
+    }
+
+    m_f_ptr(m_output.data(), m_tmp_tm.data(), m_tcs.data(), m_times_hi.data(), m_times_lo.data());
+}
+
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T> &tm)
+{
+    if (tm.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "An invalid time vector was passed to the call operator of continuous_output_batch: the "
+            "vector size is {}, but a size of {} was expected instead"_format(tm.size(), m_batch_size));
+    }
+
+    return (*this)(tm.data());
+}
+
+template <typename T>
+const llvm_state &continuous_output_batch<T>::get_llvm_state() const
+{
+    return m_llvm_state;
+}
+
+template class continuous_output_batch<double>;
+template class continuous_output_batch<long double>;
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template class continuous_output_batch<mppp::real128>;
 
 #endif
 

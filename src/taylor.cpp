@@ -3895,9 +3895,9 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &delta_ts, std::size_t max_steps,
-                                                       const std::vector<T> &max_delta_ts,
-                                                       std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_for_impl(
+    const std::vector<T> &delta_ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
+    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -3911,13 +3911,13 @@ void taylor_adaptive_batch_impl<T>::propagate_for_impl(const std::vector<T> &del
     }
 
     // NOTE: max_delta_ts is checked in propagate_until_impl().
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloat<T>> &ts, std::size_t max_steps,
-                                                         const std::vector<T> &max_delta_ts,
-                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
+    const std::vector<dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
+    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -3958,6 +3958,18 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         }
     }
 
+    // If with_c_out is true, we always need to write the Taylor coefficients.
+    wtc = wtc || with_c_out;
+
+    // These vectors are used in the construction of the continuous output.
+    // If continuous output is not requested, they will remain empty.
+    std::vector<T> c_out_tcs, c_out_times_hi, c_out_times_lo;
+    if (with_c_out) {
+        // Push in the starting time.
+        c_out_times_hi.insert(c_out_times_hi.end(), m_time_hi.begin(), m_time_hi.end());
+        c_out_times_lo.insert(c_out_times_lo.end(), m_time_lo.begin(), m_time_lo.end());
+    }
+
     // Reset the counters and the min/max abs(h) vectors.
     std::size_t iter_counter = 0;
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -3977,6 +3989,82 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
 
         m_t_dir[i] = (m_rem_time[i] >= T(0));
     }
+
+    // Helper to create the continuous output object.
+    auto make_c_out = [&]() -> std::optional<continuous_output_batch<T>> {
+        if (with_c_out) {
+            if (c_out_times_hi.size() / m_batch_size < 2u) {
+                // NOTE: this means that no successful steps
+                // were taken.
+                return {};
+            }
+
+            // Construct the return value.
+            continuous_output_batch<T> ret(m_llvm.make_similar());
+
+            // Fill in the data.
+            ret.m_batch_size = m_batch_size;
+            ret.m_tcs = std::move(c_out_tcs);
+            ret.m_times_hi = std::move(c_out_times_hi);
+            ret.m_times_lo = std::move(c_out_times_lo);
+
+            // Add padding to the times vectors to make the
+            // vectorised upper_bound implementation well defined.
+            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+                ret.m_times_hi.push_back(m_t_dir[i] ? std::numeric_limits<T>::infinity()
+                                                    : -std::numeric_limits<T>::infinity());
+                ret.m_times_lo.push_back(T(0));
+            }
+
+            // Prepare the output vector.
+            ret.m_output.resize(boost::numeric_cast<decltype(ret.m_output.size())>(m_dim * m_batch_size));
+
+            // Prepare the temp time vector.
+            ret.m_tmp_tm.resize(boost::numeric_cast<decltype(ret.m_tmp_tm.size())>(m_batch_size));
+
+            // Add the continuous output function.
+            ret.add_c_out_function(m_order, m_dim, m_high_accuracy);
+
+            return std::optional{std::move(ret)};
+        } else {
+            return {};
+        }
+    };
+
+    // Helper to update the continuous output data after a timestep.
+    auto update_c_out = [&]() {
+        if (with_c_out) {
+            // Check if any batch element produced an error during the
+            // last timestep. The only error that can arise is a non-finite
+            // time/state.
+            if (std::any_of(m_step_res.begin(), m_step_res.end(),
+                            [](const auto &tup) { return std::get<0>(tup) == taylor_outcome::err_nf_state; })) {
+                // Don't update the continuous output.
+                return;
+            }
+
+            // TODO fix assertions.
+            // #if !defined(NDEBUG)
+            //             const dfloat<T> prev_time(c_out_times_hi.back(), c_out_times_lo.back());
+            // #endif
+
+            c_out_times_hi.insert(c_out_times_hi.end(), m_time_hi.begin(), m_time_hi.end());
+            c_out_times_lo.insert(c_out_times_lo.end(), m_time_lo.begin(), m_time_lo.end());
+
+            // TODO fix assertions.
+            // #if !defined(NDEBUG)
+            //             const dfloat<T> new_time(c_out_times_hi.back(), c_out_times_lo.back());
+            //             assert(isfinite(new_time));
+            //             if (t_dir) {
+            //                 assert(!(new_time < prev_time));
+            //             } else {
+            //                 assert(!(new_time > prev_time));
+            //             }
+            // #endif
+
+            c_out_tcs.insert(c_out_tcs.end(), m_tc.begin(), m_tc.end());
+        }
+    };
 
     while (true) {
         // Compute the max integration times for this timestep.
@@ -3999,6 +4087,11 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
         step_impl(m_cur_max_delta_ts, wtc);
 
+        // Update the continuous output.
+        // NOTE: this function will avoid updating the c_out if any non-finite
+        // state is detected in the step that was just taken.
+        update_c_out();
+
         // Check if the integration timestep produced an error condition or we reached
         // a stopping terminal event.
         if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &tup) {
@@ -4017,7 +4110,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                 m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            return;
+            return make_c_out();
         }
 
         // Update the iteration counter.
@@ -4049,7 +4142,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                 m_prop_res[i] = std::tuple{taylor_outcome::cb_stop, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            return;
+            return make_c_out();
         }
 
         // Break out if we have reached the final time
@@ -4070,7 +4163,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                 m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            return;
+            return make_c_out();
         }
 
         // Check the iteration limit.
@@ -4086,7 +4179,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
                 m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
             }
 
-            return;
+            return make_c_out();
         }
 
         // Update the remaining times.
@@ -4108,12 +4201,18 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<dfloa
             }
         }
     }
+
+    // LCOV_EXCL_START
+    assert(false);
+
+    return {};
+    // LCOV_EXCL_STOP
 }
 
 template <typename T>
-void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &ts, std::size_t max_steps,
-                                                         const std::vector<T> &max_delta_ts,
-                                                         std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc)
+std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
+    const std::vector<T> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
+    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -4129,7 +4228,7 @@ void taylor_adaptive_batch_impl<T>::propagate_until_impl(const std::vector<T> &t
     }
 
     // NOTE: max_delta_ts is checked in the other propagate_until_impl() overload.
-    propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc);
+    return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
 template <typename T>

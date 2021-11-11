@@ -685,6 +685,81 @@ HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const continuous_outp
 
 #endif
 
+template <typename>
+class HEYOKA_DLL_PUBLIC continuous_output_batch;
+
+namespace detail
+{
+
+template <typename T>
+std::ostream &c_out_batch_stream_impl(std::ostream &, const continuous_output_batch<T> &);
+
+}
+
+template <typename T>
+class HEYOKA_DLL_PUBLIC continuous_output_batch
+{
+    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
+
+    template <typename>
+    friend class HEYOKA_DLL_PUBLIC detail::taylor_adaptive_batch_impl;
+
+    friend std::ostream &detail::c_out_batch_stream_impl<T>(std::ostream &, const continuous_output_batch<T> &);
+
+    std::uint32_t m_batch_size = 0;
+    llvm_state m_llvm_state;
+    std::vector<T> m_tcs;
+    std::vector<T> m_times_hi, m_times_lo;
+    std::vector<T> m_output;
+    std::vector<T> m_tmp_tm;
+    using fptr_t = void (*)(T *, const T *, const T *, const T *, const T *);
+    fptr_t m_f_ptr = nullptr;
+
+    HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
+    void call_impl(const T *);
+
+    // Serialisation.
+    friend class boost::serialization::access;
+    void save(boost::archive::binary_oarchive &, unsigned) const;
+    void load(boost::archive::binary_iarchive &, unsigned);
+    BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+public:
+    continuous_output_batch();
+    explicit continuous_output_batch(llvm_state &&);
+    continuous_output_batch(const continuous_output_batch &);
+    continuous_output_batch(continuous_output_batch &&) noexcept;
+    ~continuous_output_batch();
+
+    continuous_output_batch &operator=(const continuous_output_batch &);
+    continuous_output_batch &operator=(continuous_output_batch &&) noexcept;
+
+    const llvm_state &get_llvm_state() const;
+
+    const std::vector<T> &operator()(const T *tm)
+    {
+        call_impl(tm);
+        return m_output;
+    }
+    const std::vector<T> &operator()(const std::vector<T> &);
+
+    const std::vector<T> &get_output() const
+    {
+        return m_output;
+    }
+    const std::vector<T> &get_times() const
+    {
+        return m_times_hi;
+    }
+    const std::vector<T> &get_tcs() const
+    {
+        return m_tcs;
+    }
+
+    // std::pair<T, T> get_bounds() const;
+    // std::size_t get_n_steps() const;
+};
+
 namespace detail
 {
 
@@ -1459,7 +1534,7 @@ public:
 
 private:
     // Parser for the common kwargs options for the propagate_*() functions.
-    template <typename... KwArgs>
+    template <bool Grid, typename... KwArgs>
     auto propagate_common_ops(KwArgs &&...kw_args) const
     {
         igor::parser p{kw_args...};
@@ -1512,41 +1587,65 @@ private:
                 }
             }();
 
-            // NOTE: use make_tuple so that max_delta_t is transformed
-            // into a reference if it is a reference wrapper.
-            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+            if constexpr (Grid) {
+                // NOTE: use make_tuple so that max_delta_t is transformed
+                // into a reference if it is a reference wrapper.
+                return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+            } else {
+                // Continuous output (defaults to false).
+                auto with_c_out = [&p]() -> bool {
+                    if constexpr (p.has(kw::c_output)) {
+                        return std::forward<decltype(p(kw::c_output))>(p(kw::c_output));
+                    } else {
+                        return false;
+                    }
+                }();
+
+                // NOTE: use make_tuple so that max_delta_t is transformed
+                // into a reference if it is a reference wrapper.
+                return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
+            }
         }
     }
 
     // Implementations of the propagate_*() functions.
-    HEYOKA_DLL_LOCAL void propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
-                                               std::function<bool(taylor_adaptive_batch_impl &)>, bool);
-    void propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                              std::function<bool(taylor_adaptive_batch_impl &)>, bool);
-    void propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                            std::function<bool(taylor_adaptive_batch_impl &)>, bool);
+    HEYOKA_DLL_LOCAL std::optional<continuous_output_batch<T>>
+    propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
+                         std::function<bool(taylor_adaptive_batch_impl &)>, bool, bool);
+    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<T> &, std::size_t,
+                                                                   const std::vector<T> &,
+                                                                   std::function<bool(taylor_adaptive_batch_impl &)>,
+                                                                   bool, bool);
+    std::optional<continuous_output_batch<T>> propagate_for_impl(const std::vector<T> &, std::size_t,
+                                                                 const std::vector<T> &,
+                                                                 std::function<bool(taylor_adaptive_batch_impl &)>,
+                                                                 bool, bool);
     std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
                                        std::function<bool(taylor_adaptive_batch_impl &)>);
 
 public:
     template <typename... KwArgs>
-    void propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
+    std::optional<continuous_output_batch<T>> propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_ts, cb, write_tc] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
+            = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
-        propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb), write_tc);
+        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
+                                    write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    void propagate_for(const std::vector<T> &ts, KwArgs &&...kw_args)
+    std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_ts, cb, write_tc] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
+            = propagate_common_ops<false>(std::forward<KwArgs>(kw_args)...);
 
-        propagate_for_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb), write_tc);
+        return propagate_for_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb), write_tc,
+                                  with_c_out);
     }
     template <typename... KwArgs>
     std::vector<T> propagate_grid(const std::vector<T> &grid, KwArgs &&...kw_args)
     {
-        auto [max_steps, max_delta_ts, cb, _] = propagate_common_ops(std::forward<KwArgs>(kw_args)...);
+        auto [max_steps, max_delta_ts, cb, _] = propagate_common_ops<true>(std::forward<KwArgs>(kw_args)...);
 
         return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }

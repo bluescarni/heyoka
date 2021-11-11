@@ -220,22 +220,29 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 
 // Gather a vector of type vec_tp from the vector of pointers ptrs. align is the alignment of the
 // scalar values stored in ptrs.
-llvm::Value *gather_vector_from_memory(ir_builder &builder, [[maybe_unused]] llvm::Type *vec_tp, llvm::Value *ptrs,
-                                       std::size_t align)
+llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs, std::size_t align)
 {
-    return builder.CreateMaskedGather(
+    if (llvm::isa<llvm_vector_type>(vec_tp)) {
+        assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+
+        return builder.CreateMaskedGather(
 #if LLVM_VERSION_MAJOR >= 13
-        // NOTE: new initial argument required since LLVM 13
-        // (the vector type to gather).
-        vec_tp,
+            // NOTE: new initial argument required since LLVM 13
+            // (the vector type to gather).
+            vec_tp,
 #endif
-        ptrs,
+            ptrs,
 #if LLVM_VERSION_MAJOR == 10
-        align
+            align
 #else
-        llvm::Align(align)
+            llvm::Align(align)
 #endif
-    );
+        );
+    } else {
+        assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
+
+        return builder.CreateLoad(ptrs);
+    }
 }
 
 // Create a SIMD vector of size vector_size filled with the value c. If vector_size is 1,
