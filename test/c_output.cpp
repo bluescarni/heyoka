@@ -100,13 +100,14 @@ TEST_CASE("scalar")
         auto ta = taylor_adaptive<fp_t>{
             {prime(x) = v, prime(v) = -x}, {0., 1.}, kw::opt_level = opt_level, kw::high_accuracy = ha};
 
-        auto d_out = std::get<4>(ta.propagate_until(10., kw::c_output = true));
+        auto [_0, _1, _2, tot_steps, d_out] = ta.propagate_until(10., kw::c_output = true);
 
         REQUIRE(d_out.has_value());
         REQUIRE(d_out->get_output().size() == 2u);
         REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
         REQUIRE(!d_out->get_tcs().empty());
         REQUIRE(!d_out->get_llvm_state().get_ir().empty());
+        REQUIRE(tot_steps == d_out->get_n_steps());
 
         oss.str("");
         oss << *d_out;
@@ -152,6 +153,29 @@ TEST_CASE("scalar")
         ta.set_time(0);
         d_out = std::get<4>(ta.propagate_until(10., kw::c_output = true));
         REQUIRE(!d_out.has_value());
+
+        // Try with propagate_for() too.
+
+        // Reset time/state.
+        ta.get_state_data()[0] = 0;
+        ta.get_state_data()[1] = 1;
+        ta.set_time(0);
+
+        std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(10., kw::c_output = true);
+
+        REQUIRE(d_out.has_value());
+        REQUIRE(d_out->get_output().size() == 2u);
+        REQUIRE(d_out->get_times().size() == d_out->get_n_steps() + 1u);
+        REQUIRE(!d_out->get_tcs().empty());
+        REQUIRE(!d_out->get_llvm_state().get_ir().empty());
+        REQUIRE(tot_steps == d_out->get_n_steps());
+
+        // Compare the two.
+        for (auto i = 0u; i < 11u; ++i) {
+            (*d_out)(t_grid[i]);
+            REQUIRE(d_out->get_output()[0] == approximately(grid_out[2u * i], fp_t(10)));
+            REQUIRE(d_out->get_output()[1] == approximately(grid_out[2u * i + 1u], fp_t(10)));
+        }
 
         // Do it backwards too.
         ta.get_state_data()[0] = 0;
@@ -254,6 +278,15 @@ TEST_CASE("scalar")
         REQUIRE(co4.get_output().empty());
         REQUIRE_THROWS_MATCHES(co4(0.), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output object"));
+
+        // Try with c_output=false too.
+        ta.get_state_data()[0] = 0;
+        ta.get_state_data()[1] = 1;
+        ta.set_time(0);
+
+        std::tie(_0, _1, _2, tot_steps, d_out) = ta.propagate_for(10., kw::c_output = false);
+
+        REQUIRE(!d_out.has_value());
     };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
@@ -438,6 +471,43 @@ TEST_CASE("batch")
         d_out = ta.propagate_until(final_tm, kw::c_output = true);
         REQUIRE(!d_out.has_value());
 
+        // Try with propagate_for() too.
+
+        // Reset time/state.
+        std::copy(ic.begin(), ic.end(), ta.get_state_data());
+        ta.set_time(init_tm);
+
+        d_out = ta.propagate_for(final_tm, kw::c_output = true);
+
+        REQUIRE(d_out.has_value());
+        REQUIRE(d_out->get_output().size() == 2u * batch_size);
+        REQUIRE(d_out->get_times().size() == (d_out->get_n_steps() + 2u) * batch_size);
+        REQUIRE(!d_out->get_tcs().empty());
+        REQUIRE(!d_out->get_llvm_state().get_ir().empty());
+
+        // Compare the two.
+        for (auto i = 0u; i < n_points; ++i) {
+            for (auto j = 0u; j < batch_size; ++j) {
+                loc_time[j] = grid[i * batch_size + j];
+            }
+
+            (*d_out)(loc_time);
+
+            for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[batch_size + j]
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+            }
+        }
+
+        REQUIRE(d_out->get_bounds().first.size() == batch_size);
+        REQUIRE(d_out->get_bounds().second.size() == batch_size);
+        for (std::size_t j = 0; j < batch_size; ++j) {
+            REQUIRE(d_out->get_bounds().first[j] == 0.);
+            REQUIRE(d_out->get_bounds().second[j] == approximately(final_tm[j]));
+        }
+        REQUIRE(d_out->get_n_steps() > 0u);
+
         // Integrate backwards in time.
         for (auto j = 0u; j < batch_size; ++j) {
             final_tm[j] = -final_tm[j];
@@ -613,6 +683,14 @@ TEST_CASE("batch")
             co(std::vector<fp_t>{}), std::invalid_argument,
             Message("An invalid time vector was passed to the call operator of continuous_output_batch: the "
                     "vector size is 0, but a size of {} was expected instead"_format(batch_size)));
+
+        // Try with c_output=false too.
+        std::copy(ic.begin(), ic.end(), ta.get_state_data());
+        ta.set_time(init_tm);
+
+        d_out = ta.propagate_for(final_tm, kw::c_output = false);
+
+        REQUIRE(!d_out.has_value());
     };
 
     for (auto opt_level : {0u, 1u, 2u, 3u}) {
