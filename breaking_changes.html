@@ -117,7 +117,7 @@
    </li>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_d_output.html">
-     Dense output
+     Dense &amp; continuous output
     </a>
    </li>
    <li class="toctree-l2">
@@ -267,7 +267,7 @@
             <nav id="bd-toc-nav" aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#id2">
+  <a class="reference internal nav-link" href="#bchanges-0-16-0">
    0.16.0
   </a>
  </li>
@@ -299,13 +299,30 @@
                 
   <div class="section" id="breaking-changes">
 <span id="id1"></span><h1>Breaking changes<a class="headerlink" href="#breaking-changes" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="id2">
-<h2>0.16.0<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
-<ul class="simple">
+<div class="section" id="bchanges-0-16-0">
+<span id="id2"></span><h2>0.16.0<a class="headerlink" href="#bchanges-0-16-0" title="Permalink to this headline">¶</a></h2>
+<ul>
 <li><p>The <code class="docutils literal notranslate"><span class="pre">pairwise_sum()</span></code> function has been replaced
 by a new function called <code class="docutils literal notranslate"><span class="pre">sum()</span></code> with similar semantics.
-<code class="docutils literal notranslate"><span class="pre">sum()</span></code> should behave in most cases as a drop-in replacement
+<code class="docutils literal notranslate"><span class="pre">sum()</span></code> should behave as a drop-in replacement
 for <code class="docutils literal notranslate"><span class="pre">pairwise_sum()</span></code>.</p></li>
+<li><p>The tuple returned by the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions
+in a scalar integrator has now 5 elements, rather than 4.
+The new return value at index 4 is the <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>
+function object. This change can break code which assumes
+that the tuple returned by the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions
+has a size of 4, such as:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">r0</span><span class="p">,</span><span class="w"> </span><span class="n">r1</span><span class="p">,</span><span class="w"> </span><span class="n">r2</span><span class="p">,</span><span class="w"> </span><span class="n">r3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(...);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The fix should be straightforward in most cases, e.g.:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">r0</span><span class="p">,</span><span class="w"> </span><span class="n">r1</span><span class="p">,</span><span class="w"> </span><span class="n">r2</span><span class="p">,</span><span class="w"> </span><span class="n">r3</span><span class="p">,</span><span class="w"> </span><span class="n">r4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(...);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Similarly, the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions in a batch integrator,
+which previously returned nothing, now return the <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>
+function object.</p>
+</li>
 </ul>
 </div>
 <div class="section" id="bchanges-0-15-0">

@@ -32,7 +32,7 @@
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Serialisation" href="tut_s11n.html" />
@@ -118,7 +118,7 @@
    </li>
    <li class="toctree-l2">
     <a class="reference internal" href="tut_d_output.html">
-     Dense output
+     Dense &amp; continuous output
     </a>
    </li>
    <li class="toctree-l2">
@@ -283,8 +283,8 @@
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#dense-output">
-     Dense output
+    <a class="reference internal nav-link" href="#dense-continuous-output">
+     Dense &amp; continuous output
     </a>
    </li>
    <li class="toc-h3 nav-item toc-entry">
@@ -538,7 +538,11 @@ functions are stored in internal vectors of tuples, with the tuple elements repr
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken.</p></li>
 </ul>
-<p>Let’s see a couple of examples:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions in batch mode return the
+<a class="reference internal" href="#tut-c-output-batch"><span class="std std-ref">continuous output</span></a> function object
+(if requested). The <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> function returns
+the result of the integration over a grid of time batches.</p>
+<p>Let us see a couple of examples:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for different time intervals.</span>
 <span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">({</span><span class="mf">10.</span><span class="p">,</span><span class="w"> </span><span class="mf">11.</span><span class="p">,</span><span class="w"> </span><span class="mf">12.</span><span class="p">,</span><span class="w"> </span><span class="mf">13.</span><span class="p">});</span><span class="w"></span>
 <span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0u</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">batch_size</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
@@ -593,8 +597,8 @@ events triggering). In scalar mode, by contrast, in case of early termination
 could be computed before the early exit. In batch mode, the values for the grid
 points that could not be reached due to early exit are filled with NaNs.</p>
 </div>
-<div class="section" id="dense-output">
-<h3>Dense output<a class="headerlink" href="#dense-output" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="dense-continuous-output">
+<span id="tut-c-output-batch"></span><h3>Dense &amp; continuous output<a class="headerlink" href="#dense-continuous-output" title="Permalink to this headline">¶</a></h3>
 <p>The batch integrator also supports <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. Like for <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code>,
 enabling dense output is a two-step process. First we invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
 with the optional flag set to <code class="docutils literal notranslate"><span class="pre">True</span></code>. This will write the Taylor coefficients that were
@@ -689,6 +693,16 @@ at different time coordinates:</p>
 <span class="go"> { 1.289941,  0.411166, -0.134188,  0.776195}}</span>
 </pre></div>
 </div>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.16.0.</span></p>
+</div>
+<p>Support for <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a> is also available in batch mode.
+Like in scalar mode, continuous output is requested via the <code class="docutils literal notranslate"><span class="pre">c_output</span></code> boolean keyword flag,
+which can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> functions. The usage of the
+continuous output object returned by <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> is analogous to the scalar case,
+the only difference being that the call operator expects a batch of time coordinates
+(represented as a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>)
+rather than a single scalar time corrdinate.</p>
 </div>
 <div class="section" id="event-detection">
 <h3>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h3>

@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dense output &#8212; heyoka 0.16.0 documentation</title>
+    <title>Dense &amp; continuous output &#8212; heyoka 0.16.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -32,7 +32,7 @@
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
     <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Event detection" href="tut_events.html" />
@@ -118,7 +118,7 @@
    </li>
    <li class="toctree-l2 current active">
     <a class="current reference internal" href="#">
-     Dense output
+     Dense &amp; continuous output
     </a>
    </li>
    <li class="toctree-l2">
@@ -290,6 +290,11 @@
   </a>
  </li>
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#continuous-output">
+   Continuous output
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#full-code-listing">
    Full code listing
   </a>
@@ -305,8 +310,8 @@
         
               <div>
                 
-  <div class="section" id="dense-output">
-<span id="tut-d-output"></span><h1>Dense output<a class="headerlink" href="#dense-output" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="dense-continuous-output">
+<span id="tut-d-output"></span><h1>Dense &amp; continuous output<a class="headerlink" href="#dense-continuous-output" title="Permalink to this headline">¶</a></h1>
 <div class="versionadded">
 <p><span class="versionmodified added">New in version 0.4.0.</span></p>
 </div>
@@ -446,6 +451,93 @@ optional callback that can be passed to the <code class="docutils literal notran
 <p>Note that <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> always unconditionally writes the Taylor coefficients
 at the end of each timestep.</p>
 </div>
+<div class="section" id="continuous-output">
+<span id="tut-c-output"></span><h2>Continuous output<a class="headerlink" href="#continuous-output" title="Permalink to this headline">¶</a></h2>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.16.0.</span></p>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions can optionally return
+a function object providing <em>continuous output</em> in the integration interval.
+That is, this function object can be used compute the solution at <em>any</em> time
+within the time interval covered by <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code>.</p>
+<p>Let us see a concrete example of <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> in action:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset time and state.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.05</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.025</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Integrate up to t = 10, and request continuous output.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">c_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">10.</span><span class="p">,</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">c_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Continuous output can be requested via the <code class="docutils literal notranslate"><span class="pre">c_output</span></code> boolean keyword flag, and it is stored
+as the fifth element of the tuple returned by <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code>. The <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code>
+function object
+is wrapped in a <code class="docutils literal notranslate"><span class="pre">std::optional</span></code> (so that when continuous output is not requested, the
+<code class="docutils literal notranslate"><span class="pre">std::optional</span></code> will be empty).</p>
+<p>Let us try to print <code class="docutils literal notranslate"><span class="pre">c_out</span></code> to screen:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="o">*</span><span class="n">c_out</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Direction : forward</span>
+<span class="go">Time range: [0, 10)</span>
+<span class="go">N of steps: 48</span>
+</pre></div>
+</div>
+<p>The screen output informs us that the <code class="docutils literal notranslate"><span class="pre">c_out</span></code> object is capable of providing continuous output
+in the <span class="math notranslate nohighlight">\(\left[ 0, 10 \right)\)</span> time interval, and that 48 integration steps were taken
+during the integration.</p>
+<p>Let us compute and print to screen the state of the system at a few time coordinates:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Compute and print to screen the system state</span>
+<span class="w">    </span><span class="c1">// at different time coordinates.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">tm</span> <span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="mf">4.3</span><span class="p">,</span><span class="w"> </span><span class="mf">6.7</span><span class="p">,</span><span class="w"> </span><span class="mf">8.9</span><span class="p">,</span><span class="w"> </span><span class="mf">10.</span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Compute the state at tm.</span>
+<span class="w">        </span><span class="p">(</span><span class="o">*</span><span class="n">c_out</span><span class="p">)(</span><span class="n">tm</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1">// Print it out:</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;time=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">tm</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, x=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">c_out</span><span class="o">-&gt;</span><span class="n">get_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="c1">//</span>
+<span class="w">                  </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, v=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">c_out</span><span class="o">-&gt;</span><span class="n">get_output</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">time=0, x=0.05, v=0.025</span>
+<span class="go">time=1.5, x=-0.0088572, v=0.156048</span>
+<span class="go">time=4.3, x=0.0375906, v=-0.106177</span>
+<span class="go">time=6.7, x=-0.0193535, v=-0.146456</span>
+<span class="go">time=8.9, x=-0.0424699, v=-0.0862923</span>
+<span class="go">time=10, x=0.0487397, v=0.0429423</span>
+</pre></div>
+</div>
+<p>The call operator of <code class="docutils literal notranslate"><span class="pre">c_out</span></code> takes a time value <code class="docutils literal notranslate"><span class="pre">tm</span></code> as input, and computes and writes to
+an internal buffer the value of the state vector at <code class="docutils literal notranslate"><span class="pre">tm</span></code>. The <code class="docutils literal notranslate"><span class="pre">get_output()</span></code> member function
+returns a reference to the internal buffer containing the state of the system at <code class="docutils literal notranslate"><span class="pre">tm</span></code>.</p>
+<p>As we can see from the screen output, the state vector at <span class="math notranslate nohighlight">\(t = 0\)</span> corresponds to the initial conditions.
+The state vector at <span class="math notranslate nohighlight">\(t=10\)</span> (i.e., at the end of the integration interval) corresponds to the current
+state of the integrator object.</p>
+<p>Before concluding, we need to highlight a couple of caveats regarding the
+use of <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code>.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> function object stores internally the time coordinate
+and Taylor coefficients at the end of each step taken during the integration interval.
+This means that the memory usage of a <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> object scales linearly
+with the number of timesteps taken during the integration interval. Thus, for a sufficiently
+long integration interval, the <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> object might end up exhausting
+the available memory.</p>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Like for dense output, the accuracy of <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> is guaranteed to match the integrator’s
+accuracy only if the time coordinate falls within the integration interval. Note that heyoka will
+<strong>not</strong> prevent the use of a <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> object outside the
+guaranteed accuracy range - it is the user’s responsibility to be aware
+that doing so will produce results whose accuracy does not match the integrator’s
+error tolerance.</p>
+</div>
+<p>Note that, like the other main classes in heyoka, <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> supports
+<a class="reference internal" href="tut_s11n.html#tut-s11n"><span class="std std-ref">serialisation</span></a>.</p>
+</div>
 <div class="section" id="full-code-listing">
 <h2>Full code listing<a class="headerlink" href="#full-code-listing" title="Permalink to this headline">¶</a></h2>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
@@ -490,6 +582,28 @@ at the end of each timestep.</p>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state</span><span class="p">();</span><span class="w"></span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x rel. difference: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;v rel. difference: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">d_out</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">st</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Reset time and state.</span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.05</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.025</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Integrate up to t = 10, and request continuous output.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">c_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_until</span><span class="p">(</span><span class="mf">10.</span><span class="p">,</span><span class="w"> </span><span class="n">kw</span><span class="o">::</span><span class="n">c_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Print to screen.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="o">*</span><span class="n">c_out</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Compute and print to screen the system state</span>
+<span class="w">    </span><span class="c1">// at different time coordinates.</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">tm</span> <span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="mf">4.3</span><span class="p">,</span><span class="w"> </span><span class="mf">6.7</span><span class="p">,</span><span class="w"> </span><span class="mf">8.9</span><span class="p">,</span><span class="w"> </span><span class="mf">10.</span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Compute the state at tm.</span>
+<span class="w">        </span><span class="p">(</span><span class="o">*</span><span class="n">c_out</span><span class="p">)(</span><span class="n">tm</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1">// Print it out:</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;time=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">tm</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, x=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">c_out</span><span class="o">-&gt;</span><span class="n">get_output</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="c1">//</span>
+<span class="w">                  </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;, v=&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">c_out</span><span class="o">-&gt;</span><span class="n">get_output</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
