@@ -5,7 +5,7 @@ The adaptive integrator
 
 The ``taylor_adaptive`` class provides an easy-to-use interface to heyoka's
 main capabilities. Objects of this class can be constructed from a system
-of ODEs and a set of initial conditions (plus a number of optional parameters
+of ODEs and a set of initial conditions (plus a number of optional configuration parameters
 with - hopefully - sensible defaults). Member functions are provided to
 propagate in time the state of the system, either step-by-step or by specifying
 time limits.
@@ -195,13 +195,15 @@ Let's see a couple of usage examples:
    Current time : 20
 
 The time-limited propagation functions return
-a tuple of 4 values, which represent, respectively:
+a tuple of 5 values, which represent, respectively:
 
 * the outcome of the integration (which will always be
   ``taylor_outcome::time_limit``, unless error conditions arise),
 * the minimum and maximum integration timesteps
   that were used in the propagation,
-* the total number of steps that were taken.
+* the total number of steps that were taken,
+* the :ref:`continuous output <tut_c_output>` function object,
+  if requested (off by default).
 
 The time-limited propagation functions can be used
 to propagate both forward and backward in time:

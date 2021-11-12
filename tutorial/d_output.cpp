@@ -48,4 +48,26 @@ int main()
     const auto &st = ta.get_state();
     std::cout << "x rel. difference: " << (d_out[0] - st[0]) / st[0] << '\n';
     std::cout << "v rel. difference: " << (d_out[1] - st[1]) / st[1] << '\n';
+
+    // Reset time and state.
+    ta.get_state_data()[0] = 0.05;
+    ta.get_state_data()[1] = 0.025;
+    ta.set_time(0);
+
+    // Integrate up to t = 10, and request continuous output.
+    auto c_out = std::get<4>(ta.propagate_until(10., kw::c_output = true));
+
+    // Print to screen.
+    std::cout << *c_out << '\n';
+
+    // Compute and print to screen the system state
+    // at different time coordinates.
+    for (auto tm : {0., 1.5, 4.3, 6.7, 8.9, 10.}) {
+        // Compute the state at tm.
+        (*c_out)(tm);
+
+        // Print it out:
+        std::cout << "time=" << tm << ", x=" << c_out->get_output()[0] //
+                  << ", v=" << c_out->get_output()[1] << '\n';
+    }
 }
