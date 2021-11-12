@@ -1026,6 +1026,15 @@ const std::string &llvm_state::module_name() const
     return m_module_name;
 }
 
+// A helper that returns a new llvm_state configured in the same
+// way as this (i.e., same module name, opt level, fast math flags, etc.),
+// but with no code defined in it.
+llvm_state llvm_state::make_similar() const
+{
+    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math,
+                      kw::inline_functions = m_inline_functions);
+}
+
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
 {
     std::ostringstream oss;

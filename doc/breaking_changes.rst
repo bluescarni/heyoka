@@ -3,13 +3,35 @@
 Breaking changes
 ================
 
+.. _bchanges_0_16_0:
+
 0.16.0
 ------
 
 - The ``pairwise_sum()`` function has been replaced
   by a new function called ``sum()`` with similar semantics.
-  ``sum()`` should behave in most cases as a drop-in replacement
+  ``sum()`` should behave as a drop-in replacement
   for ``pairwise_sum()``.
+- The tuple returned by the ``propagate_for/until()`` functions
+  in a scalar integrator has now 5 elements, rather than 4.
+  The new return value at index 4 is the :ref:`continuous output <tut_c_output>`
+  function object. This change can break code which assumes
+  that the tuple returned by the ``propagate_for/until()`` functions
+  has a size of 4, such as:
+
+  .. code-block:: c++
+
+     auto [r0, r1, r2, r3] = ta.propagate_until(...);
+
+  The fix should be straightforward in most cases, e.g.:
+
+  .. code-block:: c++
+
+     auto [r0, r1, r2, r3, r4] = ta.propagate_until(...);
+
+  Similarly, the ``propagate_for/until()`` functions in a batch integrator,
+  which previously returned nothing, now return the :ref:`continuous output <tut_c_output>`
+  function object.
 
 .. _bchanges_0_15_0:
 

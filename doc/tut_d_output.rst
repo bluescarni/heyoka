@@ -1,7 +1,7 @@
 .. _tut_d_output:
 
-Dense output
-============
+Dense & continuous output
+=========================
 
 .. versionadded:: 0.4.0
 
@@ -138,6 +138,93 @@ optional callback that can be passed to the ``propagate_*()`` functions.
 
 Note that ``propagate_grid()`` always unconditionally writes the Taylor coefficients
 at the end of each timestep.
+
+.. _tut_c_output:
+
+Continuous output
+-----------------
+
+.. versionadded:: 0.16.0
+
+The ``propagate_for()`` and ``propagate_until()`` functions can optionally return
+a function object providing *continuous output* in the integration interval.
+That is, this function object can be used compute the solution at *any* time
+within the time interval covered by ``propagate_for/until()``.
+
+Let us see a concrete example of ``continuous_output`` in action:
+
+.. literalinclude:: ../tutorial/d_output.cpp
+   :language: c++
+   :lines: 52-58
+
+Continuous output can be requested via the ``c_output`` boolean keyword flag, and it is stored
+as the fifth element of the tuple returned by ``propagate_for/until()``. The ``continuous_output``
+function object
+is wrapped in a ``std::optional`` (so that when continuous output is not requested, the
+``std::optional`` will be empty).
+
+Let us try to print ``c_out`` to screen:
+
+.. literalinclude:: ../tutorial/d_output.cpp
+   :language: c++
+   :lines: 60-61
+
+.. code-block:: console
+
+   Direction : forward
+   Time range: [0, 10)
+   N of steps: 48
+
+The screen output informs us that the ``c_out`` object is capable of providing continuous output
+in the :math:`\left[ 0, 10 \right)` time interval, and that 48 integration steps were taken
+during the integration.
+
+Let us compute and print to screen the state of the system at a few time coordinates:
+
+.. literalinclude:: ../tutorial/d_output.cpp
+   :language: c++
+   :lines: 63-72
+
+.. code-block:: console
+
+   time=0, x=0.05, v=0.025
+   time=1.5, x=-0.0088572, v=0.156048
+   time=4.3, x=0.0375906, v=-0.106177
+   time=6.7, x=-0.0193535, v=-0.146456
+   time=8.9, x=-0.0424699, v=-0.0862923
+   time=10, x=0.0487397, v=0.0429423
+
+The call operator of ``c_out`` takes a time value ``tm`` as input, and computes and writes to
+an internal buffer the value of the state vector at ``tm``. The ``get_output()`` member function
+returns a reference to the internal buffer containing the state of the system at ``tm``.
+
+As we can see from the screen output, the state vector at :math:`t = 0` corresponds to the initial conditions.
+The state vector at :math:`t=10` (i.e., at the end of the integration interval) corresponds to the current
+state of the integrator object.
+
+Before concluding, we need to highlight a couple of caveats regarding the
+use of ``continuous_output``.
+
+.. important::
+
+   The ``continuous_output`` function object stores internally the time coordinate
+   and Taylor coefficients at the end of each step taken during the integration interval.
+   This means that the memory usage of a ``continuous_output`` object scales linearly
+   with the number of timesteps taken during the integration interval. Thus, for a sufficiently
+   long integration interval, the ``continuous_output`` object might end up exhausting
+   the available memory.
+
+.. important::
+
+   Like for dense output, the accuracy of ``continuous_output`` is guaranteed to match the integrator's
+   accuracy only if the time coordinate falls within the integration interval. Note that heyoka will
+   **not** prevent the use of a ``continuous_output`` object outside the
+   guaranteed accuracy range - it is the user's responsibility to be aware
+   that doing so will produce results whose accuracy does not match the integrator's
+   error tolerance.
+
+Note that, like the other main classes in heyoka, ``continuous_output`` supports
+:ref:`serialisation <tut_s11n>`.
 
 Full code listing
 -----------------

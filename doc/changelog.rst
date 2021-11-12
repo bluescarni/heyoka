@@ -7,6 +7,10 @@ Changelog
 New
 ~~~
 
+- **BREAKING**: add support for :ref:`continuous output <tut_c_output>`
+  to the ``propagate_for/until()`` functions
+  (`#216 <https://github.com/bluescarni/heyoka/pull/216>`__).
+  This is a :ref:`breaking change <bchanges_0_16_0>`.
 - Event detection is now available also in batch mode
   (`#214 <https://github.com/bluescarni/heyoka/pull/214>`__).
 - Add a sum of squares primitive
@@ -37,6 +41,14 @@ Changes
 - **BREAKING**: the ``pairwise_sum()`` function has been replaced
   by a new function called ``sum()`` with similar semantics
   (`#203 <https://github.com/bluescarni/heyoka/pull/203>`__).
+  This is a :ref:`breaking change <bchanges_0_16_0>`.
+
+Fix
+~~~
+
+- Fix incorrect counting of the number of steps when the
+  integration is interrupted by a terminal event
+  (`#216 <https://github.com/bluescarni/heyoka/pull/216>`__).
 
 0.15.0 (2021-09-28)
 -------------------

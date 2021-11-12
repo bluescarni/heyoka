@@ -217,7 +217,12 @@ functions are stored in internal vectors of tuples, with the tuple elements repr
   that were used in the propagation,
 * the total number of steps that were taken.
 
-Let's see a couple of examples:
+The ``propagate_for/until()`` functions in batch mode return the
+:ref:`continuous output <tut_c_output_batch>` function object
+(if requested). The ``propagate_grid()`` function returns
+the result of the integration over a grid of time batches.
+
+Let us see a couple of examples:
 
 .. literalinclude:: ../tutorial/batch_mode.cpp
    :language: c++
@@ -257,8 +262,10 @@ events triggering). In scalar mode, by contrast, in case of early termination
 could be computed before the early exit. In batch mode, the values for the grid
 points that could not be reached due to early exit are filled with NaNs.
 
-Dense output
-^^^^^^^^^^^^
+.. _tut_c_output_batch:
+
+Dense & continuous output
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The batch integrator also supports :ref:`dense output <tut_d_output>`. Like for ``taylor_adaptive``,
 enabling dense output is a two-step process. First we invoke one of the ``step()`` functions
@@ -343,6 +350,17 @@ at different time coordinates:
    Dense output:
    {{ 1.934202,  2.879367,  3.389288,  6.151962},
     { 1.289941,  0.411166, -0.134188,  0.776195}}
+
+.. versionadded:: 0.16.0
+
+Support for :ref:`continuous output <tut_c_output>` is also available in batch mode.
+Like in scalar mode, continuous output is requested via the ``c_output`` boolean keyword flag,
+which can be passed to the ``propagate_for/until()`` functions. The usage of the
+continuous output object returned by ``propagate_for/until()`` is analogous to the scalar case,
+the only difference being that the call operator expects a batch of time coordinates
+(represented as a ``std::vector``)
+rather than a single scalar time corrdinate.
+
 
 Event detection
 ^^^^^^^^^^^^^^^

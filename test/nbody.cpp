@@ -54,7 +54,7 @@ TEST_CASE("zero mass")
 
     auto tad = taylor_adaptive<double>{std::move(sys), {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0}};
 
-    auto [oc, _1, _2, _3] = tad.propagate_until(10000);
+    auto [oc, _1, _2, _3, _4] = tad.propagate_until(10000);
 
     REQUIRE(oc == taylor_outcome::time_limit);
     REQUIRE(std::isfinite(tad.get_time()));

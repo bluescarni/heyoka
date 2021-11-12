@@ -75,7 +75,7 @@ int main()
     ta.get_state_data()[1] = 0.025;
 
     // Propagate for 5 time units.
-    auto [status, min_h, max_h, nsteps] = ta.propagate_for(5.);
+    auto [status, min_h, max_h, nsteps, _1] = ta.propagate_for(5.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
@@ -84,7 +84,7 @@ int main()
     std::cout << "Current time : " << ta.get_time() << "\n\n";
 
     // Propagate until t = 20.
-    std::tie(status, min_h, max_h, nsteps) = ta.propagate_until(20.);
+    std::tie(status, min_h, max_h, nsteps, _1) = ta.propagate_until(20.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';
@@ -93,7 +93,7 @@ int main()
     std::cout << "Current time : " << ta.get_time() << "\n\n";
 
     // Propagate back to t = 0.
-    std::tie(status, min_h, max_h, nsteps) = ta.propagate_until(0.);
+    std::tie(status, min_h, max_h, nsteps, _1) = ta.propagate_until(0.);
 
     std::cout << "Outcome      : " << status << '\n';
     std::cout << "Min. timestep: " << min_h << '\n';

@@ -11,6 +11,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -52,6 +53,7 @@ HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
+llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::size_t);
 
 HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 
@@ -181,6 +183,18 @@ inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
         static_assert(always_false_v<T>, "Unhandled type.");
     }
 }
+
+// Double-length primitives.
+
+// Addition.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
+                                                    llvm::Value *);
+
+// Less-than.
+llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
+// Greater-than.
+llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
 } // namespace heyoka::detail
 

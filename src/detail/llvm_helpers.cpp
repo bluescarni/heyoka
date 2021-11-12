@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <initializer_list>
@@ -42,6 +43,7 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Operator.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/Alignment.h>
@@ -213,6 +215,33 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     } else {
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
+    }
+}
+
+// Gather a vector of type vec_tp from the vector of pointers ptrs. align is the alignment of the
+// scalar values stored in ptrs.
+llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs, std::size_t align)
+{
+    if (llvm::isa<llvm_vector_type>(vec_tp)) {
+        assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+
+        return builder.CreateMaskedGather(
+#if LLVM_VERSION_MAJOR >= 13
+            // NOTE: new initial argument required since LLVM 13
+            // (the vector type to gather).
+            vec_tp,
+#endif
+            ptrs,
+#if LLVM_VERSION_MAJOR == 10
+            align
+#else
+            llvm::Align(align)
+#endif
+        );
+    } else {
+        assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
+
+        return builder.CreateLoad(ptrs);
     }
 }
 
@@ -1182,20 +1211,9 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
                 offset, builder.CreateMul(builder.CreateLoad(last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
-            auto last_nz_cf = batch_size > 1u ? static_cast<llvm::Value *>(builder.CreateMaskedGather(
-#if LLVM_VERSION_MAJOR >= 13
-                                  // NOTE: new initial argument required since LLVM 13
-                                  // (the vector type to gather).
-                                  cur_cf->getType(),
-#endif
-                                  last_nz_ptr,
-#if LLVM_VERSION_MAJOR == 10
-                                  alignof(T)
-#else
-                                                                                                      llvm::Align(alignof(T))
-#endif
-                                      ))
-                                              : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+            auto last_nz_cf = batch_size > 1u
+                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, alignof(T))
+                                  : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
 
             // Compute the sign of the current coefficient(s).
             auto cur_sgn = llvm_sgn(s, cur_cf);
@@ -1570,6 +1588,114 @@ llvm::Value *llvm_add_bc_array_f128(llvm_state &s, std::uint32_t n)
 }
 
 #endif
+
+namespace
+{
+
+// RAII helper to temporarily disable fast
+// math flags in a builder.
+class fmf_disabler
+{
+    ir_builder &m_builder;
+    llvm::FastMathFlags m_orig_fmf;
+
+public:
+    explicit fmf_disabler(ir_builder &b) : m_builder(b), m_orig_fmf(m_builder.getFastMathFlags())
+    {
+        // Reset the fast math flags.
+        m_builder.setFastMathFlags(llvm::FastMathFlags{});
+    }
+    ~fmf_disabler()
+    {
+        // Restore the original fast math flags.
+        m_builder.setFastMathFlags(m_orig_fmf);
+    }
+
+    fmf_disabler(const fmf_disabler &) = delete;
+    fmf_disabler(fmf_disabler &&) = delete;
+
+    fmf_disabler &operator=(const fmf_disabler &) = delete;
+    fmf_disabler &operator=(fmf_disabler &&) = delete;
+};
+
+} // namespace
+
+// NOTE: see the code in dfloat.hpp for the double-length primitives.
+
+// Addition.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto S = builder.CreateFAdd(x_hi, y_hi);
+    auto T = builder.CreateFAdd(x_lo, y_lo);
+    auto e = builder.CreateFSub(S, x_hi);
+    auto f = builder.CreateFSub(T, x_lo);
+
+    auto t1 = builder.CreateFSub(S, e);
+    t1 = builder.CreateFSub(x_hi, t1);
+    auto s = builder.CreateFSub(y_hi, e);
+    s = builder.CreateFAdd(s, t1);
+
+    t1 = builder.CreateFSub(T, f);
+    t1 = builder.CreateFSub(x_lo, t1);
+    auto t = builder.CreateFSub(y_lo, f);
+    t = builder.CreateFAdd(t, t1);
+
+    s = builder.CreateFAdd(s, T);
+    auto H = builder.CreateFAdd(S, s);
+    auto h = builder.CreateFSub(S, H);
+    h = builder.CreateFAdd(h, s);
+
+    h = builder.CreateFAdd(h, t);
+    e = builder.CreateFAdd(H, h);
+    f = builder.CreateFSub(H, e);
+    f = builder.CreateFAdd(f, h);
+
+    return {e, f};
+}
+
+// Less-than.
+llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto cond1 = builder.CreateFCmpOLT(x_hi, y_hi);
+    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
+    auto cond3 = builder.CreateFCmpOLT(x_lo, y_lo);
+    // NOTE: this is a logical AND.
+    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    // NOTE: this is a logical OR.
+    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+
+    return cond;
+}
+
+// Greater-than.
+llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto cond1 = builder.CreateFCmpOGT(x_hi, y_hi);
+    auto cond2 = builder.CreateFCmpOEQ(x_hi, y_hi);
+    auto cond3 = builder.CreateFCmpOGT(x_lo, y_lo);
+    // NOTE: this is a logical AND.
+    auto cond4 = builder.CreateSelect(cond2, cond3, llvm::ConstantInt::getNullValue(cond3->getType()));
+    // NOTE: this is a logical OR.
+    auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
+
+    return cond;
+}
 
 } // namespace heyoka::detail
 
