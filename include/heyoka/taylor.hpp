@@ -1200,6 +1200,8 @@ public:
 
         return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
     }
+    // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
+    // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
                                                                                  KwArgs &&...kw_args)
@@ -1579,6 +1581,11 @@ private:
             }();
 
             // Max delta_t (defaults to empty vector).
+            // NOTE: we want an explicit copy here because
+            // in the implementations of the propagate_*() functions
+            // we keep on checking on max_delta_t before invoking
+            // the single step function. Hence, we want to avoid
+            // any risk of aliasing.
             auto max_delta_t = [&p]() -> std::vector<T> {
                 if constexpr (p.has(kw::max_delta_t)) {
                     return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
@@ -1639,6 +1646,9 @@ private:
                                        std::function<bool(taylor_adaptive_batch_impl &)>);
 
 public:
+    // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always
+    // only and immediately used to set up the internal m_pfor_ts member (which is not visible
+    // from outside). Hence, even if 'ts' aliases some public integrator data, it does not matter.
     template <typename... KwArgs>
     std::optional<continuous_output_batch<T>> propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
@@ -1657,6 +1667,8 @@ public:
         return propagate_for_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb), write_tc,
                                   with_c_out); // LCOV_EXCL_LINE
     }
+    // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
+    // Hence, we need to avoid any aliasing issue with other public integrator data.
     template <typename... KwArgs>
     std::vector<T> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
