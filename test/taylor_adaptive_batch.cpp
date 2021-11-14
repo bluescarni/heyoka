@@ -1318,3 +1318,21 @@ TEST_CASE("propagate step count te stop bug")
     REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
     REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
 }
+
+// Bug: set_time() used to use std::copy(), which results in UB for self-copy.
+TEST_CASE("set_time alias bug")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                          {0., 0., 0.5, 0.5001},
+                                          2,
+                                          kw::t_events = {t_event_batch<fp_t>(x - 1e-6)}};
+
+    ta.set_time(ta.get_time());
+
+    REQUIRE(ta.get_time()[0] == 0.);
+    REQUIRE(ta.get_time()[1] == 0.);
+}

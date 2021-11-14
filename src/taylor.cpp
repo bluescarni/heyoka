@@ -3380,7 +3380,14 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
     // Prepare the temp vectors.
     m_pinf.resize(m_batch_size, std::numeric_limits<T>::infinity());
     m_minf.resize(m_batch_size, -std::numeric_limits<T>::infinity());
-    m_delta_ts.resize(m_batch_size);
+    // LCOV_EXCL_START
+    if (m_batch_size > std::numeric_limits<std::uint32_t>::max() / 2u) {
+        throw std::overflow_error("Overflow detected in the initialisation of an adaptive Taylor integrator in batch "
+                                  "mode: the batch size is too large");
+    }
+    // LCOV_EXCL_STOP
+    // NOTE: make it twice as big because we need twice the storage in step_impl().
+    m_delta_ts.resize(boost::numeric_cast<decltype(m_delta_ts.size())>(m_batch_size * 2u));
 
     // NOTE: init the outcome to success, the rest to zero.
     m_step_res.resize(boost::numeric_cast<decltype(m_step_res.size())>(m_batch_size),
@@ -3569,7 +3576,11 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
     }
 
     // Copy over the new times.
-    std::copy(new_time.begin(), new_time.end(), m_time_hi.begin());
+    // NOTE: do not use std::copy(), as it gives UB if new_time
+    // and m_time_hi are the same object.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        m_time_hi[i] = new_time[i];
+    }
     // Reset the lo part.
     std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
 }
@@ -3603,8 +3614,9 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
     assert(m_step_res.size() == m_batch_size);
     // LCOV_EXCL_STOP
 
-    // Copy max_delta_ts to the tmp buffer.
-    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.begin());
+    // Copy max_delta_ts to the tmp buffer, twice.
+    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.data());
+    std::copy(max_delta_ts.begin(), max_delta_ts.end(), m_delta_ts.data() + m_batch_size);
 
     // Helper to check if the state vector of a batch element
     // contains a non-finite value.
@@ -3642,8 +3654,12 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
                 // return an error condition.
                 m_step_res[i] = std::tuple{taylor_outcome::err_nf_state, h};
             } else {
-                m_step_res[i]
-                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+                m_step_res[i] = std::tuple{
+                    // NOTE: use here the original value of
+                    // max_delta_ts, stored at the end of m_delta_ts,
+                    // in case max_delta_ts aliases integrator data
+                    // which was modified during the step.
+                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
             }
         }
     } else {
@@ -3836,8 +3852,12 @@ void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts
 
             if (ed_data.m_d_tes[i].empty()) {
                 // No terminal events detected, return success or time limit.
-                m_step_res[i]
-                    = std::tuple{h == max_delta_ts[i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
+                m_step_res[i] = std::tuple{
+                    // NOTE: use here the original value of
+                    // max_delta_ts, stored at the end of m_delta_ts,
+                    // in case max_delta_ts aliases integrator data
+                    // which was modified during the step.
+                    h == m_delta_ts[m_batch_size + i] ? taylor_outcome::time_limit : taylor_outcome::success, h};
             } else {
                 // Terminal event detected. Fetch its index.
                 const auto ev_idx = static_cast<std::int64_t>(std::get<0>(ed_data.m_d_tes[i][0]));

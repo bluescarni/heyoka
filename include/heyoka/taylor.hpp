@@ -1201,7 +1201,7 @@ public:
         return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
     }
     template <typename... KwArgs>
-    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(const std::vector<T> &grid,
+    std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>> propagate_grid(std::vector<T> grid,
                                                                                  KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_t, cb, _] = propagate_common_ops<true>(std::forward<KwArgs>(kw_args)...);
@@ -1579,16 +1579,11 @@ private:
             }();
 
             // Max delta_t (defaults to empty vector).
-            auto max_delta_t = [&p]() {
+            auto max_delta_t = [&p]() -> std::vector<T> {
                 if constexpr (p.has(kw::max_delta_t)) {
-                    if constexpr (std::is_same_v<std::vector<T>, uncvref_t<decltype(p(kw::max_delta_t))>>) {
-                        return std::reference_wrapper<const std::vector<T>>(
-                            static_cast<const std::vector<T> &>(p(kw::max_delta_t)));
-                    } else {
-                        return std::vector<T>(std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t)));
-                    }
+                    return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
                 } else {
-                    return std::vector<T>{};
+                    return {};
                 }
             }();
 
@@ -1612,9 +1607,7 @@ private:
             }();
 
             if constexpr (Grid) {
-                // NOTE: use make_tuple so that max_delta_t is transformed
-                // into a reference if it is a reference wrapper.
-                return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
+                return std::tuple{max_steps, std::move(max_delta_t), std::move(cb), write_tc};
             } else {
                 // Continuous output (defaults to false).
                 auto with_c_out = [&p]() -> bool {
@@ -1625,9 +1618,7 @@ private:
                     }
                 }();
 
-                // NOTE: use make_tuple so that max_delta_t is transformed
-                // into a reference if it is a reference wrapper.
-                return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
+                return std::tuple{max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out};
             }
         }
     }
@@ -1667,7 +1658,7 @@ public:
                                   with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
-    std::vector<T> propagate_grid(const std::vector<T> &grid, KwArgs &&...kw_args)
+    std::vector<T> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, _] = propagate_common_ops<true>(std::forward<KwArgs>(kw_args)...);
 
