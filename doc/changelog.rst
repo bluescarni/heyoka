@@ -46,6 +46,9 @@ Changes
 Fix
 ~~~
 
+- Fix various corner-case issues in the integrator classes
+  related to data aliasing
+  (`#217 <https://github.com/bluescarni/heyoka/pull/217>`__).
 - Fix incorrect counting of the number of steps when the
   integration is interrupted by a terminal event
   (`#216 <https://github.com/bluescarni/heyoka/pull/216>`__).
