@@ -2711,6 +2711,8 @@ void continuous_output_batch<T>::call_impl(const T *t)
     // LCOV_EXCL_STOP
 
     // Copy over the times to the temp buffer and check that they are finite.
+    // NOTE: this copy ensures we avoid aliasing issues with the
+    // other data members.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
         if (!isfinite(t[i])) {
             throw std::invalid_argument("Cannot compute the continuous output in batch mode "
