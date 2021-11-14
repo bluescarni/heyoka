@@ -1717,3 +1717,28 @@ TEST_CASE("propagate step count te stop bug")
 
     REQUIRE(nsteps == 1u);
 }
+
+// Test case for an issue related to the aliasing of grid data
+// in propagate_grid() with internal integrator state.
+TEST_CASE("propagate grid alias bug")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0., 0.5}};
+
+    auto [_0, _1, _2, _3, grid_out] = ta.propagate_grid(ta.get_state());
+
+    ta.get_state_data()[0] = 0.;
+    ta.get_state_data()[1] = 0.5;
+    ta.set_time(0);
+
+    REQUIRE(grid_out[0] == 0);
+    REQUIRE(grid_out[1] == 0.5);
+
+    ta.propagate_until(0.5);
+
+    REQUIRE(grid_out[2] == approximately(ta.get_state()[0]));
+    REQUIRE(grid_out[3] == approximately(ta.get_state()[1]));
+}

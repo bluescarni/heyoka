@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
     auto start = std::chrono::high_resolution_clock::now();
 
     if (with_dense) {
-        std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(grid);
+        std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(std::move(grid));
     } else {
         std::tie(oc, h_min, h_max, n_steps) = ta.propagate_until(100000.);
     }

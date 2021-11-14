@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
     sw.reset();
 
     // Propagate.
-    auto [oc, _1, _2, nsteps, res] = ta.propagate_grid(t_grid, kw::max_delta_t = 1.);
+    auto [oc, _1, _2, nsteps, res] = ta.propagate_grid(std::move(t_grid), kw::max_delta_t = 1.);
 
     logger->trace("Integration time   : {}", sw);
     logger->info("Integration outcome : {}", oc);
