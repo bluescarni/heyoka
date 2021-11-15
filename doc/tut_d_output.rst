@@ -148,7 +148,7 @@ Continuous output
 
 The ``propagate_for()`` and ``propagate_until()`` functions can optionally return
 a function object providing *continuous output* in the integration interval.
-That is, this function object can be used compute the solution at *any* time
+That is, this function object can be used to compute the solution at *any* time
 within the time interval covered by ``propagate_for/until()``.
 
 Let us see a concrete example of ``continuous_output`` in action:
