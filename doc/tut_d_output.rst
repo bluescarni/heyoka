@@ -175,7 +175,7 @@ Let us try to print ``c_out`` to screen:
    N of steps: 48
 
 The screen output informs us that the ``c_out`` object is capable of providing continuous output
-in the :math:`\left[ 0, 10 \right)` time interval, and that 48 integration steps were taken
+in the :math:`\left[ 0, 10 \right)` time interval, and that 48 steps were taken
 during the integration.
 
 Let us compute and print to screen the state of the system at a few time coordinates:
