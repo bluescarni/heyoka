@@ -346,8 +346,8 @@ we will keep things simple and go back to the simple pendulum:</p>
 <span class="w">                                      </span><span class="p">{</span><span class="mf">0.05</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="p">}};</span><span class="w"></span>
 </pre></div>
 </div>
-<p>Enabling dense output in heyoka is a two-step process.</p>
-<p>The first step is to invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
+<p>Enabling dense output for the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions in heyoka is a two-step process.
+The first step is to invoke one of the <code class="docutils literal notranslate"><span class="pre">step()</span></code> functions
 passing an extra boolean parameter set to <code class="docutils literal notranslate"><span class="pre">true</span></code>:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Integrate for a single timestep, and store</span>
 <span class="w">    </span><span class="c1">// the Taylor coefficients in the integrator.</span>
@@ -452,7 +452,7 @@ flag set to <code class="docutils literal notranslate"><span class="pre">true</s
 will be available. The Taylor coefficients can be used, e.g., inside the
 optional callback that can be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions.</p>
 <p>Note that <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> always unconditionally writes the Taylor coefficients
-at the end of each timestep.</p>
+at the end of each timestep, and thus using the <code class="docutils literal notranslate"><span class="pre">write_tc</span></code> argument is not necessary.</p>
 </div>
 <div class="section" id="continuous-output">
 <span id="tut-c-output"></span><h2>Continuous output<a class="headerlink" href="#continuous-output" title="Permalink to this headline">¶</a></h2>
@@ -461,7 +461,7 @@ at the end of each timestep.</p>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">propagate_for()</span></code> and <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> functions can optionally return
 a function object providing <em>continuous output</em> in the integration interval.
-That is, this function object can be used compute the solution at <em>any</em> time
+That is, this function object can be used to compute the solution at <em>any</em> time
 within the time interval covered by <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code>.</p>
 <p>Let us see a concrete example of <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code> in action:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset time and state.</span>
@@ -518,6 +518,11 @@ returns a reference to the internal buffer containing the state of the system at
 <p>As we can see from the screen output, the state vector at <span class="math notranslate nohighlight">\(t = 0\)</span> corresponds to the initial conditions.
 The state vector at <span class="math notranslate nohighlight">\(t=10\)</span> (i.e., at the end of the integration interval) corresponds to the current
 state of the integrator object.</p>
+<p>Continuous output is somewhat similar to <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code>, in the sense that both allow to compute
+the value of the solution at arbitrary time points. <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> is computationally more efficient,
+but it requires to specify up-front the list of times at which the solution should be computed.
+Continuous output, on the other hand, is not bound to a predetermined time grid, and it can thus be helpful
+if time coordinates of interest can be identified only after the solution has been computed.</p>
 <p>Before concluding, we need to highlight a couple of caveats regarding the
 use of <code class="docutils literal notranslate"><span class="pre">continuous_output</span></code>.</p>
 <div class="admonition important">
