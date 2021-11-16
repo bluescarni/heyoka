@@ -27,8 +27,7 @@ we will keep things simple and go back to the simple pendulum:
    :language: c++
    :lines: 17-28
 
-Enabling dense output in heyoka is a two-step process.
-
+Enabling dense output for the ``step()`` functions in heyoka is a two-step process.
 The first step is to invoke one of the ``step()`` functions
 passing an extra boolean parameter set to ``true``:
 
@@ -137,7 +136,7 @@ will be available. The Taylor coefficients can be used, e.g., inside the
 optional callback that can be passed to the ``propagate_*()`` functions.
 
 Note that ``propagate_grid()`` always unconditionally writes the Taylor coefficients
-at the end of each timestep.
+at the end of each timestep, and thus using the ``write_tc`` argument is not necessary.
 
 .. _tut_c_output:
 
@@ -201,6 +200,12 @@ returns a reference to the internal buffer containing the state of the system at
 As we can see from the screen output, the state vector at :math:`t = 0` corresponds to the initial conditions.
 The state vector at :math:`t=10` (i.e., at the end of the integration interval) corresponds to the current
 state of the integrator object.
+
+Continuous output is somewhat similar to ``propagate_grid()``, in the sense that both allow to compute
+the value of the solution at arbitrary time points. ``propagate_grid()`` is computationally more efficient,
+but it requires to specify up-front the list of times at which the solution should be computed.
+Continuous output, on the other hand, is not bound to a predetermined time grid, and it can thus be helpful
+if time coordinates of interest can be identified only after the solution has been computed.
 
 Before concluding, we need to highlight a couple of caveats regarding the
 use of ``continuous_output``.
