@@ -404,7 +404,7 @@ void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_u
     assert(llvm_depr_GEP_type_check(diff_arr, diff_arr->getType()->getPointerElementType())); // LCOV_EXCL_LINE
     auto *ptr
         = builder.CreateInBoundsGEP(diff_arr->getType()->getPointerElementType(), diff_arr,
-                                    {builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx)});
+                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
 
     builder.CreateStore(val, ptr);
 }
@@ -1268,15 +1268,15 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
         // Fetch the pointer from order0.
         assert(llvm_depr_GEP_type_check(order0, fp_type)); // LCOV_EXCL_LINE
-        auto *ptr = builder.CreateInBoundsGEP(fp_type, order0,
-                                              {builder.CreateMul(cur_var_idx, builder.getInt32(batch_size))});
+        auto *ptr
+            = builder.CreateInBoundsGEP(fp_type, order0, builder.CreateMul(cur_var_idx, builder.getInt32(batch_size)));
 
         // Load as a vector.
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
 
         // Store into diff_arr.
         assert(llvm_depr_GEP_type_check(diff_arr, fp_vec_type)); // LCOV_EXCL_LINE
-        builder.CreateStore(vec, builder.CreateInBoundsGEP(fp_vec_type, diff_arr, {cur_var_idx}));
+        builder.CreateStore(vec, builder.CreateInBoundsGEP(fp_vec_type, diff_arr, cur_var_idx));
     });
 
     // Helper to compute and store the derivatives of order cur_order
@@ -1410,7 +1410,7 @@ auto taylor_load_values(llvm_state &s, llvm::Value *in, std::uint32_t n, std::ui
         // NOTE: overflow checking is done in the parent function.
         assert(llvm_depr_GEP_type_check(in, in->getType()->getPointerElementType())); // LCOV_EXCL_LINE
         auto *ptr
-            = builder.CreateInBoundsGEP(in->getType()->getPointerElementType(), in, {builder.getInt32(i * batch_size)});
+            = builder.CreateInBoundsGEP(in->getType()->getPointerElementType(), in, builder.getInt32(i * batch_size));
 
         // Load the value in vector mode.
         retval.push_back(load_vector_from_memory(builder, ptr, batch_size));
@@ -1621,25 +1621,25 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 
         // Write out the Taylor coefficients for the state variables.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var) {
-            llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-                          [&](llvm::Value *cur_order) {
-                              // Load the value of the derivative from diff_arr.
-                              auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
+            llvm_loop_u32(
+                s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                [&](llvm::Value *cur_order) {
+                    // Load the value of the derivative from diff_arr.
+                    auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
 
-                              // Compute the index in the output pointer.
-                              auto *out_idx = builder.CreateAdd(
-                                  builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
-                                  builder.CreateMul(cur_order, builder.getInt32(batch_size)));
+                    // Compute the index in the output pointer.
+                    auto *out_idx
+                        = builder.CreateAdd(builder.CreateMul(builder.getInt32((order + 1u) * batch_size), cur_var),
+                                            builder.CreateMul(cur_order, builder.getInt32(batch_size)));
 
-                              // Store into tc_ptr.
-                              // LCOV_EXCL_START
-                              assert(llvm_depr_GEP_type_check(tc_ptr, tc_ptr->getType()->getPointerElementType()));
-                              // LCOV_EXCL_STOP
-                              store_vector_to_memory(builder,
-                                                     builder.CreateInBoundsGEP(
-                                                         tc_ptr->getType()->getPointerElementType(), tc_ptr, {out_idx}),
-                                                     diff_val);
-                          });
+                    // Store into tc_ptr.
+                    // LCOV_EXCL_START
+                    assert(llvm_depr_GEP_type_check(tc_ptr, tc_ptr->getType()->getPointerElementType()));
+                    // LCOV_EXCL_STOP
+                    store_vector_to_memory(
+                        builder, builder.CreateInBoundsGEP(tc_ptr->getType()->getPointerElementType(), tc_ptr, out_idx),
+                        diff_val);
+                });
         });
 
         // Write out the Taylor coefficients for the sv funcs, if necessary.
@@ -1647,7 +1647,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_sv_funcs), [&](llvm::Value *arr_idx) {
                 // Fetch the u var index from svf_ptr.
                 assert(llvm_depr_GEP_type_check(svf_ptr, builder.getInt32Ty())); // LCOV_EXCL_LINE
-                auto *cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, {arr_idx}));
+                auto *cur_idx = builder.CreateLoad(builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
 
                 llvm_loop_u32(
                     s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
@@ -1667,7 +1667,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                         // LCOV_EXCL_STOP
                         store_vector_to_memory(
                             builder,
-                            builder.CreateInBoundsGEP(tc_ptr->getType()->getPointerElementType(), tc_ptr, {out_idx}),
+                            builder.CreateInBoundsGEP(tc_ptr->getType()->getPointerElementType(), tc_ptr, out_idx),
                             diff_val);
                     });
             });
@@ -1693,7 +1693,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 // Write to tc_ptr.
                 assert(llvm_depr_GEP_type_check(tc_ptr, tc_ptr->getType()->getPointerElementType())); // LCOV_EXCL_LINE
                 auto *out_ptr = builder.CreateInBoundsGEP(tc_ptr->getType()->getPointerElementType(), tc_ptr,
-                                                          {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
                 store_vector_to_memory(builder, out_ptr, val);
             }
         }
@@ -1711,7 +1711,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 // Write to tc_ptr.
                 assert(llvm_depr_GEP_type_check(tc_ptr, tc_ptr->getType()->getPointerElementType())); // LCOV_EXCL_LINE
                 auto *out_ptr = builder.CreateInBoundsGEP(tc_ptr->getType()->getPointerElementType(), tc_ptr,
-                                                          {builder.getInt32(static_cast<std::uint32_t>(out_idx))});
+                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
                 store_vector_to_memory(builder, out_ptr, val);
             }
         }
@@ -1870,7 +1870,7 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
             // Load the value from diff_arr and store it in res_arr.
             assert(llvm_depr_GEP_type_check(res_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
             builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
-                                builder.CreateInBoundsGEP(pointee_type(diff_arr), res_arr, {cur_var_idx}));
+                                builder.CreateInBoundsGEP(pointee_type(diff_arr), res_arr, cur_var_idx));
         });
 
         // Run the evaluation.
@@ -1886,7 +1886,7 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
 
                               // Accumulate in res_arr.
                               assert(llvm_depr_GEP_type_check(res_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
-                              auto *res_ptr = builder.CreateInBoundsGEP(pointee_type(diff_arr), res_arr, {cur_var_idx});
+                              auto *res_ptr = builder.CreateInBoundsGEP(pointee_type(diff_arr), res_arr, cur_var_idx);
                               builder.CreateStore(
                                   builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(res_ptr), h)), res_ptr);
                           });
