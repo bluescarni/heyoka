@@ -1700,8 +1700,8 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
 }
 
 // NOTE: this will check that a pointer ptr passed to
-// a GEP instruction is, after the removal of vector,
-// of type tp. This how the deprecated CreateInBoundsGEP()
+// a GEP instruction points, after the removal of vector,
+// to a value of type tp. This how the deprecated CreateInBoundsGEP()
 // function is implemented.
 bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
 {
