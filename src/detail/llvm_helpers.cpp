@@ -597,7 +597,9 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 // pointed-to type.
 llvm::Type *pointee_type(llvm::Value *ptr)
 {
-    return llvm::cast<llvm::PointerType>(ptr->getType())->getElementType();
+    assert(llvm::isa<llvm::PointerType>(ptr->getType())); // LCOV_EXCL_LINE
+
+    return ptr->getType()->getPointerElementType();
 }
 
 // Small helper to fetch a string representation
