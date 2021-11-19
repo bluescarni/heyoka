@@ -63,7 +63,7 @@ constexpr bool skip_batch_ld =
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
-    for (auto batch_size : {2u, 4u, 8u, 23u}) {
+    for (auto batch_size : {2u, 4u, 8u, 5u}) {
         llvm_state s{kw::opt_level = opt_level};
 
         taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
@@ -76,7 +76,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
 
         std::vector<T> jet_batch;
         jet_batch.resize(8 * batch_size);
-        std::uniform_real_distribution<float> dist(1.1f, 2.1f);
+        std::uniform_real_distribution<float> dist(1.3f, 5.1f);
         std::generate(jet_batch.begin(), jet_batch.end(), [&dist]() { return T{dist(rng)}; });
 
         std::vector<T> jet_scalar;

@@ -64,7 +64,7 @@ const mppp::real128 pi_const<mppp::real128> = mppp::pi_128;
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
-    for (auto batch_size : {2u, 4u, 8u, 23u}) {
+    for (auto batch_size : {2u, 4u, 8u, 5u}) {
         llvm_state s{kw::opt_level = opt_level};
 
         taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);

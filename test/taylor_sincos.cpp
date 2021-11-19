@@ -49,7 +49,7 @@ const auto fp_types = std::tuple<double
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
-    for (auto batch_size : {2u, 4u, 8u, 23u}) {
+    for (auto batch_size : {2u, 4u, 8u, 5u}) {
         llvm_state s{kw::opt_level = opt_level};
 
         taylor_add_jet<T>(s, "jet_batch", sys, 3, batch_size, high_accuracy, compact_mode);
@@ -79,7 +79,7 @@ void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool
             jptr_scalar(jet_scalar.data(), nullptr, nullptr);
 
             for (auto i = 2u; i < 8u; ++i) {
-                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx]));
+                REQUIRE(jet_scalar[i] == approximately(jet_batch[i * batch_size + batch_idx], T(1000)));
             }
         }
     }
