@@ -1919,8 +1919,7 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
 // a compensated summation over the naive evaluation of monomials.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var, llvm::Value *h,
-                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool,
-                 bool compact_mode)
+                 std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, bool, bool compact_mode)
 {
     auto &builder = s.builder();
 
@@ -2129,9 +2128,8 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     // Evaluate the Taylor polynomials, producing the updated state of the system.
     auto new_state_var
-        = high_accuracy
-              ? taylor_run_ceval(s, diff_variant, h, n_eq, n_uvars, order, batch_size, high_accuracy, compact_mode)
-              : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
+        = high_accuracy ? taylor_run_ceval(s, diff_variant, h, n_eq, n_uvars, order, high_accuracy, compact_mode)
+                        : taylor_run_multihorner(s, diff_variant, h, n_eq, n_uvars, order, batch_size, compact_mode);
 
     // Store the new state.
     // NOTE: no need to perform overflow check on n_eq * batch_size,
