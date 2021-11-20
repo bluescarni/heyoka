@@ -169,8 +169,8 @@ std::string llvm_mangle_type(llvm::Type *t)
     }
 }
 
-// Helper to load the data from pointer ptr as a vector of size vector_size. If vector_size is
-// 1, a scalar is loaded instead.
+// Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
+// If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
     assert(vector_size > 0u);
@@ -255,17 +255,7 @@ llvm::Value *vector_splat(ir_builder &builder, llvm::Value *c, std::uint32_t vec
         return c;
     }
 
-    llvm::Value *vec = llvm::UndefValue::get(make_vector_type(c->getType(), vector_size));
-    assert(vec != nullptr);
-
-    // Fill up the vector with insertelement.
-    for (std::uint32_t i = 0; i < vector_size; ++i) {
-        // NOTE: the insertelement instruction returns
-        // a new vector with the element at index i changed.
-        vec = builder.CreateInsertElement(vec, c, i);
-    }
-
-    return vec;
+    return builder.CreateVectorSplat(boost::numeric_cast<unsigned>(vector_size), c);
 }
 
 llvm::Type *make_vector_type(llvm::Type *t, std::uint32_t vector_size)
@@ -597,7 +587,9 @@ void llvm_loop_u32(llvm_state &s, llvm::Value *begin, llvm::Value *end, const st
 // pointed-to type.
 llvm::Type *pointee_type(llvm::Value *ptr)
 {
-    return llvm::cast<llvm::PointerType>(ptr->getType())->getElementType();
+    assert(llvm::isa<llvm::PointerType>(ptr->getType())); // LCOV_EXCL_LINE
+
+    return ptr->getType()->getPointerElementType();
 }
 
 // Small helper to fetch a string representation
@@ -1695,6 +1687,17 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
     auto cond = builder.CreateSelect(cond1, llvm::ConstantInt::getAllOnesValue(cond4->getType()), cond4);
 
     return cond;
+}
+
+// NOTE: this will check that a pointer ptr passed to
+// a GEP instruction points, after the removal of vector,
+// to a value of type tp. This how the deprecated CreateInBoundsGEP()
+// function is implemented.
+bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
+{
+    assert(llvm::isa<llvm::PointerType>(ptr->getType())); // LCOV_EXCL_LINE
+
+    return ptr->getType()->getScalarType()->getPointerElementType() == tp;
 }
 
 } // namespace heyoka::detail

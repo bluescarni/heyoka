@@ -546,7 +546,7 @@ TEST_CASE("last h")
     }
 
     // Batch test.
-    for (auto batch_size : {1u, 4u, 23u}) {
+    for (auto batch_size : {1u, 4u, 5u}) {
         std::vector<double> init_state;
         for (auto i = 0u; i < batch_size; ++i) {
             init_state.push_back(0.05 + i / 100.);
@@ -661,7 +661,7 @@ TEST_CASE("dense output")
     }
 
     // Batch test.
-    for (auto batch_size : {1u, 4u, 23u}) {
+    for (auto batch_size : {1u, 4u, 5u}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             for (auto cm : {false, true}) {
                 for (auto ha : {false, true}) {
@@ -839,7 +839,7 @@ TEST_CASE("taylor tc basic")
     }
 
     // Batch test.
-    for (auto batch_size : {1u, 4u, 23u}) {
+    for (auto batch_size : {1u, 4u, 5u}) {
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             for (auto cm : {false, true}) {
                 for (auto ha : {false, true}) {

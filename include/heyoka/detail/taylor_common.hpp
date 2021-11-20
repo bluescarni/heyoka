@@ -93,7 +93,7 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

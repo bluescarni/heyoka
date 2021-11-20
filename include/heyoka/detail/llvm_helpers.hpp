@@ -196,6 +196,10 @@ llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value 
 // Greater-than.
 llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
+// Helpers to double check the modifications needed
+// by LLVM deprecations.
+bool llvm_depr_GEP_type_check(llvm::Value *, llvm::Type *);
+
 } // namespace heyoka::detail
 
 #endif

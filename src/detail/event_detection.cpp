@@ -241,6 +241,9 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
     auto &builder = s.builder();
     auto &context = s.context();
 
+    // The scalar floating-point type.
+    auto *fp_t = to_llvm_type<T>(context);
+
     // Helper to fetch the (i, j) binomial coefficient from
     // a precomputed global array. The returned value is already
     // splatted.
@@ -248,7 +251,8 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
         auto idx = builder.CreateMul(i, builder.getInt32(order + 1u));
         idx = builder.CreateAdd(idx, j);
 
-        auto val = builder.CreateLoad(builder.CreateInBoundsGEP(bc_ptr, {idx}));
+        assert(llvm_depr_GEP_type_check(bc_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto val = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, bc_ptr, idx));
 
         return vector_splat(builder, val, batch_size);
     };
@@ -291,20 +295,23 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 
     // Init the return values as zeroes.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
-        auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))});
-        store_vector_to_memory(builder, ptr, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
+        assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(i, builder.getInt32(batch_size)));
+        store_vector_to_memory(builder, ptr, vector_splat(builder, llvm::ConstantFP::get(fp_t, 0.), batch_size));
     });
 
     // Do the translation.
     llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(order + 1u), [&](llvm::Value *i) {
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
         auto ai = load_vector_from_memory(
-            builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(i, builder.getInt32(batch_size))}),
+            builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(i, builder.getInt32(batch_size))),
             batch_size);
 
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(i, builder.getInt32(1)), [&](llvm::Value *k) {
             auto tmp = builder.CreateFMul(ai, get_bc(i, k));
 
-            auto ptr = builder.CreateInBoundsGEP(out_ptr, {builder.CreateMul(k, builder.getInt32(batch_size))});
+            assert(llvm_depr_GEP_type_check(out_ptr, fp_t)); // LCOV_EXCL_LINE
+            auto ptr = builder.CreateInBoundsGEP(fp_t, out_ptr, builder.CreateMul(k, builder.getInt32(batch_size)));
             auto new_val = builder.CreateFAdd(load_vector_from_memory(builder, ptr, batch_size), tmp);
             store_vector_to_memory(builder, ptr, new_val);
         });
@@ -359,7 +366,8 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
     // - the output pointer to the number of sign changes (write-only),
     // - the input pointer to the original poly coefficients (read-only).
     // No overlap is allowed.
-    auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
     std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, llvm::PointerType::getUnqual(builder.getInt32Ty()), fp_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -411,8 +419,10 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
         auto load_idx = builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size));
         auto store_idx = builder.CreateMul(i, builder.getInt32(batch_size));
 
-        auto cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(cf_ptr, {load_idx}), batch_size);
-        store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr1, {store_idx}), cur_cf);
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
+        auto cur_cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_t, cf_ptr, load_idx), batch_size);
+        assert(llvm_depr_GEP_type_check(out_ptr1, fp_t)); // LCOV_EXCL_LINE
+        store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_t, out_ptr1, store_idx), cur_cf);
     });
 
     // Translate out_ptr1 into out_ptr2.
@@ -464,8 +474,9 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // - pointer to the int32 flag(s) to signal integration backwards in time (read-only),
     // - output pointer (write-only).
     // No overlap is allowed.
-    auto fp_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
-    auto int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
+    auto *fp_t = to_llvm_type<T>(context);
+    auto *fp_ptr_t = llvm::PointerType::getUnqual(fp_t);
+    auto *int32_ptr_t = llvm::PointerType::getUnqual(builder.getInt32Ty());
     std::vector<llvm::Type *> fargs{fp_ptr_t, fp_ptr_t, int32_ptr_t, int32_ptr_t};
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
@@ -547,9 +558,10 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     auto acc_hi = builder.CreateAlloca(fp_vec_t);
 
     // Init the accumulator's lo/hi components with the highest-order coefficient.
+    assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
     auto ho_cf = load_vector_from_memory(
         builder,
-        builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))}),
+        builder.CreateInBoundsGEP(fp_t, cf_ptr, builder.CreateMul(builder.getInt32(n), builder.getInt32(batch_size))),
         batch_size);
     builder.CreateStore(ho_cf, acc_lo);
     builder.CreateStore(ho_cf, acc_hi);
@@ -558,12 +570,14 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     // highest-order coefficient).
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *i) {
         // Load the current coefficient.
+        assert(llvm_depr_GEP_type_check(cf_ptr, fp_t)); // LCOV_EXCL_LINE
         auto ptr = builder.CreateInBoundsGEP(
-            cf_ptr, {builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size))});
+            fp_t, cf_ptr, builder.CreateMul(builder.CreateSub(builder.getInt32(n), i), builder.getInt32(batch_size)));
         auto cur_cf = load_vector_from_memory(builder, ptr, batch_size);
 
         // Multiply the accumulator by h.
-        auto [acc_h_lo, acc_h_hi] = ival_prod(builder.CreateLoad(acc_lo), builder.CreateLoad(acc_hi), h_lo, h_hi);
+        auto [acc_h_lo, acc_h_hi]
+            = ival_prod(builder.CreateLoad(fp_vec_t, acc_lo), builder.CreateLoad(fp_vec_t, acc_hi), h_lo, h_hi);
 
         // Update the value of the accumulator.
         auto [new_acc_lo, new_acc_hi] = ival_sum(cur_cf, cur_cf, acc_h_lo, acc_h_hi);
@@ -572,8 +586,8 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
     });
 
     // Compute the sign of the components of the accumulator.
-    auto s_lo = llvm_sgn(s, builder.CreateLoad(acc_lo));
-    auto s_hi = llvm_sgn(s, builder.CreateLoad(acc_hi));
+    auto s_lo = llvm_sgn(s, builder.CreateLoad(fp_vec_t, acc_lo));
+    auto s_hi = llvm_sgn(s, builder.CreateLoad(fp_vec_t, acc_hi));
 
     // Check if the signs are equal and the low sign is nonzero.
     auto cmp1 = builder.CreateICmpEQ(s_lo, s_hi);
