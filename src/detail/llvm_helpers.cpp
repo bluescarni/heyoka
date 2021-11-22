@@ -233,9 +233,9 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 #endif
             ptrs,
 #if LLVM_VERSION_MAJOR == 10
-            align
+            boost::numeric_cast<unsigned>(align)
 #else
-            llvm::Align(align)
+            llvm::Align(boost::numeric_cast<std::uint64_t>(align))
 #endif
         );
     } else {
