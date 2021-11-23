@@ -1119,9 +1119,9 @@ namespace
 
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type T.
-template <typename T>
-llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+// and scalar type scal_t. The alignment of scal_t is scal_t_align.
+llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size,
+                                  std::size_t scal_t_align)
 {
     assert(batch_size > 0u);
 
@@ -1136,10 +1136,9 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
 
     auto &md = s.module();
     auto &builder = s.builder();
-    auto &context = s.context();
 
     // Fetch the floating-point type.
-    auto tp = to_llvm_vector_type<T>(context, batch_size);
+    auto tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
     const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
@@ -1151,7 +1150,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
     // of the vector types, so that we can call this from regular
     // C++ code.
     std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+                                    llvm::PointerType::getUnqual(scal_t)};
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -1182,7 +1181,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+        builder.SetInsertPoint(llvm::BasicBlock::Create(s.context(), "entry", f));
 
         // Fetch the type for storing the last_nz_idx variable.
         auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
@@ -1231,7 +1230,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
             auto last_nz_cf = batch_size > 1u
-                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, alignof(T))
+                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, scal_t_align)
                                   : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
 
             // Compute the sign of the current coefficient(s).
@@ -1289,19 +1288,19 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
 
 llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<double>(s, n, batch_size);
+    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size, alignof(double));
 }
 
 llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<long double>(s, n, batch_size);
+    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size, alignof(long double));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<mppp::real128>(s, n, batch_size);
+    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size, alignof(mppp::real128));
 }
 
 #endif
