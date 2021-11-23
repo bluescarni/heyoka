@@ -223,7 +223,10 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs, std::size_t align)
 {
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
+        // LCOV_EXCL_START
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
+        // LCOV_EXCL_STOP
 
         return builder.CreateMaskedGather(
 #if LLVM_VERSION_MAJOR >= 13
@@ -239,9 +242,12 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 #endif
         );
     } else {
+        // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(ptrs->getType()->getPointerElementType() == vec_tp);
+        // LCOV_EXCL_STOP
 
-        return builder.CreateLoad(ptrs);
+        return builder.CreateLoad(vec_tp, ptrs);
     }
 }
 
