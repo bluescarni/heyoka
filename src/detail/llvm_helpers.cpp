@@ -229,7 +229,7 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
         for (std::uint32_t i = 0; i < vector_size; ++i) {
             assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
             builder.CreateStore(builder.CreateExtractElement(vec, i),
-                                builder.CreateInBoundsGEP(scal_t, ptr, {builder.getInt32(i)}));
+                                builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i)));
         }
     } else {
         assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
