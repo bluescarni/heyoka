@@ -618,7 +618,7 @@ class HEYOKA_DLL_PUBLIC continuous_output
     std::vector<T> m_tcs;
     std::vector<T> m_times_hi, m_times_lo;
     std::vector<T> m_output;
-    using fptr_t = void (*)(T *, T, const T *, const T *, const T *);
+    using fptr_t = void (*)(T *, T, const T *, const T *, const T *) noexcept;
     fptr_t m_f_ptr = nullptr;
 
     HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
@@ -712,7 +712,7 @@ class HEYOKA_DLL_PUBLIC continuous_output_batch
     std::vector<T> m_times_hi, m_times_lo;
     std::vector<T> m_output;
     std::vector<T> m_tmp_tm;
-    using fptr_t = void (*)(T *, const T *, const T *, const T *, const T *);
+    using fptr_t = void (*)(T *, const T *, const T *, const T *, const T *) noexcept;
     fptr_t m_f_ptr = nullptr;
 
     HEYOKA_DLL_LOCAL void add_c_out_function(std::uint32_t, std::uint32_t, bool);
@@ -816,11 +816,11 @@ private:
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
-        using pt_t = void (*)(T *, const T *);
+        using pt_t = void (*)(T *, const T *) noexcept;
         // rtscc function type.
-        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
         // fex_check function type.
-        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
 
         // The vector of terminal events.
         std::vector<t_event_t> m_tes;
@@ -898,8 +898,8 @@ private:
     // Compact mode.
     bool m_compact_mode;
     // The steppers.
-    using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
+    using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
     std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
@@ -908,7 +908,7 @@ private:
     // Size of the last timestep taken.
     T m_last_h = T(0);
     // The function for computing the dense output.
-    using d_out_f_t = void (*)(T *, const T *, const T *);
+    using d_out_f_t = void (*)(T *, const T *, const T *) noexcept;
     d_out_f_t m_d_out_f;
     // The vector for the dense output.
     std::vector<T> m_d_out;
@@ -1237,11 +1237,11 @@ private:
         // The type used to store the list of isolating intervals.
         using isol_t = std::vector<std::tuple<T, T>>;
         // Polynomial translation function type.
-        using pt_t = void (*)(T *, const T *);
+        using pt_t = void (*)(T *, const T *) noexcept;
         // rtscc function type.
-        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *);
+        using rtscc_t = void (*)(T *, T *, std::uint32_t *, const T *) noexcept;
         // fex_check function type.
-        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *);
+        using fex_check_t = void (*)(const T *, const T *, const std::uint32_t *, std::uint32_t *) noexcept;
 
         // The vector of terminal events.
         std::vector<t_event_t> m_tes;
@@ -1331,8 +1331,8 @@ private:
     // Compact mode.
     bool m_compact_mode;
     // The steppers.
-    using step_f_t = void (*)(T *, const T *, const T *, T *, T *);
-    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *);
+    using step_f_t = void (*)(T *, const T *, const T *, T *, T *) noexcept;
+    using step_f_e_t = void (*)(T *, const T *, const T *, const T *, T *, T *) noexcept;
     std::variant<step_f_t, step_f_e_t> m_step_f;
     // The vector of parameters.
     std::vector<T> m_pars;
@@ -1341,7 +1341,7 @@ private:
     // The sizes of the last timesteps taken.
     std::vector<T> m_last_h;
     // The function for computing the dense output.
-    using d_out_f_t = void (*)(T *, const T *, const T *);
+    using d_out_f_t = void (*)(T *, const T *, const T *) noexcept;
     d_out_f_t m_d_out_f;
     // The vector for the dense output.
     std::vector<T> m_d_out;
