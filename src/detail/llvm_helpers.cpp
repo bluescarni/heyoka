@@ -173,28 +173,36 @@ std::string llvm_mangle_type(llvm::Type *t)
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
+    // LCOV_EXCL_START
     assert(vector_size > 0u);
-
-    if (vector_size == 1u) {
-        // Scalar case.
-        return builder.CreateLoad(ptr);
-    }
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
+    // LCOV_EXCL_STOP
 
     // Fetch the pointer type (this will result in an assertion
     // failure if ptr is not a pointer).
     auto ptr_t = llvm::cast<llvm::PointerType>(ptr->getType());
 
+    // Fetch the scalar type.
+    auto scal_t = ptr_t->getElementType();
+
+    if (vector_size == 1u) {
+        // Scalar case.
+        return builder.CreateLoad(scal_t, ptr);
+    }
+
     // Create the vector type.
-    auto vector_t = make_vector_type(ptr_t->getElementType(), vector_size);
-    assert(vector_t != nullptr);
+    auto vector_t = make_vector_type(scal_t, vector_size);
+    assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
     // Create the output vector.
     auto ret = static_cast<llvm::Value *>(llvm::UndefValue::get(vector_t));
 
     // Fill it.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
-        ret = builder.CreateInsertElement(ret,
-                                          builder.CreateLoad(builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)})), i);
+        assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
+        ret = builder.CreateInsertElement(
+            ret, builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i))), i);
     }
 
     return ret;
@@ -204,15 +212,28 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
 {
+    // LCOV_EXCL_START
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
+    // LCOV_EXCL_STOP
+
+    auto scal_t = ptr->getType()->getPointerElementType();
+
     if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+        assert(scal_t == vec->getType()->getScalarType()); // LCOV_EXCL_LINE
+
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
 
         for (std::uint32_t i = 0; i < vector_size; ++i) {
+            assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
             builder.CreateStore(builder.CreateExtractElement(vec, i),
-                                builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+                                builder.CreateInBoundsGEP(scal_t, ptr, {builder.getInt32(i)}));
         }
     } else {
+        assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
+
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
     }
