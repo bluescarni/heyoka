@@ -9,6 +9,8 @@
 #ifndef HEYOKA_LLVM_STATE_HPP
 #define HEYOKA_LLVM_STATE_HPP
 
+#include <heyoka/config.hpp>
+
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
@@ -18,6 +20,12 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/detail/fwd_decl.hpp>
 #include <heyoka/detail/igor.hpp>
@@ -47,6 +55,12 @@ struct target_features {
     // bit we need only vsx and vsx3 (not vsx2).
     bool vsx = false;
     bool vsx3 = false;
+    // Recommended SIMD sizes.
+    std::uint32_t simd_size_dbl = 1;
+    std::uint32_t simd_size_ldbl = 1;
+#if defined(HEYOKA_HAVE_REAL128)
+    std::uint32_t simd_size_f128 = 1;
+#endif
 };
 
 // NOTE: no need to make this DLL-public as long
@@ -66,6 +80,27 @@ IGOR_MAKE_NAMED_ARGUMENT(inline_functions);
 } // namespace kw
 
 HEYOKA_DLL_PUBLIC std::ostream &operator<<(std::ostream &, const llvm_state &);
+
+template <typename T>
+inline std::uint32_t recommended_simd_size()
+{
+    static_assert(detail::always_false_v<T>, "Unhandled type.");
+
+    return 0;
+}
+
+template <>
+HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<double>();
+
+template <>
+HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<long double>();
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+HEYOKA_DLL_PUBLIC std::uint32_t recommended_simd_size<mppp::real128>();
+
+#endif
 
 class HEYOKA_DLL_PUBLIC llvm_state
 {

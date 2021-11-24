@@ -6,12 +6,20 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
 
 #include <heyoka/expression.hpp>
 #include <heyoka/llvm_state.hpp>
@@ -307,4 +315,22 @@ TEST_CASE("make_similar")
     REQUIRE(s2.inline_functions() == false);
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
+}
+
+TEST_CASE("simd size")
+{
+    REQUIRE(recommended_simd_size<double>() > 0u);
+    REQUIRE(recommended_simd_size<long double>() > 0u);
+
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
+#endif
+
+#if defined(__GNUC__)
+
+#if defined(__amd64__) || defined(__aarch64__)
+    REQUIRE(recommended_simd_size<double>() >= 2u);
+#endif
+
+#endif
 }

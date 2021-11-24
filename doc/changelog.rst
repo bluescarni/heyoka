@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.17.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Add helper to compute the suggested SIMD size for
+  the CPU in use
+  (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
+
 0.16.0 (2021-11-20)
 -------------------
 
