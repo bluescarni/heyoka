@@ -7,7 +7,7 @@ Changelog
 New
 ~~~
 
-- Add helper to compute the suggested SIMD size for
+- Add a function to compute the suggested SIMD size for
   the CPU in use
   (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
 
