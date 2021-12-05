@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <iostream>
+#include <optional>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -82,13 +83,14 @@ int main(int argc, char *argv[])
     double h_min, h_max;
     std::size_t n_steps;
     std::vector<double> d_out;
+    std::optional<continuous_output<double>> c_out;
 
     auto start = std::chrono::high_resolution_clock::now();
 
     if (with_dense) {
         std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(std::move(grid));
     } else {
-        std::tie(oc, h_min, h_max, n_steps) = ta.propagate_until(100000.);
+        std::tie(oc, h_min, h_max, n_steps, c_out) = ta.propagate_until(100000.);
     }
 
     auto elapsed = static_cast<double>(
