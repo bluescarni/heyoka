@@ -104,7 +104,7 @@ could use the following command:
    $ conda install heyoka-llvm-12
 
 The list of heyoka meta-packages is available
-`here <https://github.com/conda-forge/heyoka-feedstock#current-release-info>`__.
+`here <https://github.com/conda-forge/heyoka-feedstock>`__.
 
 The conda packages for heyoka are maintained by the core development team,
 and they are regularly updated when new heyoka versions are released.

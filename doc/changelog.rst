@@ -91,7 +91,7 @@ New
   to the expression system
   (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
 - Implement additional automatic simplifications for sin/cos
-  (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
+  (`#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
 
 Changes
 ~~~~~~~
