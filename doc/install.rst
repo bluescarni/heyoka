@@ -94,8 +94,20 @@ to the channels, and then we can immediately install heyoka:
    $ conda config --set channel_priority strict
    $ conda install heyoka
 
-The conda package for heyoka is maintained by the core development team,
-and it is regularly updated when new heyoka versions are released.
+Note that the ``heyoka`` package on conda is built against an unspecified version of LLVM. If you need
+a package built against a *specific* version of LLVM, you can install one of the ``heyoka-llvm-*``
+meta-packages. For instance, in order to install a package built against LLVM 12, you
+could use the following command:
+
+.. code-block:: console
+
+   $ conda install heyoka-llvm-12
+
+The list of heyoka meta-packages is available
+`here <https://github.com/conda-forge/heyoka-feedstock#current-release-info>`__.
+
+The conda packages for heyoka are maintained by the core development team,
+and they are regularly updated when new heyoka versions are released.
 
 Please refer to the `conda documentation <https://docs.conda.io/en/latest/>`__ for instructions
 on how to setup and manage
