@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Installation &#8212; heyoka 0.16.0 documentation</title>
+    <title>Installation &#8212; heyoka 0.17.0 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet">
   <link href="_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
@@ -64,7 +64,7 @@
       <img src="_static/white_logo.png" class="logo" alt="logo">
       
       
-      <h1 class="site-logo" id="site-title">heyoka 0.16.0 documentation</h1>
+      <h1 class="site-logo" id="site-title">heyoka 0.17.0 documentation</h1>
       
     </a>
 </div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
@@ -412,8 +412,17 @@ to the channels, and then we can immediately install heyoka:</p>
 <span class="gp">$ </span>conda install heyoka
 </pre></div>
 </div>
-<p>The conda package for heyoka is maintained by the core development team,
-and it is regularly updated when new heyoka versions are released.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">heyoka</span></code> package on conda is built against an unspecified version of LLVM. If you need
+a package built against a <em>specific</em> version of LLVM, you can install one of the <code class="docutils literal notranslate"><span class="pre">heyoka-llvm-*</span></code>
+meta-packages. For instance, in order to install a package built against LLVM 12, you
+could use the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda install heyoka-llvm-12
+</pre></div>
+</div>
+<p>The list of heyoka meta-packages is available
+<a class="reference external" href="https://github.com/conda-forge/heyoka-feedstock">here</a>.</p>
+<p>The conda packages for heyoka are maintained by the core development team,
+and they are regularly updated when new heyoka versions are released.</p>
 <p>Please refer to the <a class="reference external" href="https://docs.conda.io/en/latest/">conda documentation</a> for instructions
 on how to setup and manage
 your conda installation.</p>

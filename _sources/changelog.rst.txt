@@ -1,6 +1,16 @@
 Changelog
 =========
 
+0.17.0 (unreleased)
+-------------------
+
+New
+~~~
+
+- Add a function to compute the suggested SIMD size for
+  the CPU in use
+  (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
+
 0.16.0 (2021-11-20)
 -------------------
 
@@ -81,7 +91,7 @@ New
   to the expression system
   (`#182 <https://github.com/bluescarni/heyoka/pull/182>`__).
 - Implement additional automatic simplifications for sin/cos
-  (`#179 <https://github.com/bluescarni/heyoka/pull/179>`__).
+  (`#180 <https://github.com/bluescarni/heyoka/pull/180>`__).
 
 Changes
 ~~~~~~~
