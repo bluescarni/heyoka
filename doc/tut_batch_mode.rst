@@ -33,6 +33,11 @@ processor in use. Because at this time the most widespread SIMD instruction set 
 most x86 processors sold since 2011), in this tutorial we will be using a
 batch size :math:`n=4`.
 
+.. versionadded:: 0.17.0
+
+The recommended SIMD width for the processor in use can be fetched
+via the ``recommended_simd_size()`` function.
+
 The adaptive batch integrator
 -----------------------------
 

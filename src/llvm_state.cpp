@@ -6,6 +6,8 @@
 // Public License v. 2.0. If a copy of the MPL was not distributed
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include <heyoka/config.hpp>
+
 #include <cassert>
 #include <charconv>
 #include <cstdint>
@@ -73,6 +75,12 @@
 #if LLVM_VERSION_MAJOR == 10
 
 #include <llvm/CodeGen/CommandFlags.inc>
+
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
 
 #endif
 
@@ -183,6 +191,18 @@ target_features get_target_features_impl()
         }
     }
 
+    // Compute the recommended SIMD sizes.
+    if (retval.avx512f || retval.avx2 || retval.avx) {
+        // NOTE: keep the recommended SIMD size to
+        // 4 also for AVX512 due to perf issues in early
+        // implementations. Revisit this in the future, possibly
+        // making it conditional on the specific CPU model
+        // in use.
+        retval.simd_size_dbl = 4;
+    } else if (retval.sse2 || retval.aarch64 || retval.vsx || retval.vsx3) {
+        retval.simd_size_dbl = 2;
+    }
+
     return retval;
 }
 
@@ -194,10 +214,37 @@ target_features get_target_features_impl()
 // containing info about the host machine.
 const target_features &get_target_features()
 {
-    static const target_features retval{get_target_features_impl()};
+    static const target_features retval = get_target_features_impl();
 
     return retval;
 }
+
+} // namespace detail
+
+template <>
+std::uint32_t recommended_simd_size<double>()
+{
+    return detail::get_target_features().simd_size_dbl;
+}
+
+template <>
+std::uint32_t recommended_simd_size<long double>()
+{
+    return detail::get_target_features().simd_size_ldbl;
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template <>
+std::uint32_t recommended_simd_size<mppp::real128>()
+{
+    return detail::get_target_features().simd_size_f128;
+}
+
+#endif
+
+namespace detail
+{
 
 namespace
 {

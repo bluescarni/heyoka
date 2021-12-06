@@ -173,28 +173,36 @@ std::string llvm_mangle_type(llvm::Type *t)
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
 {
+    // LCOV_EXCL_START
     assert(vector_size > 0u);
-
-    if (vector_size == 1u) {
-        // Scalar case.
-        return builder.CreateLoad(ptr);
-    }
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
+    // LCOV_EXCL_STOP
 
     // Fetch the pointer type (this will result in an assertion
     // failure if ptr is not a pointer).
     auto ptr_t = llvm::cast<llvm::PointerType>(ptr->getType());
 
+    // Fetch the scalar type.
+    auto scal_t = ptr_t->getElementType();
+
+    if (vector_size == 1u) {
+        // Scalar case.
+        return builder.CreateLoad(scal_t, ptr);
+    }
+
     // Create the vector type.
-    auto vector_t = make_vector_type(ptr_t->getElementType(), vector_size);
-    assert(vector_t != nullptr);
+    auto vector_t = make_vector_type(scal_t, vector_size);
+    assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
     // Create the output vector.
     auto ret = static_cast<llvm::Value *>(llvm::UndefValue::get(vector_t));
 
     // Fill it.
     for (std::uint32_t i = 0; i < vector_size; ++i) {
-        ret = builder.CreateInsertElement(ret,
-                                          builder.CreateLoad(builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)})), i);
+        assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
+        ret = builder.CreateInsertElement(
+            ret, builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i))), i);
     }
 
     return ret;
@@ -204,15 +212,28 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
 // a plain store will be performed.
 void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *vec)
 {
+    // LCOV_EXCL_START
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
+    // LCOV_EXCL_STOP
+
+    auto scal_t = ptr->getType()->getPointerElementType();
+
     if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+        assert(scal_t == vec->getType()->getScalarType()); // LCOV_EXCL_LINE
+
         // Determine the vector size.
         const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
 
         for (std::uint32_t i = 0; i < vector_size; ++i) {
+            assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
             builder.CreateStore(builder.CreateExtractElement(vec, i),
-                                builder.CreateInBoundsGEP(ptr, {builder.getInt32(i)}));
+                                builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i)));
         }
     } else {
+        assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
+
         // Not a vector, store vec directly.
         builder.CreateStore(vec, ptr);
     }
@@ -223,7 +244,10 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs, std::size_t align)
 {
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
+        // LCOV_EXCL_START
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
+        // LCOV_EXCL_STOP
 
         return builder.CreateMaskedGather(
 #if LLVM_VERSION_MAJOR >= 13
@@ -233,15 +257,18 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 #endif
             ptrs,
 #if LLVM_VERSION_MAJOR == 10
-            align
+            boost::numeric_cast<unsigned>(align)
 #else
-            llvm::Align(align)
+            llvm::Align(boost::numeric_cast<std::uint64_t>(align))
 #endif
         );
     } else {
+        // LCOV_EXCL_START
         assert(!llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(ptrs->getType()->getPointerElementType() == vec_tp);
+        // LCOV_EXCL_STOP
 
-        return builder.CreateLoad(ptrs);
+        return builder.CreateLoad(vec_tp, ptrs);
     }
 }
 
@@ -887,8 +914,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
                 s, "sincosq", builder.getVoidTy(), {x_scalars[i], s_all, c_all},
                 {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
 
-            res_sin.emplace_back(builder.CreateLoad(s_all));
-            res_cos.emplace_back(builder.CreateLoad(c_all));
+            res_sin.emplace_back(builder.CreateLoad(x_t, s_all));
+            res_cos.emplace_back(builder.CreateLoad(x_t, c_all));
         }
 
         // Reconstruct the return value as a vector.
@@ -1092,9 +1119,9 @@ namespace
 
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type T.
-template <typename T>
-llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+// and scalar type scal_t. The alignment of scal_t is scal_t_align.
+llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size,
+                                  std::size_t scal_t_align)
 {
     assert(batch_size > 0u);
 
@@ -1109,10 +1136,9 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
 
     auto &md = s.module();
     auto &builder = s.builder();
-    auto &context = s.context();
 
     // Fetch the floating-point type.
-    auto tp = to_llvm_vector_type<T>(context, batch_size);
+    auto tp = make_vector_type(scal_t, batch_size);
 
     // Fetch the function name.
     const auto fname = "heyoka_csc_degree_{}_{}"_format(n, llvm_mangle_type(tp));
@@ -1124,7 +1150,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
     // of the vector types, so that we can call this from regular
     // C++ code.
     std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(builder.getInt32Ty()),
-                                    llvm::PointerType::getUnqual(to_llvm_type<T>(context))};
+                                    llvm::PointerType::getUnqual(scal_t)};
 
     // Try to see if we already created the function.
     auto f = md.getFunction(fname);
@@ -1155,7 +1181,7 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
         cf_ptr->addAttr(llvm::Attribute::ReadOnly);
 
         // Create a new basic block to start insertion into.
-        builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+        builder.SetInsertPoint(llvm::BasicBlock::Create(s.context(), "entry", f));
 
         // Fetch the type for storing the last_nz_idx variable.
         auto last_nz_idx_t = make_vector_type(builder.getInt32Ty(), batch_size);
@@ -1194,18 +1220,21 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
         // The iteration range is [1, n].
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n + 1u), [&](llvm::Value *cur_n) {
             // Load the current poly coefficient(s).
+            assert(llvm_depr_GEP_type_check(cf_ptr, scal_t)); // LCOV_EXCL_LINE
             auto cur_cf = load_vector_from_memory(
-                builder, builder.CreateInBoundsGEP(cf_ptr, {builder.CreateMul(cur_n, builder.getInt32(batch_size))}),
+                builder,
+                builder.CreateInBoundsGEP(scal_t, cf_ptr, builder.CreateMul(cur_n, builder.getInt32(batch_size))),
                 batch_size);
 
             // Load the last nonzero coefficient(s).
             auto last_nz_ptr_idx = builder.CreateAdd(
-                offset, builder.CreateMul(builder.CreateLoad(last_nz_idx),
+                offset, builder.CreateMul(builder.CreateLoad(last_nz_idx_t, last_nz_idx),
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
-            auto last_nz_ptr = builder.CreateInBoundsGEP(cf_ptr_v, {last_nz_ptr_idx});
+            assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
+            auto last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
             auto last_nz_cf = batch_size > 1u
-                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, alignof(T))
-                                  : static_cast<llvm::Value *>(builder.CreateLoad(last_nz_ptr));
+                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, scal_t_align)
+                                  : static_cast<llvm::Value *>(builder.CreateLoad(scal_t, last_nz_ptr));
 
             // Compute the sign of the current coefficient(s).
             auto cur_sgn = llvm_sgn(s, cur_cf);
@@ -1224,18 +1253,20 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
             cmp = builder.CreateSelect(zero_cmp, llvm::Constant::getNullValue(cmp->getType()), cmp);
 
             // Update retval.
-            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(retval), builder.CreateZExt(cmp, last_nz_idx_t)),
-                                retval);
+            builder.CreateStore(
+                builder.CreateAdd(builder.CreateLoad(last_nz_idx_t, retval), builder.CreateZExt(cmp, last_nz_idx_t)),
+                retval);
 
             // Update last_nz_idx.
             builder.CreateStore(
                 builder.CreateSelect(builder.CreateICmpEQ(cur_sgn, llvm::Constant::getNullValue(cur_sgn->getType())),
-                                     builder.CreateLoad(last_nz_idx), vector_splat(builder, cur_n, batch_size)),
+                                     builder.CreateLoad(last_nz_idx_t, last_nz_idx),
+                                     vector_splat(builder, cur_n, batch_size)),
                 last_nz_idx);
         });
 
         // Store the result.
-        store_vector_to_memory(builder, out_ptr, builder.CreateLoad(retval));
+        store_vector_to_memory(builder, out_ptr, builder.CreateLoad(last_nz_idx_t, retval));
 
         // Return.
         builder.CreateRetVoid();
@@ -1262,19 +1293,19 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, std::uint32_t n, std::uint32_t 
 
 llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<double>(s, n, batch_size);
+    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size, alignof(double));
 }
 
 llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<long double>(s, n, batch_size);
+    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size, alignof(long double));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl<mppp::real128>(s, n, batch_size);
+    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size, alignof(mppp::real128));
 }
 
 #endif
@@ -1557,7 +1588,9 @@ llvm::Value *llvm_add_bc_array_impl(llvm_state &s, std::uint32_t n)
                                                     llvm::GlobalVariable::InternalLinkage, bc_const_arr);
 
     // Get out a pointer to the beginning of the array.
-    return builder.CreateInBoundsGEP(g_bc_const_arr, {builder.getInt32(0), builder.getInt32(0)});
+    assert(llvm_depr_GEP_type_check(g_bc_const_arr, bc_const_arr->getType())); // LCOV_EXCL_LINE
+    return builder.CreateInBoundsGEP(bc_const_arr->getType(), g_bc_const_arr,
+                                     {builder.getInt32(0), builder.getInt32(0)});
 }
 
 } // namespace
@@ -1693,9 +1726,10 @@ llvm::Value *llvm_dl_gt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
 // a GEP instruction points, after the removal of vector,
 // to a value of type tp. This how the deprecated CreateInBoundsGEP()
 // function is implemented.
+// NOTE: ptr can also be a vector of pointers.
 bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
 {
-    assert(llvm::isa<llvm::PointerType>(ptr->getType())); // LCOV_EXCL_LINE
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()->getScalarType())); // LCOV_EXCL_LINE
 
     return ptr->getType()->getScalarType()->getPointerElementType() == tp;
 }
