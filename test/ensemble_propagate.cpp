@@ -1,0 +1,123 @@
+// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+//
+// This file is part of the heyoka library.
+//
+// This Source Code Form is subject to the terms of the Mozilla
+// Public License v. 2.0. If a copy of the MPL was not distributed
+// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+#include <heyoka/config.hpp>
+
+#include <initializer_list>
+#include <limits>
+#include <random>
+#include <stdexcept>
+#include <tuple>
+#include <vector>
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+#include <mp++/real128.hpp>
+
+#endif
+
+#include <heyoka/ensemble_propagate.hpp>
+#include <heyoka/expression.hpp>
+#include <heyoka/taylor.hpp>
+
+#include "catch.hpp"
+#include "test_utils.hpp"
+
+using namespace heyoka;
+using namespace heyoka_test;
+
+const auto fp_types = std::tuple<double
+#if !defined(HEYOKA_ARCH_PPC)
+                                 ,
+                                 long double
+#endif
+#if defined(HEYOKA_HAVE_REAL128)
+                                 ,
+                                 mppp::real128
+#endif
+                                 >{};
+
+static std::mt19937 rng;
+
+TEST_CASE("scalar propagate until")
+{
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+        const auto n_iter = 128u;
+
+        std::vector<std::vector<fp_t>> ics;
+        ics.resize(n_iter);
+
+        std::uniform_real_distribution<float> rdist(-static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100),
+                                                    static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100));
+        for (auto &ic : ics) {
+            ic.push_back(rdist(rng));
+            ic.push_back(fp_t(1) + rdist(rng));
+        }
+
+        auto res = ensemble_propagate_until<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+            tint.get_state_data()[0] = ics[i][0];
+            tint.get_state_data()[1] = ics[i][1];
+
+            return tint;
+        });
+
+        // Compare.
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(0);
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+
+            auto loc_res = ta.propagate_until(20);
+
+            REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
+            REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
+            REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
+            REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
+            REQUIRE(std::get<5>(res[i]).has_value() == std::get<4>(loc_res).has_value());
+        }
+
+        // Do it with continuous output too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+        res = ensemble_propagate_until<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+
+                return tint;
+            },
+            kw::c_output = true);
+
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(0);
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+
+            auto loc_res = ta.propagate_until(20, kw::c_output = true);
+
+            REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
+            REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
+            REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
+            REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
+            REQUIRE(std::get<5>(res[i]).has_value() == std::get<4>(loc_res).has_value());
+            REQUIRE((*std::get<5>(res[i]))(1.5) == (*std::get<4>(loc_res))(1.5));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}

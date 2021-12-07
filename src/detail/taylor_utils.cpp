@@ -1831,6 +1831,10 @@ template void taylor_add_d_out_function<mppp::real128>(llvm_state &, std::uint32
 
 } // namespace detail
 
+// NOTE: there are situations (e.g., ensemble simulations) in which
+// we may end up recompiling over and over the same code for the computation
+// of continouous output. Perhaps we should consider some caching of llvm states
+// containing continuous output functions.
 template <typename T>
 void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t dim, bool high_accuracy)
 {
