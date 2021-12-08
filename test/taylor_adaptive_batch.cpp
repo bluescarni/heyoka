@@ -370,7 +370,7 @@ TEST_CASE("set time")
     auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0, 0.1, 0.1}, 2};
 
     REQUIRE_THROWS_MATCHES(
-        ta.set_time({}), std::invalid_argument,
+        ta.set_time(std::vector<double>{}), std::invalid_argument,
         Message("Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is 2, "
                 "but the number of specified times is 0"));
     REQUIRE_THROWS_MATCHES(
