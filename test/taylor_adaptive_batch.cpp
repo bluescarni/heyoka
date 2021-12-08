@@ -383,6 +383,11 @@ TEST_CASE("set time")
     ta.set_time({1, -2});
 
     REQUIRE(ta.get_time() == std::vector{1., -2.});
+
+    ta.set_time(-1);
+    REQUIRE(ta.get_time() == std::vector{-1., -1.});
+    ta.set_time(1);
+    REQUIRE(ta.get_time() == std::vector{1., 1.});
 }
 
 TEST_CASE("propagate for_until")

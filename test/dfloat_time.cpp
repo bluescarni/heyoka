@@ -183,7 +183,7 @@ TEST_CASE("batch test")
             const auto v0 = fp_t(1) + rdist(rng);
             const auto v1 = fp_t(1) + rdist(rng);
 
-            ta.set_time({0, 0});
+            ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
             ta.get_state_data()[1] = 0;
             ta.get_state_data()[2] = v0;
@@ -213,7 +213,7 @@ TEST_CASE("batch test")
             const auto v0 = fp_t(1) + rdist(rng);
             const auto v1 = fp_t(1) + rdist(rng);
 
-            ta.set_time({0, 0});
+            ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
             ta.get_state_data()[1] = 0;
             ta.get_state_data()[2] = v0;
@@ -241,7 +241,7 @@ TEST_CASE("batch test")
             const auto v0 = fp_t(1) + rdist(rng);
             const auto v1 = fp_t(1) + rdist(rng);
 
-            ta.set_time({0, 0});
+            ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
             ta.get_state_data()[1] = 0;
             ta.get_state_data()[2] = v0;
@@ -271,7 +271,7 @@ TEST_CASE("batch test")
             const auto v0 = fp_t(1) + rdist(rng);
             const auto v1 = fp_t(1) + rdist(rng);
 
-            ta.set_time({0, 0});
+            ta.set_time({fp_t(0), 0});
             ta.get_state_data()[0] = 0;
             ta.get_state_data()[1] = 0;
             ta.get_state_data()[2] = v0;

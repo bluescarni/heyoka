@@ -1550,6 +1550,7 @@ public:
         return m_time_hi.data();
     }
     void set_time(const std::vector<T> &);
+    void set_time(T);
 
     const std::vector<T> &get_state() const
     {

@@ -3641,6 +3641,15 @@ void taylor_adaptive_batch_impl<T>::set_time(const std::vector<T> &new_time)
     std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
 }
 
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_time(T new_time)
+{
+    // Set the hi part.
+    std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
+    // Reset the lo part.
+    std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+}
+
 // Implementation detail to make a single integration timestep.
 // The magnitude of the timestep is automatically deduced for each
 // state vector, but it will always be not greater than
