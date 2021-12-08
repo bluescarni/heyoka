@@ -2745,6 +2745,50 @@ const std::vector<T> &continuous_output_batch<T>::operator()(const std::vector<T
     return (*this)(tm.data());
 }
 
+// NOTE: there's some overlap with the call_impl() code here.
+template <typename T>
+const std::vector<T> &continuous_output_batch<T>::operator()(T tm)
+{
+    using std::isfinite;
+
+    if (m_f_ptr == nullptr) {
+        throw std::invalid_argument("Cannot use a default-constructed continuous_output_batch object");
+    }
+
+    // NOTE: run the assertions only after ensuring this
+    // is a valid object.
+
+    // LCOV_EXCL_START
+#if !defined(NDEBUG)
+    // The batch size must not be zero.
+    assert(m_batch_size != 0u);
+    // m_batch_size must divide m_output exactly.
+    assert(m_output.size() % m_batch_size == 0u);
+    // m_tmp_tm must be of size m_batch_size.
+    assert(m_tmp_tm.size() == m_batch_size);
+    // m_batch_size must divide the time and tcs vectors exactly.
+    assert(m_times_hi.size() % m_batch_size == 0u);
+    assert(m_tcs.size() % m_batch_size == 0u);
+    // Need at least 3 time points (2 + 1 for padding).
+    assert(m_times_hi.size() / m_batch_size >= 3u);
+    // hi/lo parts of times must have the same sizes.
+    assert(m_times_hi.size() == m_times_lo.size());
+#endif
+    // LCOV_EXCL_STOP
+
+    if (!isfinite(tm)) {
+        throw std::invalid_argument("Cannot compute the continuous output in batch mode "
+                                    "at the non-finite time {}"_format(tm));
+    }
+
+    // Copy over the time to the temp buffer.
+    std::fill(m_tmp_tm.begin(), m_tmp_tm.end(), tm);
+
+    m_f_ptr(m_output.data(), m_tmp_tm.data(), m_tcs.data(), m_times_hi.data(), m_times_lo.data());
+
+    return m_output;
+}
+
 template <typename T>
 const llvm_state &continuous_output_batch<T>::get_llvm_state() const
 {

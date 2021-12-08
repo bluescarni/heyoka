@@ -320,6 +320,8 @@ TEST_CASE("batch")
         REQUIRE(co.get_batch_size() == 0u);
         REQUIRE_THROWS_MATCHES(co(loc_time), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output_batch object"));
+        REQUIRE_THROWS_MATCHES(co(loc_time[0]), std::invalid_argument,
+                               Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co(loc_time.data()), std::invalid_argument,
                                Message("Cannot use a default-constructed continuous_output_batch object"));
         REQUIRE_THROWS_MATCHES(co(std::vector<fp_t>{}), std::invalid_argument,
@@ -410,6 +412,14 @@ TEST_CASE("batch")
             (*d_out)(loc_time);
 
             for (auto j = 0u; j < batch_size; ++j) {
+                REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
+                REQUIRE(d_out->get_output()[batch_size + j]
+                        == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
+            }
+
+            // Try the scalar version too.
+            for (auto j = 0u; j < batch_size; ++j) {
+                (*d_out)(loc_time[j]);
                 REQUIRE(d_out->get_output()[j] == approximately(grid_out[2u * i * batch_size + j], fp_t(10)));
                 REQUIRE(d_out->get_output()[batch_size + j]
                         == approximately(grid_out[2u * i * batch_size + batch_size + j], fp_t(10)));
@@ -626,6 +636,7 @@ TEST_CASE("batch")
         // Try with non-finite time.
         loc_time[0] = std::numeric_limits<fp_t>::infinity();
         REQUIRE_THROWS_AS(co(loc_time), std::invalid_argument);
+        REQUIRE_THROWS_AS(co(loc_time[0]), std::invalid_argument);
 
         // s11n testing.
         oss.str("");

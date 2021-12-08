@@ -457,9 +457,30 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
 
+    // Scalar input time.
+    auto ta_copy2 = ta, ta_copy3 = ta;
+    ta_copy2.propagate_until(20.);
+    ta_copy3.propagate_until({20., 20.});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
+    // Try also with max_delta_t.
+    ta_copy2.propagate_until(30., kw::max_delta_t = std::vector{1e-4, 5e-5});
+    ta_copy3.propagate_until({30., 30.}, kw::max_delta_t = std::vector{1e-4, 5e-5});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
     // Do propagate_for() too.
     ta.propagate_for({10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
     ta_copy.propagate_for({10., 11.});
+
+    // Scalar input time.
+    ta_copy2.propagate_for(20.);
+    ta_copy3.propagate_for({20., 20.});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
+    // Try also with max_delta_t.
+    ta_copy2.propagate_for(30., kw::max_delta_t = std::vector{1e-4, 5e-5});
+    ta_copy3.propagate_for({30., 30.}, kw::max_delta_t = std::vector{1e-4, 5e-5});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
 
     REQUIRE(ta.get_time() == std::vector{20., 22.});
     REQUIRE(counter0 == 200000ul);

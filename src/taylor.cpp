@@ -4784,6 +4784,31 @@ const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(const std::
     return m_d_out;
 }
 
+// NOTE: there's some overlap with the code from the other overload here.
+template <typename T>
+const std::vector<T> &taylor_adaptive_batch_impl<T>::update_d_output(T time, bool rel_time)
+{
+    // NOTE: "time" needs to be translated
+    // because m_d_out_f expects a time coordinate
+    // with respect to the starting time t0 of
+    // the *previous* timestep.
+    if (rel_time) {
+        // Time coordinate relative to the current time.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_d_out_time[i] = m_last_h[i] + time;
+        }
+    } else {
+        // Absolute time coordinate.
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            m_d_out_time[i] = static_cast<T>(time - (dfloat<T>(m_time_hi[i], m_time_lo[i]) - m_last_h[i]));
+        }
+    }
+
+    m_d_out_f(m_d_out.data(), m_tc.data(), m_d_out_time.data());
+
+    return m_d_out;
+}
+
 template <typename T>
 void taylor_adaptive_batch_impl<T>::reset_cooldowns()
 {
