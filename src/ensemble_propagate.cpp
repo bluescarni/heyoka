@@ -11,7 +11,6 @@
 #include <cstddef>
 #include <functional>
 #include <optional>
-#include <stdexcept>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -30,10 +29,14 @@
 #include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/taylor.hpp>
 
-namespace heyoka
-{
+// NOTE: these actions will be performed concurrently from
+// multiple threads of exection:
+// - invocation of the generator's call operator,
+// - copy construction of the events' callbacks and of the propagate callback,
+// - invocation of the call operator of the copies of the callbacks
+//   (both event & propagate callbacks).
 
-namespace detail
+namespace heyoka::detail
 {
 
 namespace
@@ -46,10 +49,6 @@ ensemble_propagate_until_generic(const taylor_adaptive<T> &ta, T t, std::size_t 
                                  std::size_t max_steps, T max_delta_t,
                                  const std::function<bool(taylor_adaptive<T> &)> &cb, bool write_tc, bool with_c_out)
 {
-    if (n_iter == 0u) {
-        throw std::invalid_argument("The number of iterations in an ensemble propagation cannot be zero");
-    }
-
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
     // that are anyway going to be destroyed.
@@ -95,10 +94,6 @@ ensemble_propagate_for_generic(const taylor_adaptive<T> &ta, T delta_t, std::siz
                                std::size_t max_steps, T max_delta_t,
                                const std::function<bool(taylor_adaptive<T> &)> &cb, bool write_tc, bool with_c_out)
 {
-    if (n_iter == 0u) {
-        throw std::invalid_argument("The number of iterations in an ensemble propagation cannot be zero");
-    }
-
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
     // that are anyway going to be destroyed.
@@ -228,10 +223,6 @@ ensemble_propagate_until_batch_generic(
     const std::vector<T> &max_delta_ts, const std::function<bool(taylor_adaptive_batch<T> &)> &cb, bool write_tc,
     bool with_c_out)
 {
-    if (n_iter == 0u) {
-        throw std::invalid_argument("The number of iterations in an ensemble propagation in batch mode cannot be zero");
-    }
-
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
     // that are anyway going to be destroyed.
@@ -275,10 +266,6 @@ ensemble_propagate_for_batch_generic(
     const std::vector<T> &max_delta_ts, const std::function<bool(taylor_adaptive_batch<T> &)> &cb, bool write_tc,
     bool with_c_out)
 {
-    if (n_iter == 0u) {
-        throw std::invalid_argument("The number of iterations in an ensemble propagation in batch mode cannot be zero");
-    }
-
     // NOTE: store the results into a vector of optionals, so that we avoid
     // having to init a large number of default-constructed integrators
     // that are anyway going to be destroyed.
@@ -396,6 +383,4 @@ ensemble_propagate_for_batch_impl<mppp::real128>(
 
 #endif
 
-} // namespace detail
-
-} // namespace heyoka
+} // namespace heyoka::detail

@@ -11,7 +11,6 @@
 #include <initializer_list>
 #include <limits>
 #include <random>
-#include <stdexcept>
 #include <tuple>
 #include <vector>
 
@@ -65,6 +64,13 @@ TEST_CASE("scalar propagate until")
             ic.push_back(rdist(rng));
             ic.push_back(fp_t(1) + rdist(rng));
         }
+
+        REQUIRE(ensemble_propagate_until<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
+                    tint.get_state_data()[0] = ics[i][0];
+                    tint.get_state_data()[1] = ics[i][1];
+
+                    return tint;
+                }).empty());
 
         auto res = ensemble_propagate_until<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
             tint.get_state_data()[0] = ics[i][0];
@@ -145,6 +151,13 @@ TEST_CASE("scalar propagate for")
             ic.push_back(rdist(rng));
             ic.push_back(fp_t(1) + rdist(rng));
         }
+
+        REQUIRE(ensemble_propagate_for<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
+                    tint.get_state_data()[0] = ics[i][0];
+                    tint.get_state_data()[1] = ics[i][1];
+
+                    return tint;
+                }).empty());
 
         auto res = ensemble_propagate_for<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
             tint.get_state_data()[0] = ics[i][0];
@@ -229,6 +242,15 @@ TEST_CASE("batch propagate until")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
+        REQUIRE(ensemble_propagate_until_batch<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
+                    tint.get_state_data()[0] = ics[i][0];
+                    tint.get_state_data()[1] = ics[i][1];
+                    tint.get_state_data()[2] = ics[i][2];
+                    tint.get_state_data()[3] = ics[i][3];
+
+                    return tint;
+                }).empty());
+
         auto res = ensemble_propagate_until_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
             tint.get_state_data()[0] = ics[i][0];
             tint.get_state_data()[1] = ics[i][1];
@@ -312,6 +334,15 @@ TEST_CASE("batch propagate for")
             ic.push_back(fp_t(1) + rdist(rng));
             ic.push_back(fp_t(1) + rdist(rng));
         }
+
+        REQUIRE(ensemble_propagate_for_batch<fp_t>(ta, 20, 0, [&ics](auto tint, std::size_t i) {
+                    tint.get_state_data()[0] = ics[i][0];
+                    tint.get_state_data()[1] = ics[i][1];
+                    tint.get_state_data()[2] = ics[i][2];
+                    tint.get_state_data()[3] = ics[i][3];
+
+                    return tint;
+                }).empty());
 
         auto res = ensemble_propagate_for_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
             tint.get_state_data()[0] = ics[i][0];
