@@ -83,8 +83,6 @@ ensemble_propagate_until(const taylor_adaptive<T> &ta, T t, std::size_t n_iter,
                          const std::function<taylor_adaptive<T>(taylor_adaptive<T>, std::size_t)> &gen,
                          KwArgs &&...kw_args)
 {
-    static_assert(detail::is_supported_fp_v<T>, "Unhandled type.");
-
     auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
         = detail::taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
