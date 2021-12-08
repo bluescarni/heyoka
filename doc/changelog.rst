@@ -7,8 +7,20 @@ Changelog
 New
 ~~~
 
+- Several functions in the batch integration API
+  now also accept scalar time values in input,
+  instead of just vectors. The scalar values
+  are automatically splatted into vectors
+  of the appropriate size
+  (`#221 <https://github.com/bluescarni/heyoka/pull/221>`__).
 - Add a function to compute the suggested SIMD size for
   the CPU in use
+  (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
+
+Fix
+~~~
+
+- Fix build failures in the benchmark suite
   (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
 
 0.16.0 (2021-11-20)
