@@ -287,3 +287,87 @@ TEST_CASE("batch propagate until")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("batch propagate for")
+{
+    auto tester = [](auto fp_x) {
+        const auto batch_size = 2u;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, batch_size};
+
+        const auto n_iter = 128u;
+
+        std::vector<std::vector<fp_t>> ics;
+        ics.resize(n_iter);
+
+        std::uniform_real_distribution<float> rdist(-static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100),
+                                                    static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100));
+        for (auto &ic : ics) {
+            ic.push_back(rdist(rng));
+            ic.push_back(rdist(rng));
+            ic.push_back(fp_t(1) + rdist(rng));
+            ic.push_back(fp_t(1) + rdist(rng));
+        }
+
+        auto res = ensemble_propagate_for_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+            tint.get_state_data()[0] = ics[i][0];
+            tint.get_state_data()[1] = ics[i][1];
+            tint.get_state_data()[2] = ics[i][2];
+            tint.get_state_data()[3] = ics[i][3];
+
+            return tint;
+        });
+
+        // Compare.
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(std::vector<fp_t>(batch_size, fp_t(0)));
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+            ta.get_state_data()[2] = ics[i][2];
+            ta.get_state_data()[3] = ics[i][3];
+
+            auto loc_res = ta.propagate_for(20);
+
+            REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
+            REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
+            REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
+        }
+
+        // Do it with continuous output too.
+        ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, batch_size};
+
+        res = ensemble_propagate_for_batch<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+                tint.get_state_data()[2] = ics[i][2];
+                tint.get_state_data()[3] = ics[i][3];
+
+                return tint;
+            },
+            kw::c_output = true);
+
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(std::vector<fp_t>(batch_size, fp_t(0)));
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+            ta.get_state_data()[2] = ics[i][2];
+            ta.get_state_data()[3] = ics[i][3];
+
+            auto loc_res = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
+
+            REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
+            REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
+            REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
