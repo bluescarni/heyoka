@@ -124,6 +124,86 @@ TEST_CASE("scalar propagate until")
     tuple_for_each(fp_types, tester);
 }
 
+TEST_CASE("scalar propagate for")
+{
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+        const auto n_iter = 128u;
+
+        std::vector<std::vector<fp_t>> ics;
+        ics.resize(n_iter);
+
+        std::uniform_real_distribution<float> rdist(-static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100),
+                                                    static_cast<float>(std::numeric_limits<fp_t>::epsilon() * 100));
+        for (auto &ic : ics) {
+            ic.push_back(rdist(rng));
+            ic.push_back(fp_t(1) + rdist(rng));
+        }
+
+        auto res = ensemble_propagate_for<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+            tint.get_state_data()[0] = ics[i][0];
+            tint.get_state_data()[1] = ics[i][1];
+
+            return tint;
+        });
+
+        // Compare.
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(0);
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+
+            auto loc_res = ta.propagate_for(20);
+
+            REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
+            REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
+            REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
+            REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
+            REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
+            REQUIRE(std::get<5>(res[i]).has_value() == std::get<4>(loc_res).has_value());
+        }
+
+        // Do it with continuous output too.
+        ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 1.}};
+
+        res = ensemble_propagate_for<fp_t>(
+            ta, 20, n_iter,
+            [&ics](auto tint, std::size_t i) {
+                tint.get_state_data()[0] = ics[i][0];
+                tint.get_state_data()[1] = ics[i][1];
+
+                return tint;
+            },
+            kw::c_output = true);
+
+        for (auto i = 0u; i < n_iter; ++i) {
+            // Use ta for the comparison.
+            ta.set_time(0);
+            ta.get_state_data()[0] = ics[i][0];
+            ta.get_state_data()[1] = ics[i][1];
+
+            auto loc_res = ta.propagate_for(20, kw::c_output = true);
+
+            REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
+            REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
+            REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
+            REQUIRE(std::get<3>(res[i]) == std::get<2>(loc_res));
+            REQUIRE(std::get<4>(res[i]) == std::get<3>(loc_res));
+            REQUIRE(std::get<5>(res[i]).has_value() == std::get<4>(loc_res).has_value());
+            REQUIRE((*std::get<5>(res[i]))(1.5) == (*std::get<4>(loc_res))(1.5));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
 TEST_CASE("batch propagate until")
 {
     auto tester = [](auto fp_x) {
@@ -149,7 +229,7 @@ TEST_CASE("batch propagate until")
             ic.push_back(fp_t(1) + rdist(rng));
         }
 
-        auto res = ensemble_propagate_until<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+        auto res = ensemble_propagate_until_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
             tint.get_state_data()[0] = ics[i][0];
             tint.get_state_data()[1] = ics[i][1];
             tint.get_state_data()[2] = ics[i][2];
@@ -177,7 +257,7 @@ TEST_CASE("batch propagate until")
         // Do it with continuous output too.
         ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, batch_size};
 
-        res = ensemble_propagate_until<fp_t>(
+        res = ensemble_propagate_until_batch<fp_t>(
             ta, 20, n_iter,
             [&ics](auto tint, std::size_t i) {
                 tint.get_state_data()[0] = ics[i][0];
