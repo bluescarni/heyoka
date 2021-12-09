@@ -11,7 +11,9 @@
 
 #include <heyoka/config.hpp>
 
+#include <initializer_list>
 #include <type_traits>
+#include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -81,6 +83,30 @@ struct is_supported_fp<mppp::real128> : std::true_type {
 
 template <typename T>
 inline constexpr bool is_supported_fp_v = is_supported_fp<T>::value;
+
+// Detect vector type.
+template <typename>
+struct is_any_vector : std::false_type {
+};
+
+template <typename T>
+struct is_any_vector<std::vector<T>> : std::true_type {
+};
+
+template <typename T>
+inline constexpr bool is_any_vector_v = is_any_vector<T>::value;
+
+// Detect initializer_list type.
+template <typename>
+struct is_any_ilist : std::false_type {
+};
+
+template <typename T>
+struct is_any_ilist<std::initializer_list<T>> : std::true_type {
+};
+
+template <typename T>
+inline constexpr bool is_any_ilist_v = is_any_ilist<T>::value;
 
 } // namespace heyoka::detail
 

@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -27,6 +28,8 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include <boost/numeric/conversion/cast.hpp>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -1224,9 +1227,11 @@ namespace detail
 
 // Parser for the common kwargs options for the propagate_*() functions
 // for the batch integrator.
-template <typename T, bool Grid, typename... KwArgs>
-inline auto taylor_propagate_common_ops_batch(KwArgs &&...kw_args)
+template <typename T, bool Grid, bool ForceScalarMaxDeltaT, typename... KwArgs>
+inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &&...kw_args)
 {
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
     igor::parser p{kw_args...};
 
     if constexpr (p.has_unnamed_arguments()) {
@@ -1250,9 +1255,26 @@ inline auto taylor_propagate_common_ops_batch(KwArgs &&...kw_args)
         // we keep on checking on max_delta_t before invoking
         // the single step function. Hence, we want to avoid
         // any risk of aliasing.
-        auto max_delta_t = [&p]() -> std::vector<T> {
+        auto max_delta_t = [batch_size, &p]() -> std::vector<T> {
             if constexpr (p.has(kw::max_delta_t)) {
-                return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                using type = uncvref_t<decltype(p(kw::max_delta_t))>;
+
+                if constexpr (is_any_vector_v<type> || is_any_ilist_v<type>) {
+                    if constexpr (ForceScalarMaxDeltaT) {
+                        // LCOV_EXCL_START
+                        static_assert(always_false_v<T>,
+                                      "In ensemble integrations, max_delta_t must always be passed as a scalar.");
+
+                        throw;
+                        // LCOV_EXCL_STOP
+                    } else {
+                        return std::forward<decltype(p(kw::max_delta_t))>(p(kw::max_delta_t));
+                    }
+                } else {
+                    // Interpret as a scalar to be splatted.
+                    return std::vector<T>(boost::numeric_cast<typename std::vector<T>::size_type>(batch_size),
+                                          p(kw::max_delta_t));
+                }
             } else {
                 return {};
             }
@@ -1659,7 +1681,7 @@ public:
     std::optional<continuous_output_batch<T>> propagate_until(const std::vector<T> &ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false>(std::forward<KwArgs>(kw_args)...);
+            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
                                     write_tc, with_c_out); // LCOV_EXCL_LINE
@@ -1668,7 +1690,7 @@ public:
     std::optional<continuous_output_batch<T>> propagate_until(T t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false>(std::forward<KwArgs>(kw_args)...);
+            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         // NOTE: re-use m_pfor_ts as tmp storage, as the other overload does.
         assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
@@ -1680,7 +1702,7 @@ public:
     std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false>(std::forward<KwArgs>(kw_args)...);
+            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
                                   write_tc, with_c_out); // LCOV_EXCL_LINE
@@ -1689,7 +1711,7 @@ public:
     std::optional<continuous_output_batch<T>> propagate_for(T delta_t, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
-            = taylor_propagate_common_ops_batch<T, false>(std::forward<KwArgs>(kw_args)...);
+            = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         // NOTE: this is a slight repetition of the other overload's code.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -1704,7 +1726,7 @@ public:
     std::vector<T> propagate_grid(std::vector<T> grid, KwArgs &&...kw_args)
     {
         auto [max_steps, max_delta_ts, cb, _]
-            = taylor_propagate_common_ops_batch<T, true>(std::forward<KwArgs>(kw_args)...);
+            = taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
         return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
     }

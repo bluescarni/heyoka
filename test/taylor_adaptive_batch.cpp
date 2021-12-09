@@ -538,6 +538,16 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
     REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+
+    // Try with scalar max_delta_t.
+    ta_copy = ta;
+    ta.propagate_until({10., 11.}, kw::max_delta_t = {1e-4, 1e-4});
+    ta_copy.propagate_until({10., 11.}, kw::max_delta_t = 1e-4);
+    REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
+
+    ta.propagate_for({10., 11.}, kw::max_delta_t = {1e-4, 1e-4});
+    ta_copy.propagate_for({10., 11.}, kw::max_delta_t = 1e-4);
+    REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
 }
 
 TEST_CASE("propagate for_until write_tc")
@@ -668,6 +678,13 @@ TEST_CASE("propagate grid 2")
         REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
         REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
     }
+
+    // Test also with scalar max_delta_t.
+    ta_copy = ta;
+    out = ta.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 1e-4});
+    out_copy = ta_copy.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = 1e-4);
+
+    REQUIRE(out == out_copy);
 }
 
 // Test the interruption of the propagate_*() functions via callback.
