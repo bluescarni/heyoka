@@ -1256,6 +1256,9 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
         // the single step function. Hence, we want to avoid
         // any risk of aliasing.
         auto max_delta_t = [batch_size, &p]() -> std::vector<T> {
+            // NOTE: compiler warning.
+            (void)batch_size;
+
             if constexpr (p.has(kw::max_delta_t)) {
                 using type = uncvref_t<decltype(p(kw::max_delta_t))>;
 
