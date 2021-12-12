@@ -34,7 +34,7 @@
 #include <heyoka/taylor.hpp>
 
 // NOTE: these actions will be performed concurrently from
-// multiple threads of exection:
+// multiple threads of execution:
 // - invocation of the generator's call operator,
 // - copy construction of the events' callbacks and of the propagate callback,
 // - invocation of the call operator of the copies of the callbacks
