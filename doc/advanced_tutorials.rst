@@ -26,3 +26,4 @@ the tutorials should not be too hard to follow.
 
   tut_batch_mode
   tut_s11n
+  tut_ensemble
