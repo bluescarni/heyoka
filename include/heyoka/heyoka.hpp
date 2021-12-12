@@ -10,10 +10,10 @@
 #define HEYOKA_HEYOKA_HPP
 
 #include <heyoka/callable.hpp>
+#include <heyoka/ensemble_propagate.hpp>
 #include <heyoka/exceptions.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
-// #include <heyoka/gp.hpp>
 #include <heyoka/kw.hpp>
 #include <heyoka/llvm_state.hpp>
 #include <heyoka/logging.hpp>
@@ -26,5 +26,7 @@
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/taylor.hpp>
 #include <heyoka/variable.hpp>
+
+// #include <heyoka/gp.hpp>
 
 #endif
