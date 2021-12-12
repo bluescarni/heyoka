@@ -78,8 +78,7 @@ ensemble_propagate_until_generic(const taylor_adaptive<T> &ta, T t, std::size_t 
                                            kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
-            opt_retval[i].emplace(std::move(local_ta), std::get<0>(loc_ret), std::get<1>(loc_ret), std::get<2>(loc_ret),
-                                  std::get<3>(loc_ret), std::move(std::get<4>(loc_ret)));
+            opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
         }
     });
 
@@ -123,8 +122,7 @@ ensemble_propagate_for_generic(const taylor_adaptive<T> &ta, T delta_t, std::siz
                                          kw::callback = cb, kw::write_tc = write_tc, kw::c_output = with_c_out);
 
             // Assign the results.
-            opt_retval[i].emplace(std::move(local_ta), std::get<0>(loc_ret), std::get<1>(loc_ret), std::get<2>(loc_ret),
-                                  std::get<3>(loc_ret), std::move(std::get<4>(loc_ret)));
+            opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
         }
     });
 
@@ -165,8 +163,7 @@ ensemble_propagate_grid_generic(const taylor_adaptive<T> &ta, const std::vector<
                                                    kw::callback = cb);
 
             // Assign the results.
-            opt_retval[i].emplace(std::move(local_ta), std::get<0>(loc_ret), std::get<1>(loc_ret), std::get<2>(loc_ret),
-                                  std::get<3>(loc_ret), std::move(std::get<4>(loc_ret)));
+            opt_retval[i].emplace(std::tuple_cat(std::make_tuple(std::move(local_ta)), std::move(loc_ret)));
         }
     });
 
