@@ -165,6 +165,7 @@ TEST_CASE("scalar propagate for")
                 }).empty());
 
         auto res = ensemble_propagate_for<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+            tint.set_time(10);
             tint.get_state_data()[0] = ics[i][0];
             tint.get_state_data()[1] = ics[i][1];
 
@@ -176,13 +177,13 @@ TEST_CASE("scalar propagate for")
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
-            ta.set_time(0);
+            ta.set_time(10);
             ta.get_state_data()[0] = ics[i][0];
             ta.get_state_data()[1] = ics[i][1];
 
             auto loc_res = ta.propagate_for(20);
 
-            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(30), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -197,6 +198,7 @@ TEST_CASE("scalar propagate for")
         res = ensemble_propagate_for<fp_t>(
             ta, 20, n_iter,
             [&ics](auto tint, std::size_t i) {
+                tint.set_time(10);
                 tint.get_state_data()[0] = ics[i][0];
                 tint.get_state_data()[1] = ics[i][1];
 
@@ -206,13 +208,13 @@ TEST_CASE("scalar propagate for")
 
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
-            ta.set_time(0);
+            ta.set_time(10);
             ta.get_state_data()[0] = ics[i][0];
             ta.get_state_data()[1] = ics[i][1];
 
             auto loc_res = ta.propagate_for(20, kw::c_output = true);
 
-            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(30), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -426,6 +428,8 @@ TEST_CASE("batch propagate for")
                 }).empty());
 
         auto res = ensemble_propagate_for_batch<fp_t>(ta, 20, n_iter, [&ics](auto tint, std::size_t i) {
+            tint.set_time(fp_t(10));
+
             tint.get_state_data()[0] = ics[i][0];
             tint.get_state_data()[1] = ics[i][1];
             tint.get_state_data()[2] = ics[i][2];
@@ -439,7 +443,7 @@ TEST_CASE("batch propagate for")
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
-            ta.set_time(std::vector<fp_t>(batch_size, fp_t(0)));
+            ta.set_time(fp_t(10));
             ta.get_state_data()[0] = ics[i][0];
             ta.get_state_data()[1] = ics[i][1];
             ta.get_state_data()[2] = ics[i][2];
@@ -448,7 +452,7 @@ TEST_CASE("batch propagate for")
             auto loc_res = ta.propagate_for(20);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
-                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
+                                [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
@@ -460,6 +464,8 @@ TEST_CASE("batch propagate for")
         res = ensemble_propagate_for_batch<fp_t>(
             ta, 20, n_iter,
             [&ics](auto tint, std::size_t i) {
+                tint.set_time(fp_t(10));
+
                 tint.get_state_data()[0] = ics[i][0];
                 tint.get_state_data()[1] = ics[i][1];
                 tint.get_state_data()[2] = ics[i][2];
@@ -471,7 +477,7 @@ TEST_CASE("batch propagate for")
 
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
-            ta.set_time(std::vector<fp_t>(batch_size, fp_t(0)));
+            ta.set_time(fp_t(10));
             ta.get_state_data()[0] = ics[i][0];
             ta.get_state_data()[1] = ics[i][1];
             ta.get_state_data()[2] = ics[i][2];
@@ -480,7 +486,7 @@ TEST_CASE("batch propagate for")
             auto loc_res = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
             REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
-                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
+                                [](fp_t t) { return t == approximately(fp_t(30), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
