@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Add support for :ref:`ensemble propagations <tut_ensemble>`
+  (`#221 <https://github.com/bluescarni/heyoka/pull/221>`__).
 - Several functions in the batch integration API
   now also accept scalar time values in input,
   instead of just vectors. The scalar values
