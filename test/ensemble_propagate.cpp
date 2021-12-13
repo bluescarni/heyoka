@@ -8,6 +8,7 @@
 
 #include <heyoka/config.hpp>
 
+#include <algorithm>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -79,6 +80,8 @@ TEST_CASE("scalar propagate until")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -88,6 +91,7 @@ TEST_CASE("scalar propagate until")
 
             auto loc_res = ta.propagate_until(20);
 
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -117,6 +121,7 @@ TEST_CASE("scalar propagate until")
 
             auto loc_res = ta.propagate_until(20, kw::c_output = true);
 
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -166,6 +171,8 @@ TEST_CASE("scalar propagate for")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -175,6 +182,7 @@ TEST_CASE("scalar propagate for")
 
             auto loc_res = ta.propagate_for(20);
 
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -204,6 +212,7 @@ TEST_CASE("scalar propagate for")
 
             auto loc_res = ta.propagate_for(20, kw::c_output = true);
 
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -259,6 +268,8 @@ TEST_CASE("scalar propagate grid")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -268,6 +279,7 @@ TEST_CASE("scalar propagate grid")
 
             auto loc_res = ta.propagate_grid(grid);
 
+            REQUIRE(std::get<0>(res[i]).get_time() == approximately(fp_t(20), fp_t(10)));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<1>(res[i]) == std::get<0>(loc_res));
             REQUIRE(std::get<2>(res[i]) == std::get<1>(loc_res));
@@ -323,6 +335,8 @@ TEST_CASE("batch propagate until")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -334,6 +348,8 @@ TEST_CASE("batch propagate until")
 
             auto loc_res = ta.propagate_until(20);
 
+            REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
+                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
@@ -364,6 +380,8 @@ TEST_CASE("batch propagate until")
 
             auto loc_res = ta.propagate_until(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
+            REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
+                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
@@ -416,6 +434,8 @@ TEST_CASE("batch propagate for")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -427,6 +447,8 @@ TEST_CASE("batch propagate for")
 
             auto loc_res = ta.propagate_for(20);
 
+            REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
+                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]).has_value() == loc_res.has_value());
@@ -457,6 +479,8 @@ TEST_CASE("batch propagate for")
 
             auto loc_res = ta.propagate_for(std::vector<fp_t>(batch_size, fp_t(20)), kw::c_output = true);
 
+            REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
+                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE((*std::get<1>(res[i]))(1.5) == (*(loc_res))(1.5));
@@ -520,6 +544,8 @@ TEST_CASE("batch propagate grid")
             return tint;
         });
 
+        REQUIRE(res.size() == n_iter);
+
         // Compare.
         for (auto i = 0u; i < n_iter; ++i) {
             // Use ta for the comparison.
@@ -531,6 +557,8 @@ TEST_CASE("batch propagate grid")
 
             auto loc_res = ta.propagate_grid(grid_splat);
 
+            REQUIRE(std::all_of(std::get<0>(res[i]).get_time().begin(), std::get<0>(res[i]).get_time().end(),
+                                [](fp_t t) { return t == approximately(fp_t(20), fp_t(10)); }));
             REQUIRE(std::get<0>(res[i]).get_state() == ta.get_state());
             REQUIRE(std::get<0>(res[i]).get_propagate_res() == ta.get_propagate_res());
             REQUIRE(std::get<1>(res[i]) == loc_res);
