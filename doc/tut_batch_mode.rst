@@ -364,7 +364,7 @@ which can be passed to the ``propagate_for/until()`` functions. The usage of the
 continuous output object returned by ``propagate_for/until()`` is analogous to the scalar case,
 the only difference being that the call operator expects a batch of time coordinates
 (represented as a ``std::vector``)
-rather than a single scalar time corrdinate.
+rather than a single scalar time coordinate.
 
 
 Event detection

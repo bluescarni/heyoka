@@ -69,7 +69,7 @@ values) and return it.
 
 The ``ensemble_propagate_until()`` function iterates over
 the ``[0, n_iter)`` range. At each iteration, the generator ``gen`` is invoked,
-with the template integrator as first argument and the current iteration number 
+with the template integrator as the first argument and the current iteration number
 as the second argument. The ``propagate_until()`` member
 function is then called on the integrator returned by ``gen``, and the result of the propagation
 is appended to a list of results which is finally returned by
@@ -102,7 +102,7 @@ be forwarded to each ``propagate_until()`` invocation.
 
 The value returned by ``ensemble_propagate_until()`` is a vector of tuples constructed by concatenating the integrator
 object used for each integration and the tuple returned by each ``propagate_until()`` invocation. This way, at the end
-of an ensemble propagation it is possible to inspect both the state of each integrator object and the outcome of
+of an ensemble propagation it is possible to inspect both the state of each integrator object and the output of
 each invocation of ``propagate_until()`` (including, e.g., the :ref:`continuous output <tut_c_output>`, if
 requested).
 
