@@ -370,7 +370,7 @@ TEST_CASE("set time")
     auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = 1_dbl}, {0, 0, 0.1, 0.1}, 2};
 
     REQUIRE_THROWS_MATCHES(
-        ta.set_time({}), std::invalid_argument,
+        ta.set_time(std::vector<double>{}), std::invalid_argument,
         Message("Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is 2, "
                 "but the number of specified times is 0"));
     REQUIRE_THROWS_MATCHES(
@@ -383,6 +383,11 @@ TEST_CASE("set time")
     ta.set_time({1, -2});
 
     REQUIRE(ta.get_time() == std::vector{1., -2.});
+
+    ta.set_time(-1);
+    REQUIRE(ta.get_time() == std::vector{-1., -1.});
+    ta.set_time(1);
+    REQUIRE(ta.get_time() == std::vector{1., 1.});
 }
 
 TEST_CASE("propagate for_until")
@@ -457,9 +462,30 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
 
+    // Scalar input time.
+    auto ta_copy2 = ta, ta_copy3 = ta;
+    ta_copy2.propagate_until(20.);
+    ta_copy3.propagate_until({20., 20.});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
+    // Try also with max_delta_t.
+    ta_copy2.propagate_until(30., kw::max_delta_t = std::vector{1e-4, 5e-5});
+    ta_copy3.propagate_until({30., 30.}, kw::max_delta_t = std::vector{1e-4, 5e-5});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
     // Do propagate_for() too.
     ta.propagate_for({10., 11.}, kw::max_delta_t = std::vector{1e-4, 5e-5}, kw::callback = cb);
     ta_copy.propagate_for({10., 11.});
+
+    // Scalar input time.
+    ta_copy2.propagate_for(20.);
+    ta_copy3.propagate_for({20., 20.});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
+
+    // Try also with max_delta_t.
+    ta_copy2.propagate_for(30., kw::max_delta_t = std::vector{1e-4, 5e-5});
+    ta_copy3.propagate_for({30., 30.}, kw::max_delta_t = std::vector{1e-4, 5e-5});
+    REQUIRE(ta_copy2.get_state() == ta_copy3.get_state());
 
     REQUIRE(ta.get_time() == std::vector{20., 22.});
     REQUIRE(counter0 == 200000ul);
@@ -512,6 +538,16 @@ TEST_CASE("propagate for_until")
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
     REQUIRE(ta.get_state()[2] == approximately(ta_copy.get_state()[2], 1000.));
     REQUIRE(ta.get_state()[3] == approximately(ta_copy.get_state()[3], 1000.));
+
+    // Try with scalar max_delta_t.
+    ta_copy = ta;
+    ta.propagate_until({10., 11.}, kw::max_delta_t = {1e-4, 1e-4});
+    ta_copy.propagate_until({10., 11.}, kw::max_delta_t = 1e-4);
+    REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
+
+    ta.propagate_for({10., 11.}, kw::max_delta_t = {1e-4, 1e-4});
+    ta_copy.propagate_for({10., 11.}, kw::max_delta_t = 1e-4);
+    REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
 }
 
 TEST_CASE("propagate for_until write_tc")
@@ -642,6 +678,13 @@ TEST_CASE("propagate grid 2")
         REQUIRE(out[4u * i + 2u] == approximately(out_copy[4u * i + 2u], 1000.));
         REQUIRE(out[4u * i + 3u] == approximately(out_copy[4u * i + 3u], 1000.));
     }
+
+    // Test also with scalar max_delta_t.
+    ta_copy = ta;
+    out = ta.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = std::vector{1e-4, 1e-4});
+    out_copy = ta_copy.propagate_grid({1., 1.5, 5., 5.6, 10., 11.}, kw::max_delta_t = 1e-4);
+
+    REQUIRE(out == out_copy);
 }
 
 // Test the interruption of the propagate_*() functions via callback.

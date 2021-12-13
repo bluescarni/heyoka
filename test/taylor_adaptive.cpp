@@ -692,6 +692,17 @@ TEST_CASE("dense output")
                         REQUIRE(coa(1u, i) == approximately(isa(1u, i), 100.));
                     }
 
+                    ta.update_d_output(0.);
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(coa(0u, i) == approximately(isa(0u, i), 100.));
+                        REQUIRE(coa(1u, i) == approximately(isa(1u, i), 100.));
+                    }
+
+                    auto ta_copy = ta;
+                    ta.update_d_output(0.1);
+                    ta_copy.update_d_output(std::vector<double>(batch_size, 0.1));
+                    REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
+
                     ta.update_d_output(ta.get_time());
                     for (auto i = 0u; i < batch_size; ++i) {
                         REQUIRE(coa(0u, i) == approximately(sa(0u, i), 100.));
@@ -759,12 +770,23 @@ TEST_CASE("dense output")
                             REQUIRE(coa(0u, i) == approximately(sa(0u, i), 1000.));
                             REQUIRE(coa(1u, i) == approximately(sa(1u, i), 1000.));
                         }
+
+                        ta.update_d_output(0., true);
+                        for (auto i = 0u; i < batch_size; ++i) {
+                            REQUIRE(coa(0u, i) == approximately(sa(0u, i), 1000.));
+                            REQUIRE(coa(1u, i) == approximately(sa(1u, i), 1000.));
+                        }
+
+                        ta_copy = ta;
+                        ta.update_d_output(0.1, true);
+                        ta_copy.update_d_output(std::vector<double>(batch_size, 0.1), true);
+                        REQUIRE(ta.get_d_output() == ta_copy.get_d_output());
                     }
 
                     using Catch::Matchers::Message;
 
                     REQUIRE_THROWS_MATCHES(
-                        ta.update_d_output({}), std::invalid_argument,
+                        ta.update_d_output(std::vector<double>{}), std::invalid_argument,
                         Message("Invalid number of time coordinates specified for the dense output in a Taylor "
                                 "integrator in batch "
                                 "mode: the batch size is "
