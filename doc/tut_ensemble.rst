@@ -1,3 +1,5 @@
+.. _tut_ensemble:
+
 Ensemble propagations
 =====================
 

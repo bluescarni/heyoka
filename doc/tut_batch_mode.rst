@@ -432,6 +432,36 @@ the oscillation period is roughly 1 for all batch elements. This is of course
 expected due to the isochronicity property of the pendulum in the small oscillation
 regime.
 
+Ensemble propagations
+^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 0.17.0
+
+:ref:`Ensemble propagations <tut_ensemble>` are also available in batch mode. The API is identical
+to scalar mode ensemble propagations. Specifically, the following functions are available:
+
+* ``ensemble_propagate_until_batch()``, for batch ensemble propagations
+  up to a specified epoch,
+* ``ensemble_propagate_for_batch()``, for batch ensemble propagations
+  for a time interval,
+* ``ensemble_propagate_grid_batch()``, for batch ensemble propagations
+  over a time grid.
+
+Like their scalar counterparts, the batch ensemble propagation functions accept in input:
+
+* the template batch integrator ``ta``,
+* the final epoch, time interval or time grid to be used in the propagations,
+* the number of iterations ``n_iter`` in the ensemble,
+* the generator ``gen``.
+
+Note however that, whereas the ``propagate_*()`` member functions of the batch integrator
+allow to use distinct epochs, time intervals or time grids for each batch element, in batch ensemble
+propagations a single epoch, time interval or time grid is used for *all* batch elements in *all* iterations
+of the ensemble. In particular, while the ``propagate_grid()`` member function of the batch integrator
+expects a 2D array in input (i.e., an array of time batches), the ``ensemble_propagate_grid_batch()``
+function expects in input a 1D array (i.e., an array of scalars, just like the scalar
+``propagate_grid()`` member function).
+
 Full code listing
 -----------------
 
