@@ -151,6 +151,11 @@
      Serialisation
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_ensemble.html">
+     Ensemble propagations
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toctree-l1">
@@ -293,6 +298,11 @@
    <li class="toc-h3 nav-item toc-entry">
     <a class="reference internal nav-link" href="#event-detection">
      Event detection
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-propagations">
+     Ensemble propagations
     </a>
    </li>
   </ul>
@@ -710,7 +720,7 @@ which can be passed to the <code class="docutils literal notranslate"><span clas
 continuous output object returned by <code class="docutils literal notranslate"><span class="pre">propagate_for/until()</span></code> is analogous to the scalar case,
 the only difference being that the call operator expects a batch of time coordinates
 (represented as a <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>)
-rather than a single scalar time corrdinate.</p>
+rather than a single scalar time coordinate.</p>
 </div>
 <div class="section" id="event-detection">
 <h3>Event detection<a class="headerlink" href="#event-detection" title="Permalink to this headline">¶</a></h3>
@@ -794,6 +804,36 @@ coordinate for the batch element in which the event triggered.</p>
 the oscillation period is roughly 1 for all batch elements. This is of course
 expected due to the isochronicity property of the pendulum in the small oscillation
 regime.</p>
+</div>
+<div class="section" id="ensemble-propagations">
+<h3>Ensemble propagations<a class="headerlink" href="#ensemble-propagations" title="Permalink to this headline">¶</a></h3>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.17.0.</span></p>
+</div>
+<p><a class="reference internal" href="tut_ensemble.html#tut-ensemble"><span class="std std-ref">Ensemble propagations</span></a> are also available in batch mode. The API is identical
+to scalar mode ensemble propagations. Specifically, the following functions are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until_batch()</span></code>, for batch ensemble propagations
+up to a specified epoch,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_for_batch()</span></code>, for batch ensemble propagations
+for a time interval,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_grid_batch()</span></code>, for batch ensemble propagations
+over a time grid.</p></li>
+</ul>
+<p>Like their scalar counterparts, the batch ensemble propagation functions accept in input:</p>
+<ul class="simple">
+<li><p>the template batch integrator <code class="docutils literal notranslate"><span class="pre">ta</span></code>,</p></li>
+<li><p>the final epoch, time interval or time grid to be used in the propagations,</p></li>
+<li><p>the number of iterations <code class="docutils literal notranslate"><span class="pre">n_iter</span></code> in the ensemble,</p></li>
+<li><p>the generator <code class="docutils literal notranslate"><span class="pre">gen</span></code>.</p></li>
+</ul>
+<p>Note however that, whereas the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> member functions of the batch integrator
+allow to use distinct epochs, time intervals or time grids for each batch element, in batch ensemble
+propagations a single epoch, time interval or time grid is used for <em>all</em> batch elements in <em>all</em> iterations
+of the ensemble. In particular, while the <code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> member function of the batch integrator
+expects a 2D array in input (i.e., an array of time batches), the <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_grid_batch()</span></code>
+function expects in input a 1D array (i.e., an array of scalars, just like the scalar
+<code class="docutils literal notranslate"><span class="pre">propagate_grid()</span></code> member function).</p>
 </div>
 </div>
 <div class="section" id="full-code-listing">

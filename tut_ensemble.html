@@ -1,0 +1,508 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ensemble propagations &#8212; heyoka 0.17.0 documentation</title>
+    
+  <link href="_static/css/theme.css" rel="stylesheet">
+  <link href="_static/css/index.ff1ffe594081f20da1ef19478df9384b.css" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    
+  <link rel="preload" as="script" href="_static/js/index.be7d3bbb2ef33a8344ce.js">
+
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Benchmarks" href="benchmarks.html" />
+    <link rel="prev" title="Serialisation" href="tut_s11n.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="_static/white_logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">heyoka 0.17.0 documentation</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="install.html">
+   Installation
+  </a>
+ </li>
+ <li class="toctree-l1 has-children">
+  <a class="reference internal" href="basic_tutorials.html">
+   Basic tutorials
+  </a>
+  <input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/>
+  <label for="toctree-checkbox-1">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_taylor_method.html">
+     Taylor’s method
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_expression_system.html">
+     The expression system
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive.html">
+     The adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_adaptive_custom.html">
+     Customising the adaptive integrator
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_param.html">
+     Runtime parameters
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_nonauto.html">
+     Non-autonomous systems
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_d_output.html">
+     Dense &amp; continuous output
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_events.html">
+     Event detection
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1 current active has-children">
+  <a class="reference internal" href="advanced_tutorials.html">
+   Advanced tutorials
+  </a>
+  <input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/>
+  <label for="toctree-checkbox-2">
+   <i class="fas fa-chevron-down">
+   </i>
+  </label>
+  <ul class="current">
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_batch_mode.html">
+     Batch mode
+    </a>
+   </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_s11n.html">
+     Serialisation
+    </a>
+   </li>
+   <li class="toctree-l2 current active">
+    <a class="current reference internal" href="#">
+     Ensemble propagations
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="benchmarks.html">
+   Benchmarks
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ad_notes.html">
+   Notes on automatic differentiation
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="changelog.html">
+   Changelog
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="breaking_changes.html">
+   Breaking changes
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="acknowledgement.html">
+   Acknowledgement
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav> <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Theme by the <a href="https://ebp.jupyterbook.org">Executable Book Project</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="topbar container-xl fixed-top">
+    <div class="topbar-contents row">
+        <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
+        <div class="col pl-md-4 topbar-main">
+            
+            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-arrow-left"></i>
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            
+            
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="_sources/tut_ensemble.rst.txt"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.rst</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+</div>
+
+            <!-- Source interaction buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Connect with source repository"><i class="fab fa-github"></i></button>
+    <div class="dropdown-buttons sourcebuttons">
+        <a class="repository-button"
+            href="https://github.com/bluescarni/heyoka"><button type="button" class="btn btn-secondary topbarbtn"
+                data-toggle="tooltip" data-placement="left" title="Source repository"><i
+                    class="fab fa-github"></i>repository</button></a>
+        <a class="issues-button"
+            href="https://github.com/bluescarni/heyoka/issues/new?title=Issue%20on%20page%20%2Ftut_ensemble.html&body=Your%20issue%20content%20here."><button
+                type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip" data-placement="left"
+                title="Open an issue"><i class="fas fa-lightbulb"></i>open issue</button></a>
+        
+    </div>
+</div>
+
+            <!-- Full screen (wrap in <a> to have style consistency -->
+
+<a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+        data-placement="bottom" onclick="toggleFullScreen()" aria-label="Fullscreen mode"
+        title="Fullscreen mode"><i
+            class="fas fa-expand"></i></button></a>
+
+            <!-- Launch buttons -->
+
+        </div>
+
+        <!-- Table of contents -->
+        <div class="d-none d-md-block col-md-2 bd-toc show">
+            
+            <div class="tocsection onthispage pt-5 pb-3">
+                <i class="fas fa-list"></i> Contents
+            </div>
+            <nav id="bd-toc-nav" aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-simple-example">
+   A simple example
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#thread-safety-considerations">
+   Thread safety considerations
+  </a>
+ </li>
+</ul>
+
+            </nav>
+        </div>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="ensemble-propagations">
+<span id="tut-ensemble"></span><h1>Ensemble propagations<a class="headerlink" href="#ensemble-propagations" title="Permalink to this headline">¶</a></h1>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.17.0.</span></p>
+</div>
+<p>Starting with version 0.17.0, heyoka offers support for
+<em>ensemble propagations</em>. In ensemble mode, multiple distinct
+instances of the same ODE system are integrated in parallel,
+typically using different sets of initial conditions and/or
+<a class="reference internal" href="tut_param.html#tut-param"><span class="std std-ref">runtime parameters</span></a>.
+Monte Carlo simulations and parameter
+searches are two typical examples of tasks in which ensemble mode
+is particularly useful.</p>
+<p>The ensemble mode API mirrors the time-limited propagation
+functions available in the
+<a class="reference internal" href="tut_adaptive.html#tut-adaptive"><span class="std std-ref">adaptive integrator class</span></a>. Specifically,
+three functions are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code>, for ensemble propagations
+up to a specified epoch,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_for()</span></code>, for ensemble propagations
+for a time interval,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ensemble_propagate_grid()</span></code>, for ensemble propagations
+over a time grid.</p></li>
+</ul>
+<p>In this tutorial, we will be focusing on the <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code>
+function, but adapting the code to the other two functions
+should be straightforward.</p>
+<p>Note that, at this time, ensemble propagations are limited to using multiple threads
+of execution to achieve parallelisation. In the future, additional parallelisation
+modes (e.g., multiprocessing, distributed) may be added.</p>
+<div class="section" id="a-simple-example">
+<h2>A simple example<a class="headerlink" href="#a-simple-example" title="Permalink to this headline">¶</a></h2>
+<p>As usual, for this illustrative tutorial we will be using the ODEs of the simple pendulum.
+Thus, let us begin
+with the definition of the symbolic variables and of an integrator object:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create the symbolic variables x and v.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="n">v</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_vars</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// Create the integrator object</span>
+<span class="w">    </span><span class="c1">// in double precision.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">{</span><span class="c1">// Definition of the ODE system:</span>
+<span class="w">                                      </span><span class="c1">// x&#39; = v</span>
+<span class="w">                                      </span><span class="c1">// v&#39; = -9.8 * sin(x)</span>
+<span class="w">                                      </span><span class="p">{</span><span class="n">prime</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">v</span><span class="p">,</span><span class="w"> </span><span class="n">prime</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">-9.8</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)},</span><span class="w"></span>
+<span class="w">                                      </span><span class="c1">// Initial conditions</span>
+<span class="w">                                      </span><span class="c1">// for x and v.</span>
+<span class="w">                                      </span><span class="p">{</span><span class="mf">0.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.</span><span class="p">}};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note how, differently from the other tutorials, here we have set the initial conditions
+to zeroes. This is because, in ensemble mode, we will never use directly the <code class="docutils literal notranslate"><span class="pre">ta</span></code> object to perform
+a numerical integration. Rather, <code class="docutils literal notranslate"><span class="pre">ta</span></code> acts as a <em>template</em> from which other integrator
+objects will be constructed, and thus its initial conditions are inconsequential.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> function takes in input at least 4 arguments:</p>
+<ul class="simple">
+<li><p>the template integrator <code class="docutils literal notranslate"><span class="pre">ta</span></code>,</p></li>
+<li><p>the final epoch <code class="docutils literal notranslate"><span class="pre">t</span></code> for the propagations (this argument would be a time interval <code class="docutils literal notranslate"><span class="pre">delta_t</span></code>
+for <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_for()</span></code> and a time grid for <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_grid()</span></code>),</p></li>
+<li><p>the number of iterations <code class="docutils literal notranslate"><span class="pre">n_iter</span></code> in the ensemble,</p></li>
+<li><p>a function object <code class="docutils literal notranslate"><span class="pre">gen</span></code>, known as the <em>generator</em>.</p></li>
+</ul>
+<p>The signature of the generator <code class="docutils literal notranslate"><span class="pre">gen</span></code> reads:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">gen</span><span class="p">(</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">size_t</span><span class="w"> </span><span class="n">idx</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>That is, the generator takes in input a <em>copy</em> of the template integrator <code class="docutils literal notranslate"><span class="pre">ta</span></code>
+and an iteration index <code class="docutils literal notranslate"><span class="pre">idx</span></code> in the <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">n_iter)</span></code> range. <code class="docutils literal notranslate"><span class="pre">gen</span></code> is then expected
+to modify the copy of <code class="docutils literal notranslate"><span class="pre">ta</span></code> (e.g., by setting its initial conditions to specific
+values) and return it.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> function iterates over
+the <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">n_iter)</span></code> range. At each iteration, the generator <code class="docutils literal notranslate"><span class="pre">gen</span></code> is invoked,
+with the template integrator as the first argument and the current iteration number
+as the second argument. The <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> member
+function is then called on the integrator returned by <code class="docutils literal notranslate"><span class="pre">gen</span></code>, and the result of the propagation
+is appended to a list of results which is finally returned by
+<code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> once all the propagations have finished.</p>
+<p>Let us see a concrete example of <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> in action. First, we
+begin by creating 10 sets of different initial conditions to be used in the ensemble
+propagations:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Create 10 sets of different initial conditions,</span>
+<span class="w">    </span><span class="c1">// one for each element of the ensemble.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">ensemble_ics</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ensemble_ics</span><span class="p">.</span><span class="n">push_back</span><span class="p">({</span><span class="mf">0.05</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">100.</span><span class="p">,</span><span class="w"> </span><span class="mf">0.025</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">100.</span><span class="p">});</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Next, we define a generator that will pick a set of initial conditions from <code class="docutils literal notranslate"><span class="pre">ensemble_ics</span></code>,
+depending on the iteration index:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// The generator.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">gen</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="n">ensemble_ics</span><span class="p">](</span><span class="n">taylor_adaptive</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">ta_copy</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ta_copy</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ensemble_ics</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">];</span><span class="w"></span>
+<span class="w">        </span><span class="n">ta_copy</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ensemble_ics</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">];</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">ta_copy</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>We are now ready to invoke the <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> function:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Run the ensemble propagation up to t = 20.</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ensemble_propagate_until</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ta</span><span class="p">,</span><span class="w"> </span><span class="mf">20.</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">gen</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> function can be invoked with additional keyword arguments (beside
+the mandatory initial 4 arguments). Any additional argument will
+be forwarded to each <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> invocation.</p>
+<p>The value returned by <code class="docutils literal notranslate"><span class="pre">ensemble_propagate_until()</span></code> is a vector of tuples constructed by concatenating the integrator
+object used for each integration and the tuple returned by each <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> invocation. This way, at the end
+of an ensemble propagation it is possible to inspect both the state of each integrator object and the output of
+each invocation of <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> (including, e.g., the <a class="reference internal" href="tut_d_output.html#tut-c-output"><span class="std std-ref">continuous output</span></a>, if
+requested).</p>
+<p>For instance, we can print to screen the integrator used for the last iteration of the ensemble. This is the
+first object of the ninth tuple in the return value:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print to screen the integrator that was used</span>
+<span class="w">    </span><span class="c1">// for the last iteration of the ensemble.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">])</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Tolerance               : 2.2204460492503131e-16</span>
+<span class="go">High accuracy           : false</span>
+<span class="go">Compact mode            : false</span>
+<span class="go">Taylor order            : 20</span>
+<span class="go">Dimension               : 2</span>
+<span class="go">Time                    : 20.000000000000000</span>
+<span class="go">State                   : [0.12257736827306077, 0.24068377640981869]</span>
+</pre></div>
+</div>
+<p>The other values in the tuple are those returned by the <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> invocation:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Print the values returned by the propagate_until()</span>
+<span class="w">    </span><span class="c1">// invocation.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Integration outcome: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">])</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Min/max timesteps  : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">])</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;/&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">3</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">])</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;N of timesteps     : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">])</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Continuous output  : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="mi">5</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">9</span><span class="p">]))</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Integration outcome: taylor_outcome::time_limit</span>
+<span class="go">Min/max timesteps  : 0.158147/0.167025</span>
+<span class="go">N of timesteps     : 124</span>
+<span class="go">Continuous output  : 0</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="thread-safety-considerations">
+<h2>Thread safety considerations<a class="headerlink" href="#thread-safety-considerations" title="Permalink to this headline">¶</a></h2>
+<p>Because currently ensemble propagations always use thread-based parallelism,
+it is important to ensure that all the objects involved in an ensemble propagation
+provide a certain degree of thread safety. This concerns
+especially the user-provided function objects such as the generator and
+the callbacks (if present).</p>
+<p>In an ensemble propagation, it is thus important to keep in mind that
+the following actions may be performed
+concurrently by separate threads of execution:</p>
+<ul class="simple">
+<li><p>invocation of the generator’s call operator,</p></li>
+<li><p>copy construction of the callbacks (both the events’ callbacks
+and the callbacks that can optionally be passed to the
+<code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions of the adaptive integrators),</p></li>
+<li><p>invocation of the call operators of the copies of the callbacks.</p></li>
+</ul>
+<p>For instance, an event callback which performs write operations
+on a global variable without using some form of synchronisation
+will result in undefined behaviour when used in an ensemble propagation.</p>
+</div>
+</div>
+
+
+              </div>
+              
+        
+            <!-- Previous / next buttons -->
+<div class='prev-next-area'> 
+    <a class='left-prev' id="prev-link" href="tut_s11n.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Serialisation</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="benchmarks.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Benchmarks</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+        
+        </div>
+    </div>
+    <footer class="footer">
+    <div class="container">
+      <p>
+        
+          By Francesco Biscani, Dario Izzo<br/>
+        
+            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+  
+  <script src="_static/js/index.be7d3bbb2ef33a8344ce.js"></script>
+
+  </body>
+</html>
