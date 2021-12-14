@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -1005,6 +1006,40 @@ TEST_CASE("propagate trivial")
     REQUIRE(std::get<0>(ta.propagate_grid({3, 4, 5, 6, 7.})) == taylor_outcome::time_limit);
 }
 
+struct cb_functor_until {
+    cb_functor_until() = default;
+    cb_functor_until(cb_functor_until &&) noexcept = default;
+    cb_functor_until(const cb_functor_until &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
+
+struct cb_functor_for {
+    cb_functor_for() = default;
+    cb_functor_for(cb_functor_for &&) noexcept = default;
+    cb_functor_for(const cb_functor_for &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
+
 TEST_CASE("propagate for_until")
 {
     using Catch::Matchers::Message;
@@ -1107,6 +1142,15 @@ TEST_CASE("propagate for_until")
 
     REQUIRE(ta.get_state()[0] == approximately(ta_copy.get_state()[0], 1000.));
     REQUIRE(ta.get_state()[1] == approximately(ta_copy.get_state()[1], 1000.));
+
+    // Test the callback is not copied if it is already a std::function.
+    std::function<bool(taylor_adaptive<double> &)> f_cb_until(cb_functor_until{});
+    f_cb_until.target<cb_functor_until>()->n_copies_after = f_cb_until.target<cb_functor_until>()->n_copies;
+    ta.propagate_until(10., kw::callback = f_cb_until);
+
+    std::function<bool(taylor_adaptive<double> &)> f_cb_for(cb_functor_for{});
+    f_cb_for.target<cb_functor_for>()->n_copies_after = f_cb_for.target<cb_functor_for>()->n_copies;
+    ta.propagate_for(10., kw::callback = f_cb_for);
 }
 
 TEST_CASE("propagate for_until write_tc")
@@ -1143,6 +1187,23 @@ TEST_CASE("propagate for_until write_tc")
             return true;
         });
 }
+
+struct cb_functor_grid {
+    cb_functor_grid() = default;
+    cb_functor_grid(cb_functor_grid &&) noexcept = default;
+    cb_functor_grid(const cb_functor_grid &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
 
 TEST_CASE("propagate grid")
 {
@@ -1213,6 +1274,11 @@ TEST_CASE("propagate grid")
         REQUIRE(out[2u * i] == approximately(out_copy[2u * i], 1000.));
         REQUIRE(out[2u * i + 1u] == approximately(out_copy[2u * i + 1u], 1000.));
     }
+
+    // Test the callback is not copied if it is already a std::function.
+    std::function<bool(taylor_adaptive<double> &)> f_cb_grid(cb_functor_grid{});
+    f_cb_grid.target<cb_functor_grid>()->n_copies_after = f_cb_grid.target<cb_functor_grid>()->n_copies;
+    ta.propagate_grid({1., 5., 10.}, kw::callback = f_cb_grid);
 }
 
 // Test the stream operator of the outcome enum.
