@@ -450,15 +450,24 @@ the callbacks (if present).</p>
 the following actions may be performed
 concurrently by separate threads of execution:</p>
 <ul class="simple">
-<li><p>invocation of the generator’s call operator,</p></li>
-<li><p>copy construction of the callbacks (both the events’ callbacks
-and the callbacks that can optionally be passed to the
-<code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> functions of the adaptive integrators),</p></li>
-<li><p>invocation of the call operators of the copies of the callbacks.</p></li>
+<li><p>invocation of the generator’s call operator and of the call operator
+of the callback that can (optionally) be passed to the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code>
+functions. In other words, both the generator and the <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code>
+callback are shared among several threads of execution and used
+concurrently;</p></li>
+<li><p>copy construction of the events callbacks and invocation of the
+call operator on the copies. That is, each thread of execution
+gets its own copy of the event callbacks thanks to the creation
+of a new integrator object via the generator.</p></li>
 </ul>
 <p>For instance, an event callback which performs write operations
 on a global variable without using some form of synchronisation
 will result in undefined behaviour when used in an ensemble propagation.</p>
+<p>Another example of unsafe usage is a <code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callback that
+performs write operations into its own data member(s) without
+synchronisation: because the
+<code class="docutils literal notranslate"><span class="pre">propagate_*()</span></code> callback is shared among several threads, such usage results
+in a data race.</p>
 </div>
 </div>
 
