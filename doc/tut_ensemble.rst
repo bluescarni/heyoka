@@ -151,12 +151,22 @@ In an ensemble propagation, it is thus important to keep in mind that
 the following actions may be performed
 concurrently by separate threads of execution:
 
-* invocation of the generator's call operator,
-* copy construction of the callbacks (both the events' callbacks
-  and the callbacks that can optionally be passed to the
-  ``propagate_*()`` functions of the adaptive integrators),
-* invocation of the call operators of the copies of the callbacks.
+* invocation of the generator's call operator and of the call operator
+  of the callback that can (optionally) be passed to the ``propagate_*()``
+  functions. In other words, both the generator and the ``propagate_*()``
+  callback are shared among several threads of execution and used
+  concurrently;
+* copy construction of the events callbacks and invocation of the
+  call operator on the copies. That is, each thread of execution
+  gets its own copy of the event callbacks thanks to the creation
+  of a new integrator object via the generator.
 
 For instance, an event callback which performs write operations
 on a global variable without using some form of synchronisation
 will result in undefined behaviour when used in an ensemble propagation.
+
+Another example of unsafe usage is a ``propagate_*()`` callback that
+performs write operations into its own data member(s) without
+synchronisation: because the
+``propagate_*()`` callback is shared among several threads, such usage results
+in a data race.
