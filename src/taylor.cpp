@@ -2717,7 +2717,8 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
-                                              std::function<bool(taylor_adaptive_impl &)> cb, bool wtc, bool with_c_out)
+                                              const std::function<bool(taylor_adaptive_impl &)> &cb, bool wtc,
+                                              bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -2919,7 +2920,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
 taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
-                                             std::function<bool(taylor_adaptive_impl &)> cb)
+                                             const std::function<bool(taylor_adaptive_impl &)> &cb)
 {
     using std::abs;
     using std::isfinite;
@@ -3982,7 +3983,7 @@ void taylor_adaptive_batch_impl<T>::step(const std::vector<T> &max_delta_ts, boo
 template <typename T>
 std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_for_impl(
     const std::vector<T> &delta_ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
+    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of delta_ts.
     if (delta_ts.size() != m_batch_size) {
@@ -4002,7 +4003,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 template <typename T>
 std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
     const std::vector<dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
+    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
 {
     using std::abs;
     using std::isfinite;
@@ -4302,7 +4303,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 template <typename T>
 std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
     const std::vector<T> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
-    std::function<bool(taylor_adaptive_batch_impl &)> cb, bool wtc, bool with_c_out)
+    const std::function<bool(taylor_adaptive_batch_impl &)> &cb, bool wtc, bool with_c_out)
 {
     // Check the dimensionality of ts.
     if (ts.size() != m_batch_size) {
@@ -4322,9 +4323,10 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 }
 
 template <typename T>
-std::vector<T> taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
-                                                                  const std::vector<T> &max_delta_ts,
-                                                                  std::function<bool(taylor_adaptive_batch_impl &)> cb)
+std::vector<T>
+taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
+                                                   const std::vector<T> &max_delta_ts,
+                                                   const std::function<bool(taylor_adaptive_batch_impl &)> &cb)
 {
     using std::abs;
     using std::isnan;

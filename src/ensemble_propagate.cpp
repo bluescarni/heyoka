@@ -35,10 +35,9 @@
 
 // NOTE: these actions will be performed concurrently from
 // multiple threads of execution:
-// - invocation of the generator's call operator,
-// - copy construction of the events' callbacks and of the propagate callback,
-// - invocation of the call operator of the copies of the callbacks
-//   (both event & propagate callbacks).
+// - invocation of the generator's call operator and of the propagate callback,
+// - copy construction of the events' callbacks and invocation of the call operator
+//   on the copies.
 
 namespace heyoka::detail
 {

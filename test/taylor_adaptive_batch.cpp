@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <random>
@@ -116,6 +117,23 @@ TEST_CASE("batch consistency")
         REQUIRE(t_scal[i].get_state()[0] == approximately(s_arr(0, i), 1000.));
     }
 }
+
+struct cb_functor_grid {
+    cb_functor_grid() = default;
+    cb_functor_grid(cb_functor_grid &&) noexcept = default;
+    cb_functor_grid(const cb_functor_grid &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive_batch<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
 
 TEST_CASE("propagate grid")
 {
@@ -329,16 +347,24 @@ TEST_CASE("propagate grid")
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
 
-    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x},
-                                       {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
-                                       4,
-                                       kw::t_events = {t_event_batch<double>(v - 0.999)},
-                                       kw::callback = [](auto &, bool, int, std::uint32_t) { return false; }};
+    ta = taylor_adaptive_batch<double>{
+        {prime(x) = v, prime(v) = -x},
+        {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03},
+        4,
+        kw::t_events = {t_event_batch<double>(
+            v - 0.999, kw::callback = [](auto &, bool, int, std::uint32_t) { return false; })},
+    };
     out = ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.});
     REQUIRE(out.size() == 16u);
     REQUIRE(std::all_of(out.begin(), out.end(), [](const auto &v) { return std::isnan(v); }));
     REQUIRE(std::all_of(ta.get_propagate_res().begin(), ta.get_propagate_res().end(),
                         [](const auto &t) { return std::get<0>(t) == taylor_outcome{-1}; }));
+
+    // Test the callback is not copied if it is already a std::function.
+    ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -x}, {0., 0.01, 0.02, 0.03, 1., 1.01, 1.02, 1.03}, 4};
+    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_grid(cb_functor_grid{});
+    f_cb_grid.target<cb_functor_grid>()->n_copies_after = f_cb_grid.target<cb_functor_grid>()->n_copies;
+    ta.propagate_grid({10., 10., 10., 10., 100., 100., 100., 100.}, kw::callback = f_cb_grid);
 }
 
 // A test to make sure the propagate functions deal correctly
@@ -389,6 +415,40 @@ TEST_CASE("set time")
     ta.set_time(1);
     REQUIRE(ta.get_time() == std::vector{1., 1.});
 }
+
+struct cb_functor_until {
+    cb_functor_until() = default;
+    cb_functor_until(cb_functor_until &&) noexcept = default;
+    cb_functor_until(const cb_functor_until &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive_batch<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
+
+struct cb_functor_for {
+    cb_functor_for() = default;
+    cb_functor_for(cb_functor_for &&) noexcept = default;
+    cb_functor_for(const cb_functor_for &)
+    {
+        ++n_copies;
+    }
+    bool operator()(taylor_adaptive_batch<double> &) const
+    {
+        REQUIRE(n_copies == n_copies_after);
+
+        return true;
+    }
+    inline static unsigned n_copies = 0;
+    inline static unsigned n_copies_after = 0;
+};
 
 TEST_CASE("propagate for_until")
 {
@@ -548,6 +608,15 @@ TEST_CASE("propagate for_until")
     ta.propagate_for({10., 11.}, kw::max_delta_t = {1e-4, 1e-4});
     ta_copy.propagate_for({10., 11.}, kw::max_delta_t = 1e-4);
     REQUIRE(ta.get_propagate_res() == ta_copy.get_propagate_res());
+
+    // Test the callback is not copied if it is already a std::function.
+    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_until(cb_functor_until{});
+    f_cb_until.target<cb_functor_until>()->n_copies_after = f_cb_until.target<cb_functor_until>()->n_copies;
+    ta.propagate_until(20., kw::callback = f_cb_until);
+
+    std::function<bool(taylor_adaptive_batch<double> &)> f_cb_for(cb_functor_for{});
+    f_cb_for.target<cb_functor_for>()->n_copies_after = f_cb_for.target<cb_functor_for>()->n_copies;
+    ta.propagate_for(10., kw::callback = f_cb_for);
 }
 
 TEST_CASE("propagate for_until write_tc")

@@ -833,12 +833,20 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             }
         }();
 
-        // Callback (defaults to empty).
-        auto cb = [&p]() -> std::function<bool(taylor_adaptive_impl<T> &)> {
+        // Callback (defaults to empty). If a std::function with the correct
+        // signature is passed as argument, return a const reference wrapper to it
+        // in order to avoid a useless copy.
+        auto cb = [&p]() {
+            using cb_func_t = std::function<bool(taylor_adaptive_impl<T> &)>;
+
             if constexpr (p.has(kw::callback)) {
-                return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
+                    return std::cref(p(kw::callback));
+                } else {
+                    return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
+                }
             } else {
-                return {};
+                return cb_func_t{};
             }
         }();
 
@@ -852,8 +860,10 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
             }
         }();
 
+        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
+        // into a reference tuple element.
         if constexpr (Grid) {
-            return std::tuple{max_steps, max_delta_t, std::move(cb), write_tc};
+            return std::make_tuple(max_steps, max_delta_t, std::move(cb), write_tc);
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
@@ -864,7 +874,7 @@ inline auto taylor_propagate_common_ops(KwArgs &&...kw_args)
                 }
             }();
 
-            return std::tuple{max_steps, max_delta_t, std::move(cb), write_tc, with_c_out};
+            return std::make_tuple(max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
         }
     }
 }
@@ -1172,9 +1182,10 @@ public:
 private:
     // Implementations of the propagate_*() functions.
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
-    propagate_until_impl(const dfloat<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>, bool, bool);
+    propagate_until_impl(const dfloat<T> &, std::size_t, T, const std::function<bool(taylor_adaptive_impl &)> &, bool,
+                         bool);
     std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
-    propagate_grid_impl(const std::vector<T> &, std::size_t, T, std::function<bool(taylor_adaptive_impl &)>);
+    propagate_grid_impl(const std::vector<T> &, std::size_t, T, const std::function<bool(taylor_adaptive_impl &)> &);
 
 public:
     // NOTE: return values:
@@ -1194,7 +1205,7 @@ public:
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
+        return propagate_until_impl(dfloat<T>(t), max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
     template <typename... KwArgs>
     std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
@@ -1203,7 +1214,7 @@ public:
         auto [max_steps, max_delta_t, cb, write_tc, with_c_out]
             = taylor_propagate_common_ops<T, false>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, std::move(cb), write_tc, with_c_out);
+        return propagate_until_impl(m_time + delta_t, max_steps, max_delta_t, cb, write_tc, with_c_out);
     }
     // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
     // Hence, we need to avoid any aliasing issue with other public integrator data.
@@ -1213,7 +1224,7 @@ public:
     {
         auto [max_steps, max_delta_t, cb, _] = taylor_propagate_common_ops<T, true>(std::forward<KwArgs>(kw_args)...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_t, std::move(cb));
+        return propagate_grid_impl(grid, max_steps, max_delta_t, cb);
     }
 };
 
@@ -1283,12 +1294,20 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
             }
         }();
 
-        // Callback (defaults to empty).
-        auto cb = [&p]() -> std::function<bool(taylor_adaptive_batch_impl<T> &)> {
+        // Callback (defaults to empty). If a std::function with the correct
+        // signature is passed as argument, return a const reference wrapper to it
+        // in order to avoid a useless copy.
+        auto cb = [&p]() {
+            using cb_func_t = std::function<bool(taylor_adaptive_batch_impl<T> &)>;
+
             if constexpr (p.has(kw::callback)) {
-                return std::forward<decltype(p(kw::callback))>(p(kw::callback));
+                if constexpr (std::is_same_v<uncvref_t<decltype(p(kw::callback))>, cb_func_t>) {
+                    return std::cref(p(kw::callback));
+                } else {
+                    return cb_func_t(std::forward<decltype(p(kw::callback))>(p(kw::callback)));
+                }
             } else {
-                return {};
+                return cb_func_t{};
             }
         }();
 
@@ -1302,8 +1321,10 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
             }
         }();
 
+        // NOTE: use std::make_tuple() so that if cb is a reference wrapper, it is turned
+        // into a reference tuple element.
         if constexpr (Grid) {
-            return std::tuple{max_steps, std::move(max_delta_t), std::move(cb), write_tc};
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc);
         } else {
             // Continuous output (defaults to false).
             auto with_c_out = [&p]() -> bool {
@@ -1314,7 +1335,7 @@ inline auto taylor_propagate_common_ops_batch(std::uint32_t batch_size, KwArgs &
                 }
             }();
 
-            return std::tuple{max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out};
+            return std::make_tuple(max_steps, std::move(max_delta_t), std::move(cb), write_tc, with_c_out);
         }
     }
 }
@@ -1661,20 +1682,17 @@ public:
 
 private:
     // Implementations of the propagate_*() functions.
-    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t,
-                                                                   const std::vector<T> &,
-                                                                   std::function<bool(taylor_adaptive_batch_impl &)>,
-                                                                   bool, bool);
-    std::optional<continuous_output_batch<T>> propagate_until_impl(const std::vector<T> &, std::size_t,
-                                                                   const std::vector<T> &,
-                                                                   std::function<bool(taylor_adaptive_batch_impl &)>,
-                                                                   bool, bool);
-    std::optional<continuous_output_batch<T>> propagate_for_impl(const std::vector<T> &, std::size_t,
-                                                                 const std::vector<T> &,
-                                                                 std::function<bool(taylor_adaptive_batch_impl &)>,
-                                                                 bool, bool);
+    std::optional<continuous_output_batch<T>>
+    propagate_until_impl(const std::vector<dfloat<T>> &, std::size_t, const std::vector<T> &,
+                         const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
+    std::optional<continuous_output_batch<T>>
+    propagate_until_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
+                         const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
+    std::optional<continuous_output_batch<T>>
+    propagate_for_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
+                       const std::function<bool(taylor_adaptive_batch_impl &)> &, bool, bool);
     std::vector<T> propagate_grid_impl(const std::vector<T> &, std::size_t, const std::vector<T> &,
-                                       std::function<bool(taylor_adaptive_batch_impl &)>);
+                                       const std::function<bool(taylor_adaptive_batch_impl &)> &);
 
 public:
     // NOTE: in propagate_for/until(), we can take 'ts' as const reference because it is always
@@ -1686,8 +1704,8 @@ public:
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
-        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
+                                    with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
     std::optional<continuous_output_batch<T>> propagate_until(T t, KwArgs &&...kw_args)
@@ -1698,8 +1716,8 @@ public:
         // NOTE: re-use m_pfor_ts as tmp storage, as the other overload does.
         assert(m_pfor_ts.size() == m_batch_size); // LCOV_EXCL_LINE
         std::fill(m_pfor_ts.begin(), m_pfor_ts.end(), dfloat<T>(t));
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
+                                    with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
     std::optional<continuous_output_batch<T>> propagate_for(const std::vector<T> &delta_ts, KwArgs &&...kw_args)
@@ -1707,8 +1725,8 @@ public:
         auto [max_steps, max_delta_ts, cb, write_tc, with_c_out]
             = taylor_propagate_common_ops_batch<T, false, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
-        return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                  write_tc, with_c_out); // LCOV_EXCL_LINE
+        return propagate_for_impl(delta_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
+                                  with_c_out); // LCOV_EXCL_LINE
     }
     template <typename... KwArgs>
     std::optional<continuous_output_batch<T>> propagate_for(T delta_t, KwArgs &&...kw_args)
@@ -1720,8 +1738,8 @@ public:
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
             m_pfor_ts[i] = dfloat<T>(m_time_hi[i], m_time_lo[i]) + delta_t;
         }
-        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb),
-                                    write_tc, with_c_out); // LCOV_EXCL_LINE
+        return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb, write_tc,
+                                    with_c_out); // LCOV_EXCL_LINE
     }
     // NOTE: grid is taken by copy because in the implementation loop we keep on reading from it.
     // Hence, we need to avoid any aliasing issue with other public integrator data.
@@ -1731,7 +1749,7 @@ public:
         auto [max_steps, max_delta_ts, cb, _]
             = taylor_propagate_common_ops_batch<T, true, false>(m_batch_size, std::forward<KwArgs>(kw_args)...);
 
-        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, std::move(cb));
+        return propagate_grid_impl(grid, max_steps, max_delta_ts.empty() ? m_pinf : max_delta_ts, cb);
     }
     const std::vector<std::tuple<taylor_outcome, T, T, std::size_t>> &get_propagate_res() const
     {
