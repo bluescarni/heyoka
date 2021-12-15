@@ -208,12 +208,29 @@ target_features get_target_features_impl()
 
 // LCOV_EXCL_STOP
 
+// Machinery to initialise the native target in
+// LLVM. This needs to be done only once.
+std::once_flag nt_inited;
+
+void init_native_target()
+{
+    std::call_once(nt_inited, []() {
+        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeNativeTargetAsmParser();
+    });
+}
+
 } // namespace
 
 // Helper function to fetch a const ref to a global object
 // containing info about the host machine.
 const target_features &get_target_features()
 {
+    // NOTE: need to init the native target
+    // in order to get its features.
+    init_native_target();
+
     static const target_features retval = get_target_features_impl();
 
     return retval;
@@ -243,18 +260,6 @@ std::uint32_t recommended_simd_size<mppp::real128>()
 
 #endif
 
-namespace detail
-{
-
-namespace
-{
-
-std::once_flag nt_inited;
-
-} // namespace
-
-} // namespace detail
-
 // Implementation of the jit class.
 struct llvm_state::jit {
     std::unique_ptr<llvm::orc::LLJIT> m_lljit;
@@ -267,12 +272,8 @@ struct llvm_state::jit {
 
     jit()
     {
-        // NOTE: the native target initialization needs to be done only once
-        std::call_once(detail::nt_inited, []() {
-            llvm::InitializeNativeTarget();
-            llvm::InitializeNativeTargetAsmPrinter();
-            llvm::InitializeNativeTargetAsmParser();
-        });
+        // Ensure the native target is inited.
+        detail::init_native_target();
 
         // Create the target machine builder.
         auto jtmb = llvm::orc::JITTargetMachineBuilder::detectHost();

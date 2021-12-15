@@ -33,6 +33,24 @@
 using namespace heyoka;
 using namespace heyoka_test;
 
+TEST_CASE("simd size")
+{
+    REQUIRE(recommended_simd_size<double>() > 0u);
+    REQUIRE(recommended_simd_size<long double>() > 0u);
+
+#if defined(HEYOKA_HAVE_REAL128)
+    REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
+#endif
+
+#if defined(__GNUC__)
+
+#if defined(__amd64__) || defined(__aarch64__)
+    REQUIRE(recommended_simd_size<double>() >= 2u);
+#endif
+
+#endif
+}
+
 TEST_CASE("empty state")
 {
     llvm_state s;
@@ -315,22 +333,4 @@ TEST_CASE("make_similar")
     REQUIRE(s2.inline_functions() == false);
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
-}
-
-TEST_CASE("simd size")
-{
-    REQUIRE(recommended_simd_size<double>() > 0u);
-    REQUIRE(recommended_simd_size<long double>() > 0u);
-
-#if defined(HEYOKA_HAVE_REAL128)
-    REQUIRE(recommended_simd_size<mppp::real128>() > 0u);
-#endif
-
-#if defined(__GNUC__)
-
-#if defined(__amd64__) || defined(__aarch64__)
-    REQUIRE(recommended_simd_size<double>() >= 2u);
-#endif
-
-#endif
 }
