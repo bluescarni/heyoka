@@ -1027,6 +1027,30 @@ llvm::Value *llvm_max(llvm_state &s, llvm::Value *a, llvm::Value *b)
     return builder.CreateSelect(builder.CreateFCmpOLT(a, b), b, a);
 }
 
+// Same as llvm_min(), but returns NaN if any operand is NaN:
+// return (b == b) ? ((b < a) ? b : a) : b;
+llvm::Value *llvm_min_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    auto &builder = s.builder();
+
+    auto b_not_nan = builder.CreateFCmpOEQ(b, b);
+    auto b_lt_a = builder.CreateFCmpOLT(b, a);
+
+    return builder.CreateSelect(b_not_nan, builder.CreateSelect(b_lt_a, b, a), b);
+}
+
+// Same as llvm_max(), but returns NaN if any operand is NaN:
+// return (b == b) ? ((a < b) ? b : a) : b;
+llvm::Value *llvm_max_nan(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    auto &builder = s.builder();
+
+    auto b_not_nan = builder.CreateFCmpOEQ(b, b);
+    auto a_lt_b = builder.CreateFCmpOLT(a, b);
+
+    return builder.CreateSelect(b_not_nan, builder.CreateSelect(a_lt_b, b, a), b);
+}
+
 // Branchless sign function.
 // NOTE: requires FP value.
 llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
