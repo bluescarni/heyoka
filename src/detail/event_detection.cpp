@@ -447,6 +447,14 @@ llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t bat
 // Add a function implementing fast event exclusion check via the computation
 // of the enclosure of the event equation's Taylor polynomial. The enclosure is computed
 // via Horner's scheme using interval arithmetic.
+// NOTE: the interval arithmetic implementation here is not 100% correct, because
+// we do not account for floating-point truncation. In order to be mathematically
+// correct, we would need to adjust the results of interval arithmetic add/mul via
+// a std::nextafter()-like function. See here for an example:
+// https://stackoverflow.com/questions/10420848/how-do-you-get-the-next-value-in-the-floating-point-sequence
+// http://web.mit.edu/hyperbook/Patrikalakis-Maekawa-Cho/node46.html
+// Perhaps another alternative would be to employ FP primitives with explicit rounding modes,
+// which are available in LLVM.
 template <typename T>
 llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
@@ -532,6 +540,16 @@ llvm::Function *llvm_add_fex_check_impl(llvm_state &s, std::uint32_t n, std::uin
         auto tmp3 = builder.CreateFMul(a_hi, b_lo);
         auto tmp4 = builder.CreateFMul(a_hi, b_hi);
 
+        // NOTE: here we are not correctly propagating NaNs,
+        // for which we would need to use llvm_min/max_nan(),
+        // which however incur in a noticeable performance
+        // penalty. Thus, even in presence of all finite
+        // Taylor coefficients and integration timestep, it could
+        // conceivably happen that NaNs are generated in the
+        // multiplications above and they are not correctly propagated
+        // in these min/max functions, thus ultimately leading to an
+        // incorrect result. This however looks like a very unlikely
+        // occurrence.
         auto cmp1 = llvm_min(s, tmp1, tmp2);
         auto cmp2 = llvm_min(s, tmp3, tmp4);
         auto cmp3 = llvm_max(s, tmp1, tmp2);
