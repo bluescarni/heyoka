@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <random>
 #include <stdexcept>
 #include <tuple>
@@ -889,6 +890,231 @@ TEST_CASE("csc_batch")
                 std::fill(cfs.begin(), cfs.end(), fp_t(-1));
                 f_ptr(out.data(), cfs.data());
                 REQUIRE(std::all_of(out.begin(), out.end(), [](auto x) { return x == 0; }));
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("minmax")
+{
+    using detail::to_llvm_type;
+    using std::isnan;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
+                                                llvm::PointerType::getUnqual(val_t),
+                                                llvm::PointerType::getUnqual(val_t)};
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+
+                // llvm_min.
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "min", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto a_ptr = f->args().begin() + 1;
+                auto b_ptr = f->args().begin() + 2;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
+                auto b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+
+                auto ret = detail::llvm_min(s, a, b);
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                // Create the return value.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // llvm_max.
+                f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "max", &md);
+
+                ret_ptr = f->args().begin();
+                a_ptr = f->args().begin() + 1;
+                b_ptr = f->args().begin() + 2;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+
+                ret = detail::llvm_max(s, a, b);
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                // Create the return value.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // llvm_min_nan.
+                f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "min_nan", &md);
+
+                ret_ptr = f->args().begin();
+                a_ptr = f->args().begin() + 1;
+                b_ptr = f->args().begin() + 2;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+
+                ret = detail::llvm_min_nan(s, a, b);
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                // Create the return value.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // llvm_max_nan.
+                f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "max_nan", &md);
+
+                ret_ptr = f->args().begin();
+                a_ptr = f->args().begin() + 1;
+                b_ptr = f->args().begin() + 2;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                a = detail::load_vector_from_memory(builder, a_ptr, batch_size);
+                b = detail::load_vector_from_memory(builder, b_ptr, batch_size);
+
+                ret = detail::llvm_max_nan(s, a, b);
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                // Create the return value.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the pointers.
+                auto llvm_min = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("min"));
+                auto llvm_max = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("max"));
+                auto llvm_min_nan
+                    = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("min_nan"));
+                auto llvm_max_nan
+                    = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("max_nan"));
+
+                // The C++ implementations.
+                auto cpp_min = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        ret_ptr[i] = (b_ptr[i] < a_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                    }
+                };
+                auto cpp_max = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        ret_ptr[i] = (a_ptr[i] < b_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                    }
+                };
+                auto cpp_min_nan = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        if (isnan(a_ptr[i]) || isnan(b_ptr[i])) {
+                            ret_ptr[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            ret_ptr[i] = (b_ptr[i] < a_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                        }
+                    }
+                };
+                auto cpp_max_nan = [batch_size](fp_t *ret_ptr, const fp_t *a_ptr, const fp_t *b_ptr) {
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        if (isnan(a_ptr[i]) || isnan(b_ptr[i])) {
+                            ret_ptr[i] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            ret_ptr[i] = (a_ptr[i] < b_ptr[i]) ? b_ptr[i] : a_ptr[i];
+                        }
+                    }
+                };
+
+                std::vector<fp_t> av(batch_size), bv(batch_size), retv1(batch_size), retv2(batch_size);
+                std::uniform_real_distribution<double> rdist(-10, 10);
+                std::uniform_int_distribution<int> idist(0, 1);
+
+                for (auto i = 0; i < ntrials; ++i) {
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (idist(rng) && idist(rng) && idist(rng)) {
+                            av[j] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            av[j] = rdist(rng);
+                        }
+
+                        if (idist(rng) && idist(rng) && idist(rng)) {
+                            bv[j] = std::numeric_limits<fp_t>::quiet_NaN();
+                        } else {
+                            bv[j] = rdist(rng);
+                        }
+                    }
+
+                    llvm_min(retv1.data(), av.data(), bv.data());
+                    cpp_min(retv2.data(), av.data(), bv.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (isnan(retv1[j])) {
+                            REQUIRE(isnan(retv2[j]));
+                        } else {
+                            REQUIRE(retv1[j] == retv2[j]);
+                        }
+                    }
+
+                    llvm_max(retv1.data(), av.data(), bv.data());
+                    cpp_max(retv2.data(), av.data(), bv.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (isnan(retv1[j])) {
+                            REQUIRE(isnan(retv2[j]));
+                        } else {
+                            REQUIRE(retv1[j] == retv2[j]);
+                        }
+                    }
+
+                    llvm_min_nan(retv1.data(), av.data(), bv.data());
+                    cpp_min_nan(retv2.data(), av.data(), bv.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (isnan(retv1[j])) {
+                            REQUIRE(isnan(retv2[j]));
+                        } else {
+                            REQUIRE(retv1[j] == retv2[j]);
+                        }
+                    }
+
+                    llvm_max_nan(retv1.data(), av.data(), bv.data());
+                    cpp_max_nan(retv2.data(), av.data(), bv.data());
+
+                    for (auto j = 0u; j < batch_size; ++j) {
+                        if (isnan(retv1[j])) {
+                            REQUIRE(isnan(retv2[j]));
+                        } else {
+                            REQUIRE(retv1[j] == retv2[j]);
+                        }
+                    }
+                }
             }
         }
     };
