@@ -155,6 +155,14 @@ build directory:
 
    $ cmake --build .
 
+.. note::
+
+   heyoka relies on a conforming implementation of IEEE floating-point
+   arithmetic. Do *not* enable fast math flags (e.g., ``-ffast-math``,
+   ``-Ofast``, etc.) when compiling heyoka or software depending on heyoka.
+   If you are using the Intel C++ compiler, make sure that you are using
+   the ``strict`` floating-point model.
+
 To install heyoka, you can use the following CMake command:
 
 .. code-block:: console
@@ -219,3 +227,11 @@ dependencies heyoka was compiled:
 
 * ``heyoka_WITH_SLEEF`` if SLEEF support was enabled,
 * ``heyoka_WITH_MPPP`` if mp++ support was enabled.
+
+.. versionadded:: 0.17.0
+
+heyoka's config-file package also exports a
+``heyoka_LLVM_VERSION_MAJOR`` variable containing
+the major number of the LLVM version against which heyoka
+was compiled. E.g., if heyoka was compiled against LLVM 12.0.1,
+then ``heyoka_LLVM_VERSION_MAJOR`` is ``12``.
