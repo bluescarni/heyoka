@@ -1103,6 +1103,13 @@ public:
         m_time = dfloat<T>(t);
     }
 
+    // Time set/get in double-length format.
+    std::pair<T, T> get_dtime() const
+    {
+        return {m_time.hi, m_time.lo};
+    }
+    void set_dtime(T, T);
+
     const std::vector<T> &get_state() const
     {
         return m_state;
@@ -1597,6 +1604,18 @@ public:
     }
     void set_time(const std::vector<T> &);
     void set_time(T);
+
+    // Time set/get in double-length format.
+    auto get_dtime() const
+    {
+        return std::make_pair(std::cref(m_time_hi), std::cref(m_time_lo));
+    }
+    auto get_dtime_data() const
+    {
+        return std::make_pair(m_time_hi.data(), m_time_lo.data());
+    }
+    void set_dtime(const std::vector<T> &, const std::vector<T> &);
+    void set_dtime(T, T);
 
     const std::vector<T> &get_state() const
     {

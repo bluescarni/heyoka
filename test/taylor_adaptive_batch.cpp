@@ -18,6 +18,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -1447,4 +1448,64 @@ TEST_CASE("set_time alias bug")
 
     REQUIRE(ta.get_time()[0] == 0.);
     REQUIRE(ta.get_time()[1] == 0.);
+}
+
+TEST_CASE("get_set_dtime")
+{
+    using Catch::Matchers::Message;
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0, 0.01, 0.1, 0.11}, 2};
+
+    ta.step();
+
+    REQUIRE(ta.get_dtime().first[0] != 0);
+    REQUIRE(ta.get_dtime().first[1] != 0);
+    REQUIRE(ta.get_dtime().second[0] == 0);
+    REQUIRE(ta.get_dtime().second[1] == 0);
+
+    REQUIRE(std::is_reference_v<decltype(ta.get_dtime().first)>);
+    REQUIRE(std::is_reference_v<decltype(ta.get_dtime().second)>);
+
+    for (auto i = 0; i < 1000; ++i) {
+        ta.step();
+    }
+
+    REQUIRE(ta.get_dtime_data().first[0] != 0);
+    REQUIRE(ta.get_dtime_data().first[1] != 0);
+    REQUIRE(ta.get_dtime_data().second[0] != 0);
+    REQUIRE(ta.get_dtime_data().second[1] != 0);
+
+    REQUIRE_THROWS_MATCHES(
+        ta.set_dtime(std::vector<double>{}, std::vector<double>{1.}), std::invalid_argument,
+        Message("Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is 2, "
+                "but the number of specified times is (0, 1)"));
+
+    auto dtm = ta.get_dtime();
+    ta.set_dtime(dtm.first, dtm.second);
+    REQUIRE(ta.get_dtime() == dtm);
+
+    ta.set_dtime({3., -1}, {4., 5.});
+    REQUIRE(ta.get_dtime().first[0] == 7);
+    REQUIRE(ta.get_dtime().first[1] == 4);
+    REQUIRE(ta.get_dtime().second[0] == 0);
+    REQUIRE(ta.get_dtime().second[1] == 0);
+
+    ta.set_dtime({3., -3}, {std::numeric_limits<double>::epsilon(), std::numeric_limits<double>::epsilon()});
+    REQUIRE(ta.get_dtime().first[0] == 3);
+    REQUIRE(ta.get_dtime().first[1] == -3);
+    REQUIRE(ta.get_dtime().second[0] == std::numeric_limits<double>::epsilon());
+    REQUIRE(ta.get_dtime().second[1] == std::numeric_limits<double>::epsilon());
+
+    ta.set_dtime(3., 4.);
+    REQUIRE(ta.get_dtime().first[0] == 7);
+    REQUIRE(ta.get_dtime().first[1] == 7);
+    REQUIRE(ta.get_dtime().second[0] == 0);
+    REQUIRE(ta.get_dtime().second[1] == 0);
+
+    ta.set_dtime(3., std::numeric_limits<double>::epsilon());
+    REQUIRE(ta.get_dtime().first[0] == 3);
+    REQUIRE(ta.get_dtime().first[1] == 3);
+    REQUIRE(ta.get_dtime().second[0] == std::numeric_limits<double>::epsilon());
+    REQUIRE(ta.get_dtime().second[1] == std::numeric_limits<double>::epsilon());
 }

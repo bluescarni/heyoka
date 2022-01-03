@@ -3194,6 +3194,12 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
 }
 
 template <typename T>
+void taylor_adaptive_impl<T>::set_dtime(T hi, T lo)
+{
+    m_time = normalise(dfloat<T>{hi, lo});
+}
+
+template <typename T>
 const std::vector<T> &taylor_adaptive_impl<T>::update_d_output(T time, bool rel_time)
 {
     // NOTE: "time" needs to be translated
@@ -3649,6 +3655,36 @@ void taylor_adaptive_batch_impl<T>::set_time(T new_time)
     std::fill(m_time_hi.begin(), m_time_hi.end(), new_time);
     // Reset the lo part.
     std::fill(m_time_lo.begin(), m_time_lo.end(), T(0));
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const std::vector<T> &lo)
+{
+    // Check the dimensionalities.
+    if (hi.size() != m_batch_size || lo.size() != m_batch_size) {
+        throw std::invalid_argument(
+            "Invalid number of new times specified in a Taylor integrator in batch mode: the batch size is {}, "
+            "but the number of specified times is ({}, {})"_format(m_batch_size, hi.size(), lo.size()));
+    }
+
+    // Copy over the new times, ensuring proper
+    // normalisation.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        const auto tmp = normalise(dfloat<T>{hi[i], lo[i]});
+
+        m_time_hi[i] = tmp.hi;
+        m_time_lo[i] = tmp.lo;
+    }
+}
+
+template <typename T>
+void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
+{
+    // Copy over the new time, ensuring proper
+    // normalisation.
+    const auto tmp = normalise(dfloat<T>{hi, lo});
+    std::fill(m_time_hi.begin(), m_time_hi.end(), tmp.hi);
+    std::fill(m_time_lo.begin(), m_time_lo.end(), tmp.lo);
 }
 
 // Implementation detail to make a single integration timestep.

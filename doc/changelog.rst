@@ -7,6 +7,12 @@ Changelog
 New
 ~~~
 
+- The LLVM version number against which heyoka was built
+  is now exported in the CMake config-file package
+  (`#225 <https://github.com/bluescarni/heyoka/pull/225>`__).
+- It is now possible to access the adaptive integrators'
+  time values as double-length floats
+  (`#225 <https://github.com/bluescarni/heyoka/pull/225>`__).
 - Add support for :ref:`ensemble propagations <tut_ensemble>`
   (`#221 <https://github.com/bluescarni/heyoka/pull/221>`__).
 - Several functions in the batch integration API
@@ -18,6 +24,12 @@ New
 - Add a function to compute the suggested SIMD size for
   the CPU in use
   (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
+
+Changes
+~~~~~~~
+
+- Avoid unnecessary copies of the ``propagate_*()`` callbacks
+  (`#222 <https://github.com/bluescarni/heyoka/pull/222>`__).
 
 Fix
 ~~~
