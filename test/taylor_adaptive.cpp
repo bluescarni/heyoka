@@ -1830,3 +1830,36 @@ TEST_CASE("propagate grid alias bug")
     REQUIRE(grid_out[2] == approximately(ta.get_state()[0]));
     REQUIRE(grid_out[3] == approximately(ta.get_state()[1]));
 }
+
+TEST_CASE("get_set_dtime")
+{
+    using fp_t = double;
+
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)}, {0., 0.5}};
+
+    ta.step();
+
+    REQUIRE(ta.get_dtime().first != 0);
+    REQUIRE(ta.get_dtime().second == 0);
+
+    for (auto i = 0; i < 1000; ++i) {
+        ta.step();
+    }
+
+    REQUIRE(ta.get_dtime().first != 0);
+    REQUIRE(ta.get_dtime().second != 0);
+
+    auto dtm = ta.get_dtime();
+    ta.set_dtime(dtm.first, dtm.second);
+    REQUIRE(ta.get_dtime() == dtm);
+
+    ta.set_dtime(3., 4.);
+    REQUIRE(ta.get_dtime().first == 7);
+    REQUIRE(ta.get_dtime().second == 0);
+
+    ta.set_dtime(3., std::numeric_limits<double>::epsilon());
+    REQUIRE(ta.get_dtime().first == 3);
+    REQUIRE(ta.get_dtime().second == std::numeric_limits<double>::epsilon());
+}

@@ -8,8 +8,14 @@ if(@HEYOKA_WITH_MPPP@)
     endif()
 endif()
 
+# Signal that heyoka was built with
+# optional deps.
 set(heyoka_WITH_SLEEF @HEYOKA_WITH_SLEEF@)
 set(heyoka_WITH_MPPP @HEYOKA_WITH_MPPP@)
+
+# Record the LLVM major version against which
+# heyoka was built.
+set(heyoka_LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@)
 
 # Get current dir.
 get_filename_component(_HEYOKA_CONFIG_SELF_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)

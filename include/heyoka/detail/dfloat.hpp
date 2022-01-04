@@ -43,6 +43,21 @@ private:
     }
 };
 
+// Normalise a double-length float.
+// Taken from:
+// https://github.com/fhajji/ntl/blob/6918e6b80336cee34f2131fcf71a58c72b931174/src/quad_float.cpp#L125
+template <typename F>
+inline dfloat<F> normalise(const dfloat<F> &x)
+{
+    F u, v;
+
+    u = x.hi + x.lo;
+    v = x.hi - u;
+    v = v + x.lo;
+
+    return dfloat<F>{u, v};
+}
+
 // NOTE: taken with minimal adaptations from NTL. My understanding
 // here is the following: given input (x, xx) and (y, yy), the error-free
 // additions x + y and xx + yy are computed. The components of xx + yy
