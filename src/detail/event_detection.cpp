@@ -77,7 +77,7 @@ namespace
 {
 
 // Given an input polynomial a(x), substitute
-// x with x_1 * h and write to ret the resulting
+// x with x_1 * scal and write to ret the resulting
 // polynomial in the new variable x_1. Requires
 // random-access iterators.
 // NOTE: aliasing allowed.
