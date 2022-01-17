@@ -164,6 +164,17 @@ if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 13)
     endif()
 endif()
 
+# This is temporarily here in order to quench some fmt 8.1
+# warnings until we fix the code.
+find_package(fmt REQUIRED CONFIG)
+message(STATUS "fmt version: ${fmt_VERSION}")
+if(${fmt_VERSION} VERSION_GREATER_EQUAL "8.1")
+    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
+        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
+        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
+    endif()
+endif()
+
 # List of source files.
 set(HEYOKA_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/taylor.cpp"
@@ -375,7 +386,6 @@ endif()
 target_link_libraries(heyoka PRIVATE "$<BUILD_INTERFACE:heyoka_llvm_internal>")
 
 # Mandatory dependency on fmt.
-find_package(fmt REQUIRED CONFIG)
 target_link_libraries(heyoka PRIVATE fmt::fmt)
 
 # Mandatory dependency on spdlog.

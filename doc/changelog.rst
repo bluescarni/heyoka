@@ -34,6 +34,9 @@ Changes
 Fix
 ~~~
 
+- Fix compilation in debug mode when using recent versions
+  of ``fmt``
+  (`#226 <https://github.com/bluescarni/heyoka/pull/226>`__).
 - Fix potential issue arising when certain data structures
   related to event detection are destroyed in the wrong order
   (`#226 <https://github.com/bluescarni/heyoka/pull/226>`__).
