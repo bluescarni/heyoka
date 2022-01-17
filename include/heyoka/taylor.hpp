@@ -928,12 +928,17 @@ private:
         pt_t m_pt = nullptr;
         rtscc_t m_rtscc = nullptr;
         fex_check_t m_fex_check = nullptr;
+        // The polynomial cache.
+        // NOTE: it is *really* important that this is declared
+        // *before* m_wlist, because m_wlist will contain references
+        // to and interact with m_poly_cache during destruction,
+        // and we must be sure that m_wlist is destroyed *before*
+        // m_poly_cache.
+        taylor_poly_cache<T> m_poly_cache;
         // The working list.
         wlist_t m_wlist;
         // The list of isolating intervals.
         isol_t m_isol;
-        // The polynomial cache.
-        taylor_poly_cache<T> m_poly_cache;
 
         // Constructors.
         ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t);
@@ -1406,12 +1411,17 @@ private:
         pt_t m_pt = nullptr;
         rtscc_t m_rtscc = nullptr;
         fex_check_t m_fex_check = nullptr;
+        // The polynomial cache.
+        // NOTE: it is *really* important that this is declared
+        // *before* m_wlist, because m_wlist will contain references
+        // to and interact with m_poly_cache during destruction,
+        // and we must be sure that m_wlist is destroyed *before*
+        // m_poly_cache.
+        taylor_poly_cache<T> m_poly_cache;
         // The working list.
         wlist_t m_wlist;
         // The list of isolating intervals.
         isol_t m_isol;
-        // The polynomial cache.
-        taylor_poly_cache<T> m_poly_cache;
 
         // Constructors.
         ed_data(std::vector<t_event_t>, std::vector<nt_event_t>, std::uint32_t, std::uint32_t, std::uint32_t);

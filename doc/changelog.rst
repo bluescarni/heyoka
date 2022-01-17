@@ -34,6 +34,9 @@ Changes
 Fix
 ~~~
 
+- Fix potential issue arising when certain data structures
+  related to event detection are destroyed in the wrong order
+  (`#226 <https://github.com/bluescarni/heyoka/pull/226>`__).
 - Fix build failures in the benchmark suite
   (`#220 <https://github.com/bluescarni/heyoka/pull/220>`__).
 
