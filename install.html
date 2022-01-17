@@ -23,7 +23,7 @@
 
     
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=c3fdc42140077d1ad13ad2f1588a4309" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-book-theme.css?digest=84ace793992934648b4de8eed757e5a2" />
     
   <link rel="preload" as="script" href="_static/js/index.be7d3bbb2ef33a8344ce.js">
 
@@ -31,7 +31,7 @@
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx-book-theme.12a9622fbb08dcb3a2a40b2c02b83a57.js"></script>
+    <script src="_static/sphinx-book-theme.9d8b4a8b9bb19db25eeaddc40d639ba2.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Basic tutorials" href="basic_tutorials.html" />
@@ -52,7 +52,12 @@
     <div class="container-xl">
       <div class="row">
           
-<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<div class="col-12 col-md-3 bd-sidebar site-navigation " id="site-navigation">
     
         <div class="navbar-brand-box">
     <a class="navbar-brand text-wrap" href="index.html">
@@ -203,22 +208,22 @@
 
 
           
+<!-- This is an invisible pixel that we watch to see if we've scrolled. -->
+<div class="sbt-scroll-pixel-helper"></div>
 <main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
     
     <div class="topbar container-xl fixed-top">
     <div class="topbar-contents row">
         <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show"></div>
         <div class="col pl-md-4 topbar-main">
-            
-            <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
-                data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
-                aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
-                title="Toggle navigation" data-toggle="tooltip" data-placement="left">
-                <i class="fas fa-bars"></i>
-                <i class="fas fa-arrow-left"></i>
-                <i class="fas fa-arrow-up"></i>
-            </button>
-            
+            <div class="topbar-left">
+                
+                <label class="nav-toggle-button" for="__navigation">
+                    <div class="visually-hidden">Toggle navigation</div>
+                    <i class="fas fa-bars"></i>
+                </label>
+                
+            </div>
             
 <div class="dropdown-buttons-trigger">
     <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
@@ -233,7 +238,7 @@
                 data-placement="left">.rst</button></a>
         <!-- Download PDF via print -->
         <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
-            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+                onclick="printPdf(this)" data-toggle="tooltip" data-placement="left">.pdf</button>
     </div>
 </div>
 
@@ -267,7 +272,7 @@
         </div>
 
         <!-- Table of contents -->
-        <div class="d-none d-md-block col-md-2 bd-toc show">
+        <div class="d-none d-md-block col-md-2 bd-toc show noprint">
             
             <div class="tocsection onthispage pt-5 pb-3">
                 <i class="fas fa-list"></i> Contents
@@ -333,7 +338,76 @@
 </div>
     <div id="main-content" class="row">
         <div class="col-12 col-md-9 pl-md-3 pr-md-0">
-        
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Installation</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#introduction">
+   Introduction
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#support-for-extended-precision">
+     Support for extended precision
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#bit-precision">
+       80-bit precision
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id2">
+       128-bit precision
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#packages">
+   Packages
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#conda">
+     Conda
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#freebsd">
+     FreeBSD
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#installation-from-source">
+   Installation from source
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#including-heyoka-in-your-project-via-cmake">
+   Including heyoka in your project via CMake
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            
               <div>
                 
   <div class="section" id="installation">
@@ -468,6 +542,14 @@ build directory:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake --build .
 </pre></div>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>heyoka relies on a conforming implementation of IEEE floating-point
+arithmetic. Do <em>not</em> enable fast math flags (e.g., <code class="docutils literal notranslate"><span class="pre">-ffast-math</span></code>,
+<code class="docutils literal notranslate"><span class="pre">-Ofast</span></code>, etc.) when compiling heyoka or software depending on heyoka.
+If you are using the Intel C++ compiler, make sure that you are using
+the <code class="docutils literal notranslate"><span class="pre">strict</span></code> floating-point model.</p>
+</div>
 <p>To install heyoka, you can use the following CMake command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cmake  --build . --target install
 </pre></div>
@@ -503,20 +585,20 @@ on which heyoka depends are brought into the link chain.</p>
 <p>For instance, a <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> file for a project using heyoka
 may look like this:</p>
 <div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="c"># heyoka requires at least CMake 3.8.</span>
-<span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span> <span class="s">3.8.0</span><span class="p">)</span>
+<span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.8.0</span><span class="p">)</span>
 
 <span class="c"># The name of our project.</span>
 <span class="nb">project</span><span class="p">(</span><span class="s">sample_project</span><span class="p">)</span>
 
 <span class="c"># Look for an installation of heyoka in the system.</span>
-<span class="nb">find_package</span><span class="p">(</span><span class="s">heyoka</span> <span class="s">REQUIRED</span><span class="p">)</span>
+<span class="nb">find_package</span><span class="p">(</span><span class="s">heyoka</span><span class="w"> </span><span class="s">REQUIRED</span><span class="p">)</span>
 
 <span class="c"># Create an executable, and link it to the heyoka::heyoka imported target.</span>
 <span class="c"># This ensures that, in the compilation of &#39;main&#39;, heyoka&#39;s include</span>
 <span class="c"># dirs are added to the include path of the compiler and that heyoka&#39;s</span>
 <span class="c"># dependencies are transitively linked to &#39;main&#39;.</span>
-<span class="nb">add_executable</span><span class="p">(</span><span class="s">main</span> <span class="s">main.cpp</span><span class="p">)</span>
-<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">main</span> <span class="s">heyoka::heyoka</span><span class="p">)</span>
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">main</span><span class="w"> </span><span class="s">main.cpp</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">main</span><span class="w"> </span><span class="s">heyoka::heyoka</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>heyoka’s config-file package also exports the following boolean variables to signal with which optional
@@ -525,14 +607,22 @@ dependencies heyoka was compiled:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_SLEEF</span></code> if SLEEF support was enabled,</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">heyoka_WITH_MPPP</span></code> if mp++ support was enabled.</p></li>
 </ul>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 0.17.0.</span></p>
+</div>
+<p>heyoka’s config-file package also exports a
+<code class="docutils literal notranslate"><span class="pre">heyoka_LLVM_VERSION_MAJOR</span></code> variable containing
+the major number of the LLVM version against which heyoka
+was compiled. E.g., if heyoka was compiled against LLVM 12.0.1,
+then <code class="docutils literal notranslate"><span class="pre">heyoka_LLVM_VERSION_MAJOR</span></code> is <code class="docutils literal notranslate"><span class="pre">12</span></code>.</p>
 </div>
 </div>
 
 
               </div>
               
-        
-            <!-- Previous / next buttons -->
+            
+                <!-- Previous / next buttons -->
 <div class='prev-next-area'> 
     <a class='left-prev' id="prev-link" href="index.html" title="previous page">
         <i class="fas fa-angle-left"></i>
@@ -549,19 +639,17 @@ dependencies heyoka was compiled:</p>
     <i class="fas fa-angle-right"></i>
     </a>
 </div>
-        
+            
         </div>
     </div>
     <footer class="footer">
-    <div class="container">
-      <p>
-        
-          By Francesco Biscani, Dario Izzo<br/>
-        
-            &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
-      </p>
-    </div>
-  </footer>
+  <p>
+    
+      By Francesco Biscani, Dario Izzo<br/>
+    
+        &copy; Copyright 2020, 2021 Francesco Biscani, Dario Izzo.<br/>
+  </p>
+</footer>
 </main>
 
 
