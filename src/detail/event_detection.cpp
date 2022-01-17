@@ -77,7 +77,7 @@ namespace
 {
 
 // Given an input polynomial a(x), substitute
-// x with x_1 * h and write to ret the resulting
+// x with x_1 * scal and write to ret the resulting
 // polynomial in the new variable x_1. Requires
 // random-access iterators.
 // NOTE: aliasing allowed.
@@ -337,7 +337,7 @@ llvm::Function *add_poly_translator_1(llvm_state &s, std::uint32_t order, std::u
 // - counts the sign changes in the coefficients
 //   of the resulting polynomial.
 template <typename T>
-llvm::Function *add_poly_rtscc(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+llvm::Function *llvm_add_poly_rtscc_impl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u); // LCOV_EXCL_LINE
 
@@ -715,6 +715,25 @@ llvm::Function *llvm_add_fex_check_f128(llvm_state &s, std::uint32_t n, std::uin
 
 #endif
 
+llvm::Function *llvm_add_poly_rtscc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_poly_rtscc_impl<double>(s, n, batch_size);
+}
+
+llvm::Function *llvm_add_poly_rtscc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_poly_rtscc_impl<long double>(s, n, batch_size);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+llvm::Function *llvm_add_poly_rtscc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
+{
+    return llvm_add_poly_rtscc_impl<mppp::real128>(s, n, batch_size);
+}
+
+#endif
+
 // A RAII helper to extract polys from a cache and
 // return them to the cache upon destruction.
 template <typename T>
@@ -826,7 +845,7 @@ taylor_adaptive_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std::vecto
 
     // Add the rtscc function. This will also indirectly
     // add the translator function.
-    add_poly_rtscc<T>(m_state, order, 1);
+    llvm_add_poly_rtscc<T>(m_state, order, 1);
 
     // Add the function for the fast exclusion check.
     llvm_add_fex_check<T>(m_state, order, 1);
@@ -1226,6 +1245,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 max_isol_size = std::max(max_isol_size, m_isol.size());
 #endif
 
+                // LCOV_EXCL_START
                 // We want to put limits in order to avoid an endless loop when the algorithm fails.
                 // The first check is on the working list size and it is based
                 // on heuristic observation of the algorithm's behaviour in pathological
@@ -1241,6 +1261,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
                     break;
                 }
+                // LCOV_EXCL_STOP
 
             } while (!m_wlist.empty());
 
@@ -1395,7 +1416,7 @@ taylor_adaptive_batch_impl<T>::ed_data::ed_data(std::vector<t_event_t> tes, std:
     // add the translator function.
     // NOTE: keep batch size to 1 because the real-root
     // isolation is scalarised.
-    add_poly_rtscc<T>(m_state, order, 1);
+    llvm_add_poly_rtscc<T>(m_state, order, 1);
 
     // Add the function for the fast exclusion check.
     // NOTE: the fast exclusion check is vectorised.
