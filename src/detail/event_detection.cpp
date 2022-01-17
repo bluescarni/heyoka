@@ -1245,6 +1245,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 max_isol_size = std::max(max_isol_size, m_isol.size());
 #endif
 
+                // LCOV_EXCL_START
                 // We want to put limits in order to avoid an endless loop when the algorithm fails.
                 // The first check is on the working list size and it is based
                 // on heuristic observation of the algorithm's behaviour in pathological
@@ -1260,6 +1261,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
 
                     break;
                 }
+                // LCOV_EXCL_STOP
 
             } while (!m_wlist.empty());
 
