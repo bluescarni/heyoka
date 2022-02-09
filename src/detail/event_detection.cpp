@@ -185,7 +185,7 @@ std::tuple<T, int> bracketed_root_find(const T *poly, std::uint32_t order, T lb,
     // Run the root finder.
     const auto p = boost::math::tools::toms748_solve([poly, order](T x) { return poly_eval(poly, x, order); }, lb, ub,
                                                      boost::math::tools::eps_tolerance<T>(), max_iter, pol{});
-    const auto ret = (p.first + p.second) / 2;
+    const auto ret = p.first / 2 + p.second / 2;
 
     SPDLOG_LOGGER_DEBUG(get_logger(), "root finding iterations: {}", max_iter);
 
@@ -1176,6 +1176,9 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                 // When we do proper root finding below, the
                 // algorithm should be able to detect non-finite
                 // polynomials.
+                // NOTE: it's not 100% clear to me why we have to special-case
+                // this, but if we don't, the root is not detected. Note that
+                // the wikipedia algorithm also has a special case for this.
                 if (tmp.v[0] == T(0) // LCOV_EXCL_LINE
                     && std::all_of(tmp.v.data() + 1, tmp.v.data() + 1 + order,
                                    [](const auto &x) { return isfinite(x); })) {
@@ -1219,7 +1222,7 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     m_pt(tmp2.v.data(), tmp1.v.data());
 
                     // Finally we add tmp1 and tmp2 to the working list.
-                    const auto mid = (lb + ub) / 2;
+                    const auto mid = lb / 2 + ub / 2;
                     // NOTE: don't add the lower range if it falls
                     // entirely within the cooldown range.
                     if (lb_offset < mid) {
@@ -1870,7 +1873,7 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                         // Finally we add tmp1 and tmp2 to the working list.
                         // NOTE: not sure why this is not picked up by the code
                         // coverage tool.
-                        const auto mid = (lb + ub) / 2; // LCOV_EXCL_LINE
+                        const auto mid = lb / 2 + ub / 2; // LCOV_EXCL_LINE
                         // NOTE: don't add the lower range if it falls
                         // entirely within the cooldown range.
                         if (lb_offset < mid) {

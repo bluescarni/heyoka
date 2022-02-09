@@ -1149,3 +1149,61 @@ TEST_CASE("te def ctor")
     REQUIRE(te.get_direction() == event_direction::any);
     REQUIRE(te.get_cooldown() == -1.);
 }
+
+// Test to verify an event is not detected
+// when it falls exactly at the end of a timestep.
+TEST_CASE("te open range")
+{
+    auto tester = [](auto fp_x) {
+        using std::nextafter;
+
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using ev_t = typename taylor_adaptive<fp_t>::t_event_t;
+
+        auto ta = taylor_adaptive<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                        {fp_t(-0.25), fp_t(0.)},
+                                        kw::t_events = {ev_t(heyoka::time - 97 / fp_t(100000))}};
+
+        auto [oc, h] = ta.step(97 / fp_t(100000));
+
+        REQUIRE(oc == taylor_outcome::time_limit);
+
+        // Reset the integrator.
+        ta.set_time(0);
+        ta.get_state_data()[0] = fp_t(-0.25);
+        ta.get_state_data()[1] = fp_t(0);
+        ta.reset_cooldowns();
+
+        // Integrate up to immediately after the event.
+        std::tie(oc, h) = ta.step(nextafter(97 / fp_t(100000), fp_t(1)));
+
+        REQUIRE(oc == taylor_outcome{-1});
+
+        // Run also a test at the very beginning.
+        ta.set_time(97 / fp_t(100000));
+        ta.get_state_data()[0] = fp_t(-0.25);
+        ta.get_state_data()[1] = fp_t(0);
+        ta.reset_cooldowns();
+
+        std::tie(oc, h) = ta.step();
+
+        REQUIRE(oc == taylor_outcome{-1});
+        REQUIRE(h == 0);
+
+        // And slightly later.
+        ta.set_time(nextafter(97 / fp_t(100000), fp_t(1)));
+        ta.get_state_data()[0] = fp_t(-0.25);
+        ta.get_state_data()[1] = fp_t(0);
+        ta.reset_cooldowns();
+
+        std::tie(oc, h) = ta.step();
+
+        REQUIRE(oc == taylor_outcome::success);
+        REQUIRE(h > 0);
+    };
+
+    tuple_for_each(fp_types, tester);
+}
