@@ -1509,3 +1509,42 @@ TEST_CASE("get_set_dtime")
     REQUIRE(ta.get_dtime().second[0] == std::numeric_limits<double>::epsilon());
     REQUIRE(ta.get_dtime().second[1] == std::numeric_limits<double>::epsilon());
 }
+
+// Check the callback is invoked when the integration is stopped
+// by a terminal event.
+TEST_CASE("callback ste")
+{
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        auto [x, v] = make_vars("x", "v");
+
+        using ev_t = typename taylor_adaptive_batch<fp_t>::t_event_t;
+        auto ta = taylor_adaptive_batch<fp_t>{{prime(x) = v, prime(v) = -9.8 * sin(x)},
+                                              {-1, -0.0001, -1, -1, 0.025, 0.026, 0.027, 0.028},
+                                              4,
+                                              kw::t_events = {ev_t(x)}};
+
+        int n_invoked = 0;
+        auto pcb = [&n_invoked](auto &) {
+            ++n_invoked;
+
+            return true;
+        };
+
+        ta.propagate_until(10, kw::callback = pcb);
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::success);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome{-1});
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[2]) == taylor_outcome::success);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[2]) == 1);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[3]) == taylor_outcome::success);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[3]) == 1);
+
+        REQUIRE(n_invoked == 1);
+    };
+
+    tuple_for_each(fp_types, tester);
+}
