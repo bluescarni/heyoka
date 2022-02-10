@@ -2722,6 +2722,17 @@ void taylor_adaptive_impl<T>::reset_cooldowns()
     }
 }
 
+// NOTE: possible outcomes:
+// - time_limit iff the propagation was performed
+//   up to the final time, else
+// - cb_interrupt if the propagation was interrupted
+//   via callback, else
+// - err_nf_state if a non-finite state was generated, else
+// - an event index if a stopping terminal event was encountered.
+// The callback is always executed at the end of each timestep, unless
+// a non-finite state was detected.
+// The continuous output is always updated at the end of each timestep,
+// unless a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::optional<continuous_output<T>>>
 taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t max_steps, T max_delta_t,
@@ -3029,11 +3040,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // and don't pass the callback.
     const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
 
-    if (oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
-        // The outcome is not time_limit and it is not a continuing
-        // terminal event. This means that a non-finite state was
-        // encountered, or a stopping terminal event triggered, or
-        // the step limit was hit.
+    if (oc != taylor_outcome::time_limit) {
+        // The outcome is not time_limit, exit now.
         return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
     }
 
@@ -4064,6 +4072,21 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
+// NOTE: possible outcomes:
+// - all time_limit iff all batch elements
+//   were successfully propagated up to the final times; else,
+// - all cb_interrupt if the integration was interrupted via
+//   a callback; else,
+// - 1 or more err_nf_state if 1 or more batch elements generated
+//   a non-finite state. The other elements will have their outcome
+//   set by the last step taken; else,
+// - 1 or more event indices if 1 or more batch elements generated
+//   a stopping terminal event. The other elements will have their outcome
+//   set by the last step taken.
+// The callback is always executed at the end of each timestep, unless
+// a non-finite state was detected in any batch element.
+// The continuous output is always updated at the end of each timestep,
+// unless a non-finite state was detected in any batch element.
 template <typename T>
 std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propagate_until_impl(
     const std::vector<dfloat<T>> &ts, std::size_t max_steps, const std::vector<T> &max_delta_ts,
@@ -4507,12 +4530,8 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
     // Check the result of the integration.
     if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
-            // Check if the outcome is not time_limit and it is not a continuing
-            // terminal event. This means that a non-finite state was
-            // encountered, or a stopping terminal event triggered, or the step
-            // limit was hit.
-            const auto oc = std::get<0>(t);
-            return oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
+            // Check if any outcome is not time_limit.
+            return std::get<0>(t) != taylor_outcome::time_limit;
         })) {
         // NOTE: for consistency with the scalar implementation,
         // keep the outcomes from propagate_until() but we reset
