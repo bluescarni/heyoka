@@ -2465,6 +2465,14 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 // The function will return a pair, containing
 // a flag describing the outcome of the integration,
 // and the integration timestep that was used.
+//
+// NOTE: for the docs:
+// - outcome:
+//   - if nf state is detected, err_nf_state, else
+//   - if terminal events trigger, return the index
+//     of the first event triggering, else
+//   - either time_limit or success, depending on whether
+//     max_delta_t was used as a timestep or not.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
@@ -3698,6 +3706,16 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 // The function will write to res a pair for each state
 // vector, containing a flag describing the outcome of the integration
 // and the integration timestep that was used.
+//
+// NOTE: for the docs:
+// - document exception rethrowing behaviour when an event
+//   callback throws;
+// - outcome for each batch element:
+//   - if nf state is detected, err_nf_state, else
+//   - if terminal events trigger, return the index
+//     of the first event triggering, else
+//   - either time_limit or success, depending on whether
+//     max_delta_t was used as a timestep or not.
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
