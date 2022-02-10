@@ -2927,7 +2927,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // which is certainly before t, and thus a sign
         // flip cannot happen.
         if (h == rtime) {
-            rem_time = dfloat<T>(T(0));
+            rem_time = dfloat<T>(T(0)); // LCOV_EXCL_LINE
         } else {
             assert(abs(h) < abs(rtime));
             rem_time = t - m_time;
