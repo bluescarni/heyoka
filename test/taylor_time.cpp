@@ -108,7 +108,7 @@ TEST_CASE("ode test")
 
                 ta.propagate_until(100.);
 
-                REQUIRE(ta.get_state()[0] == approximately(sin(100.) + .5, 10000.));
+                REQUIRE(ta.get_state()[0] == approximately(sin(100.) + .5, 100000.));
 
                 ta.propagate_until(0.);
 
