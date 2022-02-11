@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <chrono> // NOTE: needed for the spdlog stopwatch.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -38,8 +37,6 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-
-#include <spdlog/stopwatch.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>

@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <chrono> // NOTE: needed for the spdlog stopwatch.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -34,8 +33,6 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-
-#include <spdlog/stopwatch.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -2472,7 +2469,8 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 //   - if terminal events trigger, return the index
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
-//     max_delta_t was used as a timestep or not.
+//     max_delta_t was used as a timestep or not;
+// - event detection is skipped altogether if h == 0.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
@@ -3733,7 +3731,9 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 //   - if terminal events trigger, return the index
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
-//     max_delta_t was used as a timestep or not.
+//     max_delta_t was used as a timestep or not;
+// - event detection for a batch element is skipped altogether
+//   if h == 0.
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {

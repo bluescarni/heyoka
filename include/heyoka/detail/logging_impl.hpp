@@ -18,7 +18,10 @@
 
 #endif
 
+#include <chrono> // NOTE: needed for the spdlog stopwatch.
+
 #include <spdlog/spdlog.h>
+#include <spdlog/stopwatch.h>
 
 namespace heyoka::detail
 {
