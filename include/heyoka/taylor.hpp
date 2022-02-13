@@ -223,7 +223,11 @@ enum class taylor_outcome : std::int64_t {
     // NOTE: we make these enums start at -2**32 - 1,
     // so that we have 2**32 values in the [-2**32, -1]
     // range to use for signalling stopping terminal events.
-    success = -4294967296ll - 1,      // Integration step was successful, no time/step limits were reached.
+    // NOTE: the time_limit outcome signals both a clamped
+    // timestep and a propagate_*() function that successfully
+    // finished. This can be confusing, perhaps we can consider
+    // in the future having different outcomes.
+    success = -4294967296ll - 1,      // Integration step was successful.
     step_limit = -4294967296ll - 2,   // Maximum number of steps reached.
     time_limit = -4294967296ll - 3,   // Time limit reached.
     err_nf_state = -4294967296ll - 4, // Non-finite state detected at the end of the timestep.
