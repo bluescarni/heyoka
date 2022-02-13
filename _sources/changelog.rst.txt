@@ -1,6 +1,22 @@
 Changelog
 =========
 
+0.17.1 (2022-02-13)
+-------------------
+
+Changes
+~~~~~~~
+
+- The ``propagate_*()`` callbacks are now invoked also if the integration
+  is interrupted by a stopping terminal event
+  (`#231 <https://github.com/bluescarni/heyoka/pull/231>`__).
+
+Fix
+~~~
+
+- Fix two test failures on FreeBSD
+  (`#231 <https://github.com/bluescarni/heyoka/pull/231>`__).
+
 0.17.0 (2022-01-20)
 -------------------
 
