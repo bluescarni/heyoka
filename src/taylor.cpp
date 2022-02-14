@@ -389,23 +389,6 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     return h;
 }
 
-// Store the value val as the derivative of order 'order' of the u variable u_idx
-// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         llvm::Value *u_idx, llvm::Value *val)
-{
-    auto &builder = s.builder();
-
-    // NOTE: overflow check has already been done to ensure that the
-    // total size of diff_arr fits in a 32-bit unsigned integer.
-    assert(llvm_depr_GEP_type_check(diff_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
-
-    builder.CreateStore(val, ptr);
-}
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number/param), n_uvars the number of variables in
