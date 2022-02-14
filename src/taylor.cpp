@@ -1263,8 +1263,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
 
         // Store into diff_arr.
-        assert(llvm_depr_GEP_type_check(diff_arr, fp_vec_type)); // LCOV_EXCL_LINE
-        builder.CreateStore(vec, builder.CreateInBoundsGEP(fp_vec_type, diff_arr, cur_var_idx));
+        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
     // Helper to compute and store the derivatives of order cur_order
@@ -1929,8 +1928,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         // compensations with zero.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the value from diff_arr.
-            assert(llvm_depr_GEP_type_check(diff_arr, fp_vec_t)); // LCOV_EXCL_LINE
-            auto *val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, diff_arr, cur_var_idx));
+            auto *val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx);
 
             // Store it in res_arr.
             assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
