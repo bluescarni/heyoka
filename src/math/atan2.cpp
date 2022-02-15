@@ -399,7 +399,7 @@ namespace
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const V &n1, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+                                              std::uint32_t, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -481,7 +481,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n0, const 
 // Derivative of atan2(var, number).
 template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var, const U &n, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+                                              std::uint32_t order, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -532,7 +532,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, run the codegen.
-                auto ret = llvm_atan2(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
+                auto ret = llvm_atan2(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx, order),
                                       taylor_c_diff_numparam_codegen(s, n, num_x, par_ptr, batch_size));
 
                 builder.CreateStore(ret, retval);
@@ -542,13 +542,13 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Compute the divisor: ord * d^[0].
-                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
+                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx, order);
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * c^[0] * b^[n].
                 auto dividend
                     = builder.CreateFMul(ord_v, taylor_c_diff_numparam_codegen(s, n, num_x, par_ptr, batch_size));
-                dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx));
+                dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx, order));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
@@ -557,8 +557,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx, order);
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx, order);
                     auto tmp = builder.CreateFMul(d_nj, aj);
 
                     tmp = builder.CreateFMul(j_v, tmp);
@@ -598,7 +598,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
 // Derivative of atan2(number, var).
 template <typename T, typename U, std::enable_if_t<is_num_param<U>::value, int> = 0>
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const variable &var, std::uint32_t n_uvars,
-                                              std::uint32_t batch_size)
+                                              std::uint32_t order, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -650,7 +650,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
             [&]() {
                 // For order 0, run the codegen.
                 auto ret = llvm_atan2(s, taylor_c_diff_numparam_codegen(s, n, num_y, par_ptr, batch_size),
-                                      taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
+                                      taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx, order));
 
                 builder.CreateStore(ret, retval);
             },
@@ -659,13 +659,13 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Compute the divisor: ord * d^[0].
-                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
+                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx, order);
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: -ord * b^[0] * c^[n].
                 auto dividend = builder.CreateFMul(builder.CreateFNeg(ord_v),
                                                    taylor_c_diff_numparam_codegen(s, n, num_y, par_ptr, batch_size));
-                dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx));
+                dividend = builder.CreateFMul(dividend, taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx, order));
 
                 // Init the accumulator.
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
@@ -674,8 +674,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx, order);
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx, order);
                     auto tmp = builder.CreateFMul(d_nj, aj);
 
                     tmp = builder.CreateFMul(j_v, tmp);
@@ -715,7 +715,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const U &n, const v
 // Derivative of atan2(var, var).
 template <typename T>
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var0, const variable &var1,
-                                              std::uint32_t n_uvars, std::uint32_t batch_size)
+                                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &md = s.module();
     auto &builder = s.builder();
@@ -765,8 +765,8 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, run the codegen.
-                auto ret = llvm_atan2(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
-                                      taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx));
+                auto ret = llvm_atan2(s, taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx, order),
+                                      taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx, order));
 
                 builder.CreateStore(ret, retval);
             },
@@ -775,14 +775,16 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 // Compute the divisor: ord * d^[0].
-                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx);
+                auto divisor = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), d_idx, order);
                 divisor = builder.CreateFMul(ord_v, divisor);
 
                 // Init the dividend: ord * (c^[0] * b^[n] - b^[0] * c^[n]).
-                auto div1 = builder.CreateFMul(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx),
-                                               taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx));
-                auto div2 = builder.CreateFMul(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx),
-                                               taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx));
+                auto div1
+                    = builder.CreateFMul(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), x_idx, order),
+                                         taylor_c_load_diff(s, diff_ptr, n_uvars, ord, y_idx, order));
+                auto div2
+                    = builder.CreateFMul(taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), y_idx, order),
+                                         taylor_c_load_diff(s, diff_ptr, n_uvars, ord, x_idx, order));
                 auto dividend = builder.CreateFSub(div1, div2);
                 dividend = builder.CreateFMul(ord_v, dividend);
 
@@ -793,16 +795,16 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
                 llvm_loop_u32(s, builder.getInt32(1), ord, [&](llvm::Value *j) {
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, y_idx);
+                    auto c_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), x_idx, order);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, y_idx, order);
                     auto tmp1 = builder.CreateFMul(c_nj, bj);
 
-                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), y_idx);
-                    auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, x_idx);
+                    auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), y_idx, order);
+                    auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, x_idx, order);
                     auto tmp2 = builder.CreateFMul(b_nj, cj);
 
-                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx);
-                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                    auto d_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), d_idx, order);
+                    auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx, order);
                     auto tmp3 = builder.CreateFMul(d_nj, aj);
 
                     auto tmp = builder.CreateFSub(builder.CreateFSub(tmp1, tmp2), tmp3);
@@ -845,7 +847,7 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &s, const variable &var
 // All the other cases.
 template <typename T, typename U, typename V, typename... Args>
 llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, const U &, const V &, std::uint32_t, std::uint32_t,
-                                              const Args &...)
+                                              std::uint32_t, const Args &...)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of atan2() in compact mode");
@@ -855,35 +857,37 @@ llvm::Function *taylor_c_diff_func_atan2_impl(llvm_state &, const U &, const V &
 
 template <typename T>
 llvm::Function *taylor_c_diff_func_atan2(llvm_state &s, const atan2_impl &fn, std::uint32_t n_uvars,
-                                         std::uint32_t batch_size)
+                                         std::uint32_t order, std::uint32_t batch_size)
 {
     assert(fn.args().size() == 2u); // LCOV_EXCL_LINE
 
-    return std::visit([&](const auto &v1,
-                          const auto &v2) { return taylor_c_diff_func_atan2_impl<T>(s, v1, v2, n_uvars, batch_size); },
-                      fn.args()[0].value(), fn.args()[1].value());
+    return std::visit(
+        [&](const auto &v1, const auto &v2) {
+            return taylor_c_diff_func_atan2_impl<T>(s, v1, v2, n_uvars, order, batch_size);
+        },
+        fn.args()[0].value(), fn.args()[1].value());
 }
 
 } // namespace
 
-llvm::Function *atan2_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *atan2_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_atan2<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_atan2<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *atan2_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
+llvm::Function *atan2_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                    std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_atan2<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_atan2<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *atan2_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
+llvm::Function *atan2_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                    std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_atan2<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_atan2<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

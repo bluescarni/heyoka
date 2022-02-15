@@ -186,7 +186,7 @@ namespace
 
 template <typename T>
 llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t order, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -242,7 +242,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
         f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the necessary function arguments.
-        auto order = f->args().begin();
+        auto ord = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
         auto terms = f->args().begin() + 5;
@@ -260,13 +260,13 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                     using type = detail::uncvref_t<decltype(v)>;
 
                     if constexpr (std::is_same_v<type, variable>) {
-                        return taylor_c_load_diff(s, diff_arr, n_uvars, order, terms + i);
+                        return taylor_c_load_diff(s, diff_arr, n_uvars, ord, terms + i, order);
                     } else if constexpr (is_num_param_v<type>) {
                         // Create the return value.
                         auto retval = builder.CreateAlloca(val_t);
 
                         llvm_if_then_else(
-                            s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                            s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
                             [&]() {
                                 // If the order is zero, run the codegen.
                                 builder.CreateStore(
@@ -315,24 +315,24 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
 
 } // namespace
 
-llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                 std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sum_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
+    return sum_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

@@ -353,7 +353,7 @@ namespace
 // Derivative of sigmoid(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_impl &fn, const U &num,
-                                                std::uint32_t n_uvars, std::uint32_t batch_size)
+                                                std::uint32_t n_uvars, std::uint32_t, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "sigmoid", 1);
 }
@@ -361,7 +361,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
 // Derivative of sigmoid(variable).
 template <typename T>
 llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_impl &fn, const variable &var,
-                                                std::uint32_t n_uvars, std::uint32_t batch_size)
+                                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -409,9 +409,10 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(codegen_from_values<T>(
-                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
-                                    retval);
+                builder.CreateStore(
+                    codegen_from_values<T>(
+                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx, order)}),
+                    retval);
             },
             [&]() {
                 // Init the accumulator.
@@ -419,9 +420,9 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
-                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx);
+                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx, order);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx, order);
+                    auto cnj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), dep_idx, order);
 
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
@@ -465,7 +466,7 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &s, const sigmoid_imp
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &, const sigmoid_impl &, const U &, std::uint32_t,
-                                                std::uint32_t)
+                                                std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a sigmpid in compact mode");
@@ -473,34 +474,35 @@ llvm::Function *taylor_c_diff_func_sigmoid_impl(llvm_state &, const sigmoid_impl
 
 template <typename T>
 llvm::Function *taylor_c_diff_func_sigmoid(llvm_state &s, const sigmoid_impl &fn, std::uint32_t n_uvars,
-                                           std::uint32_t batch_size)
+                                           std::uint32_t order, std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_sigmoid_impl<T>(s, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_sigmoid_impl<T>(s, fn, v, n_uvars, order, batch_size); },
+        fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *sigmoid_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                     bool) const
+llvm::Function *sigmoid_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                     std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sigmoid<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *sigmoid_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                      bool) const
+llvm::Function *sigmoid_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                      std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sigmoid<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sigmoid_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                      bool) const
+llvm::Function *sigmoid_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                      std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sigmoid<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sigmoid<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

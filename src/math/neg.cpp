@@ -209,7 +209,7 @@ namespace
 // Derivative of neg(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &fn, const U &num, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "neg");
 }
@@ -217,7 +217,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &fn, c
 // Derivative of neg(variable).
 template <typename T>
 llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, const variable &var, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t order, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -254,7 +254,7 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
         builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
 
         // Create the return value.
-        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx));
+        auto retval = builder.CreateFNeg(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx, order));
 
         // Return the result.
         builder.CreateRet(retval);
@@ -280,42 +280,44 @@ llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &s, const neg_impl &, con
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &, const neg_impl &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_neg_impl(llvm_state &, const neg_impl &, const U &, std::uint32_t, std::uint32_t,
+                                            std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a negation in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_neg(llvm_state &s, const neg_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_neg(llvm_state &s, const neg_impl &fn, std::uint32_t n_uvars, std::uint32_t order,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_neg_impl<T>(s, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_neg_impl<T>(s, fn, v, n_uvars, order, batch_size); },
+        fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *neg_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *neg_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                 std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_neg<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_neg<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *neg_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *neg_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_neg<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_neg<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *neg_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_neg<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_neg<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

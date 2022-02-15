@@ -313,7 +313,7 @@ namespace
 // Derivative of sqrt(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const U &num, std::uint32_t n_uvars,
-                                             std::uint32_t batch_size)
+                                             std::uint32_t, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "sqrt");
 }
@@ -321,7 +321,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
 // Derivative of sqrt(variable).
 template <typename T>
 llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn, const variable &var,
-                                             std::uint32_t n_uvars, std::uint32_t batch_size)
+                                             std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -369,17 +369,17 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx)}),
+                    codegen_from_values<T>(
+                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx, order)}),
                     retval);
             },
             [&]() {
                 // Compute the divisor: 2*a^[0].
-                auto div = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), u_idx);
+                auto div = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), u_idx, order);
                 div = builder.CreateFAdd(div, div);
 
                 // retval = b^[n].
-                builder.CreateStore(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx), retval);
+                builder.CreateStore(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx, order), retval);
 
                 // Determine the upper index of the summation: (ord - 1)/2 if ord is odd, (ord - 2)/2 otherwise.
                 auto ord_even = builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(0));
@@ -391,8 +391,8 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                 builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
                 llvm_loop_u32(
                     s, builder.getInt32(1), builder.CreateAdd(upper, builder.getInt32(1)), [&](llvm::Value *j) {
-                        auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-                        auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
+                        auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx, order);
+                        auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx, order);
 
                         builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(a_nj, aj)),
                                             acc);
@@ -404,7 +404,7 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                     [&]() {
                         // retval -= (a^[n/2])**2.
                         auto tmp = taylor_c_load_diff(s, diff_ptr, n_uvars,
-                                                      builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
+                                                      builder.CreateUDiv(ord, builder.getInt32(2)), u_idx, order);
                         tmp = builder.CreateFMul(tmp, tmp);
 
                         builder.CreateStore(builder.CreateFSub(builder.CreateLoad(retval), tmp), retval);
@@ -442,42 +442,44 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &, const sqrt_impl &, const U &, std::uint32_t, std::uint32_t,
+                                             std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a square root in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_sqrt(llvm_state &s, const sqrt_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_sqrt(llvm_state &s, const sqrt_impl &fn, std::uint32_t n_uvars, std::uint32_t order,
                                         std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_sqrt_impl<T>(s, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_sqrt_impl<T>(s, fn, v, n_uvars, order, batch_size); },
+        fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *sqrt_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *sqrt_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sqrt<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sqrt<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *sqrt_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *sqrt_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sqrt<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sqrt<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sqrt_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                   bool) const
+llvm::Function *sqrt_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                   std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_sqrt<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_sqrt<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

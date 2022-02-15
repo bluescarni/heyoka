@@ -292,9 +292,9 @@ llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint3
 }
 
 // Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
-// n_uvars is the total number of u variables.
+// n_uvars is the total number of u variables, t_order the order of the Taylor integrator.
 llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                                llvm::Value *u_idx)
+                                llvm::Value *u_idx, [[maybe_unused]] std::uint32_t t_order)
 {
     auto &builder = s.builder();
 
@@ -309,9 +309,10 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint3
 }
 
 // Store the value val as the derivative of order 'order' of the u variable u_idx
-// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
+// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables,
+// t_order the order of the Taylor integrator.
 void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         llvm::Value *u_idx, llvm::Value *val)
+                         llvm::Value *u_idx, [[maybe_unused]] std::uint32_t t_order, llvm::Value *val)
 {
     auto &builder = s.builder();
 

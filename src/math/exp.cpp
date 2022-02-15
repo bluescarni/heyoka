@@ -289,7 +289,7 @@ namespace
 // Derivative of exp(number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, const U &num, std::uint32_t n_uvars,
-                                            std::uint32_t batch_size)
+                                            std::uint32_t, std::uint32_t batch_size)
 {
     return taylor_c_diff_func_unary_num_det<T>(s, fn, num, n_uvars, batch_size, "exp");
 }
@@ -297,7 +297,7 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
 // Derivative of exp(variable).
 template <typename T>
 llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, const variable &var,
-                                            std::uint32_t n_uvars, std::uint32_t batch_size)
+                                            std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
@@ -345,9 +345,10 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order 0, invoke the function on the order 0 of b_idx.
-                builder.CreateStore(codegen_from_values<T>(
-                                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx)}),
-                                    retval);
+                builder.CreateStore(
+                    codegen_from_values<T>(
+                        s, fn, {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), b_idx, order)}),
+                    retval);
             },
             [&]() {
                 // Create a vector version of ord.
@@ -358,8 +359,8 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
-                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx);
-                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx);
+                    auto anj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), a_idx, order);
+                    auto bj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, b_idx, order);
 
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
@@ -397,42 +398,44 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
 
 // All the other cases.
 template <typename T, typename U, std::enable_if_t<!is_num_param_v<U>, int> = 0>
-llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &, const exp_impl &, const U &, std::uint32_t, std::uint32_t)
+llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &, const exp_impl &, const U &, std::uint32_t, std::uint32_t,
+                                            std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of an exponential in compact mode");
 }
 
 template <typename T>
-llvm::Function *taylor_c_diff_func_exp(llvm_state &s, const exp_impl &fn, std::uint32_t n_uvars,
+llvm::Function *taylor_c_diff_func_exp(llvm_state &s, const exp_impl &fn, std::uint32_t n_uvars, std::uint32_t order,
                                        std::uint32_t batch_size)
 {
     assert(fn.args().size() == 1u);
 
-    return std::visit([&](const auto &v) { return taylor_c_diff_func_exp_impl<T>(s, fn, v, n_uvars, batch_size); },
-                      fn.args()[0].value());
+    return std::visit(
+        [&](const auto &v) { return taylor_c_diff_func_exp_impl<T>(s, fn, v, n_uvars, order, batch_size); },
+        fn.args()[0].value());
 }
 
 } // namespace
 
-llvm::Function *exp_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *exp_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                 std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_exp<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_exp<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *exp_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *exp_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_exp<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_exp<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *exp_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *exp_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                  std::uint32_t batch_size, bool) const
 {
-    return taylor_c_diff_func_exp<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_exp<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

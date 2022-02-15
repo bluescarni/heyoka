@@ -290,7 +290,7 @@ namespace
 
 template <typename T>
 llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl &sf, std::uint32_t n_uvars,
-                                               std::uint32_t batch_size)
+                                               std::uint32_t order, std::uint32_t batch_size)
 {
     // NOTE: this is prevented in the implementation
     // of the sum() function.
@@ -346,7 +346,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
         f->addFnAttr(llvm::Attribute::AlwaysInline);
 
         // Fetch the necessary function arguments.
-        auto order = f->args().begin();
+        auto ord = f->args().begin();
         auto diff_arr = f->args().begin() + 2;
         auto par_ptr = f->args().begin() + 3;
         auto terms = f->args().begin() + 5;
@@ -376,8 +376,9 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                         if constexpr (std::is_same_v<type, variable>) {
                             // Variable.
-                            auto v0 = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, j), terms + k);
-                            auto v1 = taylor_c_load_diff(s, diff_arr, n_uvars, j, terms + k);
+                            auto v0
+                                = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(ord, j), terms + k, order);
+                            auto v1 = taylor_c_load_diff(s, diff_arr, n_uvars, j, terms + k, order);
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
@@ -399,14 +400,14 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
         // Distinguish odd/even cases.
         const auto odd_or_even
-            = builder.CreateICmpEQ(builder.CreateURem(order, builder.getInt32(2)), builder.getInt32(1));
+            = builder.CreateICmpEQ(builder.CreateURem(ord, builder.getInt32(2)), builder.getInt32(1));
 
         llvm_if_then_else(
             s, odd_or_even,
             [&]() {
                 // Odd order.
                 const auto loop_end = builder.CreateAdd(
-                    builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(1)), builder.getInt32(2)),
+                    builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(1)), builder.getInt32(2)),
                     builder.getInt32(1));
 
                 llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) { looper(j); });
@@ -426,14 +427,14 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                 // Even order.
                 // NOTE: run the loop only if we are not at order 0.
                 llvm_if_then_else(
-                    s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                    s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
                     []() {
                         // Order 0, do nothing.
                     },
                     [&]() {
                         // Order 2 or higher.
                         const auto loop_end = builder.CreateAdd(
-                            builder.CreateUDiv(builder.CreateSub(order, builder.getInt32(2)), builder.getInt32(2)),
+                            builder.CreateUDiv(builder.CreateSub(ord, builder.getInt32(2)), builder.getInt32(2)),
                             builder.getInt32(1));
 
                         llvm_loop_u32(s, builder.getInt32(0), loop_end, [&](llvm::Value *j) { looper(j); });
@@ -454,15 +455,16 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                             if constexpr (std::is_same_v<type, variable>) {
                                 // Variable.
-                                auto val = taylor_c_load_diff(
-                                    s, diff_arr, n_uvars, builder.CreateUDiv(order, builder.getInt32(2)), terms + k);
+                                auto val = taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                              builder.CreateUDiv(ord, builder.getInt32(2)), terms + k,
+                                                              order);
                                 return builder.CreateFMul(val, val);
                             } else if constexpr (is_num_param_v<type>) {
                                 // Number/param.
                                 auto ret = builder.CreateAlloca(val_t);
 
                                 llvm_if_then_else(
-                                    s, builder.CreateICmpEQ(order, builder.getInt32(0)),
+                                    s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
                                     [&]() {
                                         // Order 0, store the num/param.
                                         builder.CreateStore(
@@ -521,24 +523,24 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
 } // namespace
 
-llvm::Function *sum_sq_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                    bool) const
+llvm::Function *sum_sq_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                    std::uint32_t batch_size, bool) const
 {
-    return sum_sq_taylor_c_diff_func_impl<double>(s, *this, n_uvars, batch_size);
+    return sum_sq_taylor_c_diff_func_impl<double>(s, *this, n_uvars, order, batch_size);
 }
 
-llvm::Function *sum_sq_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                     bool) const
+llvm::Function *sum_sq_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                     std::uint32_t batch_size, bool) const
 {
-    return sum_sq_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, batch_size);
+    return sum_sq_taylor_c_diff_func_impl<long double>(s, *this, n_uvars, order, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *sum_sq_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                     bool) const
+llvm::Function *sum_sq_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t order,
+                                                     std::uint32_t batch_size, bool) const
 {
-    return sum_sq_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, batch_size);
+    return sum_sq_taylor_c_diff_func_impl<mppp::real128>(s, *this, n_uvars, order, batch_size);
 }
 
 #endif

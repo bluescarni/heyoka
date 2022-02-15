@@ -265,29 +265,29 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
         // Initialise with the abs(derivatives) of the first state variable at orders 0, 'order' and 'order - 1'.
         builder.CreateStore(
-            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), builder.getInt32(0))),
+            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), builder.getInt32(0), order)),
             max_abs_state);
         builder.CreateStore(
-            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), builder.getInt32(0))),
+            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), builder.getInt32(0), order)),
             max_abs_diff_o);
-        builder.CreateStore(
-            llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u), builder.getInt32(0))),
-            max_abs_diff_om1);
+        builder.CreateStore(llvm_abs(s, taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u),
+                                                           builder.getInt32(0), order)),
+                            max_abs_diff_om1);
 
         // Iterate over the variables to compute the norm infinities.
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
             builder.CreateStore(
                 taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_state),
-                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx)),
+                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx, order)),
                 max_abs_state);
             builder.CreateStore(
                 taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_o),
-                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_idx)),
+                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_idx, order)),
                 max_abs_diff_o);
-            builder.CreateStore(
-                taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_om1),
-                                   taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u), cur_idx)),
-                max_abs_diff_om1);
+            builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_om1),
+                                                   taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                                      builder.getInt32(order - 1u), cur_idx, order)),
+                                max_abs_diff_om1);
         });
 
         if (svf_ptr != nullptr) {
@@ -301,18 +301,19 @@ llvm::Value *taylor_determine_h(llvm_state &s,
                     auto cur_idx = builder.CreateLoad(
                         builder.getInt32Ty(), builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
 
-                    builder.CreateStore(
-                        taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_state),
-                                           taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx)),
-                        max_abs_state);
-                    builder.CreateStore(
-                        taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_o),
-                                           taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_idx)),
-                        max_abs_diff_o);
-                    builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_om1),
+                    builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_state),
+                                                           taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0),
+                                                                              cur_idx, order)),
+                                        max_abs_state);
+                    builder.CreateStore(taylor_step_maxabs(s, builder.CreateLoad(vec_t, max_abs_diff_o),
                                                            taylor_c_load_diff(s, diff_arr, n_uvars,
-                                                                              builder.getInt32(order - 1u), cur_idx)),
-                                        max_abs_diff_om1);
+                                                                              builder.getInt32(order), cur_idx, order)),
+                                        max_abs_diff_o);
+                    builder.CreateStore(
+                        taylor_step_maxabs(
+                            s, builder.CreateLoad(vec_t, max_abs_diff_om1),
+                            taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order - 1u), cur_idx, order)),
+                        max_abs_diff_om1);
                 });
         }
 
@@ -668,7 +669,7 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
 // the indices/constants necessary for the computation.
 void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &svd_gl,
                                llvm::Value *diff_arr, llvm::Value *par_ptr, std::uint32_t n_uvars, llvm::Value *order,
-                               std::uint32_t batch_size)
+                               std::uint32_t batch_size, std::uint32_t t_order)
 {
     assert(batch_size > 0u);
 
@@ -706,7 +707,8 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
             builder.CreateInBoundsGEP(pointee_type(sv_diff_gl[1]), sv_diff_gl[1], {builder.getInt32(0), cur_idx}));
 
         // Fetch from diff_arr the derivative of order 'order - 1' of the u variable u_idx.
-        auto *ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, builder.getInt32(1)), u_idx);
+        auto *ret
+            = taylor_c_load_diff(s, diff_arr, n_uvars, builder.CreateSub(order, builder.getInt32(1)), u_idx, t_order);
 
         // We have to divide the derivative by 'order' in order
         // to get the normalised derivative of the state variable.
@@ -714,7 +716,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
             ret, vector_splat(builder, builder.CreateUIToFP(order, fp_vec_t->getScalarType()), batch_size));
 
         // Store the derivative.
-        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, t_order, ret);
     });
 
     // Handle the number definitions.
@@ -739,7 +741,7 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
                                         llvm::ConstantFP::get(fp_vec_t, 0.));
 
         // Store the derivative.
-        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, ret);
+        taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, t_order, ret);
     });
 
     // Handle the param definitions.
@@ -764,12 +766,12 @@ void taylor_c_compute_sv_diffs(llvm_state &s, const std::pair<std::array<llvm::G
             [&]() {
                 // Derivative of order 1. Fetch the value from par_ptr.
                 // NOTE: param{0} is unused, its only purpose is type tagging.
-                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx,
+                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, t_order,
                                     taylor_c_diff_numparam_codegen(s, param{0}, par_idx, par_ptr, batch_size));
             },
             [&]() {
                 // Derivative of order > 1, return 0.
-                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, llvm::ConstantFP::get(fp_vec_t, 0.));
+                taylor_c_store_diff(s, diff_arr, n_uvars, order, sv_idx, t_order, llvm::ConstantFP::get(fp_vec_t, 0.));
             });
     });
 }
@@ -1066,7 +1068,8 @@ struct llvm_func_name_compare {
 // to yield the value of the i-th function argument for f at the j-th invocation.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
-                                std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
+                                std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
+                                bool high_accuracy)
 {
     // Log runtime in trace mode.
     spdlog::stopwatch sw;
@@ -1095,7 +1098,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
         for (const auto &ex : seg) {
             // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
+            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, order, batch_size, high_accuracy);
 
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
@@ -1208,7 +1211,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     const auto s_dc = taylor_segment_dc(dc, n_eq);
 
     // Generate the function maps.
-    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, batch_size, high_accuracy);
+    const auto f_maps = taylor_build_function_maps<T>(s, s_dc, n_eq, n_uvars, order, batch_size, high_accuracy);
 
     // Log the runtime of IR construction in trace mode.
     spdlog::stopwatch sw;
@@ -1263,7 +1266,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
 
         // Store into diff_arr.
-        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
+        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, order, vec);
     });
 
     // Helper to compute and store the derivatives of order cur_order
@@ -1305,7 +1308,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     }
 
                     // Calculate the derivative and store the result.
-                    taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+                    taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, order, builder.CreateCall(func, args));
                 });
             }
         }
@@ -1318,14 +1321,14 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Compute all derivatives up to order 'order - 1'.
     llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order), [&](llvm::Value *cur_order) {
         // State variables first.
-        taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size);
+        taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, cur_order, batch_size, order);
 
         // The other u variables.
         compute_u_diffs(cur_order);
     });
 
     // Compute the last-order derivatives for the state variables.
-    taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size);
+    taylor_c_compute_sv_diffs(s, svd_gl, diff_arr, par_ptr, n_uvars, builder.getInt32(order), batch_size, order);
 
     // Compute the last-order derivatives for the sv_funcs, if any. Because the sv funcs
     // correspond to u variables in the decomposition, we will have to compute the
@@ -1366,7 +1369,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     args.push_back(gens[i](cur_call_idx));
                 }
 
-                taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
+                taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx, order,
                                     builder.CreateCall(func, args));
             });
 
@@ -1610,7 +1613,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
             llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
                           [&](llvm::Value *cur_order) {
                               // Load the value of the derivative from diff_arr.
-                              auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var);
+                              auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var, order);
 
                               // Compute the index in the output pointer.
                               auto *out_idx = builder.CreateAdd(
@@ -1638,7 +1641,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                     s, builder.getInt32(0), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
                     [&](llvm::Value *cur_order) {
                         // Load the derivative value from diff_arr.
-                        auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+                        auto *diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx, order);
 
                         // Compute the index in the output pointer.
                         auto *out_idx
@@ -1853,28 +1856,29 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the value from diff_arr and store it in res_arr.
             assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
-            builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx),
+            builder.CreateStore(taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(order), cur_var_idx, order),
                                 builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx));
         });
 
         // Run the evaluation.
-        llvm_loop_u32(
-            s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
-            [&](llvm::Value *cur_order) {
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
-                    // Load the current poly coeff from diff_arr.
-                    // NOTE: we are loading the coefficients backwards wrt the order, hence
-                    // we specify order - cur_order.
-                    auto *cf = taylor_c_load_diff(s, diff_arr, n_uvars,
-                                                  builder.CreateSub(builder.getInt32(order), cur_order), cur_var_idx);
+        llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.getInt32(order), builder.getInt32(1)),
+                      [&](llvm::Value *cur_order) {
+                          llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
+                              // Load the current poly coeff from diff_arr.
+                              // NOTE: we are loading the coefficients backwards wrt the order, hence
+                              // we specify order - cur_order.
+                              auto *cf = taylor_c_load_diff(s, diff_arr, n_uvars,
+                                                            builder.CreateSub(builder.getInt32(order), cur_order),
+                                                            cur_var_idx, order);
 
-                    // Accumulate in res_arr.
-                    assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
-                    auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
-                    builder.CreateStore(
-                        builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(fp_vec_t, res_ptr), h)), res_ptr);
-                });
-            });
+                              // Accumulate in res_arr.
+                              assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
+                              auto *res_ptr = builder.CreateInBoundsGEP(fp_vec_t, res_arr, cur_var_idx);
+                              builder.CreateStore(
+                                  builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(fp_vec_t, res_ptr), h)),
+                                  res_ptr);
+                          });
+                      });
 
         return res_arr;
     } else {
@@ -1928,7 +1932,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         // compensations with zero.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the value from diff_arr.
-            auto *val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx);
+            auto *val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, order);
 
             // Store it in res_arr.
             assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
@@ -1951,7 +1955,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
 
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
                 // Evaluate the current monomial.
-                auto *cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx);
+                auto *cf = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_var_idx, order);
                 auto *tmp = builder.CreateFMul(cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
@@ -5076,7 +5080,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                                                   builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
 
                 // Load the derivative value from diff_arr.
-                auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx);
+                auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_idx, order);
 
                 // Compute the index in the output pointer.
                 auto out_idx = builder.CreateMul(builder.CreateAdd(builder.getInt32(n_eq), arr_idx),
@@ -5094,7 +5098,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
             [&](llvm::Value *cur_order) {
                 llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_idx) {
                     // Load the derivative value from diff_arr.
-                    auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+                    auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx, order);
 
                     // Compute the index in the output pointer.
                     auto out_idx = builder.CreateAdd(
@@ -5114,7 +5118,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
                             builder.getInt32Ty(), builder.CreateInBoundsGEP(builder.getInt32Ty(), svf_ptr, arr_idx));
 
                         // Load the derivative value from diff_arr.
-                        auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx);
+                        auto diff_val = taylor_c_load_diff(s, diff_arr, n_uvars, cur_order, cur_idx, order);
 
                         // Compute the index in the output pointer.
                         auto out_idx = builder.CreateAdd(
