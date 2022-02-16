@@ -1242,8 +1242,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // to know exactly how many slots we will need.
     auto *fp_type = llvm::cast<llvm::PointerType>(order0->getType())->getElementType();
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
-    auto *array_type
-        = llvm::ArrayType::get(fp_vec_type, (max_svf_idx < n_eq) ? (n_uvars * order + n_eq) : (n_uvars * (order + 1u)));
+    // TODO: double-check the other use of max_svf_idx to make sure we don't break something,
+    // and update the docs above: now we always allocate space for all derivatives of all u vars.
+    auto *array_type = llvm::ArrayType::get(fp_vec_type, n_uvars * (order + 1u));
 
     // Make the global array and fetch a pointer to its first element.
     // NOTE: we use a global array rather than a local one here because
