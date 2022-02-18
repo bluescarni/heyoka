@@ -389,23 +389,6 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     return h;
 }
 
-// Store the value val as the derivative of order 'order' of the u variable u_idx
-// into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
-void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         llvm::Value *u_idx, llvm::Value *val)
-{
-    auto &builder = s.builder();
-
-    // NOTE: overflow check has already been done to ensure that the
-    // total size of diff_arr fits in a 32-bit unsigned integer.
-    assert(llvm_depr_GEP_type_check(diff_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
-
-    builder.CreateStore(val, ptr);
-}
-
 // Compute the derivative of order "order" of a state variable.
 // ex is the formula for the first-order derivative of the state variable (which
 // is either a u variable or a number/param), n_uvars the number of variables in
@@ -1280,8 +1263,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         auto *vec = load_vector_from_memory(builder, ptr, batch_size);
 
         // Store into diff_arr.
-        assert(llvm_depr_GEP_type_check(diff_arr, fp_vec_type)); // LCOV_EXCL_LINE
-        builder.CreateStore(vec, builder.CreateInBoundsGEP(fp_vec_type, diff_arr, cur_var_idx));
+        taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
     // Helper to compute and store the derivatives of order cur_order
@@ -1946,8 +1928,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
         // compensations with zero.
         llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
             // Load the value from diff_arr.
-            assert(llvm_depr_GEP_type_check(diff_arr, fp_vec_t)); // LCOV_EXCL_LINE
-            auto *val = builder.CreateLoad(fp_vec_t, builder.CreateInBoundsGEP(fp_vec_t, diff_arr, cur_var_idx));
+            auto *val = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx);
 
             // Store it in res_arr.
             assert(llvm_depr_GEP_type_check(res_arr, fp_vec_t)); // LCOV_EXCL_LINE
@@ -2860,13 +2841,13 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         // NOTE: if dt_limit is zero, step_impl() will always return time_limit.
-        const auto [res, h] = step_impl(static_cast<T>(dt_limit), wtc);
+        const auto [oc, h] = step_impl(static_cast<T>(dt_limit), wtc);
 
-        if (res == taylor_outcome::err_nf_state) {
+        if (oc == taylor_outcome::err_nf_state) {
             // If a non-finite state is detected, we do *not* want
             // to execute the propagate() callback and we do *not* want
             // to update the continuous output. Just exit.
-            return std::tuple{res, min_h, max_h, step_counter, make_c_out()};
+            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
         }
 
         // Update the number of steps.
@@ -2875,7 +2856,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // Update min_h/max_h, but only if the outcome is success (otherwise
         // the step was artificially clamped either by a time limit or
         // by a terminal event).
-        if (res == taylor_outcome::success) {
+        if (oc == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
@@ -2904,12 +2885,12 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // Thus, for consistency with step(), we give precedence
         // to the event wrt time limit in determining the outcome.
         // NOTE: we check h == rem_time, instead of just
-        // res == time_limit, because clamping via max_delta_t
+        // oc == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
-        const bool ste_detected = res > taylor_outcome::success && res < taylor_outcome{0};
+        const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
         const auto rtime = static_cast<T>(rem_time);
-        if ((res == taylor_outcome::time_limit && h == rtime) || ste_detected) {
-            return std::tuple{res, min_h, max_h, step_counter, make_c_out()};
+        if ((oc == taylor_outcome::time_limit && h == rtime) || ste_detected) {
+            return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
         }
 
         // Check the iteration limit.
@@ -3113,19 +3094,19 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         assert((rem_time >= T(0)) == t_dir); // LCOV_EXCL_LINE
         const auto dt_limit
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
-        const auto [res, h] = step_impl(static_cast<T>(dt_limit), true);
+        const auto [oc, h] = step_impl(static_cast<T>(dt_limit), true);
 
-        if (res != taylor_outcome::success && res != taylor_outcome::time_limit && res < taylor_outcome{0}) {
+        if (oc != taylor_outcome::success && oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
             // Something went wrong in the propagation of the timestep, or we reached
             // a stopping terminal event.
 
-            if (res > taylor_outcome::success) {
+            if (oc > taylor_outcome::success) {
                 // In case of a stopping terminal event, we still want to update
                 // the step counter.
                 step_counter += static_cast<std::size_t>(h != 0);
             }
 
-            return std::tuple{res, min_h, max_h, step_counter, std::move(retval)};
+            return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
         }
 
         // Update the number of iterations.
@@ -3137,7 +3118,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // Update min_h/max_h, but only if the outcome is success (otherwise
         // the step was artificially clamped either by a time limit or
         // by a terminal event).
-        if (res == taylor_outcome::success) {
+        if (oc == taylor_outcome::success) {
             const auto abs_h = abs(h);
             min_h = std::min(min_h, abs_h);
             max_h = std::max(max_h, abs_h);
@@ -3164,7 +3145,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         // not going exactly to zero due to numerical issues. A zero rem_time
         // will also force the processing of all remaining grid points.
         if (h == static_cast<T>(rem_time)) {
-            assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
+            assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             rem_time = dfloat<T>(T(0));
         } else {
             rem_time = grid.back() - m_time;
@@ -4725,7 +4706,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
         // Update m_rem_time, the local step counters, min_h/max_h.
         for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto [res, h] = m_step_res[i];
+            const auto [oc, h] = m_step_res[i];
 
             // NOTE: the local step counters increase only if we integrated
             // for a nonzero time.
@@ -4742,7 +4723,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
             // will end up being repeatedly set to zero here. This
             // should be harmless.
             if (h == static_cast<T>(m_rem_time[i])) {
-                assert(res == taylor_outcome::time_limit); // LCOV_EXCL_LINE
+                assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
                 m_rem_time[i] = dfloat<T>(T(0));
             } else {
                 m_rem_time[i]
@@ -4752,7 +4733,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
             // Update min_h/max_h, but only if the outcome is success (otherwise
             // the step was artificially clamped either by a time limit or
             // by a continuing terminal event).
-            if (res == taylor_outcome::success) {
+            if (oc == taylor_outcome::success) {
                 const auto abs_h = abs(h);
                 m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
                 m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
