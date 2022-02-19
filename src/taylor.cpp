@@ -3043,7 +3043,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
         // Establish the time range of the last
         // taken timestep.
-        // NOTE: t0 < t1.
+        // NOTE: this is computed so that t0 < t1,
+        // regardless of the integration direction.
         const auto t0 = std::min(m_time, m_time - m_last_h);
         const auto t1 = std::max(m_time, m_time - m_last_h);
 
