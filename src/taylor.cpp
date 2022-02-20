@@ -2996,16 +2996,19 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
 
     // Propagate the system up to the first grid point.
-    // NOTE: this may not be needed strictly speaking if
-    // the time is already grid[0], but it will ensure that
-    // m_last_h is properly updated.
-    // NOTE: this will *not* write the TCs, but, because we
-    // know that the grid is strictly monotonic, we know that we
-    // will take at least 1 TC-writing timestep before starting
-    // to use the dense output.
+    // NOTE: we pass write_tc = true because some grid
+    // points after the first one might end up being
+    // calculated via dense output *before*
+    // taking additional steps, and, in such case, we
+    // must ensure the TCs are up to date.
+    // NOTE: if the integrator time is already at grid[0],
+    // then propagate_until() will take a zero timestep,
+    // resulting in m_last_h also going to zero and no event
+    // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
-    const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
+    const auto oc = std::get<0>(
+        propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps, kw::write_tc = true));
 
     if (oc != taylor_outcome::time_limit) {
         // The outcome is not time_limit, exit now.
@@ -4490,9 +4493,18 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
+    // NOTE: we pass write_tc = true because some grid
+    // points after the first one might end up being
+    // calculated via dense output *before*
+    // taking additional steps, and, in such case, we
+    // must ensure the TCs are up to date.
+    // NOTE: if the integrator time is already at grid[0],
+    // then propagate_until() will take a zero timestep,
+    // resulting in m_last_h also going to zero and no event
+    // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
-    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
+    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps, kw::write_tc = true);
 
     // Check the result of the integration.
     if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
