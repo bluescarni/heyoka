@@ -2451,7 +2451,17 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
 //     max_delta_t was used as a timestep or not;
-// - event detection is skipped altogether if h == 0.
+// - event detection happens in the [0, h) half-open range (that is,
+//   all detected events are guaranteed to trigger within
+//   the [0, h) range). Thus, if the timestep ends up being zero
+//   (either because max_delta_t == 0
+//   or the inferred timestep is zero), then event detection is skipped
+//   altogether;
+// - the execution of the events' callbacks is guaranteed to proceed in
+//   chronological order;
+// - a timestep h == 0 will still result in m_last_h being updated (to zero)
+//   and the Taylor coefficients being recorded in the internal array
+//   (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
@@ -3714,8 +3724,8 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
 //     max_delta_t was used as a timestep or not;
-// - event detection for a batch element is skipped altogether
-//   if h == 0.
+// - the docs for the scalar step function are applicable to
+//   the batch version too.
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
