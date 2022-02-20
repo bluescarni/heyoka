@@ -2885,21 +2885,13 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         }
 
         // The breakout conditions:
-        // - the outcome is time_limit and a step
-        //   of rem_time was used, or
+        // - a step of rem_time was used, or
         // - a stopping terminal event was detected.
-        // NOTE: for the first condition we check also the
-        // outcome because the step function could return
-        // a continuing terminal event instead of time_limit,
-        // if the event happens exactly at the time limit.
-        // Thus, for consistency with step(), we give precedence
-        // to the event wrt time limit in determining the outcome.
         // NOTE: we check h == rem_time, instead of just
         // oc == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
-        const auto rtime = static_cast<T>(rem_time);
-        if ((oc == taylor_outcome::time_limit && h == rtime) || ste_detected) {
+        if (h == static_cast<T>(rem_time) || ste_detected) {
             return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
         }
 
@@ -2912,26 +2904,12 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         }
 
         // Update the remaining time.
-        // NOTE: the h == rtime takes care of the
-        // corner case in which the step ended
-        // on a continuing terminal event occurring *exactly*
-        // at the time limit (note that I don't even
-        // know if this is possible at all, but
-        // just in case). In this case, we will
-        // take an extra step with h == 0 and exit
-        // at the next iteration. If we don't do this,
-        // the computation of t - m_time might flip
-        // around the integration direction due to
-        // FP issues. If h < rtime, it means that
-        // we ended up (after the step) on a time coordinate
-        // which is certainly before t, and thus a sign
-        // flip cannot happen.
-        if (h == rtime) {
-            rem_time = dfloat<T>(T(0)); // LCOV_EXCL_LINE
-        } else {
-            assert(abs(h) < abs(rtime));
-            rem_time = t - m_time;
-        }
+        // NOTE: at this point, we are sure
+        // that abs(h) < abs(static_cast<T>(rem_time)). This implies
+        // that t - m_time cannot undergo a sign
+        // flip and invert the integration direction.
+        assert(abs(h) < abs(static_cast<T>(rem_time)));
+        rem_time = t - m_time;
     }
 }
 
@@ -4287,30 +4265,26 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
                 ste_detected = ste_detected || (oc > taylor_outcome::success && oc < taylor_outcome{0});
 
                 // Check if this batch element is done.
-                // NOTE: here we check h == rem_time in addition to oc == time_limit,
-                // because clamping via max_delta_t could also result in time_limit.
-                // NOTE: if the step ended on a continuing terminal event, it will
-                // *not* be marked as done even if it reached the time limit - this
-                // is consistent with the behaviour of the step() function.
-                const auto rem_time = static_cast<T>(m_rem_time[i]);
-                n_done += (oc == taylor_outcome::time_limit && h == rem_time);
+                // NOTE: we check h == rem_time, instead of just
+                // oc == time_limit, because clamping via max_delta_t
+                // could also result in time_limit.
+                const auto cur_done = (h == static_cast<T>(m_rem_time[i]));
+                n_done += cur_done;
 
                 // Update the remaining times.
-                // NOTE: if rem_time was used as a timestep,
-                // it means that the current element must not proceed
-                // any further. Force m_rem_time[i] to zero
-                // to signal this, so that zero-length steps will be taken
-                // for all remaining iterations.
-                // NOTE: if m_rem_time[i] was previously set to zero, it
-                // will end up being repeatedly set to zero here. This
-                // should be harmless.
-                if (h == rem_time) {
+                if (cur_done) {
+                    // Force m_rem_time[i] to zero so that
+                    // zero-length steps will be taken
+                    // for all remaining iterations.
+                    // NOTE: if m_rem_time[i] was previously set to zero, it
+                    // will end up being repeatedly set to zero here. This
+                    // should be harmless.
                     m_rem_time[i] = dfloat<T>(T(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
                     // scalar implementation.
-                    assert(abs(h) < abs(rem_time));
+                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i])));
                     m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
                 }
             }
