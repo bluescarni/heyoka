@@ -2892,6 +2892,11 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         // could also result in time_limit.
         const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
         if (h == static_cast<T>(rem_time) || ste_detected) {
+#if !defined(NDEBUG)
+            if (h == static_cast<T>(rem_time)) {
+                assert(oc == taylor_outcome::time_limit);
+            }
+#endif
             return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
         }
 
@@ -4276,6 +4281,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 
                 // Update the remaining times.
                 if (cur_done) {
+                    assert(oc == taylor_outcome::time_limit);
+
                     // Force m_rem_time[i] to zero so that
                     // zero-length steps will be taken
                     // for all remaining iterations.
