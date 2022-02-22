@@ -6,8 +6,7 @@ language: cpp
 branches:
   except: /pr\/.*/
 
-jobs:
-  allow_failures:
+matrix:
     - os: linux
       arch: ppc64le
       dist: focal
