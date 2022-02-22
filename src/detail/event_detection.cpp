@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
@@ -1026,6 +1027,29 @@ void taylor_adaptive_impl<T>::ed_data::detect_events(T h, std::uint32_t order, s
                     // LCOV_EXCL_STOP
                 }
 
+                if (abs(root) >= abs(h)) {
+                    // LCOV_EXCL_START
+                    // NOTE: although event detection nominally
+                    // happens in the [0, h) range, due to floating-point
+                    // rounding we may end up detecting a abs(root) >= abs(h) in
+                    // corner cases. If that happens, let us clamp
+                    // root to be strictly < h in absolute value
+                    // in order to respect
+                    // the guarantee that events are always detected
+                    // in the [0, h) range.
+                    // NOTE: because throughout the various iterations
+                    // of root finding the lower bound always remains exactly zero,
+                    // it should not be possible for root to exit the [0, h)
+                    // range from the other side.
+                    get_logger()->warn("polynomial root finding produced the root {} which is not smaller, in absolute "
+                                       "value, than the integration timestep {}",
+                                       root, h);
+
+                    using std::nextafter;
+                    root = nextafter(h, T(0));
+                    // LCOV_EXCL_STOP
+                }
+
                 // Evaluate the derivative and its absolute value.
                 const auto der = poly_eval_1(ptr, root, order);
                 const auto abs_der = abs(der);
@@ -1673,6 +1697,30 @@ void taylor_adaptive_batch_impl<T>::ed_data::detect_events(const T *h_ptr, std::
                                            "index {} - skipping the event",
                                            root, j);
                         return;
+                        // LCOV_EXCL_STOP
+                    }
+
+                    if (abs(root) >= abs(h)) {
+                        // LCOV_EXCL_START
+                        // NOTE: although event detection nominally
+                        // happens in the [0, h) range, due to floating-point
+                        // rounding we may end up detecting a abs(root) >= abs(h) in
+                        // corner cases. If that happens, let us clamp
+                        // root to be strictly < h in absolute value
+                        // in order to respect
+                        // the guarantee that events are always detected
+                        // in the [0, h) range.
+                        // NOTE: because throughout the various iterations
+                        // of root finding the lower bound always remains exactly zero,
+                        // it should not be possible for root to exit the [0, h)
+                        // range from the other side.
+                        get_logger()->warn(
+                            "polynomial root finding produced the root {} which is not smaller, in absolute "
+                            "value, than the integration timestep {}",
+                            root, h);
+
+                        using std::nextafter;
+                        root = nextafter(h, T(0));
                         // LCOV_EXCL_STOP
                     }
 

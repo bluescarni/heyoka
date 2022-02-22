@@ -2451,7 +2451,17 @@ void taylor_adaptive_impl<T>::load(boost::archive::binary_iarchive &ar, unsigned
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
 //     max_delta_t was used as a timestep or not;
-// - event detection is skipped altogether if h == 0.
+// - event detection happens in the [0, h) half-open range (that is,
+//   all detected events are guaranteed to trigger within
+//   the [0, h) range). Thus, if the timestep ends up being zero
+//   (either because max_delta_t == 0
+//   or the inferred timestep is zero), then event detection is skipped
+//   altogether;
+// - the execution of the events' callbacks is guaranteed to proceed in
+//   chronological order;
+// - a timestep h == 0 will still result in m_last_h being updated (to zero)
+//   and the Taylor coefficients being recorded in the internal array
+//   (if wtc == true). That is, h == 0 is not treated in any special way.
 template <typename T>
 std::tuple<taylor_outcome, T> taylor_adaptive_impl<T>::step_impl(T max_delta_t, bool wtc)
 {
@@ -2875,21 +2885,18 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         }
 
         // The breakout conditions:
-        // - the outcome is time_limit and a step
-        //   of rem_time was used, or
+        // - a step of rem_time was used, or
         // - a stopping terminal event was detected.
-        // NOTE: for the first condition we check also the
-        // outcome because the step function could return
-        // a continuing terminal event instead of time_limit,
-        // if the event happens exactly at the time limit.
-        // Thus, for consistency with step(), we give precedence
-        // to the event wrt time limit in determining the outcome.
         // NOTE: we check h == rem_time, instead of just
         // oc == time_limit, because clamping via max_delta_t
         // could also result in time_limit.
         const bool ste_detected = oc > taylor_outcome::success && oc < taylor_outcome{0};
-        const auto rtime = static_cast<T>(rem_time);
-        if ((oc == taylor_outcome::time_limit && h == rtime) || ste_detected) {
+        if (h == static_cast<T>(rem_time) || ste_detected) {
+#if !defined(NDEBUG)
+            if (h == static_cast<T>(rem_time)) {
+                assert(oc == taylor_outcome::time_limit);
+            }
+#endif
             return std::tuple{oc, min_h, max_h, step_counter, make_c_out()};
         }
 
@@ -2902,26 +2909,12 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         }
 
         // Update the remaining time.
-        // NOTE: the h == rtime takes care of the
-        // corner case in which the step ended
-        // on a continuing terminal event occurring *exactly*
-        // at the time limit (note that I don't even
-        // know if this is possible at all, but
-        // just in case). In this case, we will
-        // take an extra step with h == 0 and exit
-        // at the next iteration. If we don't do this,
-        // the computation of t - m_time might flip
-        // around the integration direction due to
-        // FP issues. If h < rtime, it means that
-        // we ended up (after the step) on a time coordinate
-        // which is certainly before t, and thus a sign
-        // flip cannot happen.
-        if (h == rtime) {
-            rem_time = dfloat<T>(T(0)); // LCOV_EXCL_LINE
-        } else {
-            assert(abs(h) < abs(rtime));
-            rem_time = t - m_time;
-        }
+        // NOTE: at this point, we are sure
+        // that abs(h) < abs(static_cast<T>(rem_time)). This implies
+        // that t - m_time cannot undergo a sign
+        // flip and invert the integration direction.
+        assert(abs(h) < abs(static_cast<T>(rem_time)));
+        rem_time = t - m_time;
     }
 }
 
@@ -3008,16 +3001,19 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     T min_h = std::numeric_limits<T>::infinity(), max_h(0);
 
     // Propagate the system up to the first grid point.
-    // NOTE: this may not be needed strictly speaking if
-    // the time is already grid[0], but it will ensure that
-    // m_last_h is properly updated.
-    // NOTE: this will *not* write the TCs, but, because we
-    // know that the grid is strictly monotonic, we know that we
-    // will take at least 1 TC-writing timestep before starting
-    // to use the dense output.
+    // NOTE: we pass write_tc = true because some grid
+    // points after the first one might end up being
+    // calculated via dense output *before*
+    // taking additional steps, and, in such case, we
+    // must ensure the TCs are up to date.
+    // NOTE: if the integrator time is already at grid[0],
+    // then propagate_until() will take a zero timestep,
+    // resulting in m_last_h also going to zero and no event
+    // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
-    const auto oc = std::get<0>(propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps));
+    const auto oc = std::get<0>(
+        propagate_until(grid[0], kw::max_delta_t = max_delta_t, kw::max_steps = max_steps, kw::write_tc = true));
 
     if (oc != taylor_outcome::time_limit) {
         // The outcome is not time_limit, exit now.
@@ -3043,7 +3039,8 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
         // Establish the time range of the last
         // taken timestep.
-        // NOTE: t0 < t1.
+        // NOTE: this is computed so that t0 < t1,
+        // regardless of the integration direction.
         const auto t0 = std::min(m_time, m_time - m_last_h);
         const auto t1 = std::max(m_time, m_time - m_last_h);
 
@@ -3713,8 +3710,8 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 //     of the first event triggering, else
 //   - either time_limit or success, depending on whether
 //     max_delta_t was used as a timestep or not;
-// - event detection for a batch element is skipped altogether
-//   if h == 0.
+// - the docs for the scalar step function are applicable to
+//   the batch version too.
 template <typename T>
 void taylor_adaptive_batch_impl<T>::step_impl(const std::vector<T> &max_delta_ts, bool wtc)
 {
@@ -4276,30 +4273,28 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
                 ste_detected = ste_detected || (oc > taylor_outcome::success && oc < taylor_outcome{0});
 
                 // Check if this batch element is done.
-                // NOTE: here we check h == rem_time in addition to oc == time_limit,
-                // because clamping via max_delta_t could also result in time_limit.
-                // NOTE: if the step ended on a continuing terminal event, it will
-                // *not* be marked as done even if it reached the time limit - this
-                // is consistent with the behaviour of the step() function.
-                const auto rem_time = static_cast<T>(m_rem_time[i]);
-                n_done += (oc == taylor_outcome::time_limit && h == rem_time);
+                // NOTE: we check h == rem_time, instead of just
+                // oc == time_limit, because clamping via max_delta_t
+                // could also result in time_limit.
+                const auto cur_done = (h == static_cast<T>(m_rem_time[i]));
+                n_done += cur_done;
 
                 // Update the remaining times.
-                // NOTE: if rem_time was used as a timestep,
-                // it means that the current element must not proceed
-                // any further. Force m_rem_time[i] to zero
-                // to signal this, so that zero-length steps will be taken
-                // for all remaining iterations.
-                // NOTE: if m_rem_time[i] was previously set to zero, it
-                // will end up being repeatedly set to zero here. This
-                // should be harmless.
-                if (h == rem_time) {
+                if (cur_done) {
+                    assert(oc == taylor_outcome::time_limit);
+
+                    // Force m_rem_time[i] to zero so that
+                    // zero-length steps will be taken
+                    // for all remaining iterations.
+                    // NOTE: if m_rem_time[i] was previously set to zero, it
+                    // will end up being repeatedly set to zero here. This
+                    // should be harmless.
                     m_rem_time[i] = dfloat<T>(T(0));
                 } else {
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
                     // scalar implementation.
-                    assert(abs(h) < abs(rem_time));
+                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i])));
                     m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
                 }
             }
@@ -4505,9 +4500,18 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
+    // NOTE: we pass write_tc = true because some grid
+    // points after the first one might end up being
+    // calculated via dense output *before*
+    // taking additional steps, and, in such case, we
+    // must ensure the TCs are up to date.
+    // NOTE: if the integrator time is already at grid[0],
+    // then propagate_until() will take a zero timestep,
+    // resulting in m_last_h also going to zero and no event
+    // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
-    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps);
+    propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps, kw::write_tc = true);
 
     // Check the result of the integration.
     if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {

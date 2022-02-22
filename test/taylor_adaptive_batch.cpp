@@ -1548,3 +1548,27 @@ TEST_CASE("callback ste")
 
     tuple_for_each(fp_types, tester);
 }
+
+// Test for an issue arising when propagate_grid()
+// would not write the TCs necessary to the computation
+// of the dense output for some grid points.
+TEST_CASE("propagate_grid tc issue")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    auto ta = taylor_adaptive_batch<double>({prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, 2);
+
+    std::vector t_grid = {-.5, -.5, -.1, -.4999, .1, .1, .2, .2};
+
+    auto out = ta.propagate_grid(t_grid);
+
+    REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::time_limit);
+    REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::time_limit);
+
+    for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(out[i * 4u] == approximately(std::sin(t_grid[2u * i])));
+        REQUIRE(out[i * 4u + 1u] == approximately(std::sin(t_grid[2u * i + 1u])));
+        REQUIRE(out[i * 4u + 2u] == approximately(std::cos(t_grid[2u * i])));
+        REQUIRE(out[i * 4u + 3u] == approximately(std::cos(t_grid[2u * i + 1u])));
+    }
+}
