@@ -4501,10 +4501,12 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     // are signalled with NaN if we exit early.
     retval.resize(grid.size() * get_dim(), std::numeric_limits<T>::quiet_NaN());
 
-    // Propagate the system up to the first batch of grid points.
+    // NOTE: this is a buffer of size m_batch_size
+    // that is used in various places as temp storage.
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
-    std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
+
+    // Propagate the system up to the first batch of grid points.
     // NOTE: we pass write_tc = true because some grid
     // points after the first one might end up being
     // calculated via dense output *before*
@@ -4516,6 +4518,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     // detection being performed.
     // NOTE: use the same max_steps for the initial propagation,
     // and don't pass the callback.
+    std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
     propagate_until(pgrid_tmp, kw::max_delta_t = max_delta_ts, kw::max_steps = max_steps, kw::write_tc = true);
 
     // Check the result of the integration.
@@ -4550,6 +4553,9 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
         m_t_dir[i] = (m_rem_time[i] >= T(0));
     }
+
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
 
     // Reset the counters and the min/max abs(h) vectors.
     std::size_t iter_counter = 0;
@@ -4597,7 +4603,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
         // Compute the state of the system via dense output for as many grid
         // points as possible, i.e., as long as the grid times
-        // fall within the validity range for the dense output of at least
+        // fall within the last taken step of at least
         // one batch element.
         while (true) {
             // Establish and count for which batch elements we
@@ -4611,7 +4617,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
                     // The current batch element has not been eliminated
                     // yet from the candidate list and it still has grid
                     // points available. Determine if the current grid point
-                    // falls within the validity domain for the dense output.
+                    // falls within the last taken step.
                     // NOTE: if we are at the last timestep for this batch
                     // element, force processing of all remaining grid points.
                     // We do this to avoid numerical issues when deciding if
@@ -4641,6 +4647,11 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
             }
 
             // Compute the dense output.
+            // NOTE: for some batch elements, the data in pgrid_tmp
+            // may be meaningless/wrong. This should be ok, as below
+            // we filter out from the dense output vector
+            // the data for the batch elements for which the wrong
+            // dense output was computed.
             update_d_output(pgrid_tmp);
 
             // Add the results to retval and bump up the values in cur_grid_idx.
@@ -4750,7 +4761,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
         }
 
         // Step successful: invoke the callback, if needed.
-        if (cb && !cb(*this)) {
+        if (with_cb && !cb(*this)) {
             // Setup m_prop_res before exiting. We set all outcomes
             // to cb_stop regardless of the timestep outcome.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {
