@@ -2788,6 +2788,9 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
     // Cache the integration direction.
     const auto t_dir = (rem_time >= T(0));
 
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
     // Helper to create the continuous output object.
     auto make_c_out = [&]() -> std::optional<continuous_output<T>> {
         if (with_c_out) {
@@ -2879,7 +2882,7 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (cb && !cb(*this)) {
+        if (with_cb && !cb(*this)) {
             // Interruption via callback.
             return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter, make_c_out()};
         }
@@ -3035,6 +3038,13 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
     // Cache the integration direction.
     const auto t_dir = (rem_time >= T(0));
 
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
+    // This flag, if set to something else than success,
+    // is used to signal the early interruption of the integration.
+    taylor_outcome interrupt = taylor_outcome::success;
+
     // Iterate over the remaining grid points.
     for (decltype(grid.size()) cur_grid_idx = 1; cur_grid_idx < grid.size();) {
         // Establish the time range of the last
@@ -3046,7 +3056,7 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
 
         // Compute the state of the system via dense output for as many grid
         // points as possible, i.e., as long as the grid times
-        // fall within the validity range for the dense output.
+        // fall within the time range of the last step.
         while (true) {
             // Fetch the current time target.
             const auto cur_tt = grid[cur_grid_idx];
@@ -3054,11 +3064,10 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             // NOTE: we force processing of all remaining grid points
             // if we are at the last timestep. We do this in order to avoid
             // numerical issues when deciding if the last grid point
-            // falls within the range of validity of the dense output.
+            // falls within the range of the last step.
             if ((cur_tt >= t0 && cur_tt <= t1) || (rem_time == dfloat<T>(T(0)))) {
                 // The current time target falls within the range of
-                // validity of the dense output. Compute the dense
-                // output in cur_tt.
+                // the last step. Compute the dense output in cur_tt.
                 update_d_output(cur_tt);
 
                 // Add the result to retval.
@@ -3076,8 +3085,9 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             }
         }
 
-        if (cur_grid_idx == grid.size()) {
-            // No more grid points, exit.
+        if (cur_grid_idx == grid.size() || interrupt != taylor_outcome::success) {
+            // Either we ran out of grid points, or the last step() invocation
+            // resulted in early termination.
             break;
         }
 
@@ -3093,21 +3103,12 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             = t_dir ? std::min(dfloat<T>(max_delta_t), rem_time) : std::max(dfloat<T>(-max_delta_t), rem_time);
         const auto [oc, h] = step_impl(static_cast<T>(dt_limit), true);
 
-        if (oc != taylor_outcome::success && oc != taylor_outcome::time_limit && oc < taylor_outcome{0}) {
-            // Something went wrong in the propagation of the timestep, or we reached
-            // a stopping terminal event.
-
-            if (oc > taylor_outcome::success) {
-                // In case of a stopping terminal event, we still want to update
-                // the step counter.
-                step_counter += static_cast<std::size_t>(h != 0);
-            }
-
+        if (oc == taylor_outcome::err_nf_state) {
+            // If a non-finite state is detected, we do *not* want
+            // to execute the propagate() callback and we do *not* want
+            // to update the return value. Just exit.
             return std::tuple{oc, min_h, max_h, step_counter, std::move(retval)};
         }
-
-        // Update the number of iterations.
-        ++iter_counter;
 
         // Update the number of steps.
         step_counter += static_cast<std::size_t>(h != 0);
@@ -3121,18 +3122,20 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             max_h = std::max(max_h, abs_h);
         }
 
-        // Step successful: invoke the callback, if needed.
-        if (cb && !cb(*this)) {
-            // Interruption via callback.
-            return std::tuple{taylor_outcome::cb_stop, min_h, max_h, step_counter, std::move(retval)};
-        }
+        // Update the number of iterations.
+        ++iter_counter;
 
-        // Check the iteration limit.
-        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
-        // then this condition will never trigger as by this point we are
-        // sure iter_counter is at least 1.
-        if (iter_counter == max_steps) {
-            return std::tuple{taylor_outcome::step_limit, min_h, max_h, step_counter, std::move(retval)};
+        // Check the early interruption conditions.
+        // NOTE: only one of them must be set.
+        if (with_cb && !cb(*this)) {
+            // Interruption via callback.
+            interrupt = taylor_outcome::cb_stop;
+        } else if (oc > taylor_outcome::success && oc < taylor_outcome{0}) {
+            // Interruption via stopping terminal event.
+            interrupt = oc;
+        } else if (iter_counter == max_steps) {
+            // Interruption via max iteration limit.
+            interrupt = taylor_outcome::step_limit;
         }
 
         // Update the remaining time.
@@ -3149,8 +3152,10 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
         }
     }
 
-    // Everything went well, return time_limit.
-    return std::tuple{taylor_outcome::time_limit, min_h, max_h, step_counter, std::move(retval)};
+    // Return time_limit or the interrupt condition, if the integration
+    // was stopped early.
+    return std::tuple{interrupt == taylor_outcome::success ? taylor_outcome::time_limit : interrupt, min_h, max_h,
+                      step_counter, std::move(retval)};
 }
 
 template <typename T>
@@ -4141,6 +4146,9 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
         m_t_dir[i] = (m_rem_time[i] >= T(0));
     }
 
+    // Cache the presence/absence of a callback.
+    const auto with_cb = static_cast<bool>(cb);
+
     // Helper to create the continuous output object.
     auto make_c_out = [&]() -> std::optional<continuous_output_batch<T>> {
         if (with_c_out) {
@@ -4317,7 +4325,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
         ++iter_counter;
 
         // Execute the propagate() callback, if applicable.
-        if (cb && !cb(*this)) {
+        if (with_cb && !cb(*this)) {
             // Change m_prop_res before exiting by setting all outcomes
             // to cb_stop regardless of the timestep outcome.
             for (std::uint32_t i = 0; i < m_batch_size; ++i) {

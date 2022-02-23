@@ -856,7 +856,7 @@ TEST_CASE("taylor te propagate_grid first step bug")
 
         auto out = ta.propagate_grid(grid);
 
-        REQUIRE(std::get<4>(out).size() == 2u);
+        REQUIRE(std::get<4>(out).size() == 4u);
     }
 }
 

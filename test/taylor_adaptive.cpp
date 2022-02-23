@@ -40,6 +40,7 @@
 #include <heyoka/expression.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/math/sin.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -1452,6 +1453,16 @@ TEST_CASE("cb interrupt")
         REQUIRE(std::get<3>(res) == 6u);
         REQUIRE(std::get<4>(res).size() < 9u);
         REQUIRE(ta.get_time() < 19.);
+
+        // Check that stopping via cb still processes the grid points
+        // within the last taken step.
+        res = ta.propagate_grid(
+            {11., 11. + 1e-6, 11. + 2e-6, 12., 13., 14, 15, 16, 17, 18, 19},
+            kw::callback = [&counter](auto &) { return false; });
+
+        REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<4>(res).size() == 6u);
+        REQUIRE(ta.get_time() < 19.);
     }
 }
 
@@ -1910,6 +1921,31 @@ TEST_CASE("propagate_grid tc issue")
     REQUIRE(oc == taylor_outcome::time_limit);
 
     for (auto i = 0u; i < 4u; ++i) {
+        REQUIRE(out[i * 2u] == approximately(std::sin(t_grid[i])));
+        REQUIRE(out[i * 2u + 1u] == approximately(std::cos(t_grid[i])));
+    }
+}
+
+// Test that when propagate_grid() runs into a stopping terminal
+// event all the grid points within the last taken step are
+// processed.
+TEST_CASE("propagate_grid ste")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using ev_t = typename taylor_adaptive<double>::t_event_t;
+
+    auto ta = taylor_adaptive<double>({prime(x) = v, prime(v) = -x}, {0., 1}, kw::t_events = {ev_t(heyoka::time - .1)});
+
+    std::vector t_grid = {0., .1 - 2e-6, .1 - 1e-6, .1 + 1e-6};
+
+    auto [oc, _1, _2, _3, out] = ta.propagate_grid(t_grid);
+
+    REQUIRE(oc == taylor_outcome{-1});
+
+    REQUIRE(out.size() == 6u);
+
+    for (auto i = 0u; i < 3u; ++i) {
         REQUIRE(out[i * 2u] == approximately(std::sin(t_grid[i])));
         REQUIRE(out[i * 2u + 1u] == approximately(std::cos(t_grid[i])));
     }
