@@ -4650,8 +4650,7 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
             // NOTE: for some batch elements, the data in pgrid_tmp
             // may be meaningless/wrong. This should be ok, as below
             // we filter out from the dense output vector
-            // the data for the batch elements for which the wrong
-            // dense output was computed.
+            // the wrong data.
             update_d_output(pgrid_tmp);
 
             // Add the results to retval and bump up the values in cur_grid_idx.
