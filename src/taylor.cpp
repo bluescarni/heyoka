@@ -4494,9 +4494,6 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     retval.resize(grid.size() * get_dim(), std::numeric_limits<T>::quiet_NaN());
 
     // Propagate the system up to the first batch of grid points.
-    // NOTE: this will *not* write the TCs, but because we know that
-    // the grid is strictly monotonic, we are sure we will take at least
-    // one TC-writing timestep below before trying to use the dense output.
     std::vector<T> pgrid_tmp;
     pgrid_tmp.resize(boost::numeric_cast<decltype(pgrid_tmp.size())>(m_batch_size));
     std::copy(grid_ptr, grid_ptr + m_batch_size, pgrid_tmp.begin());
