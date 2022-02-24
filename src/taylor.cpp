@@ -3148,6 +3148,10 @@ taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::si
             assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
             rem_time = dfloat<T>(T(0));
         } else {
+            // NOTE: this should never flip the time direction of the
+            // integration for the same reasons as explained in the
+            // scalar implementation of propagate_until().
+            assert(abs(h) < abs(static_cast<T>(rem_time))); // LCOV_EXCL_LINE
             rem_time = grid.back() - m_time;
         }
     }
@@ -4289,7 +4293,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 
                 // Update the remaining times.
                 if (cur_done) {
-                    assert(oc == taylor_outcome::time_limit);
+                    assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
 
                     // Force m_rem_time[i] to zero so that
                     // zero-length steps will be taken
@@ -4302,7 +4306,7 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
                     // NOTE: this should never flip the time direction of the
                     // integration for the same reasons as explained in the
                     // scalar implementation.
-                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i])));
+                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
                     m_rem_time[i] = ts[i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
                 }
             }
@@ -4580,8 +4584,8 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
     // we can compute dense output for.
     std::vector<unsigned> dflags(boost::numeric_cast<std::vector<unsigned>::size_type>(m_batch_size));
 
-    // NOTE: loop until we have processed all grid points
-    // for all batch elements.
+    // NOTE: small helper to detect if there are still unprocessed
+    // grid points for at least one batch element.
     auto cont_cond = [n_grid_points, &cur_grid_idx]() {
         return std::any_of(cur_grid_idx.begin(), cur_grid_idx.end(),
                            [n_grid_points](auto idx) { return idx < n_grid_points; });
