@@ -4393,6 +4393,12 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
     return propagate_until_impl(m_pfor_ts, max_steps, max_delta_ts, std::move(cb), wtc, with_c_out);
 }
 
+// NOTE: possible outcomes:
+// - all time_limit (the happy path),
+// - at least 1 err_nf_state if a non-finite state was detected,
+// - all cb_stop or all step_limit in case of interruption by,
+//   respectively, callback or iteration limit,
+// - at least 1 stopping terminal event.
 template <typename T>
 std::vector<T>
 taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
@@ -4679,6 +4685,27 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
 
         // Check if we exhausted all grid points for all batch elements.
         if (!cont_cond()) {
+            assert(std::all_of(m_prop_res.begin(), m_prop_res.end(),
+                               [](const auto &t) { return std::get<0>(t) == taylor_outcome::time_limit; }));
+
+            break;
+        }
+
+        // If the last step we took led to an interrupt condition,
+        // we will also break out.
+        // NOTE: the first time we execute this code, m_prop_res
+        // is guaranteed to contain only time_limit outcomes after
+        // the initial propagate_until().
+        // NOTE: interruption is signalled by an outcome of either:
+        // - cb_stop, or
+        // - a stopping terminal event, or
+        // - step_limit.
+        if (std::any_of(m_prop_res.begin(), m_prop_res.end(), [](const auto &t) {
+                const auto t_oc = std::get<0>(t);
+
+                return t_oc == taylor_outcome::cb_stop || (t_oc > taylor_outcome::success && t_oc < taylor_outcome{0})
+                       || t_oc == taylor_outcome::step_limit;
+            })) {
             break;
         }
 
@@ -4702,100 +4729,104 @@ taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, s
         }
         step_impl(pgrid_tmp, true);
 
-        // Check the result of the integration.
-        if (std::any_of(m_step_res.begin(), m_step_res.end(), [](const auto &t) {
-                // Something went wrong in the propagation of the timestep, or we reached
-                // a stopping terminal event.
-                const auto oc = std::get<0>(t);
-                return oc != taylor_outcome::success && oc != taylor_outcome::time_limit && oc < taylor_outcome{0};
-            })) {
-            // Setup m_prop_res before exiting.
-            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                const auto [oc, h] = m_step_res[i];
-                if (oc > taylor_outcome::success) {
-                    // In case of a stopping terminal event, we still want to update
-                    // the step counter.
-                    m_ts_count[i] += static_cast<std::size_t>(h != 0);
+        // Check the outcomes of the step for each batch element,
+        // update the step counters, min_h/max_h and the remaining times
+        // (if meaningful), and keep track of
+        // whether or not any non-finite state was detected.
+        // This loop will also write into m_prop_res the outcomes,
+        // taking them from the step() outcomes.
+        bool nfs_detected = false;
+
+        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+            const auto [oc, h] = m_step_res[i];
+
+            if (oc == taylor_outcome::err_nf_state) {
+                // Non-finite state: flag it and do nothing else.
+                nfs_detected = true;
+            } else {
+                // Step outcome is one of:
+                // - success,
+                // - time_limit,
+                // - terminal event.
+
+                // Update the local step counters.
+                // NOTE: the local step counters increase only if we integrated
+                // for a nonzero time.
+                m_ts_count[i] += static_cast<std::size_t>(h != 0);
+
+                // Update min_h/max_h only if the outcome is success (otherwise
+                // the step was artificially clamped either by a time limit or
+                // by a terminal event).
+                if (oc == taylor_outcome::success) {
+                    const auto abs_h = abs(h);
+                    m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
+                    m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
                 }
 
-                m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+                // Update the remaining times.
+                // NOTE: if static_cast<T>(m_rem_time[i]) was used as a timestep,
+                // it means that we hit the time limit. Force rem_time to zero
+                // to signal this, so that zero-length steps will be taken
+                // for all remaining iterations, thus always triggering the
+                // time_limit outcome. A zero m_rem_time[i]
+                // will also force the processing of all remaining grid points.
+                // NOTE: if m_rem_time[i] was previously set to zero, it
+                // will end up being repeatedly set to zero here. This
+                // should be harmless.
+                // NOTE: we check h == rem_time, instead of just
+                // oc == time_limit, because clamping via max_delta_t
+                // could also result in time_limit.
+                if (h == static_cast<T>(m_rem_time[i])) {
+                    assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
+                    m_rem_time[i] = dfloat<T>(T(0));
+                } else {
+                    // NOTE: this should never flip the time direction of the
+                    // integration for the same reasons as explained in the
+                    // scalar implementation of propagate_until().
+                    assert(abs(h) < abs(static_cast<T>(m_rem_time[i]))); // LCOV_EXCL_LINE
+                    m_rem_time[i]
+                        = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
+                }
             }
 
-            return retval;
+            // Write into m_prop_res.
+            m_prop_res[i] = std::tuple{oc, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        }
+
+        if (nfs_detected) {
+            // At least 1 batch element generated a non-finite state. In this situation,
+            // we do *not* want to execute the propagate() callback or modify retval
+            // any further. Just break and return what we have.
+            break;
         }
 
         // Update the number of iterations.
         ++iter_counter;
 
-        // Update m_rem_time, the local step counters, min_h/max_h.
-        for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-            const auto [oc, h] = m_step_res[i];
-
-            // NOTE: the local step counters increase only if we integrated
-            // for a nonzero time.
-            m_ts_count[i] += static_cast<std::size_t>(h != 0);
-
-            // Update the remaining time.
-            // NOTE: if static_cast<T>(m_rem_time[i]) was used as a timestep,
-            // it means that we hit the time limit. Force rem_time to zero
-            // to signal this, so that zero-length steps will be taken
-            // for all remaining iterations, thus always triggering the
-            // time_limit outcome. A zero m_rem_time[i]
-            // will also force the processing of all remaining grid points.
-            // NOTE: if m_rem_time[i] was previously set to zero, it
-            // will end up being repeatedly set to zero here. This
-            // should be harmless.
-            if (h == static_cast<T>(m_rem_time[i])) {
-                assert(oc == taylor_outcome::time_limit); // LCOV_EXCL_LINE
-                m_rem_time[i] = dfloat<T>(T(0));
-            } else {
-                m_rem_time[i]
-                    = grid_ptr[(n_grid_points - 1u) * m_batch_size + i] - dfloat<T>(m_time_hi[i], m_time_lo[i]);
-            }
-
-            // Update min_h/max_h, but only if the outcome is success (otherwise
-            // the step was artificially clamped either by a time limit or
-            // by a continuing terminal event).
-            if (oc == taylor_outcome::success) {
-                const auto abs_h = abs(h);
-                m_min_abs_h[i] = std::min(m_min_abs_h[i], abs_h);
-                m_max_abs_h[i] = std::max(m_max_abs_h[i], abs_h);
-            }
-        }
-
-        // Step successful: invoke the callback, if needed.
+        // Check the early interruption conditions.
+        // NOTE: in case of cb_stop or step_limit,
+        // we will overwrite the outcomes in m_prop_res.
+        // The outcome for a stopping terminal event is already
+        // set up properly in the previous loop.
         if (with_cb && !cb(*this)) {
-            // Setup m_prop_res before exiting. We set all outcomes
-            // to cb_stop regardless of the timestep outcome.
-            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i] = std::tuple{taylor_outcome::cb_stop, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+            // Interruption via callback.
+            for (auto &t : m_prop_res) {
+                std::get<0>(t) = taylor_outcome::cb_stop;
             }
-
-            return retval;
-        }
-
-        // Check the iteration limit.
-        // NOTE: if max_steps is 0 (i.e., no limit on the number of steps),
-        // then this condition will never trigger as by this point we are
-        // sure iter_counter is at least 1.
-        if (iter_counter == max_steps) {
-            // We reached the max_steps limit: set the outcome for all batch elements
-            // to step_limit.
-            // NOTE: this is the same logic adopted when the integration is stopped
-            // by the callback (see above).
-            for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-                m_prop_res[i] = std::tuple{taylor_outcome::step_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
+        } else if (iter_counter == max_steps) {
+            // Interruption via max iteration limit.
+            for (auto &t : m_prop_res) {
+                std::get<0>(t) = taylor_outcome::step_limit;
             }
-
-            return retval;
         }
     }
 
-    // Everything went fine, set all outcomes to time_limit.
-    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        m_prop_res[i] = std::tuple{taylor_outcome::time_limit, m_min_abs_h[i], m_max_abs_h[i], m_ts_count[i]};
-    }
-
+    // NOTE: at this point, we have the following possibilities:
+    // - a non-finite state was detected -> at least one outcome is err_nf_state,
+    // - the integration was interrupted early -> at least one outcome
+    //   is either cb_stop, step_limit or a stopping terminal event,
+    // - the integration finished successfully, in which case we consumed
+    //   all grid points and all outcomes are time_limit.
     return retval;
 }
 

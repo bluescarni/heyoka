@@ -821,6 +821,33 @@ TEST_CASE("cb interrupt")
         REQUIRE(ta.get_time()[0] < 32.);
         REQUIRE(ta.get_time()[1] < 32.);
     }
+
+    // Check that stopping via cb still processes the grid points
+    // within the last taken step.
+    {
+        auto res = ta.propagate_grid(
+            {10., 10.1, 10. + 1e-6, 21.1, 10. + 2e-6, 32.1}, kw::callback = [](auto &) { return false; });
+
+        REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome::cb_stop);
+        REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome::cb_stop);
+
+        REQUIRE(std::get<3>(ta.get_propagate_res()[0]) == 1u);
+        REQUIRE(std::get<3>(ta.get_propagate_res()[1]) == 1u);
+
+        REQUIRE(res.size() == 12u);
+        REQUIRE(!std::isnan(res[0]));
+        REQUIRE(!std::isnan(res[1]));
+        REQUIRE(!std::isnan(res[2]));
+        REQUIRE(!std::isnan(res[3]));
+        REQUIRE(!std::isnan(res[4]));
+        REQUIRE(std::isnan(res[5]));
+        REQUIRE(!std::isnan(res[6]));
+        REQUIRE(std::isnan(res[7]));
+        REQUIRE(!std::isnan(res[8]));
+        REQUIRE(std::isnan(res[9]));
+        REQUIRE(!std::isnan(res[10]));
+        REQUIRE(std::isnan(res[11]));
+    }
 }
 
 // Test excessive number of params provided upon construction
@@ -1571,4 +1598,43 @@ TEST_CASE("propagate_grid tc issue")
         REQUIRE(out[i * 4u + 2u] == approximately(std::cos(t_grid[2u * i])));
         REQUIRE(out[i * 4u + 3u] == approximately(std::cos(t_grid[2u * i + 1u])));
     }
+}
+
+// Test that when propagate_grid() runs into a stopping terminal
+// event all the grid points within the last taken step are
+// processed.
+TEST_CASE("propagate_grid ste")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    using ev_t = typename taylor_adaptive_batch<double>::t_event_t;
+
+    auto ta = taylor_adaptive_batch<double>({prime(x) = v, prime(v) = -x}, {0., 0., 1., 1.}, 2,
+                                            kw::t_events = {ev_t(heyoka::time - .1)});
+
+    std::vector t_grid = {0., 0., .1 - 2e-6, 10., .1 - 1e-6, 20., .1 + 1e-6, 30.};
+
+    auto res = ta.propagate_grid(t_grid);
+
+    REQUIRE(res.size() == 16u);
+
+    REQUIRE(std::get<0>(ta.get_propagate_res()[0]) == taylor_outcome{-1});
+    REQUIRE(std::get<0>(ta.get_propagate_res()[1]) == taylor_outcome{-1});
+
+    REQUIRE(!std::isnan(res[0]));
+    REQUIRE(!std::isnan(res[1]));
+    REQUIRE(!std::isnan(res[2]));
+    REQUIRE(!std::isnan(res[3]));
+    REQUIRE(!std::isnan(res[4]));
+    REQUIRE(std::isnan(res[5]));
+    REQUIRE(!std::isnan(res[6]));
+    REQUIRE(std::isnan(res[7]));
+    REQUIRE(!std::isnan(res[8]));
+    REQUIRE(std::isnan(res[9]));
+    REQUIRE(!std::isnan(res[10]));
+    REQUIRE(std::isnan(res[11]));
+    REQUIRE(std::isnan(res[12]));
+    REQUIRE(std::isnan(res[13]));
+    REQUIRE(std::isnan(res[14]));
+    REQUIRE(std::isnan(res[15]));
 }
