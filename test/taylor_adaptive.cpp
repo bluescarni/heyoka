@@ -1458,7 +1458,7 @@ TEST_CASE("cb interrupt")
         // within the last taken step.
         res = ta.propagate_grid(
             {11., 11. + 1e-6, 11. + 2e-6, 12., 13., 14, 15, 16, 17, 18, 19},
-            kw::callback = [&counter](auto &) { return false; });
+            kw::callback = [](auto &) { return false; });
 
         REQUIRE(std::get<0>(res) == taylor_outcome::cb_stop);
         REQUIRE(std::get<4>(res).size() == 6u);
