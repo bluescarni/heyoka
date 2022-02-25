@@ -2921,6 +2921,14 @@ taylor_adaptive_impl<T>::propagate_until_impl(const dfloat<T> &t, std::size_t ma
     }
 }
 
+// NOTE: possible outcomes:
+// - time_limit (the happy path),
+// - nf_err_state in case of non-finite state
+//   detected,
+// - cb_stop in case of stop by callback,
+// - the index of a stopping terminal event.
+// The callback is always executed at the end of each timestep, unless
+// a non-finite state was detected.
 template <typename T>
 std::tuple<taylor_outcome, T, T, std::size_t, std::vector<T>>
 taylor_adaptive_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps, T max_delta_t,
@@ -4399,6 +4407,8 @@ std::optional<continuous_output_batch<T>> taylor_adaptive_batch_impl<T>::propaga
 // - all cb_stop or all step_limit in case of interruption by,
 //   respectively, callback or iteration limit,
 // - at least 1 stopping terminal event.
+// The callback is always executed at the end of each timestep, unless
+// a non-finite state was detected.
 template <typename T>
 std::vector<T>
 taylor_adaptive_batch_impl<T>::propagate_grid_impl(const std::vector<T> &grid, std::size_t max_steps,
