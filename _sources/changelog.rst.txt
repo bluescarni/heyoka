@@ -1,13 +1,33 @@
 Changelog
 =========
 
+0.18.0 (unreleased)
+-------------------
+
+Changes
+~~~~~~~
+
+- In case of an early interruption, the ``propagate_grid()`` function will now
+  process all available grid points before the interruption time before exiting
+  (`#235 <https://github.com/bluescarni/heyoka/pull/235>`__).
+- The ``propagate_grid()`` callbacks are now invoked also if the integration
+  is interrupted by a stopping terminal event
+  (`#235 <https://github.com/bluescarni/heyoka/pull/235>`__).
+
+Fix
+~~~
+
+- Fix an issue in the ``propagate_grid()`` functions
+  that could lead to invalid results in certain corner cases
+  (`#234 <https://github.com/bluescarni/heyoka/pull/234>`__).
+
 0.17.1 (2022-02-13)
 -------------------
 
 Changes
 ~~~~~~~
 
-- The ``propagate_*()`` callbacks are now invoked also if the integration
+- The ``propagate_for/until()`` callbacks are now invoked also if the integration
   is interrupted by a stopping terminal event
   (`#231 <https://github.com/bluescarni/heyoka/pull/231>`__).
 
