@@ -1578,7 +1578,7 @@ TEST_CASE("te propagate_grid first step bug")
         auto out = ta.propagate_grid(grid);
 
         REQUIRE(out.size() == 200u * 4u);
-        REQUIRE(std::all_of(out.begin() + 8, out.end(), [](const auto &v) { return std::isnan(v); }));
+        REQUIRE(std::all_of(out.begin() + 32, out.end(), [](const auto &v) { return std::isnan(v); }));
     }
 }
 
