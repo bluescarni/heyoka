@@ -38,6 +38,9 @@
 #include <heyoka/exceptions.hpp>
 #include <heyoka/s11n.hpp>
 
+// Current archive version is 1.
+BOOST_CLASS_VERSION(heyoka::func, 1)
+
 namespace heyoka
 {
 
@@ -669,7 +672,7 @@ class HEYOKA_DLL_PUBLIC func
     void serialize(Archive &ar, unsigned version)
     {
         // LCOV_EXCL_START
-        if (version == 0u) {
+        if (version < static_cast<unsigned>(boost::serialization::version<func>::type::value)) {
             throw std::invalid_argument("Cannot load a function instance from an older archive");
         }
         // LCOV_EXCL_STOP
@@ -835,9 +838,6 @@ inline llvm::Value *codegen_from_values(llvm_state &s, const F &f, const std::ve
 } // namespace detail
 
 } // namespace heyoka
-
-// Current archive version is 1.
-BOOST_CLASS_VERSION(heyoka::func, 1)
 
 // Macros for the registration of s11n for concrete functions.
 #define HEYOKA_S11N_FUNC_EXPORT_KEY(f) BOOST_CLASS_EXPORT_KEY(heyoka::detail::func_inner<f>)
