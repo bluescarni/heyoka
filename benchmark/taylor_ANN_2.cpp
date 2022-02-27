@@ -15,6 +15,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/logging.hpp>
 #include <heyoka/math.hpp>
 #include <heyoka/splitmix64.hpp>
 #include <heyoka/taylor.hpp>
@@ -120,6 +121,8 @@ struct ffnn {
 
 int main()
 {
+    set_logger_level_trace();
+
     for (auto i = 2u; i < 15; ++i) {
         std::cout << "\nLayers: " << std::to_string(i) << std::endl;
         // A FFNN 2 in, 2 out 4 extra layers, ten neurons
