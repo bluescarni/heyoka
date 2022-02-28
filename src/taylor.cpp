@@ -1290,7 +1290,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     // TODO docs.
     std::vector<std::vector<llvm::AllocaInst *>> par_funcs_ptrs;
-    llvm::FunctionType *par_ft = nullptr;
 
     // TODO fix.
     if (true) {
@@ -1299,7 +1298,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
         // Build the function type.
         auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
-        par_ft = llvm::FunctionType::get(
+        auto *par_ft = llvm::FunctionType::get(
             builder.getVoidTy(),
             {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt32Ty(), scal_ptr_t, scal_ptr_t}, false);
         assert(par_ft != nullptr); // LCOV_EXCL_LINE
