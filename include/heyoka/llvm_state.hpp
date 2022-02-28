@@ -75,7 +75,6 @@ namespace kw
 IGOR_MAKE_NAMED_ARGUMENT(mname);
 IGOR_MAKE_NAMED_ARGUMENT(opt_level);
 IGOR_MAKE_NAMED_ARGUMENT(fast_math);
-IGOR_MAKE_NAMED_ARGUMENT(inline_functions);
 
 } // namespace kw
 
@@ -115,7 +114,6 @@ class HEYOKA_DLL_PUBLIC llvm_state
     std::string m_ir_snapshot;
     bool m_fast_math;
     std::string m_module_name;
-    bool m_inline_functions;
 
     // Serialization.
     template <typename Archive>
@@ -170,19 +168,10 @@ class HEYOKA_DLL_PUBLIC llvm_state
                 }
             }();
 
-            // Inline functions (defaults to true).
-            auto i_func = [&p]() -> bool {
-                if constexpr (p.has(kw::inline_functions)) {
-                    return std::forward<decltype(p(kw::inline_functions))>(p(kw::inline_functions));
-                } else {
-                    return true;
-                }
-            }();
-
-            return std::tuple{std::move(mod_name), opt_level, fmath, i_func};
+            return std::tuple{std::move(mod_name), opt_level, fmath};
         }
     }
-    explicit llvm_state(std::tuple<std::string, unsigned, bool, bool> &&);
+    explicit llvm_state(std::tuple<std::string, unsigned, bool> &&);
 
     // Small shared helper to setup the math flags in the builder at the
     // end of a constructor.
@@ -214,7 +203,6 @@ public:
     llvm::LLVMContext &context();
     unsigned &opt_level();
     bool &fast_math();
-    bool &inline_functions();
 
     const std::string &module_name() const;
     const llvm::Module &module() const;
@@ -222,7 +210,6 @@ public:
     const llvm::LLVMContext &context() const;
     const unsigned &opt_level() const;
     const bool &fast_math() const;
-    const bool &inline_functions() const;
 
     std::string get_ir() const;
     void dump_object_code(const std::string &) const;
@@ -243,5 +230,8 @@ public:
 };
 
 } // namespace heyoka
+
+// Current archive version is 1.
+BOOST_CLASS_VERSION(heyoka::llvm_state, 1)
 
 #endif

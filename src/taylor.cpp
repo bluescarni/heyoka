@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <fmt/ranges.h>
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
@@ -892,10 +893,13 @@ bool is_consecutive(const std::vector<std::uint32_t> &v)
 // the Taylor derivatives in compact mode. The generators are created from vectors
 // of either u var indices (taylor_c_make_arg_gen_vidx()) or floating-point constants
 // (taylor_c_make_arg_gen_vc()).
+// NOTE: in these two functions we ensure that the return values do not capture
+// any LLVM value except for types and global variables. This way we ensure that
+// the generators do not rely on LLVM values created at the current insertion point.
 std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_state &s,
                                                                        const std::vector<std::uint32_t> &ind)
 {
-    assert(!ind.empty());
+    assert(!ind.empty()); // LCOV_EXCL_LINE
 
     auto &builder = s.builder();
 
@@ -903,14 +907,14 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
     if (std::all_of(ind.begin() + 1, ind.end(), [&ind](const auto &n) { return n == ind[0]; })) {
         // If all indices are the same, don't construct an array, just always return
         // the same value.
-        return [num = builder.getInt32(ind[0])](llvm::Value *) -> llvm::Value * { return num; };
+        return [&builder, num = ind[0]](llvm::Value *) -> llvm::Value * { return builder.getInt32(num); };
     }
 
     // If ind consists of consecutive indices, we can replace
     // the index array with a simple offset computation.
     if (is_consecutive(ind)) {
-        return [&builder, start_idx = builder.getInt32(ind[0])](llvm::Value *cur_call_idx) -> llvm::Value * {
-            return builder.CreateAdd(start_idx, cur_call_idx);
+        return [&builder, start_idx = ind[0]](llvm::Value *cur_call_idx) -> llvm::Value * {
+            return builder.CreateAdd(builder.getInt32(start_idx), cur_call_idx);
         };
     }
 
@@ -965,13 +969,13 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
                 for (decltype(ind.size()) i = 0; i < ind.size(); ++i) {
                     checker.push_back(boost::numeric_cast<std::uint32_t>(ind[0] + i / n_reps));
                 }
-                assert(checker == ind);
+                assert(checker == ind); // LCOV_EXCL_LINE
 #endif
 
-                return [&builder, start_idx = builder.getInt32(rep_indices[0]),
-                        n_reps = builder.getInt32(boost::numeric_cast<std::uint32_t>(n_reps))](
+                return [&builder, start_idx = rep_indices[0], n_reps = boost::numeric_cast<std::uint32_t>(n_reps)](
                            llvm::Value *cur_call_idx) -> llvm::Value * {
-                    return builder.CreateAdd(start_idx, builder.CreateUDiv(cur_call_idx, n_reps));
+                    return builder.CreateAdd(builder.getInt32(start_idx),
+                                             builder.CreateUDiv(cur_call_idx, builder.getInt32(n_reps)));
                 };
             }
         }
@@ -988,18 +992,18 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 
     // Create the array type.
     auto *arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(ind.size()));
-    assert(arr_type != nullptr);
+    assert(arr_type != nullptr); // LCOV_EXCL_LINE
 
     // Create the constant array as a global read-only variable.
     auto *const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-    assert(const_arr != nullptr);
+    assert(const_arr != nullptr); // LCOV_EXCL_LINE
     // NOTE: naked new here is fine, gvar will be registered in the module
     // object and cleaned up when the module is destroyed.
     auto *gvar
         = new llvm::GlobalVariable(md, const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage, const_arr);
 
     // Return the generator.
-    return [gvar, arr_type, &builder](llvm::Value *cur_call_idx) -> llvm::Value * {
+    return [&builder, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
         assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
         return builder.CreateLoad(builder.getInt32Ty(),
                                   builder.CreateInBoundsGEP(arr_type, gvar, {builder.getInt32(0), cur_call_idx}));
@@ -1009,7 +1013,7 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vidx(llvm_stat
 template <typename T>
 std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state &s, const std::vector<number> &vc)
 {
-    assert(!vc.empty());
+    assert(!vc.empty()); // LCOV_EXCL_LINE
 
     // Check if all the numbers are the same.
     // NOTE: the comparison operator of number will consider two numbers of different
@@ -1017,7 +1021,7 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
     if (std::all_of(vc.begin() + 1, vc.end(), [&vc](const auto &n) { return n == vc[0]; })) {
         // If all constants are the same, don't construct an array, just always return
         // the same value.
-        return [num = codegen<T>(s, vc[0])](llvm::Value *) -> llvm::Value * { return num; };
+        return [&s, num = vc[0]](llvm::Value *) -> llvm::Value * { return codegen<T>(s, num); };
     }
 
     // Generate the array of constants as llvm constants.
@@ -1029,18 +1033,18 @@ std::function<llvm::Value *(llvm::Value *)> taylor_c_make_arg_gen_vc(llvm_state 
 
     // Create the array type.
     auto *arr_type = llvm::ArrayType::get(tmp_c_vec[0]->getType(), boost::numeric_cast<std::uint64_t>(vc.size()));
-    assert(arr_type != nullptr);
+    assert(arr_type != nullptr); // LCOV_EXCL_LINE
 
     // Create the constant array as a global read-only variable.
     auto *const_arr = llvm::ConstantArray::get(arr_type, tmp_c_vec);
-    assert(const_arr != nullptr);
+    assert(const_arr != nullptr); // LCOV_EXCL_LINE
     // NOTE: naked new here is fine, gvar will be registered in the module
     // object and cleaned up when the module is destroyed.
     auto *gvar = new llvm::GlobalVariable(s.module(), const_arr->getType(), true, llvm::GlobalVariable::InternalLinkage,
                                           const_arr);
 
     // Return the generator.
-    return [gvar, arr_type, &s](llvm::Value *cur_call_idx) -> llvm::Value * {
+    return [&s, gvar, arr_type](llvm::Value *cur_call_idx) -> llvm::Value * {
         auto &builder = s.builder();
 
         assert(llvm_depr_GEP_type_check(gvar, arr_type)); // LCOV_EXCL_LINE
@@ -1100,7 +1104,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             // Insert the function into tmp_map.
             const auto [it, is_new_func] = tmp_map.try_emplace(func);
 
-            assert(is_new_func || !it->second.empty());
+            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
@@ -1128,18 +1132,18 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         std::unordered_map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
             tmp_map_transpose;
         for (const auto &[func, vv] : tmp_map) {
-            assert(!vv.empty());
+            assert(!vv.empty()); // LCOV_EXCL_LINE
 
             // Add the function.
             const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
-            assert(ins_status);
+            assert(ins_status); // LCOV_EXCL_LINE
 
             const auto n_calls = vv.size();
             const auto n_args = vv[0].size();
             // NOTE: n_args must be at least 1 because the u idx
             // is prepended to the actual function arguments in
             // the tmp_map entries.
-            assert(n_args >= 1u);
+            assert(n_args >= 1u); // LCOV_EXCL_LINE
 
             for (decltype(vv[0].size()) i = 0; i < n_args; ++i) {
                 // Build the vector of values corresponding
@@ -1160,16 +1164,16 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         auto &a_map = retval.back();
 
         for (const auto &[func, vv] : tmp_map_transpose) {
-            assert(!vv.empty());
+            assert(!vv.empty()); // LCOV_EXCL_LINE
 
             // Add the function.
             const auto [it, ins_status] = a_map.try_emplace(func);
-            assert(ins_status);
+            assert(ins_status); // LCOV_EXCL_LINE
 
             // Set the number of calls for this function.
             it->second.first
                 = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(it->second.first > 0u);
+            assert(it->second.first > 0u); // LCOV_EXCL_LINE
 
             // Create the g functions for each argument.
             for (const auto &v : vv) {
@@ -1189,6 +1193,23 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     }
 
     get_logger()->trace("Taylor build function maps runtime: {}", sw);
+
+    // LCOV_EXCL_START
+    // Log a breakdown of the return value in trace mode.
+    if (get_logger()->should_log(spdlog::level::trace)) {
+        std::vector<std::vector<std::uint32_t>> fm_bd;
+
+        for (const auto &m : retval) {
+            fm_bd.emplace_back();
+
+            for (const auto &p : m) {
+                fm_bd.back().push_back(p.second.first);
+            }
+        }
+
+        get_logger()->trace("Taylor function maps breakdown: {}", fm_bd);
+    }
+    // LCOV_EXCL_STOP
 
     return retval;
 }

@@ -70,13 +70,11 @@ TEST_CASE("copy semantics")
     {
         std::vector<double> jet{2, 3, 0, 0};
 
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                     kw::inline_functions = false};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         REQUIRE(s.module_name() == "sample state");
         REQUIRE(s.opt_level() == 2u);
         REQUIRE(s.fast_math());
-        REQUIRE(s.inline_functions() == false);
         REQUIRE(!s.is_compiled());
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
@@ -86,7 +84,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
-        REQUIRE(s2.inline_functions() == false);
         REQUIRE(!s2.is_compiled());
 
         s2.compile();
@@ -105,8 +102,7 @@ TEST_CASE("copy semantics")
     {
         std::vector<double> jet{2, 3, 0, 0};
 
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                     kw::inline_functions = false};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
@@ -117,7 +113,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
-        REQUIRE(s2.inline_functions() == false);
         REQUIRE(s2.is_compiled());
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
@@ -134,8 +129,7 @@ TEST_CASE("copy semantics")
     {
         std::vector<double> jet{2, 3, 0, 0};
 
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                     kw::inline_functions = false};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
@@ -148,7 +142,6 @@ TEST_CASE("copy semantics")
         REQUIRE(s2.module_name() == "sample state");
         REQUIRE(s2.opt_level() == 2u);
         REQUIRE(s2.fast_math());
-        REQUIRE(s2.inline_functions() == false);
         REQUIRE(s2.is_compiled());
 
         jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s2.jit_lookup("jet"));
@@ -169,8 +162,7 @@ TEST_CASE("get object code")
     auto [x, y] = make_vars("x", "y");
 
     {
-        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                     kw::inline_functions = false};
+        llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         taylor_add_jet<double>(s, "jet", {x * y, y * x}, 1, 1, true, false);
 
@@ -208,8 +200,7 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                       kw::inline_functions = false};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -222,7 +213,6 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
-        REQUIRE(s.inline_functions() == true);
     }
 
     // Compiled state but without object file.
@@ -243,8 +233,7 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                       kw::inline_functions = false};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -257,7 +246,6 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
-        REQUIRE(s.inline_functions() == true);
     }
 
     // Compiled state with object file.
@@ -280,8 +268,7 @@ TEST_CASE("s11n")
             oa << s;
         }
 
-        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true,
-                       kw::inline_functions = false};
+        s = llvm_state{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
 
         {
             boost::archive::binary_iarchive ia(ss);
@@ -294,7 +281,6 @@ TEST_CASE("s11n")
         REQUIRE(s.module_name() == "");
         REQUIRE(s.opt_level() == 3u);
         REQUIRE(s.fast_math() == false);
-        REQUIRE(s.inline_functions() == true);
 
         auto jptr = reinterpret_cast<void (*)(double *, const double *, const double *)>(s.jit_lookup("jet"));
 
@@ -314,7 +300,7 @@ TEST_CASE("make_similar")
 {
     auto [x, y] = make_vars("x", "y");
 
-    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true, kw::inline_functions = false};
+    llvm_state s{kw::mname = "sample state", kw::opt_level = 2u, kw::fast_math = true};
     taylor_add_jet<double>(s, "jet", {sub(2_dbl, 3_dbl), x + y}, 1, 1, true, false);
 
     s.compile();
@@ -322,7 +308,6 @@ TEST_CASE("make_similar")
     REQUIRE(s.module_name() == "sample state");
     REQUIRE(s.opt_level() == 2u);
     REQUIRE(s.fast_math());
-    REQUIRE(s.inline_functions() == false);
     REQUIRE(s.is_compiled());
 
     auto s2 = s.make_similar();
@@ -330,7 +315,6 @@ TEST_CASE("make_similar")
     REQUIRE(s2.module_name() == "sample state");
     REQUIRE(s2.opt_level() == 2u);
     REQUIRE(s2.fast_math());
-    REQUIRE(s2.inline_functions() == false);
     REQUIRE(!s2.is_compiled());
     REQUIRE(s.get_ir() != s2.get_ir());
 }

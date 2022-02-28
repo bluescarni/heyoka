@@ -35,6 +35,7 @@
 
 #endif
 
+#include <heyoka/logging.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
@@ -161,6 +162,8 @@ void run_bench(std::uint32_t nplanets, T tol, bool high_accuracy, bool compact_m
 int main(int argc, char *argv[])
 {
     namespace po = boost::program_options;
+
+    set_logger_level_trace();
 
     std::string fp_type;
     double tol;

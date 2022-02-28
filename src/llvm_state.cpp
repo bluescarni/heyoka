@@ -489,9 +489,9 @@ auto llvm_state_ir_to_module(std::string &&ir, llvm::LLVMContext &ctx)
 
 } // namespace detail
 
-llvm_state::llvm_state(std::tuple<std::string, unsigned, bool, bool> &&tup)
+llvm_state::llvm_state(std::tuple<std::string, unsigned, bool> &&tup)
     : m_jitter(std::make_unique<jit>()), m_opt_level(std::get<1>(tup)), m_fast_math(std::get<2>(tup)),
-      m_module_name(std::move(std::get<0>(tup))), m_inline_functions(std::get<3>(tup))
+      m_module_name(std::move(std::get<0>(tup)))
 {
     // Create the module.
     m_module = std::make_unique<llvm::Module>(m_module_name, context());
@@ -515,7 +515,7 @@ llvm_state::llvm_state(const llvm_state &other)
     // - creating a new jit,
     // - copying over the options from other.
     : m_jitter(std::make_unique<jit>()), m_opt_level(other.m_opt_level), m_fast_math(other.m_fast_math),
-      m_module_name(other.m_module_name), m_inline_functions(other.m_inline_functions)
+      m_module_name(other.m_module_name)
 {
     if (other.is_compiled() && other.m_jitter->m_object_file) {
         // 'other' was compiled and code was generated.
@@ -580,7 +580,6 @@ llvm_state &llvm_state::operator=(llvm_state &&other) noexcept
         m_ir_snapshot = std::move(other.m_ir_snapshot);
         m_fast_math = other.m_fast_math;
         m_module_name = std::move(other.m_module_name);
-        m_inline_functions = other.m_inline_functions;
     }
 
     return *this;
@@ -610,7 +609,6 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
     ar << m_opt_level;
     ar << m_fast_math;
     ar << m_module_name;
-    ar << m_inline_functions;
 
     // Store the IR.
     // NOTE: avoid get_ir() if the module has been compiled,
@@ -629,8 +627,9 @@ void llvm_state::save_impl(Archive &ar, unsigned) const
 }
 
 template <typename Archive>
-void llvm_state::load_impl(Archive &ar, unsigned)
+void llvm_state::load_impl(Archive &ar, unsigned version)
 {
+
     // NOTE: all serialised objects in the archive
     // are primitive types, no need to reset the
     // addresses.
@@ -654,8 +653,14 @@ void llvm_state::load_impl(Archive &ar, unsigned)
     std::string module_name;
     ar >> module_name;
 
-    bool inline_functions{};
-    ar >> inline_functions;
+    // LCOV_EXCL_START
+    if (version == 0u) {
+        // NOTE: version 0 had a setting here for function inlining.
+        // Load it and ignore it.
+        bool inline_functions{};
+        ar >> inline_functions;
+    }
+    // LCOV_EXCL_STOP
 
     // Load the ir
     std::string ir;
@@ -673,7 +678,6 @@ void llvm_state::load_impl(Archive &ar, unsigned)
         m_opt_level = opt_level;
         m_fast_math = fast_math;
         m_module_name = module_name;
-        m_inline_functions = inline_functions;
 
         // Reset module and builder to the def-cted state.
         m_module.reset();
@@ -759,11 +763,6 @@ bool &llvm_state::fast_math()
     return m_fast_math;
 }
 
-bool &llvm_state::inline_functions()
-{
-    return m_inline_functions;
-}
-
 const llvm::Module &llvm_state::module() const
 {
     check_uncompiled(__func__);
@@ -789,11 +788,6 @@ const unsigned &llvm_state::opt_level() const
 const bool &llvm_state::fast_math() const
 {
     return m_fast_math;
-}
-
-const bool &llvm_state::inline_functions() const
-{
-    return m_inline_functions;
 }
 
 void llvm_state::check_uncompiled(const char *f) const
@@ -942,10 +936,8 @@ void llvm_state::optimise()
         // NOTE: perhaps in the future we can make the autovectorizer an
         // option like the fast math flag.
         pm_builder.OptLevel = m_opt_level;
-        if (m_inline_functions) {
-            // Enable function inlining if the inlining flag is enabled.
-            pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
-        }
+        // Enable function inlining.
+        pm_builder.Inliner = llvm::createFunctionInliningPass(m_opt_level, 0, false);
 
         m_jitter->m_tm->adjustPassManager(pm_builder);
 
@@ -1079,8 +1071,7 @@ const std::string &llvm_state::module_name() const
 // but with no code defined in it.
 llvm_state llvm_state::make_similar() const
 {
-    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math,
-                      kw::inline_functions = m_inline_functions);
+    return llvm_state(kw::mname = m_module_name, kw::opt_level = m_opt_level, kw::fast_math = m_fast_math);
 }
 
 std::ostream &operator<<(std::ostream &os, const llvm_state &s)
@@ -1092,7 +1083,6 @@ std::ostream &operator<<(std::ostream &os, const llvm_state &s)
     oss << "Compiled           : " << s.is_compiled() << '\n';
     oss << "Fast math          : " << s.m_fast_math << '\n';
     oss << "Optimisation level : " << s.m_opt_level << '\n';
-    oss << "Inline functions   : " << s.m_inline_functions << '\n';
     oss << "Target triple      : " << s.m_jitter->get_target_triple().str() << '\n';
     oss << "Target CPU         : " << s.m_jitter->get_target_cpu() << '\n';
     oss << "Target features    : " << s.m_jitter->get_target_features() << '\n';
