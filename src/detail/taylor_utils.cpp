@@ -35,6 +35,9 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
@@ -2966,4 +2969,55 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::r
 
 #endif
 
+namespace detail
+{
+
+namespace
+{
+
+// TODO exception throwing.
+template <typename T>
+void heyoka_cm_par_impl(std::uint32_t ncalls,
+                        void (*fptr)(std::uint32_t, std::uint32_t, std::uint32_t, const T *, const T *),
+                        std::uint32_t cur_order, const T *par_ptr, const T *time_ptr)
+{
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, ncalls),
+                              [fptr, cur_order, par_ptr, time_ptr](const auto &range) {
+                                  fptr(range.begin(), range.end(), cur_order, par_ptr, time_ptr);
+                              });
+}
+
+} // namespace
+
+} // namespace detail
+
 } // namespace heyoka
+
+extern "C" HEYOKA_DLL_PUBLIC void
+heyoka_cm_par_dbl(std::uint32_t ncalls,
+                  void (*fptr)(std::uint32_t, std::uint32_t, std::uint32_t, const double *, const double *),
+                  std::uint32_t cur_order, const double *par_ptr, const double *time_ptr)
+{
+    heyoka::detail::heyoka_cm_par_impl<double>(ncalls, fptr, cur_order, par_ptr, time_ptr);
+}
+
+extern "C" HEYOKA_DLL_PUBLIC void
+heyoka_cm_par_ldbl(std::uint32_t ncalls,
+                   void (*fptr)(std::uint32_t, std::uint32_t, std::uint32_t, const long double *, const long double *),
+                   std::uint32_t cur_order, const long double *par_ptr, const long double *time_ptr)
+{
+    heyoka::detail::heyoka_cm_par_impl<long double>(ncalls, fptr, cur_order, par_ptr, time_ptr);
+}
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_f128(std::uint32_t ncalls,
+                                                     void (*fptr)(std::uint32_t, std::uint32_t, std::uint32_t,
+                                                                  const mppp::real128 *, const mppp::real128 *),
+                                                     std::uint32_t cur_order, const mppp::real128 *par_ptr,
+                                                     const mppp::real128 *time_ptr)
+{
+    heyoka::detail::heyoka_cm_par_impl<mppp::real128>(ncalls, fptr, cur_order, par_ptr, time_ptr);
+}
+
+#endif

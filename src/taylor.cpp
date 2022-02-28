@@ -43,6 +43,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -1287,27 +1288,58 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
-    // Helper to compute and store the derivatives of order cur_order
-    // of the u variables which are not state variables.
-    auto compute_u_diffs = [&](llvm::Value *cur_order) {
+    // TODO docs.
+    std::vector<std::vector<llvm::AllocaInst *>> par_funcs_ptrs;
+    llvm::FunctionType *par_ft = nullptr;
+
+    // TODO fix.
+    if (true) {
+        auto &md = s.module();
+        auto &context = s.context();
+
+        // Build the function type.
+        auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+        par_ft = llvm::FunctionType::get(
+            builder.getVoidTy(),
+            {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt32Ty(), scal_ptr_t, scal_ptr_t}, false);
+        assert(par_ft != nullptr); // LCOV_EXCL_LINE
+
         for (const auto &map : f_maps) {
+            par_funcs_ptrs.emplace_back();
+
             for (const auto &p : map) {
                 // The LLVM function for the computation of the
                 // derivative in compact mode.
                 const auto &func = p.first;
 
-                // The number of func calls.
-                const auto ncalls = p.second.first;
-
                 // The generators for the arguments of func.
                 const auto &gens = p.second.second;
 
-                assert(ncalls > 0u);
-                assert(!gens.empty());
-                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+                // Fetch the current insertion block.
+                auto *orig_bb = builder.GetInsertBlock();
 
-                // Loop over the number of calls.
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                auto *cur_f = llvm::Function::Create(par_ft, llvm::Function::InternalLinkage, "", &md);
+                assert(cur_f != nullptr); // LCOV_EXCL_LINE
+
+                // Set the attributes of the function arguments.
+                auto *b_idx = cur_f->args().begin();
+                auto *e_idx = cur_f->args().begin() + 1;
+                auto *cur_order = cur_f->args().begin() + 2;
+
+                auto *par_arg = cur_f->args().begin() + 3;
+                par_arg->addAttr(llvm::Attribute::NoCapture);
+                par_arg->addAttr(llvm::Attribute::NoAlias);
+                par_arg->addAttr(llvm::Attribute::ReadOnly);
+
+                auto *time_arg = cur_f->args().begin() + 4;
+                time_arg->addAttr(llvm::Attribute::NoCapture);
+                time_arg->addAttr(llvm::Attribute::NoAlias);
+                time_arg->addAttr(llvm::Attribute::ReadOnly);
+
+                // Create a new basic block to start insertion into.
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", cur_f));
+
+                llvm_loop_u32(s, b_idx, e_idx, [&](llvm::Value *cur_call_idx) {
                     // Create the u variable index from the first generator.
                     auto u_idx = gens[0](cur_call_idx);
 
@@ -1318,7 +1350,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // - array of derivatives,
                     // - pointer to the param values,
                     // - pointer to the time value(s).
-                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_arg, time_arg};
 
                     // Create the other arguments via the generators.
                     for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -1328,6 +1360,102 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // Calculate the derivative and store the result.
                     taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
                 });
+
+                // Return the result.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(cur_f);
+
+                // Restore the original insertion block.
+                builder.SetInsertPoint(orig_bb);
+
+                auto f_ptr = builder.CreateAlloca(cur_f->getType());
+                builder.CreateStore(cur_f, f_ptr);
+                par_funcs_ptrs.back().push_back(f_ptr);
+            }
+        }
+    }
+
+    // Helper to compute and store the derivatives of order cur_order
+    // of the u variables which are not state variables.
+    auto compute_u_diffs = [&](llvm::Value *cur_order) {
+        if (true) {
+            for (decltype(f_maps.size()) i = 0; i < f_maps.size(); ++i) {
+                const auto &map = f_maps[i];
+                const auto &pfptrs = par_funcs_ptrs[i];
+
+                decltype(pfptrs.size()) j = 0;
+                for (const auto &p : map) {
+                    // The number of func calls.
+                    const auto ncalls = p.second.first;
+
+                    auto func = builder.CreateLoad(pfptrs[j]->getAllocatedType(), pfptrs[j]);
+
+                    const auto helper_name = []() {
+                        std::string ret = "heyoka_cm_par_";
+
+                        if constexpr (std::is_same_v<T, double>) {
+                            ret += "dbl";
+                        } else if constexpr (std::is_same_v<T, long double>) {
+                            ret += "ldbl";
+#if defined(HEYOKA_HAVE_REAL128)
+                        } else if constexpr (std::is_same_v<T, mppp::real128>) {
+                            ret += "f128";
+#endif
+                        } else {
+                            static_assert(always_false_v<T>, "Unhandled type");
+                        }
+
+                        return ret;
+                    }();
+
+                    llvm_invoke_external(s, helper_name, builder.getVoidTy(),
+                                         {builder.getInt32(ncalls), func, cur_order, par_ptr, time_ptr});
+
+                    ++j;
+                }
+            }
+        } else {
+            for (const auto &map : f_maps) {
+                for (const auto &p : map) {
+                    // The LLVM function for the computation of the
+                    // derivative in compact mode.
+                    const auto &func = p.first;
+
+                    // The number of func calls.
+                    const auto ncalls = p.second.first;
+
+                    // The generators for the arguments of func.
+                    const auto &gens = p.second.second;
+
+                    assert(ncalls > 0u);
+                    assert(!gens.empty());
+                    assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+
+                    // Loop over the number of calls.
+                    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                        // Create the u variable index from the first generator.
+                        auto u_idx = gens[0](cur_call_idx);
+
+                        // Initialise the vector of arguments with which func must be called. The following
+                        // initial arguments are always present:
+                        // - current Taylor order,
+                        // - u index of the variable,
+                        // - array of derivatives,
+                        // - pointer to the param values,
+                        // - pointer to the time value(s).
+                        std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+
+                        // Create the other arguments via the generators.
+                        for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                            args.push_back(gens[i](cur_call_idx));
+                        }
+
+                        // Calculate the derivative and store the result.
+                        taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+                    });
+                }
             }
         }
     };
