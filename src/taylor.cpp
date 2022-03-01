@@ -1288,20 +1288,47 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
-    // TODO docs.
+    // NOTE: these are used only in parallel mode.
     std::vector<std::vector<llvm::AllocaInst *>> par_funcs_ptrs;
+    llvm::Value *gl_par_data = nullptr;
+    llvm::Type *par_data_t = nullptr;
 
     // TODO fix.
-    if (true) {
+    bool parallel_mode = true;
+
+    if (parallel_mode) {
         auto &md = s.module();
         auto &context = s.context();
 
-        // Build the function type.
+        // Fetch the LLVM version of T *.
         auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
-        auto *par_ft = llvm::FunctionType::get(
-            builder.getVoidTy(),
-            {builder.getInt32Ty(), builder.getInt32Ty(), builder.getInt32Ty(), scal_ptr_t, scal_ptr_t}, false);
-        assert(par_ft != nullptr); // LCOV_EXCL_LINE
+
+        // NOTE: we will use a global struct with these fields:
+        //
+        // - int32 (current Taylor order),
+        // - T * (pointer to the runtime parameters),
+        // - T * (pointer to the time coordinate(s)),
+        //
+        // to pass the data necessary to the parallel workers.
+        par_data_t = llvm::StructType::get(context, {builder.getInt32Ty(), scal_ptr_t, scal_ptr_t});
+        gl_par_data = new llvm::GlobalVariable(md, par_data_t, false, llvm::GlobalVariable::InternalLinkage,
+                                               llvm::ConstantAggregateZero::get(par_data_t));
+
+        // Write the par/time pointers into the global struct (unlike the current order, this needs
+        // to be done only once).
+        assert(llvm_depr_GEP_type_check(gl_par_data, par_data_t)); // LCOV_EXCL_LINE
+        builder.CreateStore(
+            par_ptr, builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(1)}));
+        builder.CreateStore(
+            time_ptr, builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(2)}));
+
+        // Fetch the function types for the parallel worker and the wrapper.
+        auto *worker_t
+            = llvm::FunctionType::get(builder.getVoidTy(), {builder.getInt32Ty(), builder.getInt32Ty()}, false);
+        assert(worker_t != nullptr); // LCOV_EXCL_LINE
+
+        auto *wrapper_t = llvm::FunctionType::get(builder.getVoidTy(), {}, false);
+        assert(wrapper_t != nullptr); // LCOV_EXCL_LINE
 
         for (const auto &map : f_maps) {
             par_funcs_ptrs.emplace_back();
@@ -1311,33 +1338,38 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 // derivative in compact mode.
                 const auto &func = p.first;
 
+                // The number of func calls.
+                const auto ncalls = p.second.first;
+
                 // The generators for the arguments of func.
                 const auto &gens = p.second.second;
 
                 // Fetch the current insertion block.
                 auto *orig_bb = builder.GetInsertBlock();
 
-                auto *cur_f = llvm::Function::Create(par_ft, llvm::Function::InternalLinkage, "", &md);
-                assert(cur_f != nullptr); // LCOV_EXCL_LINE
+                // Create the worker function.
+                auto *worker = llvm::Function::Create(worker_t, llvm::Function::InternalLinkage, "", &md);
+                assert(worker != nullptr); // LCOV_EXCL_LINE
 
-                // Set the attributes of the function arguments.
-                auto *b_idx = cur_f->args().begin();
-                auto *e_idx = cur_f->args().begin() + 1;
-                auto *cur_order = cur_f->args().begin() + 2;
-
-                auto *par_arg = cur_f->args().begin() + 3;
-                par_arg->addAttr(llvm::Attribute::NoCapture);
-                par_arg->addAttr(llvm::Attribute::NoAlias);
-                par_arg->addAttr(llvm::Attribute::ReadOnly);
-
-                auto *time_arg = cur_f->args().begin() + 4;
-                time_arg->addAttr(llvm::Attribute::NoCapture);
-                time_arg->addAttr(llvm::Attribute::NoAlias);
-                time_arg->addAttr(llvm::Attribute::ReadOnly);
+                // Fetch the function arguments.
+                auto *b_idx = worker->args().begin();
+                auto *e_idx = worker->args().begin() + 1;
 
                 // Create a new basic block to start insertion into.
-                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", cur_f));
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", worker));
 
+                // Load the order and par/time pointers from the global variable.
+                auto cur_order = builder.CreateLoad(
+                    builder.getInt32Ty(),
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
+                auto par_arg = builder.CreateLoad(
+                    scal_ptr_t,
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(1)}));
+                auto time_arg = builder.CreateLoad(
+                    scal_ptr_t,
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(2)}));
+
+                // Iterate over the range.
                 llvm_loop_u32(s, b_idx, e_idx, [&](llvm::Value *cur_call_idx) {
                     // Create the u variable index from the first generator.
                     auto u_idx = gens[0](cur_call_idx);
@@ -1360,17 +1392,37 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
                 });
 
-                // Return the result.
+                // Return.
                 builder.CreateRetVoid();
 
                 // Verify.
-                s.verify_function(cur_f);
+                s.verify_function(worker);
+
+                // Create the wrapper function. This will execute multiple calls
+                // to the worker in parallel, until the entire range [0, ncalls) has
+                // been consumed.
+                auto *wrapper = llvm::Function::Create(wrapper_t, llvm::Function::InternalLinkage, "", &md);
+                assert(wrapper != nullptr); // LCOV_EXCL_LINE
+
+                // Create a new basic block to start insertion into.
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", wrapper));
+
+                // Invoke the parallel looper.
+                llvm_invoke_external(s, "heyoka_cm_par_looper", builder.getVoidTy(), {builder.getInt32(ncalls), worker},
+                                     {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+                // Return.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(wrapper);
 
                 // Restore the original insertion block.
                 builder.SetInsertPoint(orig_bb);
 
-                auto f_ptr = builder.CreateAlloca(cur_f->getType());
-                builder.CreateStore(cur_f, f_ptr);
+                // Add a pointer to the wrapper to par_funcs_ptrs.
+                auto f_ptr = builder.CreateAlloca(wrapper->getType());
+                builder.CreateStore(wrapper, f_ptr);
                 par_funcs_ptrs.back().push_back(f_ptr);
             }
         }
@@ -1379,40 +1431,46 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // Helper to compute and store the derivatives of order cur_order
     // of the u variables which are not state variables.
     auto compute_u_diffs = [&](llvm::Value *cur_order) {
-        if (true) {
-            for (decltype(f_maps.size()) i = 0; i < f_maps.size(); ++i) {
-                const auto &map = f_maps[i];
-                const auto &pfptrs = par_funcs_ptrs[i];
+        if (parallel_mode) {
+            // Store the current order in the global struct.
+            builder.CreateStore(cur_order, builder.CreateInBoundsGEP(par_data_t, gl_par_data,
+                                                                     {builder.getInt32(0), builder.getInt32(0)}));
 
-                decltype(pfptrs.size()) j = 0;
-                for (const auto &p : map) {
-                    // The number of func calls.
-                    const auto ncalls = p.second.first;
+            // For each segment, invoke the wrapper functions concurrently.
+            for (const auto &pfptrs : par_funcs_ptrs) {
+                assert(!pfptrs.empty()); // LCOV_EXCL_LINE
 
-                    auto func = builder.CreateLoad(pfptrs[j]->getAllocatedType(), pfptrs[j]);
+                // NOTE: we can invoke in parallel only up to a fixed number
+                // of wrappers. Thus, we process them in chunks.
 
-                    const auto helper_name = []() {
-                        std::string ret = "heyoka_cm_par_";
+                // The remaining number of wrappers to invoke.
+                auto rem = pfptrs.size();
 
-                        if constexpr (std::is_same_v<T, double>) {
-                            ret += "dbl";
-                        } else if constexpr (std::is_same_v<T, long double>) {
-                            ret += "ldbl";
-#if defined(HEYOKA_HAVE_REAL128)
-                        } else if constexpr (std::is_same_v<T, mppp::real128>) {
-                            ret += "f128";
-#endif
-                        } else {
-                            static_assert(always_false_v<T>, "Unhandled type");
-                        }
+                // Starting index in pfptrs.
+                decltype(rem) start_idx = 0;
 
-                        return ret;
-                    }();
+                while (rem != 0u) {
+                    // Current chunk size.
+                    const auto cur_size = std::min(static_cast<decltype(rem)>(HEYOKA_CM_PAR_MAX_INVOKE_N), rem);
 
-                    llvm_invoke_external(s, helper_name, builder.getVoidTy(),
-                                         {builder.getInt32(ncalls), func, cur_order, par_ptr, time_ptr});
+                    // Setup the function name.
+                    const auto fname = fmt::format("heyoka_cm_par_invoke_{}", cur_size);
 
-                    ++j;
+                    // Setup the function arguments.
+                    std::vector<llvm::Value *> args;
+                    for (auto i = start_idx; i < start_idx + cur_size; ++i) {
+                        assert(i < pfptrs.size()); // LCOV_EXCL_LINE
+                        auto *ptr = pfptrs[i];
+                        args.push_back(builder.CreateLoad(ptr->getAllocatedType(), ptr));
+                    }
+
+                    // Invoke.
+                    llvm_invoke_external(s, fname, builder.getVoidTy(), args,
+                                         {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+                    // Update rem and start_idx.
+                    rem -= cur_size;
+                    start_idx += cur_size;
                 }
             }
         } else {

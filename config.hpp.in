@@ -42,4 +42,6 @@
 
 #endif
 
+#define HEYOKA_CM_PAR_MAX_INVOKE_N 20
+
 #endif
