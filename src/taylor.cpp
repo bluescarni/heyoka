@@ -1222,7 +1222,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                                              llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                                             bool high_accuracy)
+                                             bool high_accuracy, bool parallel_mode)
 {
     auto &builder = s.builder();
 
@@ -1292,9 +1292,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     std::vector<std::vector<llvm::AllocaInst *>> par_funcs_ptrs;
     llvm::Value *gl_par_data = nullptr;
     llvm::Type *par_data_t = nullptr;
-
-    // TODO fix.
-    bool parallel_mode = true;
 
     if (parallel_mode) {
         auto &md = s.module();
@@ -1661,7 +1658,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode,
-                   bool high_accuracy)
+                   bool high_accuracy, bool parallel_mode)
 {
     assert(batch_size > 0u);
     assert(n_eq > 0u);
@@ -1699,7 +1696,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // LCOV_EXCL_STOP
 
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                                  batch_size, high_accuracy);
+                                                  batch_size, high_accuracy, parallel_mode);
     } else {
         // Log the runtime of IR construction in trace mode.
         spdlog::stopwatch sw;
@@ -1925,7 +1922,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 template <typename T, typename U>
 auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          const std::vector<expression> &evs, bool high_accuracy)
+                                          const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -2017,7 +2014,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy);
+                                              batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -2238,7 +2235,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, T tol, std::uint32_t batch_size,
-                              bool high_accuracy, bool compact_mode)
+                              bool high_accuracy, bool compact_mode, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -2321,7 +2318,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
-                                              compact_mode, high_accuracy);
+                                              compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -2397,7 +2394,7 @@ template <typename T>
 template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                                 std::vector<nt_event_t> ntes)
+                                                 std::vector<nt_event_t> ntes, bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -2439,6 +2436,10 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
                 tol));
     }
 
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
+    }
+
     // Store the tolerance.
     m_tol = tol;
 
@@ -2465,10 +2466,11 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", sys, tol, 1, high_accuracy,
-                                                                          compact_mode, ee, high_accuracy);
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
+            m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode);
+        std::tie(m_dc, m_order)
+            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
@@ -3467,23 +3469,23 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl
                                                                                  std::vector<double>, double, double,
                                                                                  bool, bool, std::vector<double>,
                                                                                  std::vector<t_event_t>,
-                                                                                 std::vector<nt_event_t>);
+                                                                                 std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
                                                  std::vector<double>, double, double, bool, bool, std::vector<double>,
-                                                 std::vector<t_event_t>, std::vector<nt_event_t>);
+                                                 std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
                                                       long double, long double, bool, bool, std::vector<long double>,
-                                                      std::vector<t_event_t>, std::vector<nt_event_t>);
+                                                      std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
-    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -3491,11 +3493,11 @@ template class taylor_adaptive_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
-    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
-    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 
@@ -3509,7 +3511,8 @@ template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars,
-                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes)
+                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                                       bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -3571,6 +3574,10 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
                 tol));
     }
 
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
+    }
+
     // Store the tolerance.
     m_tol = tol;
 
@@ -3598,10 +3605,10 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
         }
 
         std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy);
+            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order)
-            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy, compact_mode);
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy,
+                                                              compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
@@ -5193,22 +5200,22 @@ template class taylor_adaptive_batch_impl<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, double, bool, bool,
-    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
-    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_batch_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
-    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
     std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
-    std::vector<nt_event_t>);
+    std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -5216,12 +5223,12 @@ template class taylor_adaptive_batch_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
     std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>);
+    std::vector<nt_event_t>, bool);
 
 #endif
 
@@ -5244,7 +5251,7 @@ namespace
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
                          std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                         const std::vector<expression> &sv_funcs)
+                         const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -5327,7 +5334,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Compute the jet of derivatives.
     auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy);
+                                              batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array
@@ -5484,27 +5491,28 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
 taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs)
+                               const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                               parallel_mode);
 }
 
 taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs);
+                                                    sv_funcs, parallel_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs);
+                                                      sv_funcs, parallel_mode);
 }
 
 #endif
@@ -5512,18 +5520,19 @@ taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const st
 taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name,
                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs)
+                               const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                               parallel_mode);
 }
 
 taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
                                 const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs);
+                                                    sv_funcs, parallel_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -5531,10 +5540,10 @@ taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
 taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
                                 const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs);
+                                                      sv_funcs, parallel_mode);
 }
 
 #endif
