@@ -1303,7 +1303,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         // Fetch the LLVM version of T *.
         auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
 
-        // NOTE: we will use a global struct with these fields:
+        // NOTE: we will use a global variable with these fields:
         //
         // - int32 (current Taylor order),
         // - T * (pointer to the runtime parameters),
@@ -1428,6 +1428,80 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         }
     }
 
+    // Helper to compute the Taylor derivatives for a block.
+    // func is the LLVM function for the computation of the Taylor derivative in the block,
+    // ncalls the number of times it must be called, gens the generators for the
+    // function arguments and cur_order the order of the derivative.
+    auto block_diff = [&](const auto &func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
+        // LCOV_EXCL_START
+        assert(ncalls > 0u);
+        assert(!gens.empty());
+        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        // LCOV_EXCL_STOP
+
+        // Loop over the number of calls.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u index of the variable,
+            // - array of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+        });
+    };
+
+    // Helper to compute concurrently all the derivatives
+    // in a segment using the parallel wrappers.
+    auto parallel_segment_diff = [&](const auto &pfptrs) {
+        assert(!pfptrs.empty()); // LCOV_EXCL_LINE
+
+        // NOTE: we can invoke in parallel only up to a fixed number
+        // of wrappers. Thus, we process them in chunks.
+
+        // The remaining number of wrappers to invoke.
+        auto rem = pfptrs.size();
+
+        // Starting index in pfptrs.
+        decltype(rem) start_idx = 0;
+
+        while (rem != 0u) {
+            // Current chunk size.
+            const auto cur_size = std::min(static_cast<decltype(rem)>(HEYOKA_CM_PAR_MAX_INVOKE_N), rem);
+
+            // Setup the function name.
+            const auto fname = fmt::format("heyoka_cm_par_invoke_{}", cur_size);
+
+            // Setup the function arguments.
+            std::vector<llvm::Value *> args;
+            for (auto i = start_idx; i < start_idx + cur_size; ++i) {
+                assert(i < pfptrs.size()); // LCOV_EXCL_LINE
+                auto *ptr = pfptrs[i];
+                args.push_back(builder.CreateLoad(ptr->getAllocatedType(), ptr));
+            }
+
+            // Invoke.
+            llvm_invoke_external(s, fname, builder.getVoidTy(), args,
+                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+            // Update rem and start_idx.
+            rem -= cur_size;
+            start_idx += cur_size;
+        }
+    };
+
     // Helper to compute and store the derivatives of order cur_order
     // of the u variables which are not state variables.
     auto compute_u_diffs = [&](llvm::Value *cur_order) {
@@ -1438,80 +1512,14 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
             // For each segment, invoke the wrapper functions concurrently.
             for (const auto &pfptrs : par_funcs_ptrs) {
-                assert(!pfptrs.empty()); // LCOV_EXCL_LINE
-
-                // NOTE: we can invoke in parallel only up to a fixed number
-                // of wrappers. Thus, we process them in chunks.
-
-                // The remaining number of wrappers to invoke.
-                auto rem = pfptrs.size();
-
-                // Starting index in pfptrs.
-                decltype(rem) start_idx = 0;
-
-                while (rem != 0u) {
-                    // Current chunk size.
-                    const auto cur_size = std::min(static_cast<decltype(rem)>(HEYOKA_CM_PAR_MAX_INVOKE_N), rem);
-
-                    // Setup the function name.
-                    const auto fname = fmt::format("heyoka_cm_par_invoke_{}", cur_size);
-
-                    // Setup the function arguments.
-                    std::vector<llvm::Value *> args;
-                    for (auto i = start_idx; i < start_idx + cur_size; ++i) {
-                        assert(i < pfptrs.size()); // LCOV_EXCL_LINE
-                        auto *ptr = pfptrs[i];
-                        args.push_back(builder.CreateLoad(ptr->getAllocatedType(), ptr));
-                    }
-
-                    // Invoke.
-                    llvm_invoke_external(s, fname, builder.getVoidTy(), args,
-                                         {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
-
-                    // Update rem and start_idx.
-                    rem -= cur_size;
-                    start_idx += cur_size;
-                }
+                parallel_segment_diff(pfptrs);
             }
         } else {
+            // For each block in each segment, compute the derivatives
+            // of order cur_order serially.
             for (const auto &map : f_maps) {
                 for (const auto &p : map) {
-                    // The LLVM function for the computation of the
-                    // derivative in compact mode.
-                    const auto &func = p.first;
-
-                    // The number of func calls.
-                    const auto ncalls = p.second.first;
-
-                    // The generators for the arguments of func.
-                    const auto &gens = p.second.second;
-
-                    assert(ncalls > 0u);
-                    assert(!gens.empty());
-                    assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-
-                    // Loop over the number of calls.
-                    llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                        // Create the u variable index from the first generator.
-                        auto u_idx = gens[0](cur_call_idx);
-
-                        // Initialise the vector of arguments with which func must be called. The following
-                        // initial arguments are always present:
-                        // - current Taylor order,
-                        // - u index of the variable,
-                        // - array of derivatives,
-                        // - pointer to the param values,
-                        // - pointer to the time value(s).
-                        std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
-
-                        // Create the other arguments via the generators.
-                        for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                            args.push_back(gens[i](cur_call_idx));
-                        }
-
-                        // Calculate the derivative and store the result.
-                        taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
-                    });
+                    block_diff(p.first, p.second.first, p.second.second, cur_order);
                 }
             }
         }
@@ -1537,49 +1545,53 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // correspond to u variables in the decomposition, we will have to compute the
     // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
     // have been properly computed.
+    if (max_svf_idx >= n_eq) {
+        // Monitor the starting index of the current
+        // segment while iterating on the segments.
+        auto cur_start_u_idx = n_eq;
 
-    // Monitor the starting index of the current
-    // segment while iterating on f_maps.
-    auto cur_start_u_idx = n_eq;
+        if (parallel_mode) {
+            // Store the derivative order in the global struct.
+            builder.CreateStore(
+                builder.getInt32(order),
+                builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
 
-    // NOTE: this is a slight repetition of compute_u_diffs() with minor modifications.
-    for (const auto &map : f_maps) {
-        if (cur_start_u_idx > max_svf_idx) {
-            // We computed all the necessary derivatives, break out.
-            // NOTE: if we did not have sv_funcs to begin with,
-            // max_svf_idx is zero and we exit at the first iteration
-            // without doing anything. If all sv funcs alias state variables,
-            // then max_svf_idx < n_eq and thus we also exit immediately
-            // at the first iteration.
-            break;
-        }
-
-        for (const auto &p : map) {
-            const auto &func = p.first;
-            const auto ncalls = p.second.first;
-            const auto &gens = p.second.second;
-
-            assert(ncalls > 0u);
-            assert(!gens.empty());
-            assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-
-            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                auto u_idx = gens[0](cur_call_idx);
-
-                std::vector<llvm::Value *> args{builder.getInt32(order), u_idx, diff_arr, par_ptr, time_ptr};
-
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
+            for (decltype(f_maps.size()) i = 0; i < f_maps.size(); ++i) {
+                if (cur_start_u_idx > max_svf_idx) {
+                    // We computed all the necessary derivatives, break out.
+                    break;
                 }
 
-                taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
-                                    builder.CreateCall(func, args));
-            });
+                // Compute the derivatives for the current segment.
+                parallel_segment_diff(par_funcs_ptrs[i]);
 
-            // Update cur_start_u_idx taking advantage of the fact
-            // that each block in a segment processes the derivatives
-            // of exactly ncalls u variables.
-            cur_start_u_idx += ncalls;
+                // Update cur_start_u_idx, taking advantage of the fact
+                // that each block in a segment processes the derivatives
+                // of exactly ncalls u variables.
+                for (const auto &p : f_maps[i]) {
+                    const auto ncalls = p.second.first;
+                    cur_start_u_idx += ncalls;
+                }
+            }
+        } else {
+            for (const auto &map : f_maps) {
+                if (cur_start_u_idx > max_svf_idx) {
+                    // We computed all the necessary derivatives, break out.
+                    break;
+                }
+
+                // Compute the derivatives of all the blocks in the segment.
+                for (const auto &p : map) {
+                    const auto ncalls = p.second.first;
+
+                    block_diff(p.first, ncalls, p.second.second, builder.getInt32(order));
+
+                    // Update cur_start_u_idx taking advantage of the fact
+                    // that each block in a segment processes the derivatives
+                    // of exactly ncalls u variables.
+                    cur_start_u_idx += ncalls;
+                }
+            }
         }
     }
 
