@@ -97,7 +97,7 @@ TEST_CASE("parallel consistency")
         t_grid.push_back(i * .5);
     }
 
-    for (auto opt_level : {0, 1, 2, 3}) {
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
         taylor_adaptive<double> ta_serial{sys, ic, kw::opt_level = opt_level, kw::compact_mode = true,
                                           kw::nt_events = evs};
 
