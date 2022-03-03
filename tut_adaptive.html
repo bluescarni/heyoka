@@ -161,6 +161,11 @@
      Ensemble propagations
     </a>
    </li>
+   <li class="toctree-l2">
+    <a class="reference internal" href="tut_parallel_mode.html">
+     Parallel mode
+    </a>
+   </li>
   </ul>
  </li>
  <li class="toctree-l1">
@@ -377,7 +382,7 @@ of ODEs and a set of initial conditions (plus a number of optional configuration
 with - hopefully - sensible defaults). Member functions are provided to
 propagate in time the state of the system, either step-by-step or by specifying
 time limits.</p>
-<p>Let’s see how we can use <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> to integrate the ODE
+<p>Let us see how we can use <code class="docutils literal notranslate"><span class="pre">taylor_adaptive</span></code> to integrate the ODE
 system of the <a class="reference external" href="https://en.wikipedia.org/wiki/Pendulum_(mathematics)">simple pendulum</a>,</p>
 <div class="math notranslate nohighlight">
 \[\begin{split}\begin{cases}
@@ -416,7 +421,7 @@ will be carried out in double precision.</p>
 <p>As (mandatory) construction arguments, we pass in the system of
 differential equations using the syntax <code class="docutils literal notranslate"><span class="pre">prime(x)</span> <span class="pre">=</span> <span class="pre">...</span></code>, and a set
 of initial conditions for <code class="docutils literal notranslate"><span class="pre">x</span></code> and <code class="docutils literal notranslate"><span class="pre">v</span></code> respectively.</p>
-<p>Let’s try to print to screen the integrator object:</p>
+<p>Let us try to print to screen the integrator object:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ta</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="sc">&#39;\n&#39;</span><span class="p">;</span><span class="w"></span>
 </pre></div>
 </div>
@@ -437,7 +442,7 @@ functions. Note also how, by default, the time variable is initially set to zero
 </div>
 <div class="section" id="single-timestep">
 <h2>Single timestep<a class="headerlink" href="#single-timestep" title="Permalink to this headline">¶</a></h2>
-<p>Let’s now try to perform a single integration timestep:</p>
+<p>Let us now try to perform a single integration timestep:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Perform a single step.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">oc</span><span class="p">,</span><span class="w"> </span><span class="n">h</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">step</span><span class="p">();</span><span class="w"></span>
 
@@ -553,7 +558,7 @@ These functions are called <code class="docutils literal notranslate"><span clas
 <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code>: the former integrates
 the system for a specified amount of time, the latter
 propagates the state up to a specified epoch.</p>
-<p>Let’s see a couple of usage examples:</p>
+<p>Let us see a couple of usage examples:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Propagate for 5 time units.</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">min_h</span><span class="p">,</span><span class="w"> </span><span class="n">max_h</span><span class="p">,</span><span class="w"> </span><span class="n">nsteps</span><span class="p">,</span><span class="w"> </span><span class="n">_1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ta</span><span class="p">.</span><span class="n">propagate_for</span><span class="p">(</span><span class="mf">5.</span><span class="p">);</span><span class="w"></span>
 
@@ -589,8 +594,8 @@ propagates the state up to a specified epoch.</p>
 <p>The time-limited propagation functions return
 a tuple of 5 values, which represent, respectively:</p>
 <ul class="simple">
-<li><p>the outcome of the integration (which will always be
-<code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>, unless error conditions arise),</p></li>
+<li><p>the outcome of the integration (which will usually be
+<code class="docutils literal notranslate"><span class="pre">taylor_outcome::time_limit</span></code>),</p></li>
 <li><p>the minimum and maximum integration timesteps
 that were used in the propagation,</p></li>
 <li><p>the total number of steps that were taken,</p></li>
@@ -660,7 +665,7 @@ than the typical timestep size, this can be noticeably more efficient than
 repeatedly calling <code class="docutils literal notranslate"><span class="pre">propagate_until()</span></code> on the grid points, because
 propagating the system state via dense output is much faster than taking
 a full integration step.</p>
-<p>Let’s see a simple usage example:</p>
+<p>Let us see a simple usage example:</p>
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="w">    </span><span class="c1">// Reset the time and state to the initial values.</span>
 <span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">set_time</span><span class="p">(</span><span class="mf">0.</span><span class="p">);</span><span class="w"></span>
 <span class="w">    </span><span class="n">ta</span><span class="p">.</span><span class="n">get_state_data</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.05</span><span class="p">;</span><span class="w"></span>

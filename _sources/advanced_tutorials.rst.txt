@@ -19,7 +19,7 @@ to `NumPy <https://numpy.org/>`__ for working with multidimensional arrays.
 It is outside the scope of this document to give a full overview on xtensor's
 API and capabilities. Here, however, we will use only some of xtensor's most basic
 features, and, for a reader familiar with NumPy and its multidimensional array API,
-the tutorials should not be too hard to follow.
+the tutorials should not be hard to follow.
 
 .. toctree::
   :maxdepth: 1
@@ -27,3 +27,4 @@ the tutorials should not be too hard to follow.
   tut_batch_mode
   tut_s11n
   tut_ensemble
+  tut_parallel_mode
