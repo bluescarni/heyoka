@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <initializer_list>
 #include <ios>
 #include <iterator>
@@ -34,6 +35,15 @@
 
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/numeric/conversion/cast.hpp>
+#include <boost/preprocessor/arithmetic/add.hpp>
+#include <boost/preprocessor/arithmetic/sub.hpp>
+#include <boost/preprocessor/control/if.hpp>
+#include <boost/preprocessor/repetition/enum_params.hpp>
+#include <boost/preprocessor/repetition/repeat_from_to.hpp>
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_invoke.h>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -2967,3 +2977,57 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::r
 #endif
 
 } // namespace heyoka
+
+// NOTE: this is the worker function that is invoked to compute
+// in parallel all the derivatives of a block in parallel mode.
+extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_looper(std::uint32_t ncalls,
+                                                       void (*fptr)(std::uint32_t, std::uint32_t) noexcept) noexcept
+{
+    try {
+        oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(0, ncalls),
+                                  [fptr](const auto &range) { fptr(range.begin(), range.end()); });
+        // LCOV_EXCL_START
+    } catch (const std::exception &ex) {
+        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode looper: {}", ex.what());
+    } catch (...) {
+        heyoka::detail::get_logger()->critical("Exception caught in the parallel mode looper");
+    }
+    // LCOV_EXCL_STOP
+}
+
+namespace heyoka::detail
+{
+
+namespace
+{
+
+// NOTE: use typedef to minimise issues
+// when mucking around with the preprocessor.
+using par_f_ptr = void (*)() noexcept;
+
+} // namespace
+
+} // namespace heyoka::detail
+
+// NOTE: this is the parallel invoker that gets called from LLVM
+// to run multiple parallel workers within a segment at the same time, i.e.,
+// to process multiple blocks within a segment concurrently.
+// We need to generate multiple instantiatiation of this function
+// up to the limit HEYOKA_CM_PAR_MAX_INVOKE_N defined in config.hpp.
+
+#define HEYOKA_CM_PAR_INVOKE(_0, N, _1)                                                                                \
+    extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_invoke_##N(                                                        \
+        BOOST_PP_ENUM_PARAMS(N, heyoka::detail::par_f_ptr f)) noexcept                                                 \
+    {                                                                                                                  \
+        try {                                                                                                          \
+            BOOST_PP_IF(BOOST_PP_SUB(N, 1), oneapi::tbb::parallel_invoke(BOOST_PP_ENUM_PARAMS(N, f)), f0());           \
+        } catch (const std::exception &ex) {                                                                           \
+            heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker: {}", ex.what());    \
+        } catch (...) {                                                                                                \
+            heyoka::detail::get_logger()->critical("Exception caught in the parallel mode invoker");                   \
+        }                                                                                                              \
+    }
+
+BOOST_PP_REPEAT_FROM_TO(1, BOOST_PP_ADD(HEYOKA_CM_PAR_MAX_INVOKE_N, 1), HEYOKA_CM_PAR_INVOKE, _0)
+
+#undef HEYOKA_CM_PAR_INVOKE

@@ -750,6 +750,8 @@ llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
 // Helper to invoke an external function on a vector argument.
 // The function will be called on each element of the vector separately,
 // and the return will be re-assembled as a vector.
+// NOTE: there are some assumptions about valid function attributes
+// in this implementation.
 llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string &fname)
 {
     assert(arg != nullptr);
@@ -778,6 +780,8 @@ llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string 
 // Helper to invoke an external function on 2 vector arguments.
 // The function will be called on each elements of the vectors separately,
 // and the return will be re-assembled as a vector.
+// NOTE: there are some assumptions about valid function attributes
+// in this implementation.
 llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg0, llvm::Value *arg1, const std::string &fname)
 {
     assert(arg0 != nullptr);

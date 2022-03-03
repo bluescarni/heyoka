@@ -43,6 +43,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -1221,7 +1222,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                                              llvm::Value *time_ptr, const taylor_dc_t &dc,
                                              const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                                              std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size,
-                                             bool high_accuracy)
+                                             bool high_accuracy, bool parallel_mode)
 {
     auto &builder = s.builder();
 
@@ -1287,10 +1288,48 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(0), cur_var_idx, vec);
     });
 
-    // Helper to compute and store the derivatives of order cur_order
-    // of the u variables which are not state variables.
-    auto compute_u_diffs = [&](llvm::Value *cur_order) {
+    // NOTE: these are used only in parallel mode.
+    std::vector<std::vector<llvm::AllocaInst *>> par_funcs_ptrs;
+    llvm::Value *gl_par_data = nullptr;
+    llvm::Type *par_data_t = nullptr;
+
+    if (parallel_mode) {
+        auto &md = s.module();
+        auto &context = s.context();
+
+        // Fetch the LLVM version of T *.
+        auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
+
+        // NOTE: we will use a global variable with these fields:
+        //
+        // - int32 (current Taylor order),
+        // - T * (pointer to the runtime parameters),
+        // - T * (pointer to the time coordinate(s)),
+        //
+        // to pass the data necessary to the parallel workers.
+        par_data_t = llvm::StructType::get(context, {builder.getInt32Ty(), scal_ptr_t, scal_ptr_t});
+        gl_par_data = new llvm::GlobalVariable(md, par_data_t, false, llvm::GlobalVariable::InternalLinkage,
+                                               llvm::ConstantAggregateZero::get(par_data_t));
+
+        // Write the par/time pointers into the global struct (unlike the current order, this needs
+        // to be done only once).
+        assert(llvm_depr_GEP_type_check(gl_par_data, par_data_t)); // LCOV_EXCL_LINE
+        builder.CreateStore(
+            par_ptr, builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(1)}));
+        builder.CreateStore(
+            time_ptr, builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(2)}));
+
+        // Fetch the function types for the parallel worker and the wrapper.
+        auto *worker_t
+            = llvm::FunctionType::get(builder.getVoidTy(), {builder.getInt32Ty(), builder.getInt32Ty()}, false);
+        assert(worker_t != nullptr); // LCOV_EXCL_LINE
+
+        auto *wrapper_t = llvm::FunctionType::get(builder.getVoidTy(), {}, false);
+        assert(wrapper_t != nullptr); // LCOV_EXCL_LINE
+
         for (const auto &map : f_maps) {
+            par_funcs_ptrs.emplace_back();
+
             for (const auto &p : map) {
                 // The LLVM function for the computation of the
                 // derivative in compact mode.
@@ -1302,12 +1341,33 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 // The generators for the arguments of func.
                 const auto &gens = p.second.second;
 
-                assert(ncalls > 0u);
-                assert(!gens.empty());
-                assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+                // Fetch the current insertion block.
+                auto *orig_bb = builder.GetInsertBlock();
 
-                // Loop over the number of calls.
-                llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                // Create the worker function.
+                auto *worker = llvm::Function::Create(worker_t, llvm::Function::InternalLinkage, "", &md);
+                assert(worker != nullptr); // LCOV_EXCL_LINE
+
+                // Fetch the function arguments.
+                auto *b_idx = worker->args().begin();
+                auto *e_idx = worker->args().begin() + 1;
+
+                // Create a new basic block to start insertion into.
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", worker));
+
+                // Load the order and par/time pointers from the global variable.
+                auto cur_order = builder.CreateLoad(
+                    builder.getInt32Ty(),
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
+                auto par_arg = builder.CreateLoad(
+                    scal_ptr_t,
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(1)}));
+                auto time_arg = builder.CreateLoad(
+                    scal_ptr_t,
+                    builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(2)}));
+
+                // Iterate over the range.
+                llvm_loop_u32(s, b_idx, e_idx, [&](llvm::Value *cur_call_idx) {
                     // Create the u variable index from the first generator.
                     auto u_idx = gens[0](cur_call_idx);
 
@@ -1318,7 +1378,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // - array of derivatives,
                     // - pointer to the param values,
                     // - pointer to the time value(s).
-                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+                    std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_arg, time_arg};
 
                     // Create the other arguments via the generators.
                     for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
@@ -1328,6 +1388,136 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     // Calculate the derivative and store the result.
                     taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
                 });
+
+                // Return.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(worker);
+
+                // Create the wrapper function. This will execute multiple calls
+                // to the worker in parallel, until the entire range [0, ncalls) has
+                // been consumed.
+                auto *wrapper = llvm::Function::Create(wrapper_t, llvm::Function::InternalLinkage, "", &md);
+                assert(wrapper != nullptr); // LCOV_EXCL_LINE
+
+                // Create a new basic block to start insertion into.
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", wrapper));
+
+                // Invoke the parallel looper.
+                llvm_invoke_external(s, "heyoka_cm_par_looper", builder.getVoidTy(), {builder.getInt32(ncalls), worker},
+                                     {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+                // Return.
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(wrapper);
+
+                // Restore the original insertion block.
+                builder.SetInsertPoint(orig_bb);
+
+                // Add a pointer to the wrapper to par_funcs_ptrs.
+                auto f_ptr = builder.CreateAlloca(wrapper->getType());
+                builder.CreateStore(wrapper, f_ptr);
+                par_funcs_ptrs.back().push_back(f_ptr);
+            }
+        }
+    }
+
+    // Helper to compute the Taylor derivatives for a block.
+    // func is the LLVM function for the computation of the Taylor derivative in the block,
+    // ncalls the number of times it must be called, gens the generators for the
+    // function arguments and cur_order the order of the derivative.
+    auto block_diff = [&](const auto &func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
+        // LCOV_EXCL_START
+        assert(ncalls > 0u);
+        assert(!gens.empty());
+        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        // LCOV_EXCL_STOP
+
+        // Loop over the number of calls.
+        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+            // Create the u variable index from the first generator.
+            auto u_idx = gens[0](cur_call_idx);
+
+            // Initialise the vector of arguments with which func must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u index of the variable,
+            // - array of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+
+            // Create the other arguments via the generators.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gens[i](cur_call_idx));
+            }
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+        });
+    };
+
+    // Helper to compute concurrently all the derivatives
+    // in a segment using the parallel wrappers.
+    auto parallel_segment_diff = [&](const auto &pfptrs) {
+        assert(!pfptrs.empty()); // LCOV_EXCL_LINE
+
+        // NOTE: we can invoke in parallel only up to a fixed number
+        // of wrappers. Thus, we process them in chunks.
+
+        // The remaining number of wrappers to invoke.
+        auto rem = pfptrs.size();
+
+        // Starting index in pfptrs.
+        decltype(rem) start_idx = 0;
+
+        while (rem != 0u) {
+            // Current chunk size.
+            const auto cur_size = std::min(static_cast<decltype(rem)>(HEYOKA_CM_PAR_MAX_INVOKE_N), rem);
+
+            // Setup the function name.
+            const auto fname = fmt::format("heyoka_cm_par_invoke_{}", cur_size);
+
+            // Setup the function arguments.
+            std::vector<llvm::Value *> args;
+            for (auto i = start_idx; i < start_idx + cur_size; ++i) {
+                assert(i < pfptrs.size()); // LCOV_EXCL_LINE
+                auto *ptr = pfptrs[i];
+                args.push_back(builder.CreateLoad(ptr->getAllocatedType(), ptr));
+            }
+
+            // Invoke.
+            llvm_invoke_external(s, fname, builder.getVoidTy(), args,
+                                 {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
+
+            // Update rem and start_idx.
+            rem -= cur_size;
+            start_idx += cur_size;
+        }
+    };
+
+    // Helper to compute and store the derivatives of order cur_order
+    // of the u variables which are not state variables.
+    auto compute_u_diffs = [&](llvm::Value *cur_order) {
+        if (parallel_mode) {
+            // Store the current order in the global struct.
+            builder.CreateStore(cur_order, builder.CreateInBoundsGEP(par_data_t, gl_par_data,
+                                                                     {builder.getInt32(0), builder.getInt32(0)}));
+
+            // For each segment, invoke the wrapper functions concurrently.
+            for (const auto &pfptrs : par_funcs_ptrs) {
+                parallel_segment_diff(pfptrs);
+            }
+        } else {
+            // For each block in each segment, compute the derivatives
+            // of order cur_order serially.
+            for (const auto &map : f_maps) {
+                for (const auto &p : map) {
+                    block_diff(p.first, p.second.first, p.second.second, cur_order);
+                }
             }
         }
     };
@@ -1352,49 +1542,53 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // correspond to u variables in the decomposition, we will have to compute the
     // last-order derivatives of the u variables until we are sure all sv_funcs derivatives
     // have been properly computed.
+    if (max_svf_idx >= n_eq) {
+        // Monitor the starting index of the current
+        // segment while iterating on the segments.
+        auto cur_start_u_idx = n_eq;
 
-    // Monitor the starting index of the current
-    // segment while iterating on f_maps.
-    auto cur_start_u_idx = n_eq;
+        if (parallel_mode) {
+            // Store the derivative order in the global struct.
+            builder.CreateStore(
+                builder.getInt32(order),
+                builder.CreateInBoundsGEP(par_data_t, gl_par_data, {builder.getInt32(0), builder.getInt32(0)}));
 
-    // NOTE: this is a slight repetition of compute_u_diffs() with minor modifications.
-    for (const auto &map : f_maps) {
-        if (cur_start_u_idx > max_svf_idx) {
-            // We computed all the necessary derivatives, break out.
-            // NOTE: if we did not have sv_funcs to begin with,
-            // max_svf_idx is zero and we exit at the first iteration
-            // without doing anything. If all sv funcs alias state variables,
-            // then max_svf_idx < n_eq and thus we also exit immediately
-            // at the first iteration.
-            break;
-        }
-
-        for (const auto &p : map) {
-            const auto &func = p.first;
-            const auto ncalls = p.second.first;
-            const auto &gens = p.second.second;
-
-            assert(ncalls > 0u);
-            assert(!gens.empty());
-            assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-
-            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                auto u_idx = gens[0](cur_call_idx);
-
-                std::vector<llvm::Value *> args{builder.getInt32(order), u_idx, diff_arr, par_ptr, time_ptr};
-
-                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                    args.push_back(gens[i](cur_call_idx));
+            for (decltype(f_maps.size()) i = 0; i < f_maps.size(); ++i) {
+                if (cur_start_u_idx > max_svf_idx) {
+                    // We computed all the necessary derivatives, break out.
+                    break;
                 }
 
-                taylor_c_store_diff(s, diff_arr, n_uvars, builder.getInt32(order), u_idx,
-                                    builder.CreateCall(func, args));
-            });
+                // Compute the derivatives for the current segment.
+                parallel_segment_diff(par_funcs_ptrs[i]);
 
-            // Update cur_start_u_idx taking advantage of the fact
-            // that each block in a segment processes the derivatives
-            // of exactly ncalls u variables.
-            cur_start_u_idx += ncalls;
+                // Update cur_start_u_idx, taking advantage of the fact
+                // that each block in a segment processes the derivatives
+                // of exactly ncalls u variables.
+                for (const auto &p : f_maps[i]) {
+                    const auto ncalls = p.second.first;
+                    cur_start_u_idx += ncalls;
+                }
+            }
+        } else {
+            for (const auto &map : f_maps) {
+                if (cur_start_u_idx > max_svf_idx) {
+                    // We computed all the necessary derivatives, break out.
+                    break;
+                }
+
+                // Compute the derivatives of all the blocks in the segment.
+                for (const auto &p : map) {
+                    const auto ncalls = p.second.first;
+
+                    block_diff(p.first, ncalls, p.second.second, builder.getInt32(order));
+
+                    // Update cur_start_u_idx taking advantage of the fact
+                    // that each block in a segment processes the derivatives
+                    // of exactly ncalls u variables.
+                    cur_start_u_idx += ncalls;
+                }
+            }
         }
     }
 
@@ -1464,7 +1658,7 @@ std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llvm::Value *time_ptr,
                    const taylor_dc_t &dc, const std::vector<std::uint32_t> &sv_funcs_dc, std::uint32_t n_eq,
                    std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size, bool compact_mode,
-                   bool high_accuracy)
+                   bool high_accuracy, bool parallel_mode)
 {
     assert(batch_size > 0u);
     assert(n_eq > 0u);
@@ -1502,7 +1696,7 @@ taylor_compute_jet(llvm_state &s, llvm::Value *order0, llvm::Value *par_ptr, llv
         // LCOV_EXCL_STOP
 
         return taylor_compute_jet_compact_mode<T>(s, order0, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                                  batch_size, high_accuracy);
+                                                  batch_size, high_accuracy, parallel_mode);
     } else {
         // Log the runtime of IR construction in trace mode.
         spdlog::stopwatch sw;
@@ -1728,7 +1922,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 template <typename T, typename U>
 auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name, const U &sys, T tol,
                                           std::uint32_t batch_size, bool, bool compact_mode,
-                                          const std::vector<expression> &evs, bool high_accuracy)
+                                          const std::vector<expression> &evs, bool high_accuracy, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -1820,7 +2014,7 @@ auto taylor_add_adaptive_step_with_events(llvm_state &s, const std::string &name
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, ev_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy);
+                                              batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, ev_dc, svf_ptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -2041,7 +2235,7 @@ taylor_run_ceval(llvm_state &s, const std::variant<llvm::Value *, std::vector<ll
 // NOTE: document this eventually.
 template <typename T, typename U>
 auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &sys, T tol, std::uint32_t batch_size,
-                              bool high_accuracy, bool compact_mode)
+                              bool high_accuracy, bool compact_mode, bool parallel_mode)
 {
     using std::isfinite;
 
@@ -2124,7 +2318,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
 
     // Compute the jet of derivatives at the given order.
     auto diff_variant = taylor_compute_jet<T>(s, state_ptr, par_ptr, time_ptr, dc, {}, n_eq, n_uvars, order, batch_size,
-                                              compact_mode, high_accuracy);
+                                              compact_mode, high_accuracy, parallel_mode);
 
     // Determine the integration timestep.
     auto h = taylor_determine_h<T>(s, diff_variant, sv_funcs_dc, nullptr, h_ptr, n_eq, n_uvars, order, batch_size,
@@ -2200,7 +2394,7 @@ template <typename T>
 template <typename U>
 void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, T time, T tol, bool high_accuracy,
                                                  bool compact_mode, std::vector<T> pars, std::vector<t_event_t> tes,
-                                                 std::vector<nt_event_t> ntes)
+                                                 std::vector<nt_event_t> ntes, bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -2242,6 +2436,10 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
                 tol));
     }
 
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
+    }
+
     // Store the tolerance.
     m_tol = tol;
 
@@ -2268,10 +2466,11 @@ void taylor_adaptive_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> st
             ee.push_back(ev.get_expression());
         }
 
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(m_llvm, "step_e", sys, tol, 1, high_accuracy,
-                                                                          compact_mode, ee, high_accuracy);
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
+            m_llvm, "step_e", sys, tol, 1, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode);
+        std::tie(m_dc, m_order)
+            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, 1, high_accuracy, compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
@@ -3270,23 +3469,23 @@ template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<double>::finalise_ctor_impl
                                                                                  std::vector<double>, double, double,
                                                                                  bool, bool, std::vector<double>,
                                                                                  std::vector<t_event_t>,
-                                                                                 std::vector<nt_event_t>);
+                                                                                 std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<double>::finalise_ctor_impl(const std::vector<std::pair<expression, expression>> &,
                                                  std::vector<double>, double, double, bool, bool, std::vector<double>,
-                                                 std::vector<t_event_t>, std::vector<nt_event_t>);
+                                                 std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void
 taylor_adaptive_impl<long double>::finalise_ctor_impl(const std::vector<expression> &, std::vector<long double>,
                                                       long double, long double, bool, bool, std::vector<long double>,
-                                                      std::vector<t_event_t>, std::vector<nt_event_t>);
+                                                      std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, long double, long double, bool,
-    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -3294,11 +3493,11 @@ template class taylor_adaptive_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, mppp::real128, mppp::real128, bool, bool,
-    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, mppp::real128, mppp::real128,
-    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 #endif
 
@@ -3312,7 +3511,8 @@ template <typename U>
 void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector<T> state, std::uint32_t batch_size,
                                                        std::vector<T> time, T tol, bool high_accuracy,
                                                        bool compact_mode, std::vector<T> pars,
-                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes)
+                                                       std::vector<t_event_t> tes, std::vector<nt_event_t> ntes,
+                                                       bool parallel_mode)
 {
 #if defined(HEYOKA_ARCH_PPC)
     if constexpr (std::is_same_v<T, long double>) {
@@ -3374,6 +3574,10 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
                 tol));
     }
 
+    if (parallel_mode && !compact_mode) {
+        throw std::invalid_argument("Parallel mode can be activated only in conjunction with compact mode");
+    }
+
     // Store the tolerance.
     m_tol = tol;
 
@@ -3401,10 +3605,10 @@ void taylor_adaptive_batch_impl<T>::finalise_ctor_impl(const U &sys, std::vector
         }
 
         std::tie(m_dc, m_order) = taylor_add_adaptive_step_with_events<T>(
-            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy);
+            m_llvm, "step_e", sys, tol, batch_size, high_accuracy, compact_mode, ee, high_accuracy, parallel_mode);
     } else {
-        std::tie(m_dc, m_order)
-            = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy, compact_mode);
+        std::tie(m_dc, m_order) = taylor_add_adaptive_step<T>(m_llvm, "step", sys, tol, batch_size, high_accuracy,
+                                                              compact_mode, parallel_mode);
     }
 
     // Fix m_pars' size, if necessary.
@@ -4996,22 +5200,22 @@ template class taylor_adaptive_batch_impl<double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<double>, std::uint32_t, std::vector<double>, double, bool, bool,
-    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<double>, std::uint32_t, std::vector<double>,
-    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    double, bool, bool, std::vector<double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template class taylor_adaptive_batch_impl<long double>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<long double>, std::uint32_t, std::vector<long double>, long double,
-    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    bool, bool, std::vector<long double>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<long double>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<long double>, std::uint32_t,
     std::vector<long double>, long double, bool, bool, std::vector<long double>, std::vector<t_event_t>,
-    std::vector<nt_event_t>);
+    std::vector<nt_event_t>, bool);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -5019,12 +5223,12 @@ template class taylor_adaptive_batch_impl<mppp::real128>;
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<expression> &, std::vector<mppp::real128>, std::uint32_t, std::vector<mppp::real128>,
-    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>);
+    mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>, std::vector<nt_event_t>, bool);
 
 template HEYOKA_DLL_PUBLIC void taylor_adaptive_batch_impl<mppp::real128>::finalise_ctor_impl(
     const std::vector<std::pair<expression, expression>> &, std::vector<mppp::real128>, std::uint32_t,
     std::vector<mppp::real128>, mppp::real128, bool, bool, std::vector<mppp::real128>, std::vector<t_event_t>,
-    std::vector<nt_event_t>);
+    std::vector<nt_event_t>, bool);
 
 #endif
 
@@ -5047,7 +5251,7 @@ namespace
 template <typename T, typename U>
 auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, std::uint32_t order,
                          std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                         const std::vector<expression> &sv_funcs)
+                         const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     if (s.is_compiled()) {
         throw std::invalid_argument("A function for the computation of the jet of Taylor derivatives cannot be added "
@@ -5130,7 +5334,7 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
     // Compute the jet of derivatives.
     auto diff_variant = taylor_compute_jet<T>(s, in_out, par_ptr, time_ptr, dc, sv_funcs_dc, n_eq, n_uvars, order,
-                                              batch_size, compact_mode, high_accuracy);
+                                              batch_size, compact_mode, high_accuracy, parallel_mode);
 
     // Write the derivatives to in_out.
     // NOTE: overflow checking. We need to be able to index into the jet array
@@ -5287,27 +5491,28 @@ auto taylor_add_jet_impl(llvm_state &s, const std::string &name, const U &sys, s
 
 taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs)
+                               const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                               parallel_mode);
 }
 
 taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs);
+                                                    sv_funcs, parallel_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const std::vector<expression> &sys,
                                 std::uint32_t order, std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs);
+                                                      sv_funcs, parallel_mode);
 }
 
 #endif
@@ -5315,18 +5520,19 @@ taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name, const st
 taylor_dc_t taylor_add_jet_dbl(llvm_state &s, const std::string &name,
                                const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                               const std::vector<expression> &sv_funcs)
+                               const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
-    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs);
+    return detail::taylor_add_jet_impl<double>(s, name, sys, order, batch_size, high_accuracy, compact_mode, sv_funcs,
+                                               parallel_mode);
 }
 
 taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
                                 const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<long double>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                    sv_funcs);
+                                                    sv_funcs, parallel_mode);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -5334,10 +5540,10 @@ taylor_dc_t taylor_add_jet_ldbl(llvm_state &s, const std::string &name,
 taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
                                 const std::vector<std::pair<expression, expression>> &sys, std::uint32_t order,
                                 std::uint32_t batch_size, bool high_accuracy, bool compact_mode,
-                                const std::vector<expression> &sv_funcs)
+                                const std::vector<expression> &sv_funcs, bool parallel_mode)
 {
     return detail::taylor_add_jet_impl<mppp::real128>(s, name, sys, order, batch_size, high_accuracy, compact_mode,
-                                                      sv_funcs);
+                                                      sv_funcs, parallel_mode);
 }
 
 #endif
