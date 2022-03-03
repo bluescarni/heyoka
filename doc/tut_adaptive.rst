@@ -10,7 +10,7 @@ with - hopefully - sensible defaults). Member functions are provided to
 propagate in time the state of the system, either step-by-step or by specifying
 time limits.
 
-Let's see how we can use ``taylor_adaptive`` to integrate the ODE
+Let us see how we can use ``taylor_adaptive`` to integrate the ODE
 system of the `simple pendulum <https://en.wikipedia.org/wiki/Pendulum_(mathematics)>`__,
 
 .. math::
@@ -49,7 +49,7 @@ As (mandatory) construction arguments, we pass in the system of
 differential equations using the syntax ``prime(x) = ...``, and a set
 of initial conditions for ``x`` and ``v`` respectively.
 
-Let's try to print to screen the integrator object:
+Let us try to print to screen the integrator object:
 
 .. literalinclude:: ../tutorial/adaptive_basic.cpp
    :language: c++
@@ -75,7 +75,7 @@ functions. Note also how, by default, the time variable is initially set to zero
 Single timestep
 ---------------
 
-Let's now try to perform a single integration timestep:
+Let us now try to perform a single integration timestep:
 
 .. literalinclude:: ../tutorial/adaptive_basic.cpp
    :language: c++
@@ -174,7 +174,7 @@ These functions are called ``propagate_for()`` and
 the system for a specified amount of time, the latter
 propagates the state up to a specified epoch.
 
-Let's see a couple of usage examples:
+Let us see a couple of usage examples:
 
 .. literalinclude:: ../tutorial/adaptive_basic.cpp
    :language: c++
@@ -197,8 +197,8 @@ Let's see a couple of usage examples:
 The time-limited propagation functions return
 a tuple of 5 values, which represent, respectively:
 
-* the outcome of the integration (which will always be
-  ``taylor_outcome::time_limit``, unless error conditions arise),
+* the outcome of the integration (which will usually be
+  ``taylor_outcome::time_limit``),
 * the minimum and maximum integration timesteps
   that were used in the propagation,
 * the total number of steps that were taken,
@@ -263,7 +263,7 @@ repeatedly calling ``propagate_until()`` on the grid points, because
 propagating the system state via dense output is much faster than taking
 a full integration step.
 
-Let's see a simple usage example:
+Let us see a simple usage example:
 
 .. literalinclude:: ../tutorial/adaptive_basic.cpp
    :language: c++
