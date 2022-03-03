@@ -1,4 +1,4 @@
-// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 
     auto [x, v] = make_vars("x", "v");
 
-    auto ta = taylor_adaptive<double>({prime(x) = v, prime(v) = -sin(x)}, {1.3, 0}, kw::tol=1e-15);
+    auto ta = taylor_adaptive<double>({prime(x) = v, prime(v) = -sin(x)}, {1.3, 0}, kw::tol = 1e-15);
 
     auto start = std::chrono::high_resolution_clock::now();
     ta.propagate_until(10000.);

@@ -1,4 +1,4 @@
-// Copyright 2020, 2021 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
+// Copyright 2020, 2021, 2022 Francesco Biscani (bluescarni@gmail.com), Dario Izzo (dario.izzo@gmail.com)
 //
 // This file is part of the heyoka library.
 //
@@ -318,26 +318,19 @@ int main(int argc, char *argv[])
         "floating-point type")("filename", po::value<std::string>(&filename)->default_value(""),
                                "name of the file into which the simulation data will be saved (if empty, no data will "
                                "be saved)")("final_time", po::value<double>(&final_time)->default_value(1E6),
-                                            "simulation end time (in years)")("perturb",
-                                                                              po::value<double>(&perturb)
-                                                                                  ->default_value(0.),
-                                                                              "magnitude of the perturbation on the "
-                                                                              "initial state")("compact_mode",
-                                                                                               "compact mode")("tol",
-                                                                                                               po::value<
-                                                                                                                   double>(
-                                                                                                                   &tol)
-                                                                                                                   ->default_value(
-                                                                                                                       0.),
-                                                                                                               "toleran"
-                                                                                                               "ce (if "
-                                                                                                               "0, it "
-                                                                                                               "will "
-                                                                                                               "be "
-                                                                                                               "automat"
-                                                                                                               "ically "
-                                                                                                               "deduced"
-                                                                                                               ")");
+                                            "simulation end time (in years)")(
+        "perturb", po::value<double>(&perturb)->default_value(0.),
+        "magnitude of the perturbation on the "
+        "initial state")("compact_mode", "compact mode")("tol", po::value<double>(&tol)->default_value(0.),
+                                                         "toleran"
+                                                         "ce (if "
+                                                         "0, it "
+                                                         "will "
+                                                         "be "
+                                                         "automat"
+                                                         "ically "
+                                                         "deduced"
+                                                         ")");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
