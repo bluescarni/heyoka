@@ -4,6 +4,13 @@ Changelog
 0.18.0 (unreleased)
 -------------------
 
+New
+~~~
+
+- Implement :ref:`parallel mode <tut_parallel_mode>`
+  for the automatic parallelisation of an individual integration step
+  (`#237 <https://github.com/bluescarni/heyoka/pull/237>`__).
+
 Changes
 ~~~~~~~
 
