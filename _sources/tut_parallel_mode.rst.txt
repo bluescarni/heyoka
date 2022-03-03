@@ -97,3 +97,10 @@ In quadruple precision, the speedup is now :math:`\times 7.2`, which is quite cl
 These results show that parallel mode can provide an easy way of boosting the performance of heyoka's integrators
 for large ODE systems. For double-precision computations the speedup is suboptimal due to the high memory
 usage of Taylor integrators. For quadruple-precision computations, the speedup is close to optimal.
+
+Full code listing
+-----------------
+
+.. literalinclude:: ../tutorial/par_mode.cpp
+   :language: c++
+   :lines: 9-
