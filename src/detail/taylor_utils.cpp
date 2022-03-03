@@ -2978,6 +2978,8 @@ std::ostream &operator<<(std::ostream &os, const continuous_output_batch<mppp::r
 
 } // namespace heyoka
 
+// NOTE: this is the worker function that is invoked to compute
+// in parallel all the derivatives of a block in parallel mode.
 extern "C" HEYOKA_DLL_PUBLIC void heyoka_cm_par_looper(std::uint32_t ncalls,
                                                        void (*fptr)(std::uint32_t, std::uint32_t) noexcept) noexcept
 {
@@ -3008,7 +3010,8 @@ using par_f_ptr = void (*)() noexcept;
 } // namespace heyoka::detail
 
 // NOTE: this is the parallel invoker that gets called from LLVM
-// to run multiple parallel workers within a segment at the same time.
+// to run multiple parallel workers within a segment at the same time, i.e.,
+// to process multiple blocks within a segment concurrently.
 // We need to generate multiple instantiatiation of this function
 // up to the limit HEYOKA_CM_PAR_MAX_INVOKE_N defined in config.hpp.
 
