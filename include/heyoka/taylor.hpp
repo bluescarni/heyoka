@@ -12,6 +12,7 @@
 #include <heyoka/config.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -119,6 +120,26 @@ HEYOKA_DLL_PUBLIC void taylor_c_store_diff(llvm_state &, llvm::Value *, std::uin
 HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
 taylor_c_diff_func_name_args_impl(llvm::LLVMContext &, const std::string &, llvm::Type *, std::uint32_t,
                                   const std::vector<std::variant<variable, number, param>> &, std::uint32_t);
+
+std::vector<taylor_dc_t> taylor_segment_dc(const taylor_dc_t &, std::uint32_t);
+
+template <typename T>
+llvm::Value *taylor_determine_h(llvm_state &, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &,
+                                const std::vector<std::uint32_t> &, llvm::Value *, llvm::Value *, std::uint32_t,
+                                std::uint32_t, std::uint32_t, std::uint32_t, llvm::Value *);
+
+llvm::Value *taylor_c_make_sv_funcs_arr(llvm_state &, const std::vector<std::uint32_t> &);
+
+template <typename T>
+llvm::Value *taylor_compute_sv_diff(llvm_state &, const expression &, const std::vector<llvm::Value *> &, llvm::Value *,
+                                    std::uint32_t, std::uint32_t, std::uint32_t);
+
+template <typename T>
+std::pair<std::array<llvm::GlobalVariable *, 6>, bool> taylor_c_make_sv_diff_globals(llvm_state &, const taylor_dc_t &,
+                                                                                     std::uint32_t);
+
+void taylor_c_compute_sv_diffs(llvm_state &, const std::pair<std::array<llvm::GlobalVariable *, 6>, bool> &,
+                               llvm::Value *, llvm::Value *, std::uint32_t, llvm::Value *, std::uint32_t);
 
 // NOTE: this function will return a pair containing:
 //
