@@ -77,7 +77,7 @@ llvm::Value *sqrt_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return llvm_invoke_intrinsic(s, "llvm.sqrt", {args[0]->getType()}, args);
+    return llvm_invoke_intrinsic(s.builder(), "llvm.sqrt", {args[0]->getType()}, args);
 }
 
 llvm::Value *sqrt_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const

@@ -98,7 +98,7 @@ llvm::Value *cos_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
         }
     }
 
-    return llvm_invoke_intrinsic(s, "llvm.cos", {args[0]->getType()}, args);
+    return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {args[0]->getType()}, args);
 }
 
 llvm::Value *cos_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -106,7 +106,7 @@ llvm::Value *cos_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return llvm_invoke_intrinsic(s, "llvm.cos", {args[0]->getType()}, args);
+    return llvm_invoke_intrinsic(s.builder(), "llvm.cos", {args[0]->getType()}, args);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)

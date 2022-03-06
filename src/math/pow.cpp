@@ -122,7 +122,7 @@ llvm::Value *pow_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
         }
     }
 
-    auto ret = llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+    auto ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {args[0]->getType()}, args);
 
     if (allow_approx) {
         llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
@@ -139,7 +139,7 @@ llvm::Value *pow_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value
 
     const auto allow_approx = pow_allow_approx(*this);
 
-    auto ret = llvm_invoke_intrinsic(s, "llvm.pow", {args[0]->getType()}, args);
+    auto ret = llvm_invoke_intrinsic(s.builder(), "llvm.pow", {args[0]->getType()}, args);
 
     if (allow_approx) {
         llvm::cast<llvm::CallInst>(ret)->setHasApproxFunc(true);
