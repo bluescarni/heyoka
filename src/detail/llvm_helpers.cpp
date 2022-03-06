@@ -195,15 +195,15 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
     auto vector_t = make_vector_type(scal_t, vector_size);
     assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
-    // Create the output vector.
-    auto ret = static_cast<llvm::Value *>(llvm::UndefValue::get(vector_t));
+    // Create the mask (all 1s).
+    auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
 
-    // Fill it.
-    for (std::uint32_t i = 0; i < vector_size; ++i) {
-        assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
-        ret = builder.CreateInsertElement(
-            ret, builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i))), i);
-    }
+    // Create the passthrough value. This can stay undefined as it is never used
+    // due to the mask being all 1s.
+    auto passthru = llvm::UndefValue::get(vector_t);
+
+    // Invoke the intrinsic.
+    auto ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
 
     return ret;
 }
@@ -220,17 +220,17 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 
     auto scal_t = ptr->getType()->getPointerElementType();
 
-    if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         assert(scal_t == vec->getType()->getScalarType()); // LCOV_EXCL_LINE
 
         // Determine the vector size.
-        const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
-        for (std::uint32_t i = 0; i < vector_size; ++i) {
-            assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
-            builder.CreateStore(builder.CreateExtractElement(vec, i),
-                                builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i)));
-        }
+        // Create the mask (all 1s).
+        auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+
+        // Invoke the intrinsic.
+        llvm_invoke_intrinsic(builder, "llvm.masked.compressstore", {vector_t}, {vec, ptr, mask});
     } else {
         assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
 
