@@ -241,7 +241,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
             }
         }
 
-        return llvm_invoke_intrinsic(s, "llvm.pow", {x_v->getType()}, {x_v, y_v});
+        return llvm_invoke_intrinsic(s.builder(), "llvm.pow", {x_v->getType()}, {x_v, y_v});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif

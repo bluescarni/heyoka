@@ -195,15 +195,15 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
     auto vector_t = make_vector_type(scal_t, vector_size);
     assert(vector_t != nullptr); // LCOV_EXCL_LINE
 
-    // Create the output vector.
-    auto ret = static_cast<llvm::Value *>(llvm::UndefValue::get(vector_t));
+    // Create the mask (all 1s).
+    auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
 
-    // Fill it.
-    for (std::uint32_t i = 0; i < vector_size; ++i) {
-        assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
-        ret = builder.CreateInsertElement(
-            ret, builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i))), i);
-    }
+    // Create the passthrough value. This can stay undefined as it is never used
+    // due to the mask being all 1s.
+    auto passthru = llvm::UndefValue::get(vector_t);
+
+    // Invoke the intrinsic.
+    auto ret = llvm_invoke_intrinsic(builder, "llvm.masked.expandload", {vector_t}, {ptr, mask, passthru});
 
     return ret;
 }
@@ -220,17 +220,17 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
 
     auto scal_t = ptr->getType()->getPointerElementType();
 
-    if (auto v_ptr_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
+    if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(vec->getType())) {
         assert(scal_t == vec->getType()->getScalarType()); // LCOV_EXCL_LINE
 
         // Determine the vector size.
-        const auto vector_size = boost::numeric_cast<std::uint32_t>(v_ptr_t->getNumElements());
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
 
-        for (std::uint32_t i = 0; i < vector_size; ++i) {
-            assert(llvm_depr_GEP_type_check(ptr, scal_t)); // LCOV_EXCL_LINE
-            builder.CreateStore(builder.CreateExtractElement(vec, i),
-                                builder.CreateInBoundsGEP(scal_t, ptr, builder.getInt32(i)));
-        }
+        // Create the mask (all 1s).
+        auto mask = llvm::ConstantInt::get(make_vector_type(builder.getInt1Ty(), vector_size), 1u);
+
+        // Invoke the intrinsic.
+        llvm_invoke_intrinsic(builder, "llvm.masked.compressstore", {vector_t}, {vec, ptr, mask});
     } else {
         assert(scal_t == vec->getType()); // LCOV_EXCL_LINE
 
@@ -399,7 +399,7 @@ llvm::Value *pairwise_sum(ir_builder &builder, std::vector<llvm::Value *> &sum)
 
 // Helper to invoke an intrinsic function with arguments 'args'. 'types' are the argument type(s) for
 // overloaded intrinsics.
-llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const std::vector<llvm::Type *> &types,
+llvm::Value *llvm_invoke_intrinsic(ir_builder &builder, const std::string &name, const std::vector<llvm::Type *> &types,
                                    const std::vector<llvm::Value *> &args)
 {
     // Fetch the intrinsic ID from the name.
@@ -413,7 +413,8 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     // the desired argument type(s). See:
     // https://stackoverflow.com/questions/11985247/llvm-insert-intrinsic-function-cos
     // And the docs of the getDeclaration() function.
-    auto callee_f = llvm::Intrinsic::getDeclaration(&s.module(), intrinsic_ID, types);
+    assert(builder.GetInsertBlock() != nullptr); // LCOV_EXCL_LINE
+    auto callee_f = llvm::Intrinsic::getDeclaration(builder.GetInsertBlock()->getModule(), intrinsic_ID, types);
     if (callee_f == nullptr) {
         throw std::invalid_argument("Error getting the declaration of the intrinsic '{}'"_format(name));
     }
@@ -430,7 +431,7 @@ llvm::Value *llvm_invoke_intrinsic(llvm_state &s, const std::string &name, const
     }
 
     // Create the function call.
-    auto r = s.builder().CreateCall(callee_f, args);
+    auto r = builder.CreateCall(callee_f, args);
     assert(r != nullptr);
 
     return r;
@@ -893,6 +894,7 @@ void llvm_while_loop(llvm_state &s, const std::function<llvm::Value *()> &cond, 
 std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *x)
 {
     auto &context = s.context();
+    auto &builder = s.builder();
 
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector arguments.
@@ -901,7 +903,6 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
     if (x_t == llvm::Type::getFP128Ty(context)) {
         // NOTE: for __float128 we cannot use the intrinsics, we need
         // to call an external function.
-        auto &builder = s.builder();
 
         // Convert the vector argument to scalars.
         auto x_scalars = vector_to_scalars(builder, x);
@@ -962,8 +963,8 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
         }
 
         // Compute sin and cos via intrinsics.
-        auto *sin_x = llvm_invoke_intrinsic(s, "llvm.sin", {x->getType()}, {x});
-        auto *cos_x = llvm_invoke_intrinsic(s, "llvm.cos", {x->getType()}, {x});
+        auto *sin_x = llvm_invoke_intrinsic(builder, "llvm.sin", {x->getType()}, {x});
+        auto *cos_x = llvm_invoke_intrinsic(builder, "llvm.cos", {x->getType()}, {x});
 
         return {sin_x, cos_x};
 #if defined(HEYOKA_HAVE_REAL128)
@@ -982,7 +983,7 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
         return call_extern_vec(s, x_v, "fabsq");
     } else {
 #endif
-        return llvm_invoke_intrinsic(s, "llvm.fabs", {x_v->getType()}, {x_v});
+        return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x_v->getType()}, {x_v});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1005,7 +1006,7 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
     } else {
 #endif
         auto quo = builder.CreateFDiv(x, y);
-        auto fl_quo = llvm_invoke_intrinsic(s, "llvm.floor", {quo->getType()}, {quo});
+        auto fl_quo = llvm_invoke_intrinsic(builder, "llvm.floor", {quo->getType()}, {quo});
 
         return builder.CreateFSub(x, builder.CreateFMul(y, fl_quo));
 #if defined(HEYOKA_HAVE_REAL128)

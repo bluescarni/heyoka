@@ -45,7 +45,7 @@
 #include "benchmark_utils.hpp"
 
 template <typename T>
-void run_integration(const std::string &filename, T t_final, double perturb, bool compact_mode, T tol)
+void run_integration(const std::string &filename, T t_final, double perturb, bool compact_mode, T tol, unsigned seed)
 {
     using std::abs;
     using std::log10;
@@ -84,7 +84,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
 
     // Perturb the initial state.
     std::mt19937 rng;
-    rng.seed(static_cast<std::mt19937::result_type>(std::random_device()()));
+    rng.seed(static_cast<std::mt19937::result_type>(seed));
     std::uniform_real_distribution<double> rdist(-1., 1.);
     for (auto &x : init_state) {
         x += abs(x) * (rdist(rng) * perturb);
@@ -280,6 +280,7 @@ int main(int argc, char *argv[])
     std::string fp_type, filename;
     double final_time, perturb, tol;
     bool compact_mode = false;
+    unsigned seed;
 
     po::options_description desc("Options");
 
@@ -290,7 +291,8 @@ int main(int argc, char *argv[])
         "final_time", po::value<double>(&final_time)->default_value(1E6), "simulation end time (in years)")(
         "perturb", po::value<double>(&perturb)->default_value(0.),
         "magnitude of the perturbation on the initial state")("compact_mode", "compact mode")(
-        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be automatically deduced)");
+        "tol", po::value<double>(&tol)->default_value(0.), "tolerance (if 0, it will be automatically deduced)")(
+        "seed", po::value<unsigned>(&seed)->default_value(42u), "random seed");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -317,12 +319,13 @@ int main(int argc, char *argv[])
     }
 
     if (fp_type == "double") {
-        run_integration<double>(filename, final_time, perturb, compact_mode, tol);
+        run_integration<double>(filename, final_time, perturb, compact_mode, tol, seed);
     } else if (fp_type == "long double") {
-        run_integration<long double>(filename, final_time, perturb, compact_mode, tol);
+        run_integration<long double>(filename, final_time, perturb, compact_mode, tol, seed);
 #if defined(HEYOKA_HAVE_REAL128)
     } else if (fp_type == "real128") {
-        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb, compact_mode, mppp::real128{tol});
+        run_integration<mppp::real128>(filename, mppp::real128{final_time}, perturb, compact_mode, mppp::real128{tol},
+                                       seed);
 #endif
     } else {
         throw std::invalid_argument("Invalid floating-point type: '" + fp_type + "'");

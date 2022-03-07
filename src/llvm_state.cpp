@@ -37,9 +37,6 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Triple.h>
-#include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/CodeGen/TargetPassConfig.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -54,13 +51,11 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Operator.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
-#include <llvm/Pass.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
@@ -68,13 +63,44 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-#include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Vectorize.h>
 
 #if LLVM_VERSION_MAJOR == 10
 
 #include <llvm/CodeGen/CommandFlags.inc>
+
+#endif
+
+// NOTE: new pass manager API.
+#if LLVM_VERSION_MAJOR >= 13
+
+#define HEYOKA_USE_NEW_LLVM_PASS_MANAGER
+
+#endif
+
+#if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
+
+#include <llvm/Analysis/CGSCCPassManager.h>
+#include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/IR/PassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+
+#if LLVM_VERSION_MAJOR >= 14
+
+// NOTE: this header is available since LLVM 14.
+#include <llvm/Passes/OptimizationLevel.h>
+
+#endif
+
+#else
+
+#include <llvm/Analysis/TargetLibraryInfo.h>
+#include <llvm/Analysis/TargetTransformInfo.h>
+#include <llvm/CodeGen/TargetPassConfig.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/Pass.h>
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Vectorize.h>
 
 #endif
 
@@ -901,6 +927,61 @@ void llvm_state::optimise()
         // we could consider enabling 512-bit vector width
         // only in batch mode?
 
+#if defined(HEYOKA_USE_NEW_LLVM_PASS_MANAGER)
+
+        // NOTE: adapted from here:
+        // https://llvm.org/docs/NewPassManager.html
+
+        // NOTE: don't run any optimisation pass at O0.
+        if (m_opt_level > 0u) {
+            // Create the analysis managers.
+            llvm::LoopAnalysisManager LAM;
+            llvm::FunctionAnalysisManager FAM;
+            llvm::CGSCCAnalysisManager CGAM;
+            llvm::ModuleAnalysisManager MAM;
+
+            // Create the new pass manager builder, passing
+            // the native target machine from the JIT class.
+            llvm::PassBuilder PB(m_jitter->m_tm.get());
+
+            // Register all the basic analyses with the managers.
+            PB.registerModuleAnalyses(MAM);
+            PB.registerCGSCCAnalyses(CGAM);
+            PB.registerFunctionAnalyses(FAM);
+            PB.registerLoopAnalyses(LAM);
+            PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+            // Setup the optimisation level for the module pass manager.
+            // NOTE: the OptimizationLevel class has changed location
+            // since LLVM 14.
+#if LLVM_VERSION_MAJOR >= 14
+            using olevel = llvm::OptimizationLevel;
+#else
+            using olevel = llvm::PassBuilder::OptimizationLevel;
+#endif
+
+            olevel ol{};
+
+            switch (m_opt_level) {
+                case 1u:
+                    ol = olevel::O1;
+                    break;
+                case 2u:
+                    ol = olevel::O2;
+                    break;
+                default:
+                    ol = olevel::O3;
+            }
+
+            // Create the module pass manager.
+            auto MPM = PB.buildPerModuleDefaultPipeline(ol);
+
+            // Optimize the IR.
+            MPM.run(*m_module, MAM);
+        }
+
+#else
+
         // Init the module pass manager.
         auto module_pm = std::make_unique<llvm::legacy::PassManager>();
         // These are passes which set up target-specific info
@@ -954,6 +1035,7 @@ void llvm_state::optimise()
 
         // Run the module passes.
         module_pm->run(*m_module);
+#endif
     }
 }
 
