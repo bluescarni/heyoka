@@ -760,3 +760,12 @@ TEST_CASE("cartesian icrf")
         }
     }
 }
+
+TEST_CASE("vsop2013 mus")
+{
+    auto mus = get_vsop2013_mus();
+
+    REQUIRE(mus[0] == 2.9591220836841438269e-04);
+    REQUIRE(mus[3] == 8.9970116036316091182e-10);
+    REQUIRE(mus[9] == 2.1886997654259696800e-12);
+}
