@@ -62,6 +62,7 @@ inline auto vsop2013_common_opts(KwArgs &&...kw_args)
 HEYOKA_DLL_PUBLIC expression vsop2013_elliptic_impl(std::uint32_t, std::uint32_t, expression, double);
 HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_cartesian_impl(std::uint32_t, expression, double);
 HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t, expression, double);
+HEYOKA_DLL_PUBLIC std::vector<expression> vsop2013_barycentric_cartesian_icrf_impl(std::uint32_t, expression, double);
 
 } // namespace detail
 
@@ -87,6 +88,14 @@ inline std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwA
     auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
 
     return detail::vsop2013_cartesian_icrf_impl(pl_idx, std::move(time_expr), thresh);
+}
+
+template <typename... KwArgs>
+inline std::vector<expression> vsop2013_barycentric_cartesian_icrf(std::uint32_t pl_idx, KwArgs &&...kw_args)
+{
+    auto [time_expr, thresh] = detail::vsop2013_common_opts(std::forward<KwArgs>(kw_args)...);
+
+    return detail::vsop2013_barycentric_cartesian_icrf_impl(pl_idx, std::move(time_expr), thresh);
 }
 
 } // namespace heyoka

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
+#include <numeric>
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
@@ -304,6 +305,19 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     return sum(std::move(parts));
 }
 
+namespace
+{
+
+// G*M values for the planets.
+constexpr double vsop2013_gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
+                                     9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
+                                     1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
+
+// G*M value for the Sun.
+constexpr double vsop2013_gm_sun = 2.9591220836841438269e-04;
+
+} // namespace
+
 // Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates
 // are referred to the Dynamical Frame J2000.
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
@@ -353,17 +367,9 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
                          [&]() { R20 = si * som; }, [&]() { R21 = si * com; }, [&]() { v_num = sqrt_1me2 * cos_E; },
                          [&]() { v_den = sqrt(a) * (1_dbl - e * cos_E); });
 
-    // G*M values for the planets.
-    constexpr double gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
-                                9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
-                                1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
-
-    // G*M value for the Sun.
-    constexpr double gm_sun = 2.9591220836841438269e-04;
-
     // Compute the gravitational parameter for pl_idx.
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
-    const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
+    const auto mu = std::sqrt(vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u]);
 
     // Prepare the return value.
     std::vector<expression> retval(6u);
@@ -416,6 +422,56 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
         [&]() { retval[5] = std::sin(eps) * vye + std::cos(eps) * vze; });
 
     return retval;
+}
+
+std::vector<expression> vsop2013_barycentric_cartesian_icrf_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
+{
+    // Sum of all gravitational parameters (Sun and planets).
+    const auto mu_tot = vsop2013_gm_sun + std::accumulate(std::begin(vsop2013_gm_pl), std::end(vsop2013_gm_pl), 0.);
+
+    std::vector<expression> x_list(9u), y_list(9u), z_list(9u), vx_list(9u), vy_list(9u), vz_list(9u);
+
+    oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<std::uint32_t>(1, 10), [&](const auto &range) {
+        for (auto idx = range.begin(); idx != range.end(); ++idx) {
+            auto tmp = vsop2013_cartesian_icrf_impl(idx, t_expr, thresh);
+
+            x_list[idx - 1u] = std::move(tmp[0]);
+            y_list[idx - 1u] = std::move(tmp[1]);
+            z_list[idx - 1u] = std::move(tmp[2]);
+
+            vx_list[idx - 1u] = std::move(tmp[3]);
+            vy_list[idx - 1u] = std::move(tmp[4]);
+            vz_list[idx - 1u] = std::move(tmp[5]);
+        }
+    });
+
+    auto x_ret = x_list[pl_idx - 1u];
+    auto y_ret = y_list[pl_idx - 1u];
+    auto z_ret = z_list[pl_idx - 1u];
+
+    auto vx_ret = vx_list[pl_idx - 1u];
+    auto vy_ret = vy_list[pl_idx - 1u];
+    auto vz_ret = vz_list[pl_idx - 1u];
+
+    for (auto idx = 0u; idx < 9u; ++idx) {
+        x_list[idx] *= vsop2013_gm_pl[idx];
+        y_list[idx] *= vsop2013_gm_pl[idx];
+        z_list[idx] *= vsop2013_gm_pl[idx];
+
+        vx_list[idx] *= vsop2013_gm_pl[idx];
+        vy_list[idx] *= vsop2013_gm_pl[idx];
+        vz_list[idx] *= vsop2013_gm_pl[idx];
+    }
+
+    x_ret = sum(std::move(x_list)) / (-mu_tot) + x_ret;
+    y_ret = sum(std::move(y_list)) / (-mu_tot) + y_ret;
+    z_ret = sum(std::move(z_list)) / (-mu_tot) + z_ret;
+
+    vx_ret = sum(std::move(vx_list)) / (-mu_tot) + vx_ret;
+    vy_ret = sum(std::move(vy_list)) / (-mu_tot) + vy_ret;
+    vz_ret = sum(std::move(vz_list)) / (-mu_tot) + vz_ret;
+
+    return {x_ret, y_ret, z_ret, vx_ret, vy_ret, vz_ret};
 }
 
 } // namespace heyoka::detail
