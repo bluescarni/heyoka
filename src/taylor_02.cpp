@@ -80,6 +80,20 @@ using fmt::literals::operator""_format;
 
 #endif
 
+// NOTE: GCC warns about use of mismatched new/delete
+// when creating global variables. I am not sure this is
+// a real issue, as it looks like we are adopting the "canonical"
+// approach for the creation of global variables (at least
+// according to various sources online)
+// and clang is not complaining. But let us revisit
+// this issue in later LLVM versions.
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
+
+#endif
+
 namespace heyoka
 {
 
@@ -2426,3 +2440,9 @@ taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
 #endif
 
 } // namespace heyoka
+
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic pop
+
+#endif
