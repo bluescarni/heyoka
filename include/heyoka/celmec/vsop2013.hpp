@@ -9,6 +9,7 @@
 #ifndef HEYOKA_CELMEC_VSOP2013_HPP
 #define HEYOKA_CELMEC_VSOP2013_HPP
 
+#include <array>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -88,6 +89,8 @@ inline std::vector<expression> vsop2013_cartesian_icrf(std::uint32_t pl_idx, KwA
 
     return detail::vsop2013_cartesian_icrf_impl(pl_idx, std::move(time_expr), thresh);
 }
+
+HEYOKA_DLL_PUBLIC std::array<double, 10> get_vsop2013_mus();
 
 } // namespace heyoka
 

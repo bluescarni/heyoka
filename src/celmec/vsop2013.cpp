@@ -74,7 +74,10 @@ using fmt::literals::operator""_format;
 
 #endif
 
-namespace heyoka::detail
+namespace heyoka
+{
+
+namespace detail
 {
 
 namespace
@@ -304,6 +307,19 @@ expression vsop2013_elliptic_impl(std::uint32_t pl_idx, std::uint32_t var_idx, e
     return sum(std::move(parts));
 }
 
+namespace
+{
+
+// G*M values for the planets.
+constexpr double vsop2013_gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
+                                     9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
+                                     1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
+
+// G*M value for the Sun.
+constexpr double vsop2013_gm_sun = 2.9591220836841438269e-04;
+
+} // namespace
+
 // Implementation of the function constructing the VSOP2013 Cartesian series as heyoka expressions. The coordinates
 // are referred to the Dynamical Frame J2000.
 std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression t_expr, double thresh)
@@ -353,17 +369,9 @@ std::vector<expression> vsop2013_cartesian_impl(std::uint32_t pl_idx, expression
                          [&]() { R20 = si * som; }, [&]() { R21 = si * com; }, [&]() { v_num = sqrt_1me2 * cos_E; },
                          [&]() { v_den = sqrt(a) * (1_dbl - e * cos_E); });
 
-    // G*M values for the planets.
-    constexpr double gm_pl[] = {4.9125474514508118699e-11, 7.2434524861627027000e-10, 8.9970116036316091182e-10,
-                                9.5495351057792580598e-11, 2.8253458420837780000e-07, 8.4597151856806587398e-08,
-                                1.2920249167819693900e-08, 1.5243589007842762800e-08, 2.1886997654259696800e-12};
-
-    // G*M value for the Sun.
-    constexpr double gm_sun = 2.9591220836841438269e-04;
-
     // Compute the gravitational parameter for pl_idx.
     assert(pl_idx >= 1u && pl_idx <= 9u); // LCOV_EXCL_LINE
-    const auto mu = std::sqrt(gm_sun + gm_pl[pl_idx - 1u]);
+    const auto mu = std::sqrt(vsop2013_gm_sun + vsop2013_gm_pl[pl_idx - 1u]);
 
     // Prepare the return value.
     std::vector<expression> retval(6u);
@@ -418,4 +426,17 @@ std::vector<expression> vsop2013_cartesian_icrf_impl(std::uint32_t pl_idx, expre
     return retval;
 }
 
-} // namespace heyoka::detail
+} // namespace detail
+
+std::array<double, 10> get_vsop2013_mus()
+{
+    std::array<double, 10> retval;
+
+    retval[0] = heyoka::detail::vsop2013_gm_sun;
+
+    std::copy(std::begin(heyoka::detail::vsop2013_gm_pl), std::end(heyoka::detail::vsop2013_gm_pl), retval.data() + 1);
+
+    return retval;
+}
+
+} // namespace heyoka
