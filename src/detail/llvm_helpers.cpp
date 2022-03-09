@@ -37,6 +37,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Intrinsics.h>
@@ -74,6 +75,20 @@ using namespace fmt::literals;
 #else
 
 using fmt::literals::operator""_format;
+
+#endif
+
+// NOTE: GCC warns about use of mismatched new/delete
+// when creating global variables. I am not sure this is
+// a real issue, as it looks like we are adopting the "canonical"
+// approach for the creation of global variables (at least
+// according to various sources online)
+// and clang is not complaining. But let us revisit
+// this issue in later LLVM versions.
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmismatched-new-delete"
 
 #endif
 
@@ -1757,3 +1772,9 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
 {
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
+
+#if defined(__GNUC__)
+
+#pragma GCC diagnostic pop
+
+#endif
