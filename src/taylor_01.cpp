@@ -58,6 +58,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -208,7 +209,11 @@ llvm::Value *taylor_codegen_numparam_num(llvm_state &s, const number &num, std::
 
 llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Value *par_ptr, std::uint32_t batch_size)
 {
+    // LCOV_EXCL_START
     assert(batch_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
+    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
 
@@ -221,7 +226,8 @@ llvm::Value *taylor_codegen_numparam_par(llvm_state &s, const param &p, llvm::Va
     const auto arr_idx = static_cast<std::uint32_t>(p.idx() * batch_size);
 
     // Compute the pointer to load from.
-    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.getInt32(arr_idx)});
+    auto *ptr = builder.CreateInBoundsGEP(llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType(),
+                                          par_ptr, builder.getInt32(arr_idx));
 
     // Load.
     return load_vector_from_memory(builder, ptr, batch_size);
@@ -277,11 +283,18 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm:
 llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
                                             std::uint32_t batch_size)
 {
+    // LCOV_EXCL_START
+    assert(batch_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
+    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
+    // LCOV_EXCL_STOP
+
     auto &builder = s.builder();
 
     // Fetch the pointer into par_ptr.
     // NOTE: the overflow check is done in taylor_compute_jet().
-    auto *ptr = builder.CreateInBoundsGEP(par_ptr, {builder.CreateMul(p, builder.getInt32(batch_size))});
+    auto *ptr = builder.CreateInBoundsGEP(llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType(),
+                                          par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
     return load_vector_from_memory(builder, ptr, batch_size);
 }
@@ -315,7 +328,7 @@ llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint3
         = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
                                     builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
 
-    return builder.CreateLoad(ptr);
+    return builder.CreateLoad(pointee_type(diff_arr), ptr);
 }
 
 // Store the value val as the derivative of order 'order' of the u variable u_idx
@@ -1688,7 +1701,8 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     // - the pointer to the Taylor coefficients (read-only),
     // - the pointer to the h values (read-only).
     // No overlap is allowed.
-    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(to_llvm_type<T>(context)));
+    auto *fp_scal_t = to_llvm_type<T>(context);
+    std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_scal_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
     assert(ft != nullptr);
@@ -1730,10 +1744,12 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     auto *h = load_vector_from_memory(builder, h_ptr, batch_size);
 
     if (high_accuracy) {
+        auto *vector_t = make_vector_type(fp_scal_t, batch_size);
+
         // Create the array for storing the running compensations.
-        auto array_type = llvm::ArrayType::get(make_vector_type(to_llvm_type<T>(context), batch_size), n_eq);
-        auto comp_arr
-            = builder.CreateInBoundsGEP(builder.CreateAlloca(array_type), {builder.getInt32(0), builder.getInt32(0)});
+        auto array_type = llvm::ArrayType::get(vector_t, n_eq);
+        auto comp_arr = builder.CreateInBoundsGEP(array_type, builder.CreateAlloca(array_type),
+                                                  {builder.getInt32(0), builder.getInt32(0)});
 
         // Start by writing into out_ptr the zero-order coefficients
         // and by filling with zeroes the running compensations.
@@ -1741,26 +1757,27 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
             // Load the coefficient from tc_ptr. The index is:
             // batch_size * (order + 1u) * cur_var_idx.
             auto *tc_idx = builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx);
-            auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+            auto *tc
+                = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
 
             // Zero-init the element in comp_arr.
             builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
-                                builder.CreateInBoundsGEP(comp_arr, {cur_var_idx}));
+                                builder.CreateInBoundsGEP(vector_t, comp_arr, {cur_var_idx}));
         });
 
         // Init the running updater for the powers of h.
-        auto *cur_h = builder.CreateAlloca(h->getType());
+        auto *cur_h = builder.CreateAlloca(vector_t);
         builder.CreateStore(h, cur_h);
 
         // Run the evaluation.
         llvm_loop_u32(s, builder.getInt32(1), builder.getInt32(order + 1u), [&](llvm::Value *cur_order) {
             // Load the current power of h.
-            auto *cur_h_val = builder.CreateLoad(cur_h);
+            auto *cur_h_val = builder.CreateLoad(vector_t, cur_h);
 
             llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(n_eq), [&](llvm::Value *cur_var_idx) {
                 // Load the coefficient from tc_ptr. The index is:
@@ -1768,14 +1785,15 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
                 auto *tc_idx
                     = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                         builder.CreateMul(builder.getInt32(batch_size), cur_order));
-                auto *cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                auto *cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, {tc_idx}),
+                                                   batch_size);
                 auto *tmp = builder.CreateFMul(cf, cur_h_val);
 
                 // Compute the quantities for the compensation.
-                auto *comp_ptr = builder.CreateInBoundsGEP(comp_arr, {cur_var_idx});
+                auto *comp_ptr = builder.CreateInBoundsGEP(vector_t, comp_arr, cur_var_idx);
                 auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                auto *res_ptr = builder.CreateInBoundsGEP(out_ptr, {out_idx});
-                auto *y = builder.CreateFSub(tmp, builder.CreateLoad(comp_ptr));
+                auto *res_ptr = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
+                auto *y = builder.CreateFSub(tmp, builder.CreateLoad(vector_t, comp_ptr));
                 auto *cur_res = load_vector_from_memory(builder, res_ptr, batch_size);
                 auto *t = builder.CreateFAdd(cur_res, y);
 
@@ -1796,12 +1814,13 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
             auto *tc_idx
                 = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                     builder.getInt32(batch_size * order));
-            auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+            auto *tc
+                = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
 
             // Store it in out_ptr. The index is:
             // batch_size * cur_var_idx.
             auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-            store_vector_to_memory(builder, builder.CreateInBoundsGEP(out_ptr, {out_idx}), tc);
+            store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
         });
 
         // Now let's run the Horner scheme.
@@ -1818,13 +1837,13 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
                         = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                             builder.CreateMul(builder.getInt32(batch_size),
                                                               builder.CreateSub(builder.getInt32(order), cur_order)));
-                    auto *tc
-                        = load_vector_from_memory(builder, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), batch_size);
+                    auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx),
+                                                       batch_size);
 
                     // Accumulate in out_ptr. The index is:
                     // batch_size * cur_var_idx.
                     auto *out_idx = builder.CreateMul(builder.getInt32(batch_size), cur_var_idx);
-                    auto *out_p = builder.CreateInBoundsGEP(out_ptr, {out_idx});
+                    auto *out_p = builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx);
                     auto *cur_out = load_vector_from_memory(builder, out_p, batch_size);
                     store_vector_to_memory(builder, out_p, builder.CreateFAdd(tc, builder.CreateFMul(cur_out, h)));
                 });
@@ -1967,20 +1986,26 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     builder.CreateStore(builder.getInt32(0), first);
 
     detail::llvm_while_loop(
-        m_llvm_state, [&]() { return builder.CreateICmpNE(builder.CreateLoad(count), builder.getInt32(0)); },
+        m_llvm_state,
+        [&]() { return builder.CreateICmpNE(builder.CreateLoad(builder.getInt32Ty(), count), builder.getInt32(0)); },
         [&]() {
             // tidx = first.
-            builder.CreateStore(builder.CreateLoad(first), tidx);
+            builder.CreateStore(builder.CreateLoad(builder.getInt32Ty(), first), tidx);
             // step = count / 2.
-            builder.CreateStore(builder.CreateUDiv(builder.CreateLoad(count), builder.getInt32(2)), step);
+            builder.CreateStore(
+                builder.CreateUDiv(builder.CreateLoad(builder.getInt32Ty(), count), builder.getInt32(2)), step);
             // tidx = tidx + step.
-            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(tidx), builder.CreateLoad(step)), tidx);
+            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), tidx),
+                                                  builder.CreateLoad(builder.getInt32Ty(), step)),
+                                tidx);
 
             // Logical condition:
             // - !(tm < *tidx), if integrating forward,
             // - !(tm > *tidx), if integrating backward.
-            auto tidx_val_hi = builder.CreateLoad(builder.CreateInBoundsGEP(times_ptr_hi, {builder.CreateLoad(tidx)}));
-            auto tidx_val_lo = builder.CreateLoad(builder.CreateInBoundsGEP(times_ptr_lo, {builder.CreateLoad(tidx)}));
+            auto tidx_val_hi = builder.CreateLoad(
+                fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, builder.CreateLoad(builder.getInt32Ty(), tidx)));
+            auto tidx_val_lo = builder.CreateLoad(
+                fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, builder.CreateLoad(builder.getInt32Ty(), tidx)));
             auto zero_val = llvm::ConstantFP::get(fp_t, 0.);
             auto cond = dir ? detail::llvm_dl_lt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo)
                             : detail::llvm_dl_gt(m_llvm_state, tm, zero_val, tidx_val_hi, tidx_val_lo);
@@ -1990,24 +2015,26 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
                 m_llvm_state, cond,
                 [&]() {
                     // ++tidx.
-                    builder.CreateStore(builder.CreateAdd(builder.CreateLoad(tidx), builder.getInt32(1)), tidx);
+                    builder.CreateStore(
+                        builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), tidx), builder.getInt32(1)), tidx);
                     // first = tidx.
-                    builder.CreateStore(builder.CreateLoad(tidx), first);
+                    builder.CreateStore(builder.CreateLoad(builder.getInt32Ty(), tidx), first);
                     // count = count - (step + 1).
                     builder.CreateStore(
-                        builder.CreateSub(builder.CreateLoad(count),
-                                          builder.CreateAdd(builder.CreateLoad(step), builder.getInt32(1))),
+                        builder.CreateSub(
+                            builder.CreateLoad(builder.getInt32Ty(), count),
+                            builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), step), builder.getInt32(1))),
                         count);
                 },
                 [&]() {
                     // count = step.
-                    builder.CreateStore(builder.CreateLoad(step), count);
+                    builder.CreateStore(builder.CreateLoad(builder.getInt32Ty(), step), count);
                 });
         });
 
     // NOTE: the output of the std::upper_bound algorithm
     // is in the 'first' variable.
-    llvm::Value *tc_idx = builder.CreateLoad(first);
+    llvm::Value *tc_idx = builder.CreateLoad(builder.getInt32Ty(), first);
 
     // Normally, the TC index should be first - 1. The exceptions are:
     // - first == 0, in which case TC index is also 0,
@@ -2035,11 +2062,11 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
         });
 
     // Reload tc_idx.
-    tc_idx = builder.CreateLoad(first);
+    tc_idx = builder.CreateLoad(builder.getInt32Ty(), first);
 
     // Load the time corresponding to tc_idx.
-    auto start_tm_hi = builder.CreateLoad(builder.CreateInBoundsGEP(times_ptr_hi, {tc_idx}));
-    auto start_tm_lo = builder.CreateLoad(builder.CreateInBoundsGEP(times_ptr_lo, {tc_idx}));
+    auto start_tm_hi = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi, tc_idx));
+    auto start_tm_lo = builder.CreateLoad(fp_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo, tc_idx));
 
     // Compute and store the value of h = tm - start_tm.
     auto [h_hi, h_lo] = detail::llvm_dl_add(m_llvm_state, tm, llvm::ConstantFP::get(fp_t, 0.),
@@ -2050,7 +2077,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     tc_idx = builder.CreateMul(tc_idx, builder.getInt32(dim * (order + 1u)));
 
     // Invoke the d_out function.
-    builder.CreateCall(d_out_f, {out_ptr, builder.CreateInBoundsGEP(tc_ptr, {tc_idx}), h_ptr});
+    builder.CreateCall(d_out_f, {out_ptr, builder.CreateInBoundsGEP(fp_t, tc_ptr, tc_idx), h_ptr});
 
     // Create the return value.
     builder.CreateRetVoid();
