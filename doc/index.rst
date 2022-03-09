@@ -23,6 +23,7 @@ heyoka is a C++ library for the integration of ordinary differential equations
 * accurate and reliable event detection,
 * batch mode integration to harness the power of modern
   `SIMD <https://en.wikipedia.org/wiki/SIMD>`__ instruction sets,
+* ensemble simulations and automatic parallelisation,
 * a high-performance implementation of Taylor's method based
   on automatic differentiation techniques and aggressive just-in-time
   compilation via `LLVM <https://llvm.org/>`__.
