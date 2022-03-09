@@ -1183,6 +1183,20 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     return retval;
 }
 
+// Helper to create a global zero-inited array variable in the module m
+// with type t. The array is mutable and with internal linkage.
+llvm::Value *make_global_zero_array(llvm::Module &m, llvm::ArrayType *t)
+{
+    assert(t != nullptr); // LCOV_EXCL_LINE
+
+    // Make the global array.
+    auto gl_arr = new llvm::GlobalVariable(m, t, false, llvm::GlobalVariable::InternalLinkage,
+                                           llvm::ConstantAggregateZero::get(t));
+
+    // Return it.
+    return gl_arr;
+}
+
 } // namespace
 
 // Helper for the computation of a jet of derivatives in compact mode,
