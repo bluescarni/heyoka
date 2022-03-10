@@ -1453,7 +1453,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto cos_E = builder.CreateAlloca(tp);
 
         // Write the initial values for sin_E and cos_E.
-        auto sin_cos_E = llvm_sincos(s, builder.CreateLoad(retval));
+        auto sin_cos_E = llvm_sincos(s, builder.CreateLoad(tp, retval));
         builder.CreateStore(sin_cos_E.first, sin_E);
         builder.CreateStore(sin_cos_E.second, cos_E);
 
@@ -1461,8 +1461,8 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto fE = builder.CreateAlloca(tp);
         // Helper to compute f(E).
         auto fE_compute = [&]() {
-            auto ret = builder.CreateFMul(ecc, builder.CreateLoad(sin_E));
-            ret = builder.CreateFSub(builder.CreateLoad(retval), ret);
+            auto ret = builder.CreateFMul(ecc, builder.CreateLoad(tp, sin_E));
+            ret = builder.CreateFSub(builder.CreateLoad(tp, retval), ret);
             return builder.CreateFSub(ret, M);
         };
         // Compute and store the initial value of f(E).
@@ -1475,11 +1475,11 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
                           // NOTE: tolerance is 4 * eps.
                           tol = vector_splat(builder, codegen<T>(s, number{std::numeric_limits<T>::epsilon() * 4}),
                                              batch_size)]() -> llvm::Value * {
-            auto c_cond = builder.CreateICmpULT(builder.CreateLoad(counter), max_iter);
+            auto c_cond = builder.CreateICmpULT(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter);
 
             // Keep on iterating as long as abs(f(E)) > tol.
             // NOTE: need reduction only in batch mode.
-            auto tol_check = builder.CreateFCmpOGT(llvm_abs(s, builder.CreateLoad(fE)), tol);
+            auto tol_check = builder.CreateFCmpOGT(llvm_abs(s, builder.CreateLoad(tp, fE)), tol);
             auto tol_cond = (batch_size == 1u) ? tol_check : builder.CreateOrReduce(tol_check);
 
             // NOTE: this is a way of creating a logical AND.
@@ -1489,9 +1489,10 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Run the loop.
         llvm_while_loop(s, loop_cond, [&, one_c = vector_splat(builder, codegen<T>(s, number{1.}), batch_size)]() {
             // Compute the new value.
-            auto old_val = builder.CreateLoad(retval);
-            auto new_val = builder.CreateFDiv(
-                builder.CreateLoad(fE), builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(cos_E))));
+            auto old_val = builder.CreateLoad(tp, retval);
+            auto new_val
+                = builder.CreateFDiv(builder.CreateLoad(tp, fE),
+                                     builder.CreateFSub(one_c, builder.CreateFMul(ecc, builder.CreateLoad(tp, cos_E))));
             new_val = builder.CreateFSub(old_val, new_val);
 
             // Bisect if new_val > ub.
@@ -1523,12 +1524,13 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             builder.CreateStore(fE_compute(), fE);
 
             // Update the counter.
-            builder.CreateStore(builder.CreateAdd(builder.CreateLoad(counter), builder.getInt32(1)), counter);
+            builder.CreateStore(
+                builder.CreateAdd(builder.CreateLoad(builder.getInt32Ty(), counter), builder.getInt32(1)), counter);
         });
 
         // Check the counter.
         llvm_if_then_else(
-            s, builder.CreateICmpEQ(builder.CreateLoad(counter), max_iter),
+            s, builder.CreateICmpEQ(builder.CreateLoad(builder.getInt32Ty(), counter), max_iter),
             [&]() {
                 llvm_invoke_external(s, "heyoka_inv_kep_E_max_iter", builder.getVoidTy(), {},
                                      {llvm::Attribute::NoUnwind, llvm::Attribute::WillReturn});
@@ -1536,7 +1538,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
             []() {});
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(tp, retval));
 
         // Verify.
         s.verify_function(f);
