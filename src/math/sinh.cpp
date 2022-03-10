@@ -344,18 +344,18 @@ llvm::Function *taylor_c_diff_func_sinh_impl(llvm_state &s, const sinh_impl &fn,
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(j_v, builder.CreateFMul(cnj, bj))),
                                         acc);
                 });
 
                 // Divide by the order to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_v), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

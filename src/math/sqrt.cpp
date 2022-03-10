@@ -394,10 +394,11 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                         auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
                         auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
 
-                        builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(a_nj, aj)),
-                                            acc);
+                        builder.CreateStore(
+                            builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
                     });
-                builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateLoad(acc)), acc);
+                builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateLoad(val_t, acc)),
+                                    acc);
 
                 llvm_if_then_else(
                     s, ord_even,
@@ -407,19 +408,20 @@ llvm::Function *taylor_c_diff_func_sqrt_impl(llvm_state &s, const sqrt_impl &fn,
                                                       builder.CreateUDiv(ord, builder.getInt32(2)), u_idx);
                         tmp = builder.CreateFMul(tmp, tmp);
 
-                        builder.CreateStore(builder.CreateFSub(builder.CreateLoad(retval), tmp), retval);
+                        builder.CreateStore(builder.CreateFSub(builder.CreateLoad(val_t, retval), tmp), retval);
                     },
                     []() {});
 
                 // retval -= acc.
-                builder.CreateStore(builder.CreateFSub(builder.CreateLoad(retval), builder.CreateLoad(acc)), retval);
+                builder.CreateStore(
+                    builder.CreateFSub(builder.CreateLoad(val_t, retval), builder.CreateLoad(val_t, acc)), retval);
 
                 // retval /= div.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(retval), div), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, retval), div), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

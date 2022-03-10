@@ -483,7 +483,7 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n0, const V
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -599,16 +599,16 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var,
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), tmp), acc);
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(acc)), divisor),
-                                    retval);
+                builder.CreateStore(
+                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -716,16 +716,16 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const U &n, const va
                     auto tmp = builder.CreateFMul(c_nj, aj);
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), tmp), acc);
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(acc)), divisor),
-                                    retval);
+                builder.CreateStore(
+                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -842,16 +842,16 @@ llvm::Function *taylor_c_diff_func_kepE_impl(llvm_state &s, const variable &var0
 
                     tmp = builder.CreateFMul(j_v, tmp);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), tmp), acc);
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), tmp), acc);
                 });
 
                 // Write the result.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(acc)), divisor),
-                                    retval);
+                builder.CreateStore(
+                    builder.CreateFDiv(builder.CreateFAdd(dividend, builder.CreateLoad(val_t, acc)), divisor), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

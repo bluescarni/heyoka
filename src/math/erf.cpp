@@ -391,7 +391,7 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(c_nj, bj))),
                                         acc);
                 });
@@ -401,11 +401,11 @@ llvm::Function *taylor_c_diff_func_erf_impl(llvm_state &s, const erf_impl &fn, c
                 auto fac = builder.CreateFMul(t1_llvm, ord_fp);
 
                 // Store into retval.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), fac), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), fac), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

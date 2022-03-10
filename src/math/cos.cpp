@@ -389,18 +389,19 @@ llvm::Function *taylor_c_diff_func_cos_impl(llvm_state &s, const cos_impl &fn, c
 
                     auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(j_v, builder.CreateFMul(b_nj, cj))),
                                         acc);
                 });
 
                 // Divide by the order and negate to produce the return value.
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), builder.CreateFNeg(ord_v)), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), builder.CreateFNeg(ord_v)),
+                                    retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

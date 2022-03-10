@@ -332,11 +332,11 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
                             auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(a_nj, aj)), acc);
+                                builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
                         });
 
                         // Return 2 * acc.
-                        auto acc_load = builder.CreateLoad(acc);
+                        auto acc_load = builder.CreateLoad(val_t, acc);
                         builder.CreateStore(builder.CreateFAdd(acc_load, acc_load), retval);
                     },
                     [&]() {
@@ -355,17 +355,17 @@ llvm::Function *taylor_c_diff_func_square_impl(llvm_state &s, const square_impl 
                             auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
 
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(a_nj, aj)), acc);
+                                builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(a_nj, aj)), acc);
                         });
 
                         // Return 2 * acc + ak2 * ak2.
-                        auto acc_load = builder.CreateLoad(acc);
+                        auto acc_load = builder.CreateLoad(val_t, acc);
                         builder.CreateStore(builder.CreateFAdd(builder.CreateFAdd(acc_load, acc_load), sq_ak2), retval);
                     });
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

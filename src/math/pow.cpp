@@ -424,7 +424,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -524,21 +524,21 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                             j_v,
                             builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
                                         acc);
                 });
 
                 // Finalize the result: acc / (n*b0).
                 builder.CreateStore(
-                    builder.CreateFDiv(builder.CreateLoad(acc),
+                    builder.CreateFDiv(builder.CreateLoad(val_t, acc),
                                        builder.CreateFMul(ord_v, taylor_c_load_diff(s, diff_ptr, n_uvars,
                                                                                     builder.getInt32(0), var_idx))),
                     retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
