@@ -14,6 +14,8 @@ New
 Changes
 ~~~~~~~
 
+- heyoka now builds against LLVM 13 without deprecation warnings
+  (`#242 <https://github.com/bluescarni/heyoka/pull/242>`__).
 - In case of an early interruption, the ``propagate_grid()`` function will now
   process all available grid points before the interruption time before exiting
   (`#235 <https://github.com/bluescarni/heyoka/pull/235>`__).
