@@ -410,13 +410,13 @@ llvm::Function *taylor_c_diff_func_atanh_impl(llvm_state &s, const atanh_impl &f
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(c_nj, aj))),
                                         acc);
                 });
 
                 // Update ret.
-                ret = builder.CreateFAdd(ret, builder.CreateLoad(acc));
+                ret = builder.CreateFAdd(ret, builder.CreateLoad(val_t, acc));
 
                 // Divide by n*(1 - c^[0]).
                 ret = builder.CreateFDiv(ret, n_c0_p1);
@@ -426,7 +426,7 @@ llvm::Function *taylor_c_diff_func_atanh_impl(llvm_state &s, const atanh_impl &f
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

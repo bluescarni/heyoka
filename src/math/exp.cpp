@@ -364,17 +364,17 @@ llvm::Function *taylor_c_diff_func_exp_impl(llvm_state &s, const exp_impl &fn, c
                     // Compute the factor j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(anj, bj))),
                                         acc);
                 });
 
                 // Return acc / n.
-                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(acc), ord_fp), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_fp), retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

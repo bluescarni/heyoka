@@ -382,17 +382,18 @@ llvm::Function *taylor_c_diff_func_log_impl(llvm_state &s, const log_impl &fn, c
                     // Compute j.
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(bnj, aj))),
                                         acc);
                 });
 
                 // ret = (n*b^[n] - acc) / (n*b^[0]).
-                builder.CreateStore(builder.CreateFDiv(builder.CreateFSub(nbn, builder.CreateLoad(acc)), nb0), retval);
+                builder.CreateStore(builder.CreateFDiv(builder.CreateFSub(nbn, builder.CreateLoad(val_t, acc)), nb0),
+                                    retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

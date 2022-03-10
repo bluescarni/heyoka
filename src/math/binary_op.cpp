@@ -687,7 +687,7 @@ llvm::Function *bo_taylor_c_diff_func_num_num(llvm_state &s, const binary_op &bo
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -786,7 +786,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -869,7 +869,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -1187,11 +1187,11 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
         llvm_loop_u32(s, builder.getInt32(0), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
             auto b_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), idx0);
             auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, idx1);
-            builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(b_nj, cj)), acc);
+            builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(b_nj, cj)), acc);
         });
 
         // Create the return value.
-        builder.CreateRet(builder.CreateLoad(acc));
+        builder.CreateRet(builder.CreateLoad(val_t, acc));
 
         // Verify.
         s.verify_function(f);
@@ -1380,11 +1380,12 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
                 llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
                     auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx);
                     auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(cj, a_nj)), acc);
+                    builder.CreateStore(
+                        builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(cj, a_nj)), acc);
                 });
 
                 // Negate the loop summation.
-                auto ret = builder.CreateFNeg(builder.CreateLoad(acc));
+                auto ret = builder.CreateFNeg(builder.CreateLoad(val_t, acc));
 
                 // Divide and return.
                 builder.CreateStore(
@@ -1393,7 +1394,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
@@ -1464,10 +1465,11 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
         llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(ord, builder.getInt32(1)), [&](llvm::Value *j) {
             auto cj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, var_idx1);
             auto a_nj = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.CreateSub(ord, j), u_idx);
-            builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc), builder.CreateFMul(cj, a_nj)), acc);
+            builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc), builder.CreateFMul(cj, a_nj)), acc);
         });
 
-        auto ret = builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx0), builder.CreateLoad(acc));
+        auto ret = builder.CreateFSub(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx0),
+                                      builder.CreateLoad(val_t, acc));
 
         // Divide and return.
         builder.CreateRet(

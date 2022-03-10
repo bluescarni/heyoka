@@ -17,7 +17,6 @@ class Function;
 class Module;
 class LLVMContext;
 class Type;
-class ArrayType;
 
 // NOTE: IRBuilder is a template with default
 // parameters, hence we declare the default parameters

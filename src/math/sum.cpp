@@ -278,7 +278,7 @@ llvm::Function *sum_taylor_c_diff_func_impl(llvm_state &s, const sum_impl &sf, s
                                                     retval);
                             });
 
-                        return builder.CreateLoad(retval);
+                        return builder.CreateLoad(val_t, retval);
                     } else {
                         // LCOV_EXCL_START
                         throw std::invalid_argument(

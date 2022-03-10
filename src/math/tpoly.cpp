@@ -189,8 +189,9 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the floating-point types.
+    auto *scal_t = to_llvm_type<T>(context);
+    auto *val_t = to_llvm_vector_type<T>(context, batch_size);
 
     // Fetch the function name and arguments.
     // NOTE: we mangle on the poly degree as well, so that we will be
@@ -217,7 +218,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
             auto idx = builder.CreateMul(i, builder.getInt32(n_const + 1u));
             idx = builder.CreateAdd(idx, j);
 
-            auto val = builder.CreateLoad(builder.CreateInBoundsGEP(bc_ptr, {idx}));
+            auto val = builder.CreateLoad(scal_t, builder.CreateInBoundsGEP(scal_t, bc_ptr, idx));
 
             return vector_splat(builder, val, batch_size);
         };
@@ -259,7 +260,7 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
                 auto bc = get_bc(n, ord);
                 auto cf = load_vector_from_memory(
                     builder,
-                    builder.CreateInBoundsGEP(par_ptr,
+                    builder.CreateInBoundsGEP(scal_t, par_ptr,
                                               {builder.CreateMul(builder.getInt32(batch_size),
                                                                  builder.CreateSub(e_idx, builder.getInt32(1)))}),
                     batch_size);
@@ -267,32 +268,33 @@ llvm::Function *taylor_c_diff_tpoly_impl(llvm_state &s, const tpoly_impl &tp, st
                 builder.CreateStore(cf, retval);
 
                 // Horner evaluation of polynomial derivative.
-                llvm_loop_u32(
-                    s, builder.getInt32(1), builder.CreateAdd(builder.CreateSub(n, ord), builder.getInt32(1)),
-                    [&](llvm::Value *i_) {
-                        // NOTE: need to invert i because Horner's method
-                        // proceeds backwards.
-                        auto i = builder.CreateSub(builder.CreateSub(n, ord), i_);
+                llvm_loop_u32(s, builder.getInt32(1), builder.CreateAdd(builder.CreateSub(n, ord), builder.getInt32(1)),
+                              [&](llvm::Value *i_) {
+                                  // NOTE: need to invert i because Horner's method
+                                  // proceeds backwards.
+                                  auto i = builder.CreateSub(builder.CreateSub(n, ord), i_);
 
-                        // Get the binomial coefficient.
-                        bc = get_bc(builder.CreateAdd(i, ord), ord);
+                                  // Get the binomial coefficient.
+                                  bc = get_bc(builder.CreateAdd(i, ord), ord);
 
-                        // Load the poly coefficient from the par array and multiply it by bc.
-                        auto cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
-                                                        builder.getInt32(batch_size));
-                        cf = load_vector_from_memory(builder, builder.CreateInBoundsGEP(par_ptr, {cf_idx}), batch_size);
-                        cf = builder.CreateFMul(cf, bc);
+                                  // Load the poly coefficient from the par array and multiply it by bc.
+                                  auto cf_idx = builder.CreateMul(builder.CreateAdd(builder.CreateAdd(b_idx, i), ord),
+                                                                  builder.getInt32(batch_size));
+                                  cf = load_vector_from_memory(
+                                      builder, builder.CreateInBoundsGEP(scal_t, par_ptr, cf_idx), batch_size);
+                                  cf = builder.CreateFMul(cf, bc);
 
-                        // Horner iteration.
-                        auto new_val = builder.CreateFAdd(cf, builder.CreateFMul(builder.CreateLoad(retval), tm));
+                                  // Horner iteration.
+                                  auto new_val = builder.CreateFAdd(
+                                      cf, builder.CreateFMul(builder.CreateLoad(val_t, retval), tm));
 
-                        // Update retval.
-                        builder.CreateStore(new_val, retval);
-                    });
+                                  // Update retval.
+                                  builder.CreateStore(new_val, retval);
+                              });
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

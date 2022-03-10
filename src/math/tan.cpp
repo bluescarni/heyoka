@@ -396,7 +396,7 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &fn, c
 
                     auto fac = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
 
-                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(acc),
+                    builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(cnj, bj))),
                                         acc);
                 });
@@ -405,12 +405,12 @@ llvm::Function *taylor_c_diff_func_tan_impl(llvm_state &s, const tan_impl &fn, c
                 auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
 
                 builder.CreateStore(builder.CreateFAdd(taylor_c_load_diff(s, diff_ptr, n_uvars, ord, var_idx),
-                                                       builder.CreateFDiv(builder.CreateLoad(acc), ord_v)),
+                                                       builder.CreateFDiv(builder.CreateLoad(val_t, acc), ord_v)),
                                     retval);
             });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);

@@ -381,7 +381,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
 
                             // Update the k-th accumulator.
                             builder.CreateStore(
-                                builder.CreateFAdd(builder.CreateLoad(v_accs[k]), builder.CreateFMul(v0, v1)),
+                                builder.CreateFAdd(builder.CreateLoad(val_t, v_accs[k]), builder.CreateFMul(v0, v1)),
                                 v_accs[k]);
                         } else if constexpr (is_num_param_v<type>) {
                             // Number/param: nothing to do, leave the accumulator to zero.
@@ -415,7 +415,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                 std::vector<llvm::Value *> tmp;
                 tmp.reserve(v_accs.size());
                 for (auto &acc : v_accs) {
-                    tmp.push_back(builder.CreateLoad(acc));
+                    tmp.push_back(builder.CreateLoad(val_t, acc));
                 }
                 auto ret = pairwise_sum(builder, tmp);
 
@@ -444,7 +444,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                 tmp.reserve(v_accs.size());
                 for (decltype(sf.args().size()) k = 0; k < sf.args().size(); ++k) {
                     // Load the current accumulator and multiply it by 2.
-                    auto acc_val = builder.CreateLoad(v_accs[k]);
+                    auto acc_val = builder.CreateLoad(val_t, v_accs[k]);
                     auto acc2 = builder.CreateFAdd(acc_val, acc_val);
 
                     // Load the external term.
@@ -474,7 +474,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
                                             vector_splat(builder, codegen<T>(s, number{0.}), batch_size), ret);
                                     });
 
-                                auto val = builder.CreateLoad(ret);
+                                auto val = builder.CreateLoad(val_t, ret);
 
                                 return builder.CreateFMul(val, val);
                             } else {
@@ -496,7 +496,7 @@ llvm::Function *sum_sq_taylor_c_diff_func_impl(llvm_state &s, const sum_sq_impl 
             });
 
         // Create the return value.
-        builder.CreateRet(builder.CreateLoad(retval));
+        builder.CreateRet(builder.CreateLoad(val_t, retval));
 
         // Verify.
         s.verify_function(f);
