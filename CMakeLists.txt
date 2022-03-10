@@ -155,6 +155,15 @@ if(${LLVM_VERSION_MAJOR} LESS 10)
   message(FATAL_ERROR "LLVM >= 10 is required.")
 endif()
 
+# NOTE: LLVM >= 13 introduces various deprecations. We will have to
+# sort through them eventually.
+if(${LLVM_VERSION_MAJOR} GREATER_EQUAL 13)
+    if(YACMA_COMPILER_IS_GNUCXX OR YACMA_COMPILER_IS_CLANGXX)
+        list(APPEND HEYOKA_CXX_FLAGS_DEBUG "-Wno-deprecated-declarations")
+        list(APPEND HEYOKA_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations")
+    endif()
+endif()
+
 # This is temporarily here in order to quench some fmt 8.1
 # warnings until we fix the code.
 find_package(fmt REQUIRED CONFIG)

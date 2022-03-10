@@ -644,13 +644,11 @@ TEST_CASE("while_loop")
         builder.CreateStore(builder.getInt32(0), retval);
 
         llvm_while_loop(
-            s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(val_t, retval), final_n); },
-            [&]() {
-                builder.CreateStore(builder.CreateAdd(builder.CreateLoad(val_t, retval), builder.getInt32(1)), retval);
-            });
+            s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
+            [&]() { builder.CreateStore(builder.CreateAdd(builder.CreateLoad(retval), builder.getInt32(1)), retval); });
 
         // Return the result.
-        builder.CreateRet(builder.CreateLoad(val_t, retval));
+        builder.CreateRet(builder.CreateLoad(retval));
 
         // Verify.
         s.verify_function(f);
@@ -732,10 +730,7 @@ TEST_CASE("while_loop")
         auto thrower = [&]() {
             try {
                 llvm_while_loop(
-                    s,
-                    [&]() -> llvm::Value * {
-                        return builder.CreateICmpULT(builder.CreateLoad(val_t, retval), final_n);
-                    },
+                    s, [&]() -> llvm::Value * { return builder.CreateICmpULT(builder.CreateLoad(retval), final_n); },
                     [&]() { throw std::runtime_error{"aa"}; });
             } catch (...) {
                 f->eraseFromParent();
