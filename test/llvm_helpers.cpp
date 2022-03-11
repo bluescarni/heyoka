@@ -671,6 +671,14 @@ TEST_CASE("while_loop")
         REQUIRE(f_ptr(4) == 4u);
     }
 
+    // NOTE: don't run the error handling test on OSX, as
+    // we occasionally experience hangs/errors when
+    // catching and re-throwing exceptions. Not sure whether
+    // this is an LLVM issue or some compiler/toolchain bug.
+    // Perhaps re-check this with later LLVM versions, different
+    // build types (e.g., Release) or different compiler flags.
+#if !defined(__APPLE__)
+
     // Error handling.
     {
         llvm_state s;
@@ -746,6 +754,8 @@ TEST_CASE("while_loop")
 
         REQUIRE_THROWS_AS(thrower(), std::runtime_error);
     }
+
+#endif
 }
 
 TEST_CASE("csc_scalar")
