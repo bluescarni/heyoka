@@ -23,8 +23,24 @@
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+template <typename V>
+bool check_close(const V &v1, const V &v2)
+{
+    using vt = typename V::value_type;
+
+    for (decltype(v1.size()) i = 0; i < v1.size(); ++i) {
+        if (!(v1[i] == approximately(v2[i], vt(10)))) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 TEST_CASE("error handling")
 {
@@ -110,7 +126,7 @@ TEST_CASE("parallel consistency")
         auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
         auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
 
-        REQUIRE(out_serial == out_parallel);
+        REQUIRE(check_close(out_serial, out_parallel));
     }
 }
 
@@ -142,6 +158,6 @@ TEST_CASE("par time ptr")
         auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
         auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
 
-        REQUIRE(out_serial == out_parallel);
+        REQUIRE(check_close(out_serial, out_parallel));
     }
 }
