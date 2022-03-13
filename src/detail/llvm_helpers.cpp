@@ -85,7 +85,7 @@ using fmt::literals::operator""_format;
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -1832,7 +1832,7 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic pop
 
