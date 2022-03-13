@@ -20,18 +20,14 @@
 #include <variant>
 #include <vector>
 
-#include <boost/numeric/conversion/cast.hpp>
-
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -40,8 +36,6 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -77,42 +71,26 @@ exp_impl::exp_impl() : exp_impl(0_dbl) {}
 
 llvm::Value *exp_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
+    // LCOV_EXCL_START
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
+    // LCOV_EXCL_STOP
 
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
-        if (const auto sfn = sleef_function_name(s.context(), "exp", vec_t->getElementType(),
-                                                 boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
-            !sfn.empty()) {
-            return llvm_invoke_external(
-                s, sfn, vec_t, args,
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-        }
-    }
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.exp", {args[0]->getType()}, args);
+    return llvm_exp(s, args[0]);
 }
 
+// NOTE: the codegens for long double and real128 can re-use codegen_dbl(), which
+// just calls llvm_exp().
 llvm::Value *exp_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return llvm_invoke_intrinsic(s.builder(), "llvm.exp", {args[0]->getType()}, args);
+    return codegen_dbl(s, args);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *exp_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args[0], "expq");
+    return codegen_dbl(s, args);
 }
 
 #endif

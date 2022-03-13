@@ -24,8 +24,8 @@
 
 #include <fmt/format.h>
 
-#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -33,7 +33,6 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
-#include <llvm/Support/Casting.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
 
@@ -42,8 +41,6 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
-#include <heyoka/detail/llvm_vector_type.hpp>
-#include <heyoka/detail/sleef.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/taylor_common.hpp>
 #include <heyoka/expression.hpp>
@@ -68,33 +65,51 @@ using fmt::literals::operator""_format;
 
 #endif
 
-// The sigmoid is not in the standard library and thus needs wrappers
-// for its double, long double and 128 versions.
-
-extern "C" HEYOKA_DLL_PUBLIC double heyoka_sigmoid(double x) noexcept
-{
-    return 1. / (1. + std::exp(-x));
-}
-
-extern "C" HEYOKA_DLL_PUBLIC long double heyoka_sigmoidl(long double x) noexcept
-{
-    return 1. / (1. + std::exp(-x));
-}
-
-#if defined(HEYOKA_HAVE_REAL128)
-
-extern "C" HEYOKA_DLL_PUBLIC __float128 heyoka_sigmoid128(__float128 x) noexcept
-{
-    return (1. / (1. + mppp::exp(-mppp::real128{x}))).m_value;
-}
-
-#endif
-
 namespace heyoka
 {
 
 namespace detail
 {
+
+namespace
+{
+
+// C++ implementation.
+template <typename T>
+T cpp_sigmoid(T x)
+{
+    using std::exp;
+
+    return 1 / (1 + exp(-x));
+}
+
+// LLVM IR implementation.
+llvm::Value *llvm_sigmoid(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Fetch the batch size.
+    const auto batch_size = get_vector_size(x);
+
+    // Create the 1 constant.
+    auto one_fp = vector_splat(builder, llvm::ConstantFP::get(x->getType()->getScalarType(), 1.), batch_size);
+
+    // Compute -x.
+    auto m_x = builder.CreateFNeg(x);
+
+    // Compute e^(-x).
+    auto e_m_x = llvm_exp(s, m_x);
+
+    // Return 1 / (1 + e_m_arg).
+    return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_x));
+}
+
+} // namespace
 
 sigmoid_impl::sigmoid_impl(expression e) : func_base("sigmoid", std::vector{std::move(e)}) {}
 
@@ -105,50 +120,21 @@ llvm::Value *sigmoid_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Va
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(args[0]->getType())) {
-        const auto batch_size = boost::numeric_cast<std::uint32_t>(vec_t->getNumElements());
-
-        if (const auto sfn = sleef_function_name(s.context(), "exp", vec_t->getElementType(), batch_size);
-            !sfn.empty()) {
-            auto &builder = s.builder();
-
-            // Compute -arg.
-            auto m_arg = builder.CreateFNeg(args[0]);
-
-            // Compute e^(-arg).
-            auto e_m_arg = llvm_invoke_external(
-                s, sfn, vec_t, {m_arg},
-                // NOTE: in theory we may add ReadNone here as well,
-                // but for some reason, at least up to LLVM 10,
-                // this causes strange codegen issues. Revisit
-                // in the future.
-                {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
-
-            // Return 1 / (1 + e_m_arg).
-            auto one_fp = vector_splat(builder, codegen<double>(s, number{1.}), batch_size);
-            return builder.CreateFDiv(one_fp, builder.CreateFAdd(one_fp, e_m_arg));
-        }
-    }
-
-    return call_extern_vec(s, args[0], "heyoka_sigmoid");
+    return llvm_sigmoid(s, args[0]);
 }
 
+// NOTE: the codegens for long double and real128 can re-use codegen_dbl(), which
+// just calls llvm_sigmoid().
 llvm::Value *sigmoid_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args[0], "heyoka_sigmoidl");
+    return codegen_dbl(s, args);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Value *sigmoid_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
-    assert(args.size() == 1u);
-    assert(args[0] != nullptr);
-
-    return call_extern_vec(s, args[0], "heyoka_sigmoid128");
+    return codegen_dbl(s, args);
 }
 
 #endif
@@ -157,7 +143,7 @@ double sigmoid_impl::eval_dbl(const std::unordered_map<std::string, double> &map
 {
     assert(args().size() == 1u);
 
-    return heyoka_sigmoid(heyoka::eval_dbl(args()[0], map, pars));
+    return cpp_sigmoid(heyoka::eval_dbl(args()[0], map, pars));
 }
 
 long double sigmoid_impl::eval_ldbl(const std::unordered_map<std::string, long double> &map,
@@ -165,7 +151,7 @@ long double sigmoid_impl::eval_ldbl(const std::unordered_map<std::string, long d
 {
     assert(args().size() == 1u);
 
-    return heyoka_sigmoidl(heyoka::eval_ldbl(args()[0], map, pars));
+    return cpp_sigmoid(heyoka::eval_ldbl(args()[0], map, pars));
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -174,7 +160,7 @@ mppp::real128 sigmoid_impl::eval_f128(const std::unordered_map<std::string, mppp
 {
     assert(args().size() == 1u);
 
-    return mppp::real128(heyoka_sigmoid128(heyoka::eval_f128(args()[0], map, pars).m_value));
+    return cpp_sigmoid(heyoka::eval_f128(args()[0], map, pars));
 }
 #endif
 
@@ -186,7 +172,7 @@ void sigmoid_impl::eval_batch_dbl(std::vector<double> &out,
 
     heyoka::eval_batch_dbl(out, args()[0], map, pars);
     for (auto &el : out) {
-        el = heyoka_sigmoid(el);
+        el = cpp_sigmoid(el);
     }
 }
 
@@ -198,7 +184,7 @@ double sigmoid_impl::eval_num_dbl(const std::vector<double> &a) const
             "sigmoid over doubles (1 argument was expected, but {} arguments were provided"_format(a.size()));
     }
 
-    return heyoka_sigmoid(a[0]);
+    return cpp_sigmoid(a[0]);
 }
 
 double sigmoid_impl::deval_num_dbl(const std::vector<double> &a, std::vector<double>::size_type i) const
@@ -207,7 +193,7 @@ double sigmoid_impl::deval_num_dbl(const std::vector<double> &a, std::vector<dou
         throw std::invalid_argument("Inconsistent number of arguments or derivative requested when computing the "
                                     "numerical derivative of the sigmoid");
     }
-    auto sigma = heyoka_sigmoid(a[0]);
+    auto sigma = cpp_sigmoid(a[0]);
     return sigma * (1 - sigma);
 }
 
