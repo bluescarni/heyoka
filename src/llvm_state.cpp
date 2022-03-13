@@ -870,6 +870,7 @@ void llvm_state::optimise()
 {
     check_uncompiled(__func__);
 
+    // NOTE: don't run any optimisation pass at O0.
     if (m_opt_level > 0u) {
         // NOTE: the logic here largely mimics (with a lot of simplifications)
         // the implementation of the 'opt' tool. See:
@@ -932,53 +933,50 @@ void llvm_state::optimise()
         // NOTE: adapted from here:
         // https://llvm.org/docs/NewPassManager.html
 
-        // NOTE: don't run any optimisation pass at O0.
-        if (m_opt_level > 0u) {
-            // Create the analysis managers.
-            llvm::LoopAnalysisManager LAM;
-            llvm::FunctionAnalysisManager FAM;
-            llvm::CGSCCAnalysisManager CGAM;
-            llvm::ModuleAnalysisManager MAM;
+        // Create the analysis managers.
+        llvm::LoopAnalysisManager LAM;
+        llvm::FunctionAnalysisManager FAM;
+        llvm::CGSCCAnalysisManager CGAM;
+        llvm::ModuleAnalysisManager MAM;
 
-            // Create the new pass manager builder, passing
-            // the native target machine from the JIT class.
-            llvm::PassBuilder PB(m_jitter->m_tm.get());
+        // Create the new pass manager builder, passing
+        // the native target machine from the JIT class.
+        llvm::PassBuilder PB(m_jitter->m_tm.get());
 
-            // Register all the basic analyses with the managers.
-            PB.registerModuleAnalyses(MAM);
-            PB.registerCGSCCAnalyses(CGAM);
-            PB.registerFunctionAnalyses(FAM);
-            PB.registerLoopAnalyses(LAM);
-            PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+        // Register all the basic analyses with the managers.
+        PB.registerModuleAnalyses(MAM);
+        PB.registerCGSCCAnalyses(CGAM);
+        PB.registerFunctionAnalyses(FAM);
+        PB.registerLoopAnalyses(LAM);
+        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-            // Setup the optimisation level for the module pass manager.
-            // NOTE: the OptimizationLevel class has changed location
-            // since LLVM 14.
+        // Setup the optimisation level for the module pass manager.
+        // NOTE: the OptimizationLevel class has changed location
+        // since LLVM 14.
 #if LLVM_VERSION_MAJOR >= 14
-            using olevel = llvm::OptimizationLevel;
+        using olevel = llvm::OptimizationLevel;
 #else
-            using olevel = llvm::PassBuilder::OptimizationLevel;
+        using olevel = llvm::PassBuilder::OptimizationLevel;
 #endif
 
-            olevel ol{};
+        olevel ol{};
 
-            switch (m_opt_level) {
-                case 1u:
-                    ol = olevel::O1;
-                    break;
-                case 2u:
-                    ol = olevel::O2;
-                    break;
-                default:
-                    ol = olevel::O3;
-            }
-
-            // Create the module pass manager.
-            auto MPM = PB.buildPerModuleDefaultPipeline(ol);
-
-            // Optimize the IR.
-            MPM.run(*m_module, MAM);
+        switch (m_opt_level) {
+            case 1u:
+                ol = olevel::O1;
+                break;
+            case 2u:
+                ol = olevel::O2;
+                break;
+            default:
+                ol = olevel::O3;
         }
+
+        // Create the module pass manager.
+        auto MPM = PB.buildPerModuleDefaultPipeline(ol);
+
+        // Optimize the IR.
+        MPM.run(*m_module, MAM);
 
 #else
 
