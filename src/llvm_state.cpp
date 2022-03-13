@@ -64,6 +64,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Transforms/Vectorize/LoadStoreVectorizer.h>
 
 #if LLVM_VERSION_MAJOR == 10
 
@@ -100,7 +101,6 @@
 #include <llvm/Pass.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Vectorize.h>
 
 #endif
 
@@ -933,6 +933,15 @@ void llvm_state::optimise()
         // NOTE: adapted from here:
         // https://llvm.org/docs/NewPassManager.html
 
+        // Optimisation level for the module pass manager.
+        // NOTE: the OptimizationLevel class has changed location
+        // since LLVM 14.
+#if LLVM_VERSION_MAJOR >= 14
+        using olevel = llvm::OptimizationLevel;
+#else
+        using olevel = llvm::PassBuilder::OptimizationLevel;
+#endif
+
         // Create the analysis managers.
         llvm::LoopAnalysisManager LAM;
         llvm::FunctionAnalysisManager FAM;
@@ -942,12 +951,19 @@ void llvm_state::optimise()
         // NOTE: in the new pass manager, this seems to be the way to
         // set the target library info bits. See:
         // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
+        // Not sure if this matters, but we did it in the old pass manager
+        // and opt does it too.
         llvm::TargetLibraryInfoImpl TLII(m_jitter->get_target_triple());
         FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
         // Create the new pass manager builder, passing
         // the native target machine from the JIT class.
         llvm::PassBuilder PB(m_jitter->m_tm.get());
+
+        // NOTE: this additional pass measurably helps performance
+        // in some benchmarks when dense output is activated.
+        PB.registerVectorizerStartEPCallback(
+            [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
 
         // Register all the basic analyses with the managers.
         PB.registerModuleAnalyses(MAM);
@@ -956,15 +972,7 @@ void llvm_state::optimise()
         PB.registerLoopAnalyses(LAM);
         PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-        // Setup the optimisation level for the module pass manager.
-        // NOTE: the OptimizationLevel class has changed location
-        // since LLVM 14.
-#if LLVM_VERSION_MAJOR >= 14
-        using olevel = llvm::OptimizationLevel;
-#else
-        using olevel = llvm::PassBuilder::OptimizationLevel;
-#endif
-
+        // Construct the optimisation level.
         olevel ol{};
 
         switch (m_opt_level) {
