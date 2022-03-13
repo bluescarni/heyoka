@@ -117,8 +117,10 @@ sigmoid_impl::sigmoid_impl() : sigmoid_impl(0_dbl) {}
 
 llvm::Value *sigmoid_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
 {
+    // LCOV_EXCL_START
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
+    // LCOV_EXCL_STOP
 
     return llvm_sigmoid(s, args[0]);
 }
