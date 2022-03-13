@@ -37,6 +37,7 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Triple.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -93,7 +94,6 @@
 
 #else
 
-#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/TargetPassConfig.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -938,6 +938,12 @@ void llvm_state::optimise()
         llvm::FunctionAnalysisManager FAM;
         llvm::CGSCCAnalysisManager CGAM;
         llvm::ModuleAnalysisManager MAM;
+
+        // NOTE: in the new pass manager, this seems to be the way to
+        // set the target library info bits. See:
+        // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
+        llvm::TargetLibraryInfoImpl TLII(m_jitter->get_target_triple());
+        FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
         // Create the new pass manager builder, passing
         // the native target machine from the JIT class.
