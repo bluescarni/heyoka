@@ -407,13 +407,19 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
     } else {
         const auto &new_state = std::get<std::vector<llvm::Value *>>(new_state_var);
 
-        assert(new_state.size() == n_eq);
+        if (batch_size == 1u && !high_accuracy && false) {
+            assert(new_state.size() == 1u);
 
-        for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
-            assert(llvm_depr_GEP_type_check(state_ptr, fp_t)); // LCOV_EXCL_LINE
-            store_vector_to_memory(builder,
-                                   builder.CreateInBoundsGEP(fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
-                                   new_state[var_idx]);
+            store_vector_to_memory(builder, state_ptr, new_state[0]);
+        } else {
+            assert(new_state.size() == n_eq);
+
+            for (std::uint32_t var_idx = 0; var_idx < n_eq; ++var_idx) {
+                assert(llvm_depr_GEP_type_check(state_ptr, fp_t)); // LCOV_EXCL_LINE
+                store_vector_to_memory(
+                    builder, builder.CreateInBoundsGEP(fp_t, state_ptr, builder.getInt32(var_idx * batch_size)),
+                    new_state[var_idx]);
+            }
         }
     }
 

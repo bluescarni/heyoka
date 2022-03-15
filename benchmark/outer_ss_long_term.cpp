@@ -92,7 +92,7 @@ void run_integration(const std::string &filename, T t_final, double perturb, boo
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = true,
+    taylor_adaptive<T> ta{std::move(sys), std::move(init_state), kw::high_accuracy = false,
                           kw::compact_mode = compact_mode, kw::tol = tol};
 
     auto elapsed = static_cast<double>(

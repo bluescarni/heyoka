@@ -1951,8 +1951,8 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 // variables.
 std::variant<llvm::Value *, std::vector<llvm::Value *>>
 taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vector<llvm::Value *>> &diff_var,
-                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t,
-                       bool compact_mode)
+                       llvm::Value *h, std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order,
+                       std::uint32_t batch_size, bool compact_mode)
 {
     auto &builder = s.builder();
 
@@ -2000,21 +2000,45 @@ taylor_run_multihorner(llvm_state &s, const std::variant<llvm::Value *, std::vec
         // Non-compact mode.
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_var);
 
-        // Init the return value, filling it with the values of the
-        // coefficients of the highest-degree monomial in each polynomial.
         std::vector<llvm::Value *> res_arr;
-        for (std::uint32_t i = 0; i < n_eq; ++i) {
-            res_arr.push_back(diff_arr[(n_eq * order) + i]);
-        }
 
-        // Run the Horner scheme simultaneously for all polynomials.
-        for (std::uint32_t i = 1; i <= order; ++i) {
-            for (std::uint32_t j = 0; j < n_eq; ++j) {
-                res_arr[j] = builder.CreateFAdd(diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
+        if (batch_size == 1u && false) {
+            auto wide_vec_t = make_vector_type(h->getType(), n_eq);
+
+            res_arr.emplace_back(llvm::UndefValue::get(wide_vec_t));
+
+            for (std::uint32_t i = 0; i < n_eq; ++i) {
+                res_arr[0] = builder.CreateInsertElement(res_arr[0], diff_arr[(n_eq * order) + i], i);
             }
-        }
 
-        return res_arr;
+            for (std::uint32_t i = 1; i <= order; ++i) {
+                llvm::Value *tmp = llvm::UndefValue::get(wide_vec_t);
+
+                for (std::uint32_t j = 0; j < n_eq; ++j) {
+                    tmp = builder.CreateInsertElement(tmp, diff_arr[(order - i) * n_eq + j], j);
+                }
+
+                res_arr[0] = builder.CreateFAdd(tmp, builder.CreateFMul(res_arr[0], vector_splat(builder, h, n_eq)));
+            }
+
+            return res_arr;
+        } else {
+            // Init the return value, filling it with the values of the
+            // coefficients of the highest-degree monomial in each polynomial.
+            for (std::uint32_t i = 0; i < n_eq; ++i) {
+                res_arr.push_back(diff_arr[(n_eq * order) + i]);
+            }
+
+            // Run the Horner scheme simultaneously for all polynomials.
+            for (std::uint32_t i = 1; i <= order; ++i) {
+                for (std::uint32_t j = 0; j < n_eq; ++j) {
+                    res_arr[j]
+                        = builder.CreateFAdd(diff_arr[(order - i) * n_eq + j], builder.CreateFMul(res_arr[j], h));
+                }
+            }
+
+            return res_arr;
+        }
     }
 }
 
