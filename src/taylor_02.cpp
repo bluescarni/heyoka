@@ -87,7 +87,7 @@ using fmt::literals::operator""_format;
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -2441,7 +2441,7 @@ taylor_dc_t taylor_add_jet_f128(llvm_state &s, const std::string &name,
 
 } // namespace heyoka
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic pop
 

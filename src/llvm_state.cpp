@@ -37,6 +37,7 @@
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Triple.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/JITSymbol.h>
 #include <llvm/ExecutionEngine/Orc/CompileUtils.h>
@@ -63,6 +64,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Transforms/Vectorize/LoadStoreVectorizer.h>
 
 #if LLVM_VERSION_MAJOR == 10
 
@@ -93,14 +95,12 @@
 
 #else
 
-#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/CodeGen/TargetPassConfig.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/Pass.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Vectorize.h>
 
 #endif
 
@@ -870,6 +870,7 @@ void llvm_state::optimise()
 {
     check_uncompiled(__func__);
 
+    // NOTE: don't run any optimisation pass at O0.
     if (m_opt_level > 0u) {
         // NOTE: the logic here largely mimics (with a lot of simplifications)
         // the implementation of the 'opt' tool. See:
@@ -932,53 +933,64 @@ void llvm_state::optimise()
         // NOTE: adapted from here:
         // https://llvm.org/docs/NewPassManager.html
 
-        // NOTE: don't run any optimisation pass at O0.
-        if (m_opt_level > 0u) {
-            // Create the analysis managers.
-            llvm::LoopAnalysisManager LAM;
-            llvm::FunctionAnalysisManager FAM;
-            llvm::CGSCCAnalysisManager CGAM;
-            llvm::ModuleAnalysisManager MAM;
-
-            // Create the new pass manager builder, passing
-            // the native target machine from the JIT class.
-            llvm::PassBuilder PB(m_jitter->m_tm.get());
-
-            // Register all the basic analyses with the managers.
-            PB.registerModuleAnalyses(MAM);
-            PB.registerCGSCCAnalyses(CGAM);
-            PB.registerFunctionAnalyses(FAM);
-            PB.registerLoopAnalyses(LAM);
-            PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-            // Setup the optimisation level for the module pass manager.
-            // NOTE: the OptimizationLevel class has changed location
-            // since LLVM 14.
+        // Optimisation level for the module pass manager.
+        // NOTE: the OptimizationLevel class has changed location
+        // since LLVM 14.
 #if LLVM_VERSION_MAJOR >= 14
-            using olevel = llvm::OptimizationLevel;
+        using olevel = llvm::OptimizationLevel;
 #else
-            using olevel = llvm::PassBuilder::OptimizationLevel;
+        using olevel = llvm::PassBuilder::OptimizationLevel;
 #endif
 
-            olevel ol{};
+        // Create the analysis managers.
+        llvm::LoopAnalysisManager LAM;
+        llvm::FunctionAnalysisManager FAM;
+        llvm::CGSCCAnalysisManager CGAM;
+        llvm::ModuleAnalysisManager MAM;
 
-            switch (m_opt_level) {
-                case 1u:
-                    ol = olevel::O1;
-                    break;
-                case 2u:
-                    ol = olevel::O2;
-                    break;
-                default:
-                    ol = olevel::O3;
-            }
+        // NOTE: in the new pass manager, this seems to be the way to
+        // set the target library info bits. See:
+        // https://github.com/llvm/llvm-project/blob/b7fd30eac3183993806cc218b6deb39eb625c083/llvm/tools/opt/NewPMDriver.cpp#L408
+        // Not sure if this matters, but we did it in the old pass manager
+        // and opt does it too.
+        llvm::TargetLibraryInfoImpl TLII(m_jitter->get_target_triple());
+        FAM.registerPass([&] { return llvm::TargetLibraryAnalysis(TLII); });
 
-            // Create the module pass manager.
-            auto MPM = PB.buildPerModuleDefaultPipeline(ol);
+        // Create the new pass manager builder, passing
+        // the native target machine from the JIT class.
+        llvm::PassBuilder PB(m_jitter->m_tm.get());
 
-            // Optimize the IR.
-            MPM.run(*m_module, MAM);
+        // NOTE: this additional pass measurably helps performance
+        // in some benchmarks when dense output is activated.
+        PB.registerVectorizerStartEPCallback(
+            [](llvm::FunctionPassManager &FPM, olevel) { FPM.addPass(llvm::LoadStoreVectorizerPass()); });
+
+        // Register all the basic analyses with the managers.
+        PB.registerModuleAnalyses(MAM);
+        PB.registerCGSCCAnalyses(CGAM);
+        PB.registerFunctionAnalyses(FAM);
+        PB.registerLoopAnalyses(LAM);
+        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+        // Construct the optimisation level.
+        olevel ol{};
+
+        switch (m_opt_level) {
+            case 1u:
+                ol = olevel::O1;
+                break;
+            case 2u:
+                ol = olevel::O2;
+                break;
+            default:
+                ol = olevel::O3;
         }
+
+        // Create the module pass manager.
+        auto MPM = PB.buildPerModuleDefaultPipeline(ol);
+
+        // Optimize the IR.
+        MPM.run(*m_module, MAM);
 
 #else
 

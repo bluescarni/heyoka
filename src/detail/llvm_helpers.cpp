@@ -85,7 +85,7 @@ using fmt::literals::operator""_format;
 // according to various sources online)
 // and clang is not complaining. But let us revisit
 // this issue in later LLVM versions.
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
@@ -180,6 +180,17 @@ std::string llvm_mangle_type(llvm::Type *t)
     } else {
         // Otherwise just return the type name.
         return llvm_type_name(t);
+    }
+}
+
+// Helper to determine the vector size of x. If x is a scalar,
+// 1 will be returned.
+std::uint32_t get_vector_size(llvm::Value *x)
+{
+    if (auto vector_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+        return boost::numeric_cast<std::uint32_t>(vector_t->getNumElements());
+    } else {
+        return 1;
     }
 }
 
@@ -1090,14 +1101,16 @@ llvm::Value *llvm_sgn(llvm_state &s, llvm::Value *val)
 // NOTE: requires FP values of the same type.
 llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 {
+    // LCOV_EXCL_START
     assert(y != nullptr);
     assert(x != nullptr);
     assert(y->getType() == x->getType());
     assert(y->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
 
     auto &context = s.context();
 
-    // Determine the scalar type of the vector arguments.
+    // Determine the scalar type of the arguments.
     auto *x_t = x->getType()->getScalarType();
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -1107,7 +1120,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 #endif
         if (x_t == to_llvm_type<double>(context)) {
             if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
-                if (const auto sfn = sleef_function_name(context, "atan2", vec_t->getElementType(),
+                if (const auto sfn = sleef_function_name(context, "atan2", x_t,
                                                          boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                     !sfn.empty()) {
                     return llvm_invoke_external(
@@ -1136,6 +1149,50 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
         } else {
             throw std::invalid_argument(
                 "Invalid floating-point type encountered in the LLVM implementation of atan2()");
+        }
+        // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Exponential.
+llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
+        return call_extern_vec(s, x, "expq");
+    } else {
+#endif
+        if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
+            if (auto vec_t = llvm::dyn_cast<llvm_vector_type>(x->getType())) {
+                if (const auto sfn = sleef_function_name(context, "exp", x_t,
+                                                         boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+                    !sfn.empty()) {
+                    return llvm_invoke_external(
+                        s, sfn, vec_t, {x},
+                        // NOTE: in theory we may add ReadNone here as well,
+                        // but for some reason, at least up to LLVM 10,
+                        // this causes strange codegen issues. Revisit
+                        // in the future.
+                        {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn});
+                }
+            }
+
+            return llvm_invoke_intrinsic(s.builder(), "llvm.exp", {x->getType()}, {x});
+            // LCOV_EXCL_START
+        } else {
+            throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of exp()");
         }
         // LCOV_EXCL_STOP
 #if defined(HEYOKA_HAVE_REAL128)
@@ -1369,7 +1426,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
     auto tp = to_llvm_vector_type<T>(context, batch_size);
 
     // Fetch the function name.
-    const auto fname = "heyoka_inv_kep_E_{}"_format(llvm_mangle_type(tp));
+    const auto fname = fmt::format("heyoka.inv_kep_E.{}", llvm_mangle_type(tp));
 
     // The function arguments:
     // - eccentricity,
@@ -1775,7 +1832,7 @@ extern "C" HEYOKA_DLL_PUBLIC void heyoka_inv_kep_E_max_iter() noexcept
     heyoka::detail::get_logger()->warn("iteration limit exceeded while solving the elliptic inverse Kepler equation");
 }
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 11)
 
 #pragma GCC diagnostic pop
 

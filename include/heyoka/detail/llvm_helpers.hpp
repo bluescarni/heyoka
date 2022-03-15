@@ -51,6 +51,8 @@ inline llvm::Type *to_llvm_vector_type(llvm::LLVMContext &c, std::uint32_t batch
 
 HEYOKA_DLL_PUBLIC std::string llvm_mangle_type(llvm::Type *);
 
+HEYOKA_DLL_PUBLIC std::uint32_t get_vector_size(llvm::Value *);
+
 HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value *, std::uint32_t);
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *, std::size_t);
@@ -108,6 +110,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *llvm_min_nan(llvm_state &, llvm::Value *, llvm::V
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_max_nan(llvm_state &, llvm::Value *, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_sgn(llvm_state &, llvm::Value *);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_atan2(llvm_state &, llvm::Value *, llvm::Value *);
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_exp(llvm_state &, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_dbl(llvm_state &, std::uint32_t, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Function *llvm_add_csc_ldbl(llvm_state &, std::uint32_t, std::uint32_t);

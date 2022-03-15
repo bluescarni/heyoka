@@ -15,13 +15,32 @@
 #include <fmt/format.h>
 
 #include <heyoka/expression.hpp>
+#include <heyoka/math/cos.hpp>
+#include <heyoka/math/sin.hpp>
 #include <heyoka/math/square.hpp>
+#include <heyoka/math/time.hpp>
 #include <heyoka/nbody.hpp>
 #include <heyoka/taylor.hpp>
 
 #include "catch.hpp"
+#include "test_utils.hpp"
 
 using namespace heyoka;
+using namespace heyoka_test;
+
+template <typename V>
+bool check_close(const V &v1, const V &v2)
+{
+    using vt = typename V::value_type;
+
+    for (decltype(v1.size()) i = 0; i < v1.size(); ++i) {
+        if (!(v1[i] == approximately(v2[i], vt(10)))) {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 TEST_CASE("error handling")
 {
@@ -107,6 +126,38 @@ TEST_CASE("parallel consistency")
         auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
         auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
 
-        REQUIRE(out_serial == out_parallel);
+        REQUIRE(check_close(out_serial, out_parallel));
+    }
+}
+
+// Check the mechanism that sets the pars and time
+// pointers in the global variable in parallel mode.
+TEST_CASE("par time ptr")
+{
+    auto [x, v] = make_vars("x", "v");
+
+    std::vector<double> t_grid;
+    for (auto i = 0; i < 20; ++i) {
+        t_grid.push_back(i * .5);
+    }
+
+    for (auto opt_level : {0u, 1u, 2u, 3u}) {
+        taylor_adaptive<double> ta_serial{{prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)},
+                                          {0., 1.85},
+                                          kw::opt_level = opt_level,
+                                          kw::compact_mode = true,
+                                          kw::pars = {.1}};
+
+        taylor_adaptive<double> ta_parallel{{prime(x) = v, prime(v) = cos(heyoka::time) - par[0] * v - sin(x)},
+                                            {0., 1.85},
+                                            kw::opt_level = opt_level,
+                                            kw::compact_mode = true,
+                                            kw::pars = {.1},
+                                            kw::parallel_mode = true};
+
+        auto out_serial = std::get<4>(ta_serial.propagate_grid(t_grid));
+        auto out_parallel = std::get<4>(ta_parallel.propagate_grid(t_grid));
+
+        REQUIRE(check_close(out_serial, out_parallel));
     }
 }
