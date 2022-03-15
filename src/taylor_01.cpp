@@ -1689,9 +1689,11 @@ template <typename T>
 void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t order, std::uint32_t batch_size,
                                bool high_accuracy, bool external_linkage, bool optimise)
 {
+    // LCOV_EXCL_START
     assert(n_eq > 0u);
     assert(order > 0u);
     assert(batch_size > 0u);
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
     auto &context = s.context();
@@ -1705,7 +1707,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
     std::vector<llvm::Type *> fargs(3, llvm::PointerType::getUnqual(fp_scal_t));
     // The function does not return anything.
     auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-    assert(ft != nullptr);
+    assert(ft != nullptr); // LCOV_EXCL_LINE
     // Now create the function.
     auto *f = llvm::Function::Create(
         ft, external_linkage ? llvm::Function::ExternalLinkage : llvm::Function::InternalLinkage, "d_out_f",
@@ -1737,7 +1739,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
 
     // Create a new basic block to start insertion into.
     auto *bb = llvm::BasicBlock::Create(context, "entry", f);
-    assert(bb != nullptr);
+    assert(bb != nullptr); // LCOV_EXCL_LINE
     builder.SetInsertPoint(bb);
 
     // Load the value of h.
