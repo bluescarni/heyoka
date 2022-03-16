@@ -1814,6 +1814,9 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
             auto *tc_idx
                 = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                     builder.getInt32(batch_size * order));
+            // (order * n_eq + cur_var_idx) * batch_size
+            // auto *tc_idx = builder.CreateMul(builder.CreateAdd(builder.getInt32(order * n_eq), cur_var_idx),
+            //                                  builder.getInt32(batch_size));
             auto *tc
                 = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx), batch_size);
 
@@ -1837,6 +1840,13 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
                         = builder.CreateAdd(builder.CreateMul(builder.getInt32(batch_size * (order + 1u)), cur_var_idx),
                                             builder.CreateMul(builder.getInt32(batch_size),
                                                               builder.CreateSub(builder.getInt32(order), cur_order)));
+                    // ((order - cur_order) * n_eq + cur_var_idx) * batch_size
+                    // auto *tc_idx = builder.CreateMul(
+                    //     builder.CreateAdd(builder.CreateMul(builder.CreateSub(builder.getInt32(order), cur_order),
+                    //                                         builder.getInt32(n_eq)),
+                    //                       cur_var_idx),
+                    //     builder.getInt32(batch_size));
+
                     auto *tc = load_vector_from_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, tc_ptr, tc_idx),
                                                        batch_size);
 

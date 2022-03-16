@@ -89,6 +89,8 @@ int main(int argc, char *argv[])
 
     if (with_dense) {
         std::tie(oc, h_min, h_max, n_steps, d_out) = ta.propagate_grid(std::move(grid));
+        std::cout.precision(16);
+        std::cout << d_out[d_out.size() - 100u] << '\n';
     } else {
         std::tie(oc, h_min, h_max, n_steps, c_out) = ta.propagate_until(100000.);
     }
