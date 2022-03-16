@@ -429,7 +429,7 @@ auto taylor_add_adaptive_step(llvm_state &s, const std::string &name, const U &s
             // for the state variables.
             taylor_write_tc(s, diff_variant, {}, nullptr, tc_ptr, n_eq, n_uvars, order, batch_size);
         },
-        [&]() {
+        []() {
             // Taylor coefficients were not requested,
             // don't do anything in this branch.
         });
