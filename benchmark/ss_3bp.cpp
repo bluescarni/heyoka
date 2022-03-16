@@ -7,6 +7,7 @@
 // with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <initializer_list>
 #include <iostream>
@@ -62,20 +63,53 @@ int main(int argc, char *argv[])
         grid.push_back(100000.);
     }
 
-    auto masses = {1.00000597682, 1 / 1047.355, 1 / 3501.6};
+    auto masses = std::vector{1.00000597682, 1 / 1047.355, 1 / 3501.6};
     const auto G = 0.01720209895 * 0.01720209895 * 365 * 365;
 
     auto sys = make_nbody_sys(3, kw::masses = masses, kw::Gconst = G);
 
-    auto ic = {// Sun.
-               -5.137271893918405e-03, -5.288891104344273e-03, 6.180743702483316e-06, 2.3859757364179156e-03,
-               -2.3396779489468049e-03, -8.1384891821122709e-07,
-               // Jupiter.
-               3.404393156051084, 3.6305811472186558, 0.0342464685434024, -2.0433186406983279e+00,
-               2.0141003472039567e+00, -9.7316724504621210e-04,
-               // Saturn.
-               6.606942557811084, 6.381645992310656, -0.1361381213577972, -1.5233982268351876, 1.4589658329821569,
-               0.0061033600397708};
+    auto ic = std::vector{// Sun.
+                          -5.137271893918405e-03, -5.288891104344273e-03, 6.180743702483316e-06, 2.3859757364179156e-03,
+                          -2.3396779489468049e-03, -8.1384891821122709e-07,
+                          // Jupiter.
+                          3.404393156051084, 3.6305811472186558, 0.0342464685434024, -2.0433186406983279e+00,
+                          2.0141003472039567e+00, -9.7316724504621210e-04,
+                          // Saturn.
+                          6.606942557811084, 6.381645992310656, -0.1361381213577972, -1.5233982268351876,
+                          1.4589658329821569, 0.0061033600397708};
+
+    auto compute_energy = [&](const auto &st) {
+        auto m0 = masses[0], m1 = masses[1], m2 = masses[2];
+
+        auto x0 = st[0], y0 = st[1], z0 = st[2];
+        auto vx0 = st[3], vy0 = st[4], vz0 = st[5];
+
+        auto x1 = st[6], y1 = st[7], z1 = st[8];
+        auto vx1 = st[9], vy1 = st[10], vz1 = st[11];
+
+        auto x2 = st[12], y2 = st[13], z2 = st[14];
+        auto vx2 = st[15], vy2 = st[16], vz2 = st[17];
+
+        auto v0_2 = vx0 * vx0 + vy0 * vy0 + vz0 * vz0;
+        auto v1_2 = vx1 * vx1 + vy1 * vy1 + vz1 * vz1;
+        auto v2_2 = vx2 * vx2 + vy2 * vy2 + vz2 * vz2;
+
+        auto K = 0.5 * (m0 * v0_2 + m1 * v1_2 + m2 * v2_2);
+
+        auto x01 = x0 - x1, y01 = y0 - y1, z01 = z0 - z1;
+        auto x02 = x0 - x2, y02 = y0 - y2, z02 = z0 - z2;
+        auto x12 = x1 - x2, y12 = y1 - y2, z12 = z1 - z2;
+
+        auto r01_2 = x01 * x01 + y01 * y01 + z01 * z01;
+        auto r02_2 = x02 * x02 + y02 * y02 + z02 * z02;
+        auto r12_2 = x12 * x12 + y12 * y12 + z12 * z12;
+
+        auto U = -G * (m0 * m1 / std::sqrt(r01_2) + m0 * m2 / std::sqrt(r02_2) + m1 * m2 / std::sqrt(r12_2));
+
+        return K + U;
+    };
+
+    const auto E0 = compute_energy(ic);
 
     taylor_adaptive<double> ta{std::move(sys), ic, kw::tol = tol};
 
@@ -119,6 +153,7 @@ int main(int argc, char *argv[])
         rms_err += loc_err * loc_err;
     }
     std::cout << "RMS error: " << std::sqrt(rms_err / 18) << '\n';
+    std::cout << "Relative energy error: " << std::abs((E0 - compute_energy(ta.get_state())) / E0) << '\n';
 
     return 0;
 }

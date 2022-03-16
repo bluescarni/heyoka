@@ -11,6 +11,51 @@ const tol = 1e-15
 
 const with_dense = true
 
+function compute_energy!(st):
+    m0 = m_sun
+    m1 = m_jup
+    m2 = m_sat
+
+    x0 = st[0]
+    y0 = st[1]
+    z0 = st[2]
+    vx0 = st[3]
+    vy0 = st[4]
+    vz0 = st[5]
+
+    x1 = st[6]
+    y1 = st[7]
+    z1 = st[8]
+    vx1 = st[9]
+    vy1 = st[10]
+    vz1 = st[11]
+
+    x2 = st[12]
+    y2 = st[13]
+    z2 = st[14]
+    vx2 = st[15]
+    vy2 = st[16]
+    vz2 = st[17]
+
+    v0_2 = vx0 * vx0 + vy0 * vy0 + vz0 * vz0
+    v1_2 = vx1 * vx1 + vy1 * vy1 + vz1 * vz1
+    v2_2 = vx2 * vx2 + vy2 * vy2 + vz2 * vz2
+
+    K = 0.5 * (m0 * v0_2 + m1 * v1_2 + m2 * v2_2)
+
+    x01 = x0 - x1, y01 = y0 - y1, z01 = z0 - z1
+    x02 = x0 - x2, y02 = y0 - y2, z02 = z0 - z2
+    x12 = x1 - x2, y12 = y1 - y2, z12 = z1 - z2
+
+    r01_2 = x01 * x01 + y01 * y01 + z01 * z01
+    r02_2 = x02 * x02 + y02 * y02 + z02 * z02
+    r12_2 = x12 * x12 + y12 * y12 + z12 * z12
+
+    auto U = -G * (m0 * m1 / sqrt(r01_2) + m0 * m2 / sqrt(r02_2) + m1 * m2 / sqrt(r12_2))
+
+    return K + U
+end
+
 function ss_3bp!(dq, q, param, t)
     x_sun, y_sun, z_sun, vx_sun, vy_sun, vz_sun, x_jup, y_jup, z_jup, vx_jup, vy_jup, vz_jup, x_sat, y_sat, z_sat, vx_sat, vy_sat, vz_sat = q
 
@@ -69,6 +114,8 @@ q0 = [-5.137271893918405e-03, -5.288891104344273e-03, 6.180743702483316e-06, 2.3
       2.0141003472039567e+00, -9.7316724504621210e-04,
       6.606942557811084, 6.381645992310656, -0.1361381213577972, -1.5233982268351876, 1.4589658329821569,
       0.0061033600397708];
+
+println(compute_energy(q0))
 
 ref = [0.00529783352211642635986448512870267126,   0.00443801687663031764860286477965782292,
       -9.26927271770180624859940898715912866e-07, -0.00216531823419081350439333313986268641,
