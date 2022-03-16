@@ -11,7 +11,7 @@ const tol = 1e-15
 
 const with_dense = true
 
-function compute_energy!(st):
+function compute_energy(st)
     m0 = m_sun
     m1 = m_jup
     m2 = m_sat
@@ -43,15 +43,21 @@ function compute_energy!(st):
 
     K = 0.5 * (m0 * v0_2 + m1 * v1_2 + m2 * v2_2)
 
-    x01 = x0 - x1, y01 = y0 - y1, z01 = z0 - z1
-    x02 = x0 - x2, y02 = y0 - y2, z02 = z0 - z2
-    x12 = x1 - x2, y12 = y1 - y2, z12 = z1 - z2
+    x01 = x0 - x1
+    y01 = y0 - y1
+    z01 = z0 - z1
+    x02 = x0 - x2
+    y02 = y0 - y2
+    z02 = z0 - z2
+    x12 = x1 - x2
+    y12 = y1 - y2
+    z12 = z1 - z2
 
     r01_2 = x01 * x01 + y01 * y01 + z01 * z01
     r02_2 = x02 * x02 + y02 * y02 + z02 * z02
     r12_2 = x12 * x12 + y12 * y12 + z12 * z12
 
-    auto U = -G * (m0 * m1 / sqrt(r01_2) + m0 * m2 / sqrt(r02_2) + m1 * m2 / sqrt(r12_2))
+    U = -G * (m0 * m1 / sqrt(r01_2) + m0 * m2 / sqrt(r02_2) + m1 * m2 / sqrt(r12_2))
 
     return K + U
 end
