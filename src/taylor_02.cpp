@@ -1814,6 +1814,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                      const std::vector<std::uint32_t> &sv_funcs_dc, llvm::Value *svf_ptr, llvm::Value *tc_ptr,
                      std::uint32_t n_eq, std::uint32_t n_uvars, std::uint32_t order, std::uint32_t batch_size)
 {
+    // LCOV_EXCL_START
     assert(batch_size != 0u);
 #if !defined(NDEBUG)
     if (diff_variant.index() == 0u) {
@@ -1824,6 +1825,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
         assert(svf_ptr == nullptr);
     }
 #endif
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
 
@@ -1903,36 +1905,18 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
-        for (std::uint32_t j = 0; j < n_eq; ++j) {
+        for (std::uint32_t j = 0; j < n_eq + n_sv_funcs; ++j) {
             for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
                 // Index in the jet of derivatives.
                 // NOTE: in non-compact mode, diff_arr contains the derivatives only of the
                 // state variables and sv_variable (not all u vars), hence the indexing
                 // is cur_order * (n_eq + n_sv_funcs) + j.
                 const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + j;
-                assert(arr_idx < diff_arr.size());
+                assert(arr_idx < diff_arr.size()); // LCOV_EXCL_LINE
                 auto *const val = diff_arr[arr_idx];
 
                 // Index in tc_ptr.
                 const auto out_idx = (order + 1u) * batch_size * j + cur_order * batch_size;
-
-                // Write to tc_ptr.
-                assert(llvm_depr_GEP_type_check(tc_ptr, pointee_type(tc_ptr))); // LCOV_EXCL_LINE
-                auto *out_ptr = builder.CreateInBoundsGEP(pointee_type(tc_ptr), tc_ptr,
-                                                          builder.getInt32(static_cast<std::uint32_t>(out_idx)));
-                store_vector_to_memory(builder, out_ptr, val);
-            }
-        }
-
-        for (std::uint32_t j = 0; j < n_sv_funcs; ++j) {
-            for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
-                // Index in the jet of derivatives.
-                const auto arr_idx = cur_order * (n_eq + n_sv_funcs) + n_eq + j;
-                assert(arr_idx < diff_arr.size());
-                auto *const val = diff_arr[arr_idx];
-
-                // Index in tc_ptr.
-                const auto out_idx = (order + 1u) * batch_size * (n_eq + j) + cur_order * batch_size;
 
                 // Write to tc_ptr.
                 assert(llvm_depr_GEP_type_check(tc_ptr, pointee_type(tc_ptr))); // LCOV_EXCL_LINE
