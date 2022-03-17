@@ -107,6 +107,8 @@ class HEYOKA_DLL_PUBLIC llvm_state
 
     struct jit;
 
+    // NOTE: LLVM rules state that a context has to outlive all
+    // modules associated with it.
     std::unique_ptr<jit> m_jitter;
     std::unique_ptr<llvm::Module> m_module;
     std::unique_ptr<ir_builder> m_builder;
