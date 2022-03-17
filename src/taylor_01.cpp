@@ -2046,7 +2046,7 @@ void continuous_output<T>::add_c_out_function(std::uint32_t order, std::uint32_t
     // or the last possible set of TCs.
     detail::llvm_if_then_else(
         m_llvm_state, builder.CreateICmpEQ(tc_idx, builder.getInt32(0)),
-        [&]() {
+        []() {
             // first == 0, do nothing.
         },
         [&]() {
