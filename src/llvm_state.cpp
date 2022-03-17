@@ -958,6 +958,9 @@ void llvm_state::optimise()
 
         // Create the new pass manager builder, passing
         // the native target machine from the JIT class.
+        // NOTE: the SLP vectorizer (and other tuning options) can be
+        // set through a PipelineTuningOptions options passed as second
+        // argument to this constructor.
         llvm::PassBuilder PB(m_jitter->m_tm.get());
 
         // NOTE: this additional pass measurably helps performance
