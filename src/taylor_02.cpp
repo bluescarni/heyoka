@@ -1905,7 +1905,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
 
         const auto &diff_arr = std::get<std::vector<llvm::Value *>>(diff_variant);
 
-#if 0
+#if 1
         for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
             for (std::uint32_t j = 0; j < n_eq + n_sv_funcs; ++j) {
                 // Index in the jet of derivatives.
@@ -1926,7 +1926,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 store_vector_to_memory(builder, out_ptr, val);
             }
         }
-#endif
+#else
 
         for (std::uint32_t j = 0; j < n_eq + n_sv_funcs; ++j) {
             for (decltype(diff_arr.size()) cur_order = 0; cur_order <= order; ++cur_order) {
@@ -1948,6 +1948,7 @@ void taylor_write_tc(llvm_state &s, const std::variant<llvm::Value *, std::vecto
                 store_vector_to_memory(builder, out_ptr, val);
             }
         }
+#endif
     }
 }
 

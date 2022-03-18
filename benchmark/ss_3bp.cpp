@@ -79,6 +79,8 @@ int main(int argc, char *argv[])
 
     taylor_adaptive<double> ta{std::move(sys), ic, kw::tol = tol};
 
+    std::cout << ta.get_llvm_state().get_ir() << '\n';
+
     taylor_outcome oc;
     double h_min, h_max;
     std::size_t n_steps;
