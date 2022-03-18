@@ -351,7 +351,7 @@ ODE integration packages. Specifically, we compare heyoka to:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://diffeq.sciml.ai/">DifferentialEquations.jl</a>, a popular Julia
 library implementing several ODE solvers. In these benchmarks, we will be using
-explicit Runge-Kutta solvers such as <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and <code class="docutils literal notranslate"><span class="pre">DP8</span></code> (see
+explicit Runge-Kutta solvers such as <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>, <code class="docutils literal notranslate"><span class="pre">Vern6</span></code>, <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code>, <code class="docutils literal notranslate"><span class="pre">DP8</span></code>, etc. (see
 <a class="reference external" href="https://diffeq.sciml.ai/stable/solvers/ode_solve/">here</a> for a list of
 ODE solvers available in DifferentialEquations.jl);</p></li>
 <li><p><a class="reference external" href="https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html">Boost.ODEInt</a>,
@@ -360,9 +360,7 @@ benchmarks, we will be using the explicit Runge-Kutta-Fehlberg 78 solver;</p></l
 <li><p>the <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> integrator from <a class="reference external" href="https://github.com/hannorein/rebound">REBOUND</a>,
 a popular N-body integration package. Like heyoka, <code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is a high-precision
 non-symplectic integrator with adaptive timestepping capable of conserving the
-dynamical invariants over billions of dynamical timescales. Note, however, that
-<code class="docutils literal notranslate"><span class="pre">IAS15</span></code> is not a general-purpose integrator, and thus we will be able to use
-it only in benchmarks involving gravitational N-body systems.</p></li>
+dynamical invariants over billions of dynamical timescales.</p></li>
 </ul>
 <p>Note that the integrators from DifferentialEquations.jl by default
 enable dense output, which however incurs in a heavy computational cost. While heyoka also supports
@@ -378,28 +376,31 @@ in which the three particles are the Sun, Jupiter and Saturn, all represented as
 attracting each other according to <a class="reference external" href="https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation">Newtonian gravity</a>.
 The initial conditions are taken from <a class="reference external" href="https://ntrs.nasa.gov/citations/19860060859">this paper</a>, and the integration
 is run for a total of <span class="math notranslate nohighlight">\(10^5\)</span> years.
-For <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and heyoka, the test is run both with and without <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. When dense output is enabled,
+For the DifferentialEquations.jl integrators and heyoka, the test is run both with and without <a class="reference internal" href="tut_d_output.html#tut-d-output"><span class="std std-ref">dense output</span></a>. When dense output is enabled,
 the result of the integration over <span class="math notranslate nohighlight">\(5 \times 10^5\)</span> equispaced time grid points is requested.</p>
 <p>In order to measure the accuracy of the integration, we will also compare the final state of the system
 with the result of a numerical integration in quadruple precision with a tolerance of <span class="math notranslate nohighlight">\(10^{-30}\)</span>.</p>
 <p>Let us see first the results for an error tolerance of <span class="math notranslate nohighlight">\(10^{-15}\)</span>:</p>
 <img alt="3BP benchmark 1e-15" class="align-center" src="_images/ss_3bp_15.png" />
-<p>We can see how, without dense output, heyoka is about 3 times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. When dense output is requested,
-heyoka’s runtime increases by a modest <span class="math notranslate nohighlight">\(\sim 24\%\)</span>, whereas for <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> the runtime increases by a factor of
-<span class="math notranslate nohighlight">\(\sim 3\)</span>, so that, with dense output, heyoka is about <span class="math notranslate nohighlight">\(\sim 7\)</span> times faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code>. Performance-wise,
+<p>We can see how, without dense output, heyoka is at least 3 times faster than any other tested integrator. When dense output is requested (gray bars),
+heyoka’s runtime increases by <span class="math notranslate nohighlight">\(\sim 50\%\)</span>, whereas for the other integrators the performance hit is substantially larger. Performance-wise,
 Boost.ODEint is comparable to <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> (note that the RKF78 integrator from Boost.ODEInt does not support dense output).</p>
-<p>From the point of view of the integration accuracy, we can see how the RMS of the error across the components of the state
-vector with respect to the quadruple-precision integration is of the order of <span class="math notranslate nohighlight">\(10^{-9}\)</span> for heyoka, while for both
-<code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and Boost.ODEInt the error is about <span class="math notranslate nohighlight">\(\sim 35\)</span> times larger.</p>
+<p>From the point of view of the integration accuracy, we can see how heyoka has the lowest relative error (with respect to the quadruple-precision integration)
+among the tested integrators.</p>
 <p>Note that, even if the error tolerance for the integration is set to <span class="math notranslate nohighlight">\(10^{-15}\)</span>, the error at the end of the integration
 is of the order of <span class="math notranslate nohighlight">\(10^{-9}\)</span>. This is to be expected, as the error on the state variables accumulates as (at least)
 <span class="math notranslate nohighlight">\(t^{\frac{3}{2}}\)</span> (a result known as Brouwer’s law).</p>
 <p>Let us now see the results for an error tolerance of <span class="math notranslate nohighlight">\(10^{-9}\)</span>:</p>
 <img alt="3BP benchmark 1e-9" class="align-center" src="_images/ss_3bp_9.png" />
-<p>Whereas heyoka is still faster than <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> and Boost.ODEInt, at this higher integration tolerance the performance
+<p>Whereas heyoka is still faster than the other integrators, at this higher integration tolerance the performance
 advantage is smaller.</p>
-<p>The integration accuracy of both heyoka and <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> is of the order of <span class="math notranslate nohighlight">\(10^{-3}\)</span>. By contrast,
-the accuracy of Boost.ODEInt is two orders of magnitude worse.</p>
+<p>The integration accuracy of both heyoka and <code class="docutils literal notranslate"><span class="pre">Vern9</span></code> is of the order of <span class="math notranslate nohighlight">\(10^{-3}\)</span>. The other integrators feature
+a much worse accuracy.</p>
+<p>Finally, let us see the results for an error tolerance of <span class="math notranslate nohighlight">\(10^{-6}\)</span>. In this test, we will replace <code class="docutils literal notranslate"><span class="pre">Feagin14</span></code>
+with <code class="docutils literal notranslate"><span class="pre">Vern6</span></code>, which is supposed to be more efficient at high tolerances:</p>
+<img alt="3BP benchmark 1e-6" class="align-center" src="_images/ss_3bp_6.png" />
+<p>At low accuracy, heyoka performs similarly to <code class="docutils literal notranslate"><span class="pre">DP8</span></code> and <code class="docutils literal notranslate"><span class="pre">RKF78</span></code> without dense output. When dense output is requested,
+heyoka retains a substantial performance advantage.</p>
 </div>
 <div class="section" id="the-outer-solar-system">
 <h2>The outer Solar System<a class="headerlink" href="#the-outer-solar-system" title="Permalink to this headline">¶</a></h2>

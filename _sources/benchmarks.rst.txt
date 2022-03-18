@@ -8,7 +8,7 @@ ODE integration packages. Specifically, we compare heyoka to:
 
 - `DifferentialEquations.jl <https://diffeq.sciml.ai/>`__, a popular Julia
   library implementing several ODE solvers. In these benchmarks, we will be using
-  explicit Runge-Kutta solvers such as ``Vern9`` and ``DP8`` (see
+  explicit Runge-Kutta solvers such as ``Vern9``, ``Vern6``, ``Feagin14``, ``DP8``, etc. (see
   `here <https://diffeq.sciml.ai/stable/solvers/ode_solve/>`__ for a list of
   ODE solvers available in DifferentialEquations.jl);
 - `Boost.ODEInt <https://www.boost.org/doc/libs/master/libs/numeric/odeint/doc/html/index.html>`__,
@@ -17,9 +17,7 @@ ODE integration packages. Specifically, we compare heyoka to:
 - the ``IAS15`` integrator from `REBOUND <https://github.com/hannorein/rebound>`__,
   a popular N-body integration package. Like heyoka, ``IAS15`` is a high-precision
   non-symplectic integrator with adaptive timestepping capable of conserving the
-  dynamical invariants over billions of dynamical timescales. Note, however, that
-  ``IAS15`` is not a general-purpose integrator, and thus we will be able to use
-  it only in benchmarks involving gravitational N-body systems.
+  dynamical invariants over billions of dynamical timescales.
 
 Note that the integrators from DifferentialEquations.jl by default
 enable dense output, which however incurs in a heavy computational cost. While heyoka also supports
@@ -38,7 +36,7 @@ in which the three particles are the Sun, Jupiter and Saturn, all represented as
 attracting each other according to `Newtonian gravity <https://en.wikipedia.org/wiki/Newton%27s_law_of_universal_gravitation>`__.
 The initial conditions are taken from `this paper <https://ntrs.nasa.gov/citations/19860060859>`__, and the integration
 is run for a total of :math:`10^5` years.
-For ``Vern9`` and heyoka, the test is run both with and without :ref:`dense output <tut_d_output>`. When dense output is enabled,
+For the DifferentialEquations.jl integrators and heyoka, the test is run both with and without :ref:`dense output <tut_d_output>`. When dense output is enabled,
 the result of the integration over :math:`5 \times 10^5` equispaced time grid points is requested.
 
 In order to measure the accuracy of the integration, we will also compare the final state of the system
@@ -50,14 +48,12 @@ Let us see first the results for an error tolerance of :math:`10^{-15}`:
   :align: center
   :alt: 3BP benchmark 1e-15
 
-We can see how, without dense output, heyoka is about 3 times faster than ``Vern9``. When dense output is requested,
-heyoka's runtime increases by a modest :math:`\sim 24\%`, whereas for ``Vern9`` the runtime increases by a factor of
-:math:`\sim 3`, so that, with dense output, heyoka is about :math:`\sim 7` times faster than ``Vern9``. Performance-wise,
+We can see how, without dense output, heyoka is at least 3 times faster than any other tested integrator. When dense output is requested (gray bars),
+heyoka's runtime increases by :math:`\sim 50\%`, whereas for the other integrators the performance hit is substantially larger. Performance-wise,
 Boost.ODEint is comparable to ``Vern9`` (note that the RKF78 integrator from Boost.ODEInt does not support dense output).
 
-From the point of view of the integration accuracy, we can see how the RMS of the error across the components of the state
-vector with respect to the quadruple-precision integration is of the order of :math:`10^{-9}` for heyoka, while for both
-``Vern9`` and Boost.ODEInt the error is about :math:`\sim 35` times larger.
+From the point of view of the integration accuracy, we can see how heyoka has the lowest relative error (with respect to the quadruple-precision integration)
+among the tested integrators.
 
 Note that, even if the error tolerance for the integration is set to :math:`10^{-15}`, the error at the end of the integration
 is of the order of :math:`10^{-9}`. This is to be expected, as the error on the state variables accumulates as (at least)
@@ -69,11 +65,21 @@ Let us now see the results for an error tolerance of :math:`10^{-9}`:
   :align: center
   :alt: 3BP benchmark 1e-9
 
-Whereas heyoka is still faster than ``Vern9`` and Boost.ODEInt, at this higher integration tolerance the performance
+Whereas heyoka is still faster than the other integrators, at this higher integration tolerance the performance
 advantage is smaller.
 
-The integration accuracy of both heyoka and ``Vern9`` is of the order of :math:`10^{-3}`. By contrast,
-the accuracy of Boost.ODEInt is two orders of magnitude worse.
+The integration accuracy of both heyoka and ``Vern9`` is of the order of :math:`10^{-3}`. The other integrators feature
+a much worse accuracy.
+
+Finally, let us see the results for an error tolerance of :math:`10^{-6}`. In this test, we will replace ``Feagin14``
+with ``Vern6``, which is supposed to be more efficient at high tolerances:
+
+.. image:: images/ss_3bp_6.png
+  :align: center
+  :alt: 3BP benchmark 1e-6
+
+At low accuracy, heyoka performs similarly to ``DP8`` and ``RKF78`` without dense output. When dense output is requested,
+heyoka retains a substantial performance advantage.
 
 The outer Solar System
 ----------------------
