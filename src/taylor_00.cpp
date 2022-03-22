@@ -1492,9 +1492,39 @@ std::uint32_t taylor_adaptive_impl<T>::get_dim() const
     return m_dim;
 }
 
+namespace
+{
+
+// NOTE: double-length normalisation assumes abs(hi) >= abs(lo), we need to enforce this
+// when setting the time coordinate in double-length format.
+template <typename T>
+void dtime_checks(T hi, T lo)
+{
+    using std::abs;
+    using std::isfinite;
+
+    if (!isfinite(hi) || !isfinite(lo)) {
+        throw std::invalid_argument(fmt::format("The components of the double-length representation of the time "
+                                                "coordinate must both be finite, but they are {} and {} instead",
+                                                hi, lo));
+    }
+
+    if (abs(hi) < abs(lo)) {
+        throw std::invalid_argument(
+            fmt::format("The first component of the double-length representation of the time "
+                        "coordinate ({}) must not be smaller in magnitude than the second component ({})",
+                        hi, lo));
+    }
+}
+
+} // namespace
+
 template <typename T>
 void taylor_adaptive_impl<T>::set_dtime(T hi, T lo)
 {
+    // Check the components.
+    dtime_checks(hi, lo);
+
     m_time = normalise(dfloat<T>{hi, lo});
 }
 
@@ -1971,6 +2001,12 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
             "but the number of specified times is ({}, {})"_format(m_batch_size, hi.size(), lo.size()));
     }
 
+    // Check the values in hi/lo.
+    // NOTE: do it before ever touching m_time_hi/lo for exception safety.
+    for (std::uint32_t i = 0; i < m_batch_size; ++i) {
+        dtime_checks(hi[i], lo[i]);
+    }
+
     // Copy over the new times, ensuring proper
     // normalisation.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
@@ -1984,6 +2020,9 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
 template <typename T>
 void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 {
+    // Check the components.
+    dtime_checks(hi, lo);
+
     // Copy over the new time, ensuring proper
     // normalisation.
     const auto tmp = normalise(dfloat<T>{hi, lo});
