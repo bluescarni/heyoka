@@ -982,6 +982,11 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 // Helper to compute abs(x_v).
 llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
 {
+    // LCOV_EXCL_START
+    assert(x_v != nullptr);
+    assert(x_v->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector argument.
     auto *x_t = x_v->getType()->getScalarType();
@@ -1191,6 +1196,32 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
             throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of exp()");
         }
         // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Fused multiply-add.
+llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(y != nullptr);
+    assert(z != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    assert(x->getType() == y->getType());
+    assert(x->getType() == z->getType());
+    // LCOV_EXCL_STOP
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of x, y and z.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        return call_extern_vec(s, {x, y, z}, "fmaq");
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif

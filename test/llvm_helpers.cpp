@@ -1136,3 +1136,130 @@ TEST_CASE("minmax")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("fma scalar")
+{
+    using detail::llvm_fma;
+    using detail::to_llvm_type;
+    using std::fma;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{val_t, val_t, val_t};
+            auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
+
+            auto x = f->args().begin();
+            auto y = f->args().begin() + 1;
+            auto z = f->args().begin() + 2;
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            builder.CreateRet(llvm_fma(s, x, y, z));
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<fp_t (*)(fp_t, fp_t, fp_t)>(s.jit_lookup("hey_fma"));
+
+            auto a = fp_t(123);
+            auto b = fp_t(2) / fp_t(7);
+            auto c = fp_t(-3) / fp_t(4);
+
+            REQUIRE(f_ptr(a, b, c) == approximately(fma(a, b, c), fp_t(10)));
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("fma batch")
+{
+    using detail::llvm_fma;
+    using detail::to_llvm_type;
+    using std::fma;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_fma", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto x_ptr = f->args().begin() + 1;
+                auto y_ptr = f->args().begin() + 2;
+                auto z_ptr = f->args().begin() + 3;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto ret = llvm_fma(s, detail::load_vector_from_memory(builder, x_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, y_ptr, batch_size),
+                                    detail::load_vector_from_memory(builder, z_ptr, batch_size));
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_fma"));
+
+                // Setup the arguments and the output value.
+                std::vector<fp_t> ret_vec(batch_size), a_vec(ret_vec), b_vec(ret_vec), c_vec(ret_vec);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    a_vec[i] = i + 1u;
+                    b_vec[i] = a_vec[i] * 10 * (i + 1u);
+                    c_vec[i] = b_vec[i] * 10 * (i + 1u);
+                }
+
+                f_ptr(ret_vec.data(), a_vec.data(), b_vec.data(), c_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    auto a = a_vec[i];
+                    auto b = b_vec[i];
+                    auto c = c_vec[i];
+
+                    REQUIRE(ret_vec[i] == approximately(fma(a, b, c), fp_t(10)));
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
