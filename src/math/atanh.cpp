@@ -109,7 +109,7 @@ llvm::Value *atanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Valu
         }
     }
 
-    return call_extern_vec(s, args[0], "atanh");
+    return call_extern_vec(s, args, "atanh");
 }
 
 llvm::Value *atanh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -117,7 +117,7 @@ llvm::Value *atanh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Val
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0],
+    return call_extern_vec(s, args,
 #if defined(_MSC_VER)
                            // NOTE: it seems like the MSVC stdlib does not have an atanhl function,
                            // because LLVM complains about the symbol "atanhl" not being
@@ -136,7 +136,7 @@ llvm::Value *atanh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Val
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "atanhq");
+    return call_extern_vec(s, args, "atanhq");
 }
 
 #endif

@@ -334,11 +334,13 @@ std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *v
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
+        assert(vector_size != 0u); // LCOV_EXCL_LINE
+
         // Extract the vector elements one by one.
         std::vector<llvm::Value *> ret;
         for (decltype(vector_size) i = 0; i < vector_size; ++i) {
             ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
-            assert(ret.back() != nullptr);
+            assert(ret.back() != nullptr); // LCOV_EXCL_LINE
         }
 
         return ret;
@@ -759,58 +761,52 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     builder.SetInsertPoint(merge_bb);
 }
 
-// Helper to invoke an external function on a vector argument.
-// The function will be called on each element of the vector separately,
-// and the return will be re-assembled as a vector.
+// Helper to invoke an external function with vector arguments.
+// The call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector.
 // NOTE: there are some assumptions about valid function attributes
 // in this implementation.
-llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string &fname)
+llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
 {
-    assert(arg != nullptr);
+    // LCOV_EXCL_START
+    assert(!args.empty());
+    // Make sure all vector arguments are of the same type.
+    assert(std::all_of(args.begin() + 1, args.end(),
+                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
 
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, arg);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, fname, scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+    // Decompose each argument into a vector of scalars.
+    std::vector<std::vector<llvm::Value *>> scalars;
+    for (const auto &arg : args) {
+        scalars.push_back(vector_to_scalars(builder, arg));
     }
 
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
-}
+    // Fetch the vector size.
+    auto vec_size = scalars[0].size();
 
-// Helper to invoke an external function on 2 vector arguments.
-// The function will be called on each elements of the vectors separately,
-// and the return will be re-assembled as a vector.
-// NOTE: there are some assumptions about valid function attributes
-// in this implementation.
-llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg0, llvm::Value *arg1, const std::string &fname)
-{
-    assert(arg0 != nullptr);
-    assert(arg1 != nullptr);
-    assert(arg0->getType() == arg1->getType());
+    // Fetch the type of the scalar arguments.
+    const auto scal_t = scalars[0][0]->getType();
 
-    auto &builder = s.builder();
+    // LCOV_EXCL_START
+    // Make sure the vector size is the same for all arguments.
+    assert(std::all_of(scalars.begin() + 1, scalars.end(),
+                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
+    // LCOV_EXCL_STOP
 
-    // Decompose the arguments into scalars.
-    auto scalars0 = vector_to_scalars(builder, arg0);
-    auto scalars1 = vector_to_scalars(builder, arg1);
+    // Invoke the function on each set of scalars.
+    std::vector<llvm::Value *> retvals, scal_args;
+    for (decltype(vec_size) i = 0; i < vec_size; ++i) {
+        // Setup the vector of scalar arguments.
+        scal_args.clear();
+        for (const auto &scal_set : scalars) {
+            scal_args.push_back(scal_set[i]);
+        }
 
-    // Invoke the function on each pair of scalars.
-    std::vector<llvm::Value *> retvals;
-    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
+        // Invoke the function and store the scalar result.
         retvals.push_back(llvm_invoke_external(
-            s, fname, scalars0[i]->getType(), {scalars0[i], scalars1[i]},
+            s, fname, scal_t, scal_args,
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
@@ -991,7 +987,7 @@ llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, "fabsq");
+        return call_extern_vec(s, {x_v}, "fabsq");
     } else {
 #endif
         return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x_v->getType()}, {x_v});
@@ -1013,7 +1009,7 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
     auto &context = s.context();
 
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, x, y, "heyoka_modulus128");
+        return call_extern_vec(s, {x, y}, "heyoka_modulus128");
     } else {
 #endif
         auto quo = builder.CreateFDiv(x, y);
@@ -1115,7 +1111,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, y, x, "atan2q");
+        return call_extern_vec(s, {y, x}, "atan2q");
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context)) {
@@ -1133,9 +1129,9 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
                 }
             }
 
-            return call_extern_vec(s, y, x, "atan2");
+            return call_extern_vec(s, {y, x}, "atan2");
         } else if (x_t == to_llvm_type<long double>(context)) {
-            return call_extern_vec(s, y, x,
+            return call_extern_vec(s, {y, x},
 #if defined(_MSC_VER)
                                    // NOTE: it seems like the MSVC stdlib does not have an atan2l function,
                                    // because LLVM complains about the symbol "atan2l" not being
@@ -1171,7 +1167,7 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, x, "expq");
+        return call_extern_vec(s, {x}, "expq");
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
