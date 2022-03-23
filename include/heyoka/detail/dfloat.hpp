@@ -9,8 +9,11 @@
 #ifndef HEYOKA_DETAIL_DFLOAT_HPP
 #define HEYOKA_DETAIL_DFLOAT_HPP
 
+#include <cassert>
 #include <cmath>
 #include <string>
+#include <tuple>
+#include <utility>
 
 #include <heyoka/s11n.hpp>
 
@@ -43,43 +46,77 @@ private:
     }
 };
 
-// NOTE: taken with minimal adaptations from NTL. My understanding
-// here is the following: given input (x, xx) and (y, yy), the error-free
-// additions x + y and xx + yy are computed. The components of xx + yy
-// are then added to the low part of the result of x + y, each addition
-// being followed by a normalisation step.
 template <typename F>
-inline dfloat<F> operator+(const dfloat<F> &x, const dfloat<F> &y)
+inline bool isfinite(const dfloat<F> &x)
 {
-    F H, h, T, t, S, s, e, f;
-    F t1;
+    using std::isfinite;
 
-    S = x.hi + y.hi;
-    T = x.lo + y.lo;
-    e = S - x.hi;
-    f = T - x.lo;
+    return isfinite(x.hi) && isfinite(x.lo);
+}
 
-    t1 = S - e;
-    t1 = x.hi - t1;
-    s = y.hi - e;
-    s = s + t1;
+// Error-free transformation of the sum of two floating point numbers.
+// This is Dekker's algorithm, which requires abs(a) >= abs(b). See algorithm 2.2 here:
+// https://www.researchgate.net/publication/228568591_Error-free_transformations_in_real_and_complex_floating_point_arithmetic
+template <typename F>
+inline std::pair<F, F> eft_add_dekker(F a, F b)
+{
+    auto x = a + b;
+    auto y = (a - x) + b;
 
-    t1 = T - f;
-    t1 = x.lo - t1;
-    t = y.lo - f;
-    t = t + t1;
+    return {x, y};
+}
 
-    s = s + T;
-    H = S + s;
-    h = S - H;
-    h = h + s;
+// Error-free transformation of the sum of two floating point numbers.
+// This is Knuth's algorithm. See algorithm 2.1 here:
+// https://www.researchgate.net/publication/228568591_Error-free_transformations_in_real_and_complex_floating_point_arithmetic
+template <typename F>
+inline std::pair<F, F> eft_add_knuth(F a, F b)
+{
+    auto x = a + b;
+    auto z = x - a;
+    auto y = (a - (x - z)) + (b - z);
 
-    h = h + t;
-    e = H + h;
-    f = H - e;
-    f = f + h;
+    return {x, y};
+}
 
-    return dfloat<F>(e, f);
+// Normalise a double-length float.
+// Taken from:
+// https://github.com/fhajji/ntl/blob/6918e6b80336cee34f2131fcf71a58c72b931174/src/quad_float.cpp#L125
+// NOTE: this is based on the error-free trasformation requiring abs(x.hi) >= abs(x.lo).
+template <typename F>
+inline dfloat<F> normalise(const dfloat<F> &x)
+{
+    // LCOV_EXCL_START
+#if !defined(NDEBUG)
+    using std::abs;
+
+    if (isfinite(x)) {
+        assert(abs(x.hi) >= abs(x.lo));
+    }
+#endif
+    // LCOV_EXCL_STOP
+
+    auto [u, v] = eft_add_dekker(x.hi, x.lo);
+
+    return dfloat<F>(u, v);
+}
+
+// NOTE: taken with minimal adaptations from NTL.
+template <typename F>
+inline dfloat<F> operator+(const dfloat<F> &a, const dfloat<F> &b)
+{
+    // NOTE: x_hi + y_hi is the exact result of a.hi + b.hi.
+    // x_lo + y_lo  is the exact result of a.lo + b.lo.
+    auto [x_hi, y_hi] = eft_add_knuth(a.hi, b.hi);
+    auto [x_lo, y_lo] = eft_add_knuth(a.lo, b.lo);
+
+    // The plan is now to:
+    // - add x_lo to y_hi, and normalise;
+    // - add y_lo to v, and normalise again.
+    auto [u, v] = eft_add_dekker(x_hi, y_hi + x_lo);
+    std::tie(u, v) = eft_add_dekker(u, v + y_lo);
+
+    return dfloat<F>(u, v);
 }
 
 // Subtraction.
@@ -118,14 +155,6 @@ template <typename F>
 inline dfloat<F> operator-(const F &x, const dfloat<F> &y)
 {
     return dfloat<F>(x) - y;
-}
-
-template <typename F>
-inline bool isfinite(const dfloat<F> &x)
-{
-    using std::isfinite;
-
-    return isfinite(x.hi) && isfinite(x.lo);
 }
 
 // Comparisons.
@@ -193,31 +222,6 @@ template <typename F>
 inline bool operator>=(const F &x, const dfloat<F> &y)
 {
     return dfloat<F>(x) >= y;
-}
-
-// Normalise a double-length float.
-// Taken from:
-// https://github.com/fhajji/ntl/blob/6918e6b80336cee34f2131fcf71a58c72b931174/src/quad_float.cpp#L125
-// NOTE: this is based on the error-free trasformation requiring abs(x.hi) >= abs(x.lo). See algorithm 2.2 here:
-// https://www.researchgate.net/publication/228568591_Error-free_transformations_in_real_and_complex_floating_point_arithmetic
-template <typename F>
-inline dfloat<F> normalise(const dfloat<F> &x)
-{
-#if !defined(NDEBUG)
-    using std::abs;
-
-    if (isfinite(x)) {
-        assert(abs(x.hi) >= abs(x.lo));
-    }
-#endif
-
-    F u, v;
-
-    u = x.hi + x.lo;
-    v = x.hi - u;
-    v = v + x.lo;
-
-    return dfloat<F>{u, v};
 }
 
 } // namespace heyoka::detail

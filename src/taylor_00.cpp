@@ -1525,7 +1525,7 @@ void taylor_adaptive_impl<T>::set_dtime(T hi, T lo)
     // Check the components.
     dtime_checks(hi, lo);
 
-    m_time = normalise(dfloat<T>{hi, lo});
+    m_time = normalise(dfloat<T>(hi, lo));
 }
 
 template <typename T>
@@ -2010,7 +2010,7 @@ void taylor_adaptive_batch_impl<T>::set_dtime(const std::vector<T> &hi, const st
     // Copy over the new times, ensuring proper
     // normalisation.
     for (std::uint32_t i = 0; i < m_batch_size; ++i) {
-        const auto tmp = normalise(dfloat<T>{hi[i], lo[i]});
+        const auto tmp = normalise(dfloat<T>(hi[i], lo[i]));
 
         m_time_hi[i] = tmp.hi;
         m_time_lo[i] = tmp.lo;
@@ -2025,7 +2025,7 @@ void taylor_adaptive_batch_impl<T>::set_dtime(T hi, T lo)
 
     // Copy over the new time, ensuring proper
     // normalisation.
-    const auto tmp = normalise(dfloat<T>{hi, lo});
+    const auto tmp = normalise(dfloat<T>(hi, lo));
     std::fill(m_time_hi.begin(), m_time_hi.end(), tmp.hi);
     std::fill(m_time_lo.begin(), m_time_lo.end(), tmp.lo);
 }
