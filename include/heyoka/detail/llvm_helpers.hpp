@@ -187,23 +187,28 @@ inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
     }
 }
 
-// Double-length primitives.
-
-HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);
-
-// Addition.
-std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
-                                                    llvm::Value *);
-
-// Less-than.
-llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
-
-// Greater-than.
-llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
-
 // Helpers to double check the modifications needed
 // by LLVM deprecations.
 bool llvm_depr_GEP_type_check(llvm::Value *, llvm::Type *);
+
+// Primitives for double-length arithmetic.
+
+// Error-free product transform.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);
+
+// Addition.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+
+// Multiplication.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+
+// Less-than.
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
+
+// Greater-than.
+HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_gt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
 } // namespace heyoka::detail
 

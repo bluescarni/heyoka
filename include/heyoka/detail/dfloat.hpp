@@ -113,6 +113,11 @@ inline dfloat<F> operator+(const dfloat<F> &a, const dfloat<F> &b)
     // The plan is now to:
     // - add x_lo to y_hi, and normalise;
     // - add y_lo to v, and normalise again.
+    // NOTE: this is different from Dekker's algorithm, and I am not
+    // 100% sure why this works as Dekker's EFT has requirements on the
+    // magnitudes of the operands. However, this is essentially the
+    // original code from NTL and testing also indicates that
+    // this works.
     auto [u, v] = eft_add_dekker(x_hi, y_hi + x_lo);
     std::tie(u, v) = eft_add_dekker(u, v + y_lo);
 

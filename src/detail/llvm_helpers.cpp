@@ -1783,9 +1783,9 @@ std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Va
     return {x, y};
 }
 
-// NOTE: see the code in dfloat.hpp for the double-length primitives.
-
 // Addition.
+// NOTE: this is an LLVM port of the original code in NTL.
+// See the C++ implementation in dfloat.hpp for an explanation.
 std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
@@ -1820,6 +1820,33 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     f = builder.CreateFAdd(f, h);
 
     return {e, f};
+}
+
+// Multiplication.
+// NOTE: this is procedure mul2() from here:
+// https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
+// The mul12() function is replaced with the FMA-based llvm_eft_product().
+// NOTE: the code in NTL looks identical to Dekker's.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto [c, cc] = llvm_eft_product(state, x_hi, y_hi);
+
+    // cc = x*yy + xx*y + cc.
+    auto x_yy = builder.CreateFMul(x_hi, y_lo);
+    auto xx_y = builder.CreateFMul(x_lo, y_hi);
+    cc = builder.CreateFAdd(builder.CreateFAdd(x_yy, xx_y), cc);
+
+    // The normalisation step.
+    auto z = builder.CreateFAdd(c, cc);
+    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+
+    return {z, zz};
 }
 
 // Less-than.
