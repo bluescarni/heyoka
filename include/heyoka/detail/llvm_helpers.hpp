@@ -189,6 +189,8 @@ inline llvm::Value *llvm_add_bc_array(llvm_state &s, std::uint32_t n)
 
 // Double-length primitives.
 
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &, llvm::Value *, llvm::Value *);
+
 // Addition.
 std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *,
                                                     llvm::Value *);

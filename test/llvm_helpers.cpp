@@ -19,6 +19,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
 #include <fmt/format.h>
 
@@ -1256,6 +1257,188 @@ TEST_CASE("fma batch")
                     auto c = c_vec[i];
 
                     REQUIRE(ret_vec[i] == approximately(fma(a, b, c), fp_t(10)));
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("eft_product scalar")
+{
+    using detail::llvm_eft_product;
+    using detail::to_llvm_type;
+    using std::abs;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
+                                            val_t, val_t};
+            auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_eft_prod", &md);
+
+            {
+                auto x_ptr = f->args().begin();
+                auto y_ptr = f->args().begin() + 1;
+                auto a = f->args().begin() + 2;
+                auto b = f->args().begin() + 3;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto [x, y] = llvm_eft_product(s, a, b);
+
+                builder.CreateStore(x, x_ptr);
+                builder.CreateStore(y, y_ptr);
+            }
+
+            builder.CreateRetVoid();
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t, fp_t)>(s.jit_lookup("hey_eft_prod"));
+
+            std::uniform_int_distribution<int> idist(-10000, 10000);
+
+            for (auto i = 0; i < ntrials; ++i) {
+                fp_t x, y;
+
+                auto num1 = idist(rng), num2 = idist(rng), den1 = idist(rng), den2 = idist(rng);
+
+                den1 += (den1 == 0);
+                den2 += (den2 == 0);
+
+                auto a = fp_t(num1) / fp_t(den1);
+                auto b = fp_t(num2) / fp_t(den2);
+
+                f_ptr(&x, &y, a, b);
+
+                REQUIRE(x == a * b);
+
+#if defined(HEYOKA_HAVE_REAL128)
+                if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
+#endif
+                    namespace bmp = boost::multiprecision;
+                    using mp_fp_t
+                        = bmp::number<bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
+
+                    REQUIRE(mp_fp_t(x) + mp_fp_t(y) == mp_fp_t(a) * mp_fp_t(b));
+#if defined(HEYOKA_HAVE_REAL128)
+                }
+#endif
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("eft_product batch")
+{
+    using detail::llvm_eft_product;
+    using detail::to_llvm_type;
+    using std::abs;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_eft_prod", &md);
+
+                auto x_ptr = f->args().begin();
+                auto y_ptr = f->args().begin() + 1;
+                auto a_ptr = f->args().begin() + 2;
+                auto b_ptr = f->args().begin() + 3;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto [x, y] = llvm_eft_product(s, detail::load_vector_from_memory(builder, a_ptr, batch_size),
+                                               detail::load_vector_from_memory(builder, b_ptr, batch_size));
+
+                detail::store_vector_to_memory(builder, x_ptr, x);
+                detail::store_vector_to_memory(builder, y_ptr, y);
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_eft_prod"));
+
+                std::uniform_int_distribution<int> idist(-10000, 10000);
+
+                std::vector<fp_t> x_vec(batch_size), y_vec(x_vec), a_vec(x_vec), b_vec(x_vec);
+
+                for (auto j = 0; j < ntrials; ++j) {
+                    // Setup the arguments and the output value.
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        auto num1 = idist(rng), num2 = idist(rng), den1 = idist(rng), den2 = idist(rng);
+
+                        den1 += (den1 == 0);
+                        den2 += (den2 == 0);
+
+                        a_vec[i] = fp_t(num1) / fp_t(den1);
+                        b_vec[i] = fp_t(num2) / fp_t(den2);
+                    }
+
+                    f_ptr(x_vec.data(), y_vec.data(), a_vec.data(), b_vec.data());
+
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        auto a = a_vec[i];
+                        auto b = b_vec[i];
+                        auto x = x_vec[i];
+                        auto y = y_vec[i];
+
+                        REQUIRE(x == a * b);
+
+#if defined(HEYOKA_HAVE_REAL128)
+                        if constexpr (!std::is_same_v<fp_t, mppp::real128>) {
+#endif
+                            namespace bmp = boost::multiprecision;
+                            using mp_fp_t = bmp::number<
+                                bmp::cpp_bin_float<std::numeric_limits<fp_t>::digits * 2, bmp::digit_base_2>>;
+
+                            REQUIRE(mp_fp_t(x) + mp_fp_t(y) == mp_fp_t(a) * mp_fp_t(b));
+#if defined(HEYOKA_HAVE_REAL128)
+                        }
+#endif
+                    }
                 }
             }
         }

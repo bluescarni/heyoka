@@ -1760,6 +1760,29 @@ public:
 
 } // namespace
 
+// Error-free transformation of the product of two floating point numbers
+// using an FMA. This is algorithm 2.5 here:
+// https://www.researchgate.net/publication/228568591_Error-free_transformations_in_real_and_complex_floating_point_arithmetic
+std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType()->getScalarType()->isFloatingPointTy());
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto x = builder.CreateFMul(a, b);
+    auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
+
+    return {x, y};
+}
+
 // NOTE: see the code in dfloat.hpp for the double-length primitives.
 
 // Addition.
