@@ -27,7 +27,6 @@
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include <boost/multiprecision/float128.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -54,6 +53,13 @@
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
+
+// NOTE: this is a bit iffy, because it ends up including
+// quadmath.h: this works, as mp++ introduces a public dependency
+// on libquadmath, but technically we are introducing a direct
+// dependency for *heyoka* on libquadmath (thus we should be looking
+// for quadmath in the build system etc. etc.).
+#include <boost/multiprecision/float128.hpp>
 
 #include <mp++/real128.hpp>
 
