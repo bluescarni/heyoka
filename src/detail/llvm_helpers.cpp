@@ -1902,6 +1902,78 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Val
     return {z, zz};
 }
 
+// Floor.
+// NOTE: code taken from NTL:
+// https://github.com/libntl/ntl/blob/main/src/quad_float1.cpp#L239
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo)
+{
+    // LCOV_EXCL_START
+    assert(x_hi != nullptr);
+    assert(x_lo != nullptr);
+    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
+    assert(x_hi->getType() == x_lo->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = state.builder();
+
+    auto fp_t = x_hi->getType();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    // Floor x_hi.
+    auto *fhi = llvm_floor(state, x_hi);
+
+    // NOTE: we want to distinguish the scalar/vector codepaths, as the vectorised implementation
+    // does more work.
+    const auto vec_size = get_vector_size(x_hi);
+
+    if (vec_size == 1u) {
+        auto *ret_hi_ptr = builder.CreateAlloca(fp_t);
+        auto *ret_lo_ptr = builder.CreateAlloca(fp_t);
+
+        llvm_if_then_else(
+            state, builder.CreateFCmpOEQ(fhi, x_hi),
+            [&]() {
+                // floor(x_hi) == x_hi, that is, x_hi is already
+                // an integral value.
+
+                // Floor the low part.
+                auto *flo = llvm_floor(state, x_lo);
+
+                // Normalise.
+                auto z = builder.CreateFAdd(fhi, flo);
+                auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), flo);
+
+                // Store.
+                builder.CreateStore(z, ret_hi_ptr);
+                builder.CreateStore(zz, ret_lo_ptr);
+            },
+            [&]() {
+                // floor(x_hi) != x_hi. Just need to set the low part to zero.
+                builder.CreateStore(fhi, ret_hi_ptr);
+                builder.CreateStore(llvm::Constant::getNullValue(fp_t), ret_lo_ptr);
+            });
+
+        return {builder.CreateLoad(fp_t, ret_hi_ptr), builder.CreateLoad(fp_t, ret_lo_ptr)};
+    } else {
+        // Get a vector of zeroes.
+        auto *zero_vec = llvm::Constant::getNullValue(fp_t);
+
+        // Floor the low part.
+        auto *flo = llvm_floor(state, x_lo);
+
+        // Select flo or zero_vec, depending on fhi == x_hi.
+        auto *ret_lo = builder.CreateSelect(builder.CreateFCmpOEQ(fhi, x_hi), flo, zero_vec);
+
+        // Normalise.
+        auto z = builder.CreateFAdd(fhi, ret_lo);
+        auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), ret_lo);
+
+        return {z, zz};
+    }
+}
+
 // Less-than.
 llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
 {

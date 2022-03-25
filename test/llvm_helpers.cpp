@@ -2006,3 +2006,189 @@ TEST_CASE("floor batch")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("dl floor scalar")
+{
+    using detail::llvm_dl_floor;
+    using detail::to_llvm_type;
+    using std::abs;
+    using std::trunc;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t), llvm::PointerType::getUnqual(val_t),
+                                            val_t, val_t};
+            auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_floor", &md);
+
+            {
+                auto x_ptr = f->args().begin();
+                auto y_ptr = f->args().begin() + 1;
+                auto a_hi = f->args().begin() + 2;
+                auto a_lo = f->args().begin() + 3;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto [x, y] = llvm_dl_floor(s, a_hi, a_lo);
+
+                builder.CreateStore(x, x_ptr);
+                builder.CreateStore(y, y_ptr);
+            }
+
+            builder.CreateRetVoid();
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t, fp_t)>(s.jit_lookup("hey_dl_floor"));
+
+            std::uniform_int_distribution<int> idist(-10000, 10000);
+
+            for (auto i = 0; i < ntrials; ++i) {
+                fp_t x, y;
+
+                auto num1 = idist(rng), num2 = idist(rng), den1 = idist(rng), den2 = idist(rng);
+
+                den1 += (den1 == 0);
+                den2 += (den2 == 0);
+
+                auto a_hi = fp_t(num1) / fp_t(den1);
+                auto a_lo = fp_t(num2) / fp_t(den2);
+                if (abs(a_hi) < abs(a_lo)) {
+                    std::swap(a_hi, a_lo);
+                }
+                std::tie(a_hi, a_lo) = detail::eft_add_dekker(a_hi, a_lo);
+
+                f_ptr(&x, &y, a_hi, a_lo);
+
+                REQUIRE(trunc(x) == x);
+                REQUIRE(y == 0);
+
+                a_hi = floor(a_hi);
+
+                f_ptr(&x, &y, a_hi, a_lo);
+
+                REQUIRE(trunc(x) == x);
+                REQUIRE(y == 0);
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("dl floor batch")
+{
+    using detail::llvm_dl_floor;
+    using detail::to_llvm_type;
+    using std::abs;
+    using std::trunc;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(4u, llvm::PointerType::getUnqual(val_t));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_dl_floor", &md);
+
+                {
+                    auto x_ptr = f->args().begin();
+                    auto y_ptr = f->args().begin() + 1;
+                    auto a_hi_ptr = f->args().begin() + 2;
+                    auto a_lo_ptr = f->args().begin() + 3;
+
+                    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                    auto [x, y] = llvm_dl_floor(s, detail::load_vector_from_memory(builder, a_hi_ptr, batch_size),
+                                                detail::load_vector_from_memory(builder, a_lo_ptr, batch_size));
+
+                    detail::store_vector_to_memory(builder, x_ptr, x);
+                    detail::store_vector_to_memory(builder, y_ptr, y);
+                }
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_dl_floor"));
+
+                std::uniform_int_distribution<int> idist(-10000, 10000);
+
+                std::vector<fp_t> x_vec(batch_size), y_vec(x_vec), a_hi_vec(x_vec), a_lo_vec(x_vec);
+
+                for (auto j = 0; j < ntrials; ++j) {
+                    // Setup the argument and the output value.
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        auto num1 = idist(rng), num2 = idist(rng), den1 = idist(rng), den2 = idist(rng);
+
+                        den1 += (den1 == 0);
+                        den2 += (den2 == 0);
+
+                        auto a_hi = fp_t(num1) / fp_t(den1);
+                        auto a_lo = fp_t(num2) / fp_t(den2);
+                        if (abs(a_hi) < abs(a_lo)) {
+                            std::swap(a_hi, a_lo);
+                        }
+                        std::tie(a_hi, a_lo) = detail::eft_add_dekker(a_hi, a_lo);
+
+                        a_hi_vec[i] = a_hi;
+                        a_lo_vec[i] = a_lo;
+                    }
+
+                    f_ptr(x_vec.data(), y_vec.data(), a_hi_vec.data(), a_lo_vec.data());
+
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(trunc(x_vec[i]) == x_vec[i]);
+                        REQUIRE(y_vec[i] == 0);
+
+                        a_hi_vec[i] = floor(a_hi_vec[i]);
+                    }
+
+                    f_ptr(x_vec.data(), y_vec.data(), a_hi_vec.data(), a_lo_vec.data());
+
+                    for (auto i = 0u; i < batch_size; ++i) {
+                        REQUIRE(trunc(x_vec[i]) == x_vec[i]);
+                        REQUIRE(y_vec[i] == 0);
+                    }
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
