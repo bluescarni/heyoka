@@ -1849,6 +1849,37 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Val
     return {z, zz};
 }
 
+// Division.
+// NOTE: this is procedure div2() from here:
+// https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
+// The mul12() function is replaced with the FMA-based llvm_eft_product().
+// NOTE: the code in NTL looks identical to Dekker's.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto *c = builder.CreateFDiv(x_hi, y_hi);
+
+    auto [u, uu] = llvm_eft_product(state, c, y_hi);
+
+    // cc = (x_hi - u - uu + x_lo - c * y_lo) / y_hi.
+    auto *cc = builder.CreateFSub(x_hi, u);
+    cc = builder.CreateFSub(cc, uu);
+    cc = builder.CreateFAdd(cc, x_lo);
+    cc = builder.CreateFSub(cc, builder.CreateFMul(c, y_lo));
+    cc = builder.CreateFDiv(cc, y_hi);
+
+    // The normalisation step.
+    auto z = builder.CreateFAdd(c, cc);
+    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+
+    return {z, zz};
+}
+
 // Less-than.
 llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
 {

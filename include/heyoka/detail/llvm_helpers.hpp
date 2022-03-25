@@ -204,6 +204,10 @@ HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state
 HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &, llvm::Value *, llvm::Value *,
                                                                       llvm::Value *, llvm::Value *);
 
+// Division.
+HEYOKA_DLL_PUBLIC std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &, llvm::Value *, llvm::Value *,
+                                                                      llvm::Value *, llvm::Value *);
+
 // Less-than.
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_dl_lt(llvm_state &, llvm::Value *, llvm::Value *, llvm::Value *, llvm::Value *);
 
