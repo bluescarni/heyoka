@@ -1974,6 +1974,34 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::V
     }
 }
 
+// Helper to reduce x modulo y, that is, to compute:
+// x - y * floor(x / y).
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                        llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    // LCOV_EXCL_START
+    assert(x_hi != nullptr);
+    assert(x_lo != nullptr);
+    assert(y_hi != nullptr);
+    assert(y_lo != nullptr);
+    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
+    assert(x_hi->getType() == x_lo->getType());
+    assert(x_hi->getType() == y_hi->getType());
+    assert(x_hi->getType() == y_lo->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto [xoy_hi, xoy_lo] = llvm_dl_div(s, x_hi, x_lo, y_hi, y_lo);
+    auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
+    auto [prod_hi, prod_lo] = llvm_dl_mul(s, y_hi, y_lo, fl_hi, fl_lo);
+
+    return llvm_dl_add(s, x_hi, x_lo, builder.CreateFNeg(prod_hi), builder.CreateFNeg(prod_lo));
+}
+
 // Less-than.
 llvm::Value *llvm_dl_lt(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo, llvm::Value *y_hi, llvm::Value *y_lo)
 {
