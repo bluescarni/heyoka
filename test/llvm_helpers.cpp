@@ -1893,3 +1893,116 @@ TEST_CASE("dl div batch")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("floor scalar")
+{
+    using detail::llvm_floor;
+    using detail::to_llvm_type;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto opt_level : {0u, 1u, 2u, 3u}) {
+            llvm_state s{kw::opt_level = opt_level};
+
+            auto &md = s.module();
+            auto &builder = s.builder();
+            auto &context = s.context();
+
+            auto val_t = to_llvm_type<fp_t>(context);
+
+            std::vector<llvm::Type *> fargs{val_t};
+            auto *ft = llvm::FunctionType::get(val_t, fargs, false);
+            auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_floor", &md);
+
+            auto x = f->args().begin();
+
+            builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+            builder.CreateRet(llvm_floor(s, x));
+
+            // Verify.
+            s.verify_function(f);
+
+            // Run the optimisation pass.
+            s.optimise();
+
+            // Compile.
+            s.compile();
+
+            // Fetch the function pointer.
+            auto f_ptr = reinterpret_cast<fp_t (*)(fp_t)>(s.jit_lookup("hey_floor"));
+
+            REQUIRE(f_ptr(fp_t(2) / 7) == 0);
+            REQUIRE(f_ptr(fp_t(8) / 7) == 1);
+            REQUIRE(f_ptr(fp_t(-2) / 7) == -1);
+            REQUIRE(f_ptr(fp_t(-8) / 7) == -2);
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}
+
+TEST_CASE("floor batch")
+{
+    using detail::llvm_floor;
+    using detail::to_llvm_type;
+    using std::floor;
+
+    auto tester = [](auto fp_x) {
+        using fp_t = decltype(fp_x);
+
+        for (auto batch_size : {1u, 2u, 4u, 13u}) {
+            for (auto opt_level : {0u, 1u, 2u, 3u}) {
+                llvm_state s{kw::opt_level = opt_level};
+
+                auto &md = s.module();
+                auto &builder = s.builder();
+                auto &context = s.context();
+
+                auto val_t = to_llvm_type<fp_t>(context);
+
+                std::vector<llvm::Type *> fargs(2u, llvm::PointerType::getUnqual(val_t));
+                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_floor", &md);
+
+                auto ret_ptr = f->args().begin();
+                auto x_ptr = f->args().begin() + 1;
+
+                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+                auto ret = llvm_floor(s, detail::load_vector_from_memory(builder, x_ptr, batch_size));
+
+                detail::store_vector_to_memory(builder, ret_ptr, ret);
+
+                builder.CreateRetVoid();
+
+                // Verify.
+                s.verify_function(f);
+
+                // Run the optimisation pass.
+                s.optimise();
+
+                // Compile.
+                s.compile();
+
+                // Fetch the function pointer.
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *)>(s.jit_lookup("hey_floor"));
+
+                // Setup the argument and the output value.
+                std::vector<fp_t> ret_vec(batch_size), a_vec(ret_vec);
+                for (auto i = 0u; i < batch_size; ++i) {
+                    a_vec[i] = fp_t(i + 1u) / 3;
+                }
+
+                f_ptr(ret_vec.data(), a_vec.data());
+
+                for (auto i = 0u; i < batch_size; ++i) {
+                    REQUIRE(ret_vec[i] == floor(a_vec[i]));
+                }
+            }
+        }
+    };
+
+    tuple_for_each(fp_types, tester);
+}

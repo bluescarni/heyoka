@@ -1227,6 +1227,28 @@ llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value
 #endif
 }
 
+// Floor.
+llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        return call_extern_vec(s, {x}, "floorq");
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
 namespace
 {
 
