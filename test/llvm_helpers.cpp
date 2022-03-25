@@ -1992,7 +1992,7 @@ TEST_CASE("floor batch")
                 // Setup the argument and the output value.
                 std::vector<fp_t> ret_vec(batch_size), a_vec(ret_vec);
                 for (auto i = 0u; i < batch_size; ++i) {
-                    a_vec[i] = fp_t(i + 1u) / 3;
+                    a_vec[i] = fp_t(i + 1u) / 3 * (i % 2u == 0 ? 1 : -1);
                 }
 
                 f_ptr(ret_vec.data(), a_vec.data());
