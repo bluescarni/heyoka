@@ -18,6 +18,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
@@ -25,6 +26,8 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <boost/multiprecision/float128.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -1448,7 +1451,10 @@ llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t 
 namespace
 {
 
-// Variable template for the constant pi at different levels of precision.
+#if !defined(NDEBUG)
+
+// Variable template for the constant pi at different levels of precision, used only
+// for debugging.
 template <typename T>
 const auto inv_kep_E_pi = boost::math::constants::pi<T>();
 
@@ -1458,6 +1464,56 @@ template <>
 const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
 
 #endif
+
+#endif
+
+// Helper to return a double-length approximation of 2*pi for the given
+// input floating-point type T.
+template <typename T>
+std::pair<T, T> inv_kep_E_dl_twopi()
+{
+    constexpr bool is_ppc =
+#if defined(HEYOKA_ARCH_PPC)
+        true
+#else
+        false
+#endif
+        ;
+
+    if constexpr (is_ppc && std::is_same_v<long double, T>) {
+        throw std::invalid_argument("long double is not supported on PPC");
+    } else {
+        namespace bmp = boost::multiprecision;
+
+        // Use 4x the digits of type T for the computation of 2pi.
+        static_assert(std::numeric_limits<T>::digits <= std::numeric_limits<int>::max() / 4);
+        using mp_fp_t = bmp::number<bmp::cpp_bin_float<std::numeric_limits<T>::digits * 4, bmp::digit_base_2>>;
+
+        // Fetch 2pi in extended precision.
+        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
+
+        // Split into two parts.
+#if defined(HEYOKA_HAVE_REAL128)
+        if constexpr (std::is_same_v<T, mppp::real128>) {
+            const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
+            const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+
+            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+            return {mppp::real128{twopi_hi.backend().value()}, mppp::real128{twopi_lo.backend().value()}};
+        } else {
+#endif
+            const auto twopi_hi = static_cast<T>(mp_twopi);
+            const auto twopi_lo = static_cast<T>(mp_twopi - twopi_hi);
+
+            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+            return {twopi_hi, twopi_lo};
+#if defined(HEYOKA_HAVE_REAL128)
+        }
+#endif
+    }
+}
 
 // Implementation of the inverse Kepler equation.
 template <typename T>
@@ -1507,8 +1563,18 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
 
-        // Reduce M modulo 2*pi.
-        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
+        // Fetch 2pi in double-length precision.
+        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi<T>();
+
+#if !defined(NDEBUG)
+        assert(dl_twopi_hi == 2 * inv_kep_E_pi<T>); // LCOV_EXCL_LINE
+#endif
+
+        // Reduce M modulo 2*pi in extended precision.
+        auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
+                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_hi}), batch_size),
+                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_lo}), batch_size))
+                      .first;
 
         // Compute the initial guess from the usual elliptic expansion
         // to the third order in eccentricities:
@@ -1543,7 +1609,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, T(0))}), batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
