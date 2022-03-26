@@ -2201,13 +2201,15 @@ void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const s
 }
 
 // Explicit instantiations.
-template void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
 
-template void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t, const std::string &);
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t,
+                                                                        const std::string &);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t, const std::string &);
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t,
+                                                                          const std::string &);
 
 #endif
 
