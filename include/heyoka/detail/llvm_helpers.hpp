@@ -163,6 +163,9 @@ inline llvm::Function *llvm_add_inv_kep_E(llvm_state &s, std::uint32_t batch_siz
     }
 }
 
+template <typename T>
+HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper(llvm_state &, std::uint32_t, const std::string &);
+
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_dbl(llvm_state &, std::uint32_t);
 HEYOKA_DLL_PUBLIC llvm::Value *llvm_add_bc_array_ldbl(llvm_state &, std::uint32_t);
 

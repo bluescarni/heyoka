@@ -2124,6 +2124,93 @@ bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
     return ptr->getType()->getScalarType()->getPointerElementType() == tp;
 }
 
+// Helper to create a wrapper for kepE() usable from C++ code.
+// Input/output is done through pointers.
+template <typename T>
+void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const std::string &name)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Make sure the function does not exist already.
+    assert(md.getFunction(name) == nullptr); // LCOV_EXCL_LINE
+
+    // Fetch the scalar floating-point type.
+    auto scal_t = to_llvm_type<T>(context);
+
+    // Add the implementation function.
+    auto *impl_f = llvm_add_inv_kep_E<T>(s, batch_size);
+
+    // The function arguments:
+    // - output pointer (write only),
+    // - input ecc and mean anomaly pointers (read only).
+    // No overlap allowed.
+    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(scal_t));
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    // Create the function
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
+    assert(f != nullptr); // LCOV_EXCL_LINE
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
+    // Setup the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto ecc_ptr = f->args().begin() + 1;
+    ecc_ptr->setName("ecc_ptr");
+    ecc_ptr->addAttr(llvm::Attribute::NoCapture);
+    ecc_ptr->addAttr(llvm::Attribute::NoAlias);
+    ecc_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto M_ptr = f->args().begin() + 2;
+    M_ptr->setName("M_ptr");
+    M_ptr->addAttr(llvm::Attribute::NoCapture);
+    M_ptr->addAttr(llvm::Attribute::NoAlias);
+    M_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Load the data from the pointers.
+    auto *ecc = load_vector_from_memory(builder, ecc_ptr, batch_size);
+    auto *M = load_vector_from_memory(builder, M_ptr, batch_size);
+
+    // Invoke the implementation function.
+    auto *ret = builder.CreateCall(impl_f, {ecc, M});
+
+    // Store the result.
+    store_vector_to_memory(builder, out_ptr, ret);
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+}
+
+// Explicit instantiations.
+template void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
+
+template void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t, const std::string &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t, const std::string &);
+
+#endif
+
 } // namespace heyoka::detail
 
 // NOTE: this function will be called by the LLVM implementation

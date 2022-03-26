@@ -465,8 +465,7 @@ TEST_CASE("modulus batch")
 
 TEST_CASE("inv_kep_E_scalar")
 {
-    using detail::llvm_add_inv_kep_E;
-    using detail::to_llvm_type;
+    using detail::llvm_add_inv_kep_E_wrapper;
     namespace bmt = boost::math::tools;
     using std::cos;
     using std::sin;
@@ -477,53 +476,39 @@ TEST_CASE("inv_kep_E_scalar")
         for (auto opt_level : {0u, 1u, 2u, 3u}) {
             llvm_state s{kw::opt_level = opt_level};
 
-            auto fkep = llvm_add_inv_kep_E<fp_t>(s, 1);
+            // Add the function.
+            llvm_add_inv_kep_E_wrapper<fp_t>(s, 1, "hey_kep");
 
-            auto &md = s.module();
-            auto &builder = s.builder();
-            auto &context = s.context();
+            // Run the optimisation pass.
+            s.optimise();
 
-            {
-                auto val_t = to_llvm_type<fp_t>(context);
-
-                std::vector<llvm::Type *> fargs{val_t, val_t};
-                auto *ft = llvm::FunctionType::get(val_t, fargs, false);
-                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_kep", &md);
-
-                auto e = f->args().begin();
-                auto M = f->args().begin() + 1;
-
-                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-                builder.CreateRet(builder.CreateCall(fkep, {e, M}));
-
-                // Verify.
-                s.verify_function(f);
-
-                // Run the optimisation pass.
-                s.optimise();
-
-                // Compile.
-                s.compile();
-            }
+            // Compile.
+            s.compile();
 
             // Fetch the function pointer.
-            auto f_ptr = reinterpret_cast<fp_t (*)(fp_t, fp_t)>(s.jit_lookup("hey_kep"));
+            auto f_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("hey_kep"));
 
             std::uniform_real_distribution<double> e_dist(0., 1.), M_dist(0., 2 * boost::math::constants::pi<double>());
 
             // First set of tests with zero eccentricity.
             for (auto i = 0; i < ntrials; ++i) {
-                const auto M = M_dist(rng);
-                const auto E = f_ptr(0, M);
+                const fp_t M = M_dist(rng);
+                const fp_t e = 0;
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
                 REQUIRE(fp_t(M) == approximately(E));
             }
 
             // Non-zero eccentricities.
             for (auto i = 0; i < ntrials * 10; ++i) {
-                const auto M = M_dist(rng);
-                const auto e = e_dist(rng);
-                const auto E = f_ptr(e, M);
+                const fp_t M = M_dist(rng);
+                const fp_t e = e_dist(rng);
+                fp_t E;
+
+                f_ptr(&E, &e, &M);
+
                 REQUIRE(fp_t(M) == approximately(E - e * sin(E), fp_t(10000)));
             }
         }
@@ -534,8 +519,7 @@ TEST_CASE("inv_kep_E_scalar")
 
 TEST_CASE("inv_kep_E_batch")
 {
-    using detail::llvm_add_inv_kep_E;
-    using detail::to_llvm_type;
+    using detail::llvm_add_inv_kep_E_wrapper;
     namespace bmt = boost::math::tools;
     using std::cos;
     using std::sin;
@@ -547,35 +531,8 @@ TEST_CASE("inv_kep_E_batch")
             for (auto opt_level : {0u, 1u, 2u, 3u}) {
                 llvm_state s{kw::opt_level = opt_level};
 
-                auto fkep = llvm_add_inv_kep_E<fp_t>(s, batch_size);
-
-                auto &md = s.module();
-                auto &builder = s.builder();
-                auto &context = s.context();
-
-                auto val_t = to_llvm_type<fp_t>(context);
-
-                std::vector<llvm::Type *> fargs{llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t),
-                                                llvm::PointerType::getUnqual(val_t)};
-                auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
-                auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, "hey_kep", &md);
-
-                auto ret_ptr = f->args().begin();
-                auto e_ptr = f->args().begin() + 1;
-                auto M_ptr = f->args().begin() + 2;
-
-                builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
-
-                auto ret = builder.CreateCall(fkep, {detail::load_vector_from_memory(builder, e_ptr, batch_size),
-                                                     detail::load_vector_from_memory(builder, M_ptr, batch_size)});
-
-                detail::store_vector_to_memory(builder, ret_ptr, ret);
-
-                builder.CreateRetVoid();
-
-                // Verify.
-                s.verify_function(f);
+                // Add the function.
+                llvm_add_inv_kep_E_wrapper<fp_t>(s, batch_size, "hey_kep");
 
                 // Run the optimisation pass.
                 s.optimise();
@@ -584,7 +541,7 @@ TEST_CASE("inv_kep_E_batch")
                 s.compile();
 
                 // Fetch the function pointer.
-                auto f_ptr = reinterpret_cast<void (*)(fp_t *, fp_t *, fp_t *)>(s.jit_lookup("hey_kep"));
+                auto f_ptr = reinterpret_cast<void (*)(fp_t *, const fp_t *, const fp_t *)>(s.jit_lookup("hey_kep"));
 
                 std::uniform_real_distribution<double> e_dist(0., 1.),
                     M_dist(0., 2 * boost::math::constants::pi<double>());
