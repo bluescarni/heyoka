@@ -113,7 +113,7 @@ llvm::Value *log_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "logq");
+    return call_extern_vec(s, args, "logq");
 }
 
 #endif

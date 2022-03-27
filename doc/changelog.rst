@@ -26,6 +26,9 @@ Changes
 Fix
 ~~~
 
+- Fix a potential accuracy issue when setting the time coordinate
+  in double-length format
+  (`#246 <https://github.com/bluescarni/heyoka/pull/246>`__).
 - Fix an issue in the ``propagate_grid()`` functions
   that could lead to invalid results in certain corner cases
   (`#234 <https://github.com/bluescarni/heyoka/pull/234>`__).

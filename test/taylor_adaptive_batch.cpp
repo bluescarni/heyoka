@@ -1512,9 +1512,9 @@ TEST_CASE("get_set_dtime")
     ta.set_dtime(dtm.first, dtm.second);
     REQUIRE(ta.get_dtime() == dtm);
 
-    ta.set_dtime({3., -1}, {4., 5.});
-    REQUIRE(ta.get_dtime().first[0] == 7);
-    REQUIRE(ta.get_dtime().first[1] == 4);
+    ta.set_dtime({3., -7}, {2., 5.});
+    REQUIRE(ta.get_dtime().first[0] == 5);
+    REQUIRE(ta.get_dtime().first[1] == -2);
     REQUIRE(ta.get_dtime().second[0] == 0);
     REQUIRE(ta.get_dtime().second[1] == 0);
 
@@ -1524,7 +1524,7 @@ TEST_CASE("get_set_dtime")
     REQUIRE(ta.get_dtime().second[0] == std::numeric_limits<double>::epsilon());
     REQUIRE(ta.get_dtime().second[1] == std::numeric_limits<double>::epsilon());
 
-    ta.set_dtime(3., 4.);
+    ta.set_dtime(4., 3.);
     REQUIRE(ta.get_dtime().first[0] == 7);
     REQUIRE(ta.get_dtime().first[1] == 7);
     REQUIRE(ta.get_dtime().second[0] == 0);
@@ -1535,6 +1535,24 @@ TEST_CASE("get_set_dtime")
     REQUIRE(ta.get_dtime().first[1] == 3);
     REQUIRE(ta.get_dtime().second[0] == std::numeric_limits<double>::epsilon());
     REQUIRE(ta.get_dtime().second[1] == std::numeric_limits<double>::epsilon());
+
+    ta.set_dtime({3., 4.}, {1., 2.});
+
+    // Error logic.
+    REQUIRE_THROWS_AS(ta.set_dtime(std::numeric_limits<double>::infinity(), 1.), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime(1., std::numeric_limits<double>::infinity()), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime(3., 4.), std::invalid_argument);
+
+    REQUIRE_THROWS_AS(ta.set_dtime({1., std::numeric_limits<double>::infinity()}, {1., 2.}), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime({1., .1}, {std::numeric_limits<double>::infinity(), 2.}), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime({1., 2.}, {1., 3.}), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime({4., 4.}, {8., 3.}), std::invalid_argument);
+
+    // Make sure the internal time vectors were not touched.
+    REQUIRE(ta.get_dtime().first[0] == 4);
+    REQUIRE(ta.get_dtime().first[1] == 6);
+    REQUIRE(ta.get_dtime().second[0] == 0);
+    REQUIRE(ta.get_dtime().second[1] == 0);
 }
 
 // Check the callback is invoked when the integration is stopped

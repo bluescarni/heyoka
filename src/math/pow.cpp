@@ -156,7 +156,7 @@ llvm::Value *pow_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args[0] != nullptr);
     assert(args[1] != nullptr);
 
-    return call_extern_vec(s, args[0], args[1], "powq");
+    return call_extern_vec(s, {args}, "powq");
 }
 
 #endif

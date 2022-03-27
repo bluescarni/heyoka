@@ -101,7 +101,7 @@ llvm::Value *erf_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value 
         }
     }
 
-    return call_extern_vec(s, args[0], "erf");
+    return call_extern_vec(s, args, "erf");
 }
 
 llvm::Value *erf_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -109,7 +109,7 @@ llvm::Value *erf_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0],
+    return call_extern_vec(s, args,
 #if defined(_MSC_VER)
                            // NOTE: it seems like the MSVC stdlib does not have an erfl function,
                            // because LLVM complains about the symbol "erfl" not being
@@ -128,7 +128,7 @@ llvm::Value *erf_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Value
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "erfq");
+    return call_extern_vec(s, args, "erfq");
 }
 
 #endif
