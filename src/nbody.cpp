@@ -164,7 +164,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
 
         // All the accelerations on the massless particles
         // have already been accumulated in the loop above.
-        // We just need to perform the pairwise sums on x/y/z_acc.
+        // We just need to perform the sums on x/y/z_acc.
         for (std::uint32_t i = n_fc_massive; i < n; ++i) {
             retval.push_back(prime(x_vars[i]) = vx_vars[i]);
             retval.push_back(prime(y_vars[i]) = vy_vars[i]);
@@ -322,7 +322,7 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::ui
 
     // All the accelerations on the massless particles
     // have already been accumulated in the loop above.
-    // We just need to perform the pairwise sums on x/y/z_acc.
+    // We just need to perform the sums on x/y/z_acc.
     for (std::uint32_t i = n_massive; i < n; ++i) {
         retval.push_back(prime(x_vars[i]) = vx_vars[i]);
         retval.push_back(prime(y_vars[i]) = vy_vars[i]);

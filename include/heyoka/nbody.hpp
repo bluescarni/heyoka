@@ -39,7 +39,8 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 
 } // namespace detail
 
-// Create an ODE system representing a Newtonian N-body problem.
+// Create an ODE system representing a Newtonian N-body problem in
+// an inertial reference frame.
 // n is the number of bodies (>= 2), while the following optional kwargs
 // can be passed:
 //
