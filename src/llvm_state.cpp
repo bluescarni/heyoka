@@ -932,7 +932,7 @@ void llvm_state::optimise()
 
             // Let new_attrs override attrs.
 #if LLVM_VERSION_MAJOR < 14
-            f.setAttributes(attrs.addFnAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
+            f.setAttributes(attrs.addAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
 #else
             f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
 #endif
