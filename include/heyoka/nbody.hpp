@@ -37,6 +37,9 @@ HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_
 HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::uint32_t, number,
                                                                                            std::uint32_t);
 
+HEYOKA_DLL_PUBLIC std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std::uint32_t, number,
+                                                                                               std::vector<number>);
+
 } // namespace detail
 
 // Create an ODE system representing a Newtonian N-body problem in

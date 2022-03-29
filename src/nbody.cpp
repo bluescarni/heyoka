@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -228,6 +229,38 @@ std::vector<std::pair<expression, expression>> make_nbody_sys_fixed_masses(std::
     }
 
     return retval;
+}
+
+std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std::uint32_t n, number Gconst,
+                                                                             std::vector<number> masses)
+{
+    assert(n >= 1u);
+
+    if (n == std::numeric_limits<std::uint32_t>::max()) {
+        throw std::overflow_error("The number of bodies specified for the creation of an (N+1)-body problem is too "
+                                  "large, resulting in an overflow condition");
+    }
+
+    if (masses.size() != n + 1u) {
+        throw std::invalid_argument(fmt::format(
+            "Inconsistent sizes detected while creating an (N+1)-body system: the vector of masses has a size of "
+            "{}, while the number of bodies is {} (the number of masses must be one more than the number of bodies)",
+            masses.size(), n));
+    }
+
+    // Create the state variables.
+    // NOTE: the body indices will be in the [1, n] range.
+    std::vector<expression> x_vars, y_vars, z_vars, vx_vars, vy_vars, vz_vars;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+        x_vars.emplace_back(variable(fmt::format("x_{}", i + 1u)));
+        y_vars.emplace_back(variable(fmt::format("y_{}", i + 1u)));
+        z_vars.emplace_back(variable(fmt::format("z_{}", i + 1u)));
+
+        vx_vars.emplace_back(variable(fmt::format("vx_{}", i + 1u)));
+        vy_vars.emplace_back(variable(fmt::format("vy_{}", i + 1u)));
+        vz_vars.emplace_back(variable(fmt::format("vz_{}", i + 1u)));
+    }
 }
 
 std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::uint32_t n, number Gconst,
