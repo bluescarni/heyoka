@@ -60,7 +60,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SmallVectorMemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
@@ -69,6 +68,17 @@
 #if LLVM_VERSION_MAJOR == 10
 
 #include <llvm/CodeGen/CommandFlags.inc>
+
+#endif
+
+#if LLVM_VERSION_MAJOR < 14
+
+// NOTE: this header was moved in LLVM 14.
+#include <llvm/Support/TargetRegistry.h>
+
+#else
+
+#include <llvm/MC/TargetRegistry.h>
 
 #endif
 
@@ -890,9 +900,18 @@ void llvm_state::optimise()
         const auto cpu = m_jitter->get_target_cpu();
         const auto features = m_jitter->get_target_features();
 
+        auto &ctx = context();
+
         for (auto &f : module()) {
             auto attrs = f.getAttributes();
-            llvm::AttrBuilder new_attrs;
+
+            llvm::AttrBuilder
+#if LLVM_VERSION_MAJOR < 14
+                new_attrs
+#else
+                new_attrs(ctx)
+#endif
+                ;
 
             if (!cpu.empty() && !f.hasFnAttribute("target-cpu")) {
                 new_attrs.addAttribute("target-cpu", cpu);
@@ -911,7 +930,12 @@ void llvm_state::optimise()
                 }
             }
 
-            f.setAttributes(attrs.addAttributes(context(), llvm::AttributeList::FunctionIndex, new_attrs));
+            // Let new_attrs override attrs.
+#if LLVM_VERSION_MAJOR < 14
+            f.setAttributes(attrs.addFnAttributes(ctx, llvm::AttributeList::FunctionIndex, new_attrs));
+#else
+            f.setAttributes(attrs.addFnAttributes(ctx, new_attrs));
+#endif
         }
 #endif
 
