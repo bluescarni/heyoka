@@ -18,6 +18,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
@@ -25,6 +26,7 @@
 #include <vector>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <fmt/format.h>
@@ -51,6 +53,13 @@
 #include <llvm/Support/raw_ostream.h>
 
 #if defined(HEYOKA_HAVE_REAL128)
+
+// NOTE: this is a bit iffy, because it ends up including
+// quadmath.h: this works, as mp++ introduces a public dependency
+// on libquadmath, but technically we are introducing a direct
+// dependency for *heyoka* on libquadmath (thus we should be looking
+// for quadmath in the build system etc. etc.).
+#include <boost/multiprecision/float128.hpp>
 
 #include <mp++/real128.hpp>
 
@@ -334,11 +343,13 @@ std::vector<llvm::Value *> vector_to_scalars(ir_builder &builder, llvm::Value *v
         // Fetch the vector width.
         auto vector_size = vec_t->getNumElements();
 
+        assert(vector_size != 0u); // LCOV_EXCL_LINE
+
         // Extract the vector elements one by one.
         std::vector<llvm::Value *> ret;
         for (decltype(vector_size) i = 0; i < vector_size; ++i) {
             ret.push_back(builder.CreateExtractElement(vec, boost::numeric_cast<std::uint64_t>(i)));
-            assert(ret.back() != nullptr);
+            assert(ret.back() != nullptr); // LCOV_EXCL_LINE
         }
 
         return ret;
@@ -759,58 +770,52 @@ void llvm_if_then_else(llvm_state &s, llvm::Value *cond, const std::function<voi
     builder.SetInsertPoint(merge_bb);
 }
 
-// Helper to invoke an external function on a vector argument.
-// The function will be called on each element of the vector separately,
-// and the return will be re-assembled as a vector.
+// Helper to invoke an external function with vector arguments.
+// The call will be decomposed into a sequence of calls with scalar arguments,
+// and the return values will be re-assembled as a vector.
 // NOTE: there are some assumptions about valid function attributes
 // in this implementation.
-llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg, const std::string &fname)
+llvm::Value *call_extern_vec(llvm_state &s, const std::vector<llvm::Value *> &args, const std::string &fname)
 {
-    assert(arg != nullptr);
+    // LCOV_EXCL_START
+    assert(!args.empty());
+    // Make sure all vector arguments are of the same type.
+    assert(std::all_of(args.begin() + 1, args.end(),
+                       [&args](const auto &arg) { return arg->getType() == args[0]->getType(); }));
+    // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
 
-    // Decompose the argument into scalars.
-    auto scalars = vector_to_scalars(builder, arg);
-
-    // Invoke the function on each scalar.
-    std::vector<llvm::Value *> retvals;
-    for (auto scal : scalars) {
-        retvals.push_back(llvm_invoke_external(
-            s, fname, scal->getType(), {scal},
-            // NOTE: in theory we may add ReadNone here as well,
-            // but for some reason, at least up to LLVM 10,
-            // this causes strange codegen issues. Revisit
-            // in the future.
-            {llvm::Attribute::NoUnwind, llvm::Attribute::Speculatable, llvm::Attribute::WillReturn}));
+    // Decompose each argument into a vector of scalars.
+    std::vector<std::vector<llvm::Value *>> scalars;
+    for (const auto &arg : args) {
+        scalars.push_back(vector_to_scalars(builder, arg));
     }
 
-    // Build a vector with the results.
-    return scalars_to_vector(builder, retvals);
-}
+    // Fetch the vector size.
+    auto vec_size = scalars[0].size();
 
-// Helper to invoke an external function on 2 vector arguments.
-// The function will be called on each elements of the vectors separately,
-// and the return will be re-assembled as a vector.
-// NOTE: there are some assumptions about valid function attributes
-// in this implementation.
-llvm::Value *call_extern_vec(llvm_state &s, llvm::Value *arg0, llvm::Value *arg1, const std::string &fname)
-{
-    assert(arg0 != nullptr);
-    assert(arg1 != nullptr);
-    assert(arg0->getType() == arg1->getType());
+    // Fetch the type of the scalar arguments.
+    const auto scal_t = scalars[0][0]->getType();
 
-    auto &builder = s.builder();
+    // LCOV_EXCL_START
+    // Make sure the vector size is the same for all arguments.
+    assert(std::all_of(scalars.begin() + 1, scalars.end(),
+                       [vec_size](const auto &arg) { return arg.size() == vec_size; }));
+    // LCOV_EXCL_STOP
 
-    // Decompose the arguments into scalars.
-    auto scalars0 = vector_to_scalars(builder, arg0);
-    auto scalars1 = vector_to_scalars(builder, arg1);
+    // Invoke the function on each set of scalars.
+    std::vector<llvm::Value *> retvals, scal_args;
+    for (decltype(vec_size) i = 0; i < vec_size; ++i) {
+        // Setup the vector of scalar arguments.
+        scal_args.clear();
+        for (const auto &scal_set : scalars) {
+            scal_args.push_back(scal_set[i]);
+        }
 
-    // Invoke the function on each pair of scalars.
-    std::vector<llvm::Value *> retvals;
-    for (decltype(scalars0.size()) i = 0; i < scalars0.size(); ++i) {
+        // Invoke the function and store the scalar result.
         retvals.push_back(llvm_invoke_external(
-            s, fname, scalars0[i]->getType(), {scalars0[i], scalars1[i]},
+            s, fname, scal_t, scal_args,
             // NOTE: in theory we may add ReadNone here as well,
             // but for some reason, at least up to LLVM 10,
             // this causes strange codegen issues. Revisit
@@ -986,12 +991,17 @@ std::pair<llvm::Value *, llvm::Value *> llvm_sincos(llvm_state &s, llvm::Value *
 // Helper to compute abs(x_v).
 llvm::Value *llvm_abs(llvm_state &s, llvm::Value *x_v)
 {
+    // LCOV_EXCL_START
+    assert(x_v != nullptr);
+    assert(x_v->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
 #if defined(HEYOKA_HAVE_REAL128)
     // Determine the scalar type of the vector argument.
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, "fabsq");
+        return call_extern_vec(s, {x_v}, "fabsq");
     } else {
 #endif
         return llvm_invoke_intrinsic(s.builder(), "llvm.fabs", {x_v->getType()}, {x_v});
@@ -1013,7 +1023,7 @@ llvm::Value *llvm_modulus(llvm_state &s, llvm::Value *x, llvm::Value *y)
     auto &context = s.context();
 
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, x, y, "heyoka_modulus128");
+        return call_extern_vec(s, {x, y}, "heyoka_modulus128");
     } else {
 #endif
         auto quo = builder.CreateFDiv(x, y);
@@ -1115,7 +1125,7 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, y, x, "atan2q");
+        return call_extern_vec(s, {y, x}, "atan2q");
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context)) {
@@ -1133,9 +1143,9 @@ llvm::Value *llvm_atan2(llvm_state &s, llvm::Value *y, llvm::Value *x)
                 }
             }
 
-            return call_extern_vec(s, y, x, "atan2");
+            return call_extern_vec(s, {y, x}, "atan2");
         } else if (x_t == to_llvm_type<long double>(context)) {
-            return call_extern_vec(s, y, x,
+            return call_extern_vec(s, {y, x},
 #if defined(_MSC_VER)
                                    // NOTE: it seems like the MSVC stdlib does not have an atan2l function,
                                    // because LLVM complains about the symbol "atan2l" not being
@@ -1171,7 +1181,7 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
 
 #if defined(HEYOKA_HAVE_REAL128)
     if (x_t == llvm::Type::getFP128Ty(context)) {
-        return call_extern_vec(s, x, "expq");
+        return call_extern_vec(s, {x}, "expq");
     } else {
 #endif
         if (x_t == to_llvm_type<double>(context) || x_t == to_llvm_type<long double>(context)) {
@@ -1195,6 +1205,54 @@ llvm::Value *llvm_exp(llvm_state &s, llvm::Value *x)
             throw std::invalid_argument("Invalid floating-point type encountered in the LLVM implementation of exp()");
         }
         // LCOV_EXCL_STOP
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Fused multiply-add.
+llvm::Value *llvm_fma(llvm_state &s, llvm::Value *x, llvm::Value *y, llvm::Value *z)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(y != nullptr);
+    assert(z != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    assert(x->getType() == y->getType());
+    assert(x->getType() == z->getType());
+    // LCOV_EXCL_STOP
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of x, y and z.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        return call_extern_vec(s, {x, y, z}, "fmaq");
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s.builder(), "llvm.fma", {x->getType()}, {x, y, z});
+#if defined(HEYOKA_HAVE_REAL128)
+    }
+#endif
+}
+
+// Floor.
+llvm::Value *llvm_floor(llvm_state &s, llvm::Value *x)
+{
+    // LCOV_EXCL_START
+    assert(x != nullptr);
+    assert(x->getType()->getScalarType()->isFloatingPointTy());
+    // LCOV_EXCL_STOP
+
+#if defined(HEYOKA_HAVE_REAL128)
+    // Determine the scalar type of x.
+    auto *x_t = x->getType()->getScalarType();
+
+    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+        return call_extern_vec(s, {x}, "floorq");
+    } else {
+#endif
+        return llvm_invoke_intrinsic(s.builder(), "llvm.floor", {x->getType()}, {x});
 #if defined(HEYOKA_HAVE_REAL128)
     }
 #endif
@@ -1399,7 +1457,10 @@ llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t 
 namespace
 {
 
-// Variable template for the constant pi at different levels of precision.
+#if !defined(NDEBUG)
+
+// Variable template for the constant pi at different levels of precision, used only
+// for debugging.
 template <typename T>
 const auto inv_kep_E_pi = boost::math::constants::pi<T>();
 
@@ -1409,6 +1470,56 @@ template <>
 const mppp::real128 inv_kep_E_pi<mppp::real128> = mppp::pi_128;
 
 #endif
+
+#endif
+
+// Helper to return a double-length approximation of 2*pi for the given
+// input floating-point type T.
+template <typename T>
+std::pair<T, T> inv_kep_E_dl_twopi()
+{
+    constexpr bool is_ppc =
+#if defined(HEYOKA_ARCH_PPC)
+        true
+#else
+        false
+#endif
+        ;
+
+    if constexpr (is_ppc && std::is_same_v<long double, T>) {
+        throw std::invalid_argument("long double is not supported on PPC");
+    } else {
+        namespace bmp = boost::multiprecision;
+
+        // Use 4x the digits of type T for the computation of 2pi.
+        static_assert(std::numeric_limits<T>::digits <= std::numeric_limits<int>::max() / 4);
+        using mp_fp_t = bmp::number<bmp::cpp_bin_float<std::numeric_limits<T>::digits * 4, bmp::digit_base_2>>;
+
+        // Fetch 2pi in extended precision.
+        const auto mp_twopi = 2 * boost::math::constants::pi<mp_fp_t>();
+
+        // Split into two parts.
+#if defined(HEYOKA_HAVE_REAL128)
+        if constexpr (std::is_same_v<T, mppp::real128>) {
+            const auto twopi_hi = static_cast<bmp::float128>(mp_twopi);
+            const auto twopi_lo = static_cast<bmp::float128>(mp_twopi - mp_fp_t(twopi_hi));
+
+            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+            return {mppp::real128{twopi_hi.backend().value()}, mppp::real128{twopi_lo.backend().value()}};
+        } else {
+#endif
+            const auto twopi_hi = static_cast<T>(mp_twopi);
+            const auto twopi_lo = static_cast<T>(mp_twopi - twopi_hi);
+
+            assert(twopi_hi + twopi_lo == twopi_hi); // LCOV_EXCL_LINE
+
+            return {twopi_hi, twopi_lo};
+#if defined(HEYOKA_HAVE_REAL128)
+        }
+#endif
+    }
+}
 
 // Implementation of the inverse Kepler equation.
 template <typename T>
@@ -1458,8 +1569,18 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         // Create the return value.
         auto retval = builder.CreateAlloca(tp);
 
-        // Reduce M modulo 2*pi.
-        auto M = llvm_modulus(s, M_arg, vector_splat(builder, codegen<T>(s, number{2 * inv_kep_E_pi<T>}), batch_size));
+        // Fetch 2pi in double-length precision.
+        const auto [dl_twopi_hi, dl_twopi_lo] = inv_kep_E_dl_twopi<T>();
+
+#if !defined(NDEBUG)
+        assert(dl_twopi_hi == 2 * inv_kep_E_pi<T>); // LCOV_EXCL_LINE
+#endif
+
+        // Reduce M modulo 2*pi in extended precision.
+        auto *M = llvm_dl_modulus(s, M_arg, llvm::Constant::getNullValue(M_arg->getType()),
+                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_hi}), batch_size),
+                                  vector_splat(builder, codegen<T>(s, number{dl_twopi_lo}), batch_size))
+                      .first;
 
         // Compute the initial guess from the usual elliptic expansion
         // to the third order in eccentricities:
@@ -1494,7 +1615,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
         auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
-        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(2 * inv_kep_E_pi<T>, T(0))}), batch_size);
+        auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, T(0))}), batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);
 
@@ -1733,9 +1854,32 @@ public:
 
 } // namespace
 
-// NOTE: see the code in dfloat.hpp for the double-length primitives.
+// Error-free transformation of the product of two floating point numbers
+// using an FMA. This is algorithm 2.5 here:
+// https://www.researchgate.net/publication/228568591_Error-free_transformations_in_real_and_complex_floating_point_arithmetic
+std::pair<llvm::Value *, llvm::Value *> llvm_eft_product(llvm_state &s, llvm::Value *a, llvm::Value *b)
+{
+    // LCOV_EXCL_START
+    assert(a != nullptr);
+    assert(b != nullptr);
+    assert(a->getType()->getScalarType()->isFloatingPointTy());
+    assert(a->getType() == b->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto x = builder.CreateFMul(a, b);
+    auto y = llvm_fma(s, a, b, builder.CreateFNeg(x));
+
+    return {x, y};
+}
 
 // Addition.
+// NOTE: this is an LLVM port of the original code in NTL.
+// See the C++ implementation in dfloat.hpp for an explanation.
 std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
                                                     llvm::Value *y_hi, llvm::Value *y_lo)
 {
@@ -1770,6 +1914,164 @@ std::pair<llvm::Value *, llvm::Value *> llvm_dl_add(llvm_state &state, llvm::Val
     f = builder.CreateFAdd(f, h);
 
     return {e, f};
+}
+
+// Multiplication.
+// NOTE: this is procedure mul2() from here:
+// https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
+// The mul12() function is replaced with the FMA-based llvm_eft_product().
+// NOTE: the code in NTL looks identical to Dekker's.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_mul(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto [c, cc] = llvm_eft_product(state, x_hi, y_hi);
+
+    // cc = x*yy + xx*y + cc.
+    auto x_yy = builder.CreateFMul(x_hi, y_lo);
+    auto xx_y = builder.CreateFMul(x_lo, y_hi);
+    cc = builder.CreateFAdd(builder.CreateFAdd(x_yy, xx_y), cc);
+
+    // The normalisation step.
+    auto z = builder.CreateFAdd(c, cc);
+    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+
+    return {z, zz};
+}
+
+// Division.
+// NOTE: this is procedure div2() from here:
+// https://link.springer.com/content/pdf/10.1007/BF01397083.pdf
+// The mul12() function is replaced with the FMA-based llvm_eft_product().
+// NOTE: the code in NTL looks identical to Dekker's.
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_div(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                    llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    auto &builder = state.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto *c = builder.CreateFDiv(x_hi, y_hi);
+
+    auto [u, uu] = llvm_eft_product(state, c, y_hi);
+
+    // cc = (x_hi - u - uu + x_lo - c * y_lo) / y_hi.
+    auto *cc = builder.CreateFSub(x_hi, u);
+    cc = builder.CreateFSub(cc, uu);
+    cc = builder.CreateFAdd(cc, x_lo);
+    cc = builder.CreateFSub(cc, builder.CreateFMul(c, y_lo));
+    cc = builder.CreateFDiv(cc, y_hi);
+
+    // The normalisation step.
+    auto z = builder.CreateFAdd(c, cc);
+    auto zz = builder.CreateFAdd(builder.CreateFSub(c, z), cc);
+
+    return {z, zz};
+}
+
+// Floor.
+// NOTE: code taken from NTL:
+// https://github.com/libntl/ntl/blob/main/src/quad_float1.cpp#L239
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_floor(llvm_state &state, llvm::Value *x_hi, llvm::Value *x_lo)
+{
+    // LCOV_EXCL_START
+    assert(x_hi != nullptr);
+    assert(x_lo != nullptr);
+    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
+    assert(x_hi->getType() == x_lo->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = state.builder();
+
+    auto fp_t = x_hi->getType();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    // Floor x_hi.
+    auto *fhi = llvm_floor(state, x_hi);
+
+    // NOTE: we want to distinguish the scalar/vector codepaths, as the vectorised implementation
+    // does more work.
+    const auto vec_size = get_vector_size(x_hi);
+
+    if (vec_size == 1u) {
+        auto *ret_hi_ptr = builder.CreateAlloca(fp_t);
+        auto *ret_lo_ptr = builder.CreateAlloca(fp_t);
+
+        llvm_if_then_else(
+            state, builder.CreateFCmpOEQ(fhi, x_hi),
+            [&]() {
+                // floor(x_hi) == x_hi, that is, x_hi is already
+                // an integral value.
+
+                // Floor the low part.
+                auto *flo = llvm_floor(state, x_lo);
+
+                // Normalise.
+                auto z = builder.CreateFAdd(fhi, flo);
+                auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), flo);
+
+                // Store.
+                builder.CreateStore(z, ret_hi_ptr);
+                builder.CreateStore(zz, ret_lo_ptr);
+            },
+            [&]() {
+                // floor(x_hi) != x_hi. Just need to set the low part to zero.
+                builder.CreateStore(fhi, ret_hi_ptr);
+                builder.CreateStore(llvm::Constant::getNullValue(fp_t), ret_lo_ptr);
+            });
+
+        return {builder.CreateLoad(fp_t, ret_hi_ptr), builder.CreateLoad(fp_t, ret_lo_ptr)};
+    } else {
+        // Get a vector of zeroes.
+        auto *zero_vec = llvm::Constant::getNullValue(fp_t);
+
+        // Floor the low part.
+        auto *flo = llvm_floor(state, x_lo);
+
+        // Select flo or zero_vec, depending on fhi == x_hi.
+        auto *ret_lo = builder.CreateSelect(builder.CreateFCmpOEQ(fhi, x_hi), flo, zero_vec);
+
+        // Normalise.
+        auto z = builder.CreateFAdd(fhi, ret_lo);
+        auto zz = builder.CreateFAdd(builder.CreateFSub(fhi, z), ret_lo);
+
+        return {z, zz};
+    }
+}
+
+// Helper to reduce x modulo y, that is, to compute:
+// x - y * floor(x / y).
+std::pair<llvm::Value *, llvm::Value *> llvm_dl_modulus(llvm_state &s, llvm::Value *x_hi, llvm::Value *x_lo,
+                                                        llvm::Value *y_hi, llvm::Value *y_lo)
+{
+    // LCOV_EXCL_START
+    assert(x_hi != nullptr);
+    assert(x_lo != nullptr);
+    assert(y_hi != nullptr);
+    assert(y_lo != nullptr);
+    assert(x_hi->getType()->getScalarType()->isFloatingPointTy());
+    assert(x_hi->getType() == x_lo->getType());
+    assert(x_hi->getType() == y_hi->getType());
+    assert(x_hi->getType() == y_lo->getType());
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Temporarily disable the fast math flags.
+    fmf_disabler fd(builder);
+
+    auto [xoy_hi, xoy_lo] = llvm_dl_div(s, x_hi, x_lo, y_hi, y_lo);
+    auto [fl_hi, fl_lo] = llvm_dl_floor(s, xoy_hi, xoy_lo);
+    auto [prod_hi, prod_lo] = llvm_dl_mul(s, y_hi, y_lo, fl_hi, fl_lo);
+
+    return llvm_dl_add(s, x_hi, x_lo, builder.CreateFNeg(prod_hi), builder.CreateFNeg(prod_lo));
 }
 
 // Less-than.
@@ -1821,6 +2123,95 @@ bool llvm_depr_GEP_type_check(llvm::Value *ptr, llvm::Type *tp)
 
     return ptr->getType()->getScalarType()->getPointerElementType() == tp;
 }
+
+// Helper to create a wrapper for kepE() usable from C++ code.
+// Input/output is done through pointers.
+template <typename T>
+void llvm_add_inv_kep_E_wrapper(llvm_state &s, std::uint32_t batch_size, const std::string &name)
+{
+    assert(batch_size > 0u); // LCOV_EXCL_LINE
+
+    auto &md = s.module();
+    auto &builder = s.builder();
+    auto &context = s.context();
+
+    // Make sure the function does not exist already.
+    assert(md.getFunction(name) == nullptr); // LCOV_EXCL_LINE
+
+    // Fetch the scalar floating-point type.
+    auto scal_t = to_llvm_type<T>(context);
+
+    // Add the implementation function.
+    auto *impl_f = llvm_add_inv_kep_E<T>(s, batch_size);
+
+    // The function arguments:
+    // - output pointer (write only),
+    // - input ecc and mean anomaly pointers (read only).
+    // No overlap allowed.
+    std::vector<llvm::Type *> fargs(3u, llvm::PointerType::getUnqual(scal_t));
+    // The return type is void.
+    auto *ft = llvm::FunctionType::get(builder.getVoidTy(), fargs, false);
+    // Create the function
+    auto *f = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, name, &md);
+    assert(f != nullptr); // LCOV_EXCL_LINE
+
+    // Fetch the current insertion block.
+    auto orig_bb = builder.GetInsertBlock();
+
+    // Setup the function arguments.
+    auto out_ptr = f->args().begin();
+    out_ptr->setName("out_ptr");
+    out_ptr->addAttr(llvm::Attribute::NoCapture);
+    out_ptr->addAttr(llvm::Attribute::NoAlias);
+    out_ptr->addAttr(llvm::Attribute::WriteOnly);
+
+    auto ecc_ptr = f->args().begin() + 1;
+    ecc_ptr->setName("ecc_ptr");
+    ecc_ptr->addAttr(llvm::Attribute::NoCapture);
+    ecc_ptr->addAttr(llvm::Attribute::NoAlias);
+    ecc_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    auto M_ptr = f->args().begin() + 2;
+    M_ptr->setName("M_ptr");
+    M_ptr->addAttr(llvm::Attribute::NoCapture);
+    M_ptr->addAttr(llvm::Attribute::NoAlias);
+    M_ptr->addAttr(llvm::Attribute::ReadOnly);
+
+    // Create a new basic block to start insertion into.
+    builder.SetInsertPoint(llvm::BasicBlock::Create(context, "entry", f));
+
+    // Load the data from the pointers.
+    auto *ecc = load_vector_from_memory(builder, ecc_ptr, batch_size);
+    auto *M = load_vector_from_memory(builder, M_ptr, batch_size);
+
+    // Invoke the implementation function.
+    auto *ret = builder.CreateCall(impl_f, {ecc, M});
+
+    // Store the result.
+    store_vector_to_memory(builder, out_ptr, ret);
+
+    // Return.
+    builder.CreateRetVoid();
+
+    // Verify.
+    s.verify_function(f);
+
+    // Restore the original insertion block.
+    builder.SetInsertPoint(orig_bb);
+}
+
+// Explicit instantiations.
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<double>(llvm_state &, std::uint32_t, const std::string &);
+
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<long double>(llvm_state &, std::uint32_t,
+                                                                        const std::string &);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC void llvm_add_inv_kep_E_wrapper<mppp::real128>(llvm_state &, std::uint32_t,
+                                                                          const std::string &);
+
+#endif
 
 } // namespace heyoka::detail
 

@@ -102,7 +102,7 @@ llvm::Value *tanh_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
         }
     }
 
-    return call_extern_vec(s, args[0], "tanh");
+    return call_extern_vec(s, args, "tanh");
 }
 
 llvm::Value *tanh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -110,7 +110,7 @@ llvm::Value *tanh_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0],
+    return call_extern_vec(s, args,
 #if defined(_MSC_VER)
                            // NOTE: it seems like the MSVC stdlib does not have a tanhl function,
                            // because LLVM complains about the symbol "tanhl" not being
@@ -129,7 +129,7 @@ llvm::Value *tanh_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "tanhq");
+    return call_extern_vec(s, args, "tanhq");
 }
 
 #endif

@@ -1866,13 +1866,18 @@ TEST_CASE("get_set_dtime")
     ta.set_dtime(dtm.first, dtm.second);
     REQUIRE(ta.get_dtime() == dtm);
 
-    ta.set_dtime(3., 4.);
+    ta.set_dtime(4., 3.);
     REQUIRE(ta.get_dtime().first == 7);
     REQUIRE(ta.get_dtime().second == 0);
 
     ta.set_dtime(3., std::numeric_limits<double>::epsilon());
     REQUIRE(ta.get_dtime().first == 3);
     REQUIRE(ta.get_dtime().second == std::numeric_limits<double>::epsilon());
+
+    // Error logic.
+    REQUIRE_THROWS_AS(ta.set_dtime(std::numeric_limits<double>::infinity(), 1.), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime(1., std::numeric_limits<double>::infinity()), std::invalid_argument);
+    REQUIRE_THROWS_AS(ta.set_dtime(3., 4.), std::invalid_argument);
 }
 
 // Check the callback is invoked when the integration is stopped

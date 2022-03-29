@@ -104,7 +104,7 @@ llvm::Value *asin_impl::codegen_dbl(llvm_state &s, const std::vector<llvm::Value
         }
     }
 
-    return call_extern_vec(s, args[0], "asin");
+    return call_extern_vec(s, args, "asin");
 }
 
 llvm::Value *asin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Value *> &args) const
@@ -112,7 +112,7 @@ llvm::Value *asin_impl::codegen_ldbl(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0],
+    return call_extern_vec(s, args,
 #if defined(_MSC_VER)
                            // NOTE: it seems like the MSVC stdlib does not have an asinl function,
                            // because LLVM complains about the symbol "asinl" not being
@@ -131,7 +131,7 @@ llvm::Value *asin_impl::codegen_f128(llvm_state &s, const std::vector<llvm::Valu
     assert(args.size() == 1u);
     assert(args[0] != nullptr);
 
-    return call_extern_vec(s, args[0], "asinq");
+    return call_extern_vec(s, args, "asinq");
 }
 
 #endif

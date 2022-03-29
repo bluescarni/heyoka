@@ -13,6 +13,7 @@
 #include <random>
 #include <sstream>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #if defined(HEYOKA_HAVE_REAL128)
@@ -21,6 +22,7 @@
 
 #endif
 
+#include <heyoka/detail/dfloat.hpp>
 #include <heyoka/expression.hpp>
 #include <heyoka/s11n.hpp>
 #include <heyoka/taylor.hpp>
@@ -29,6 +31,8 @@
 #include "test_utils.hpp"
 
 static std::mt19937 rng;
+
+const int ntrials = 100;
 
 using namespace heyoka;
 using namespace heyoka_test;
@@ -60,7 +64,6 @@ TEST_CASE("scalar test")
 
         auto ta = taylor_adaptive<fp_t>({prime(x) = v, prime(v) = -x}, {0, 1}, kw::compact_mode = true);
 
-        const int ntrials = 100;
         const auto final_time = fp_t(10000.);
 
         fp_t err = 0;
@@ -172,7 +175,6 @@ TEST_CASE("batch test")
 
         auto ta = taylor_adaptive_batch<fp_t>({prime(x) = v, prime(v) = -x}, {0, 0, 1, 1}, 2u, kw::compact_mode = true);
 
-        const int ntrials = 100;
         auto final_time = std::vector{fp_t(10000.), fp_t(11000.)};
 
         fp_t err = 0;
@@ -321,4 +323,40 @@ TEST_CASE("dfloat s11n")
     }
 
     REQUIRE(df == df_t(1.1) + df_t(1.3));
+}
+
+TEST_CASE("dfloat add test")
+{
+    using std::abs;
+
+    std::uniform_real_distribution<double> rdist(-1e3, 1e3);
+
+    for (auto i = 0; i < ntrials * 100; ++i) {
+        auto a_hi = rdist(rng);
+        auto a_lo = rdist(rng);
+        if (abs(a_hi) < abs(a_lo)) {
+            std::swap(a_hi, a_lo);
+        }
+
+        auto b_hi = rdist(rng);
+        auto b_lo = rdist(rng);
+        if (abs(b_hi) < abs(b_lo)) {
+            std::swap(b_hi, b_lo);
+        }
+
+        detail::dfloat<double> x(a_hi, a_lo), y(b_hi, b_lo);
+
+        x = detail::normalise(x);
+        y = detail::normalise(y);
+
+        // Test commutativity.
+        auto res1 = x + y;
+        auto res2 = y + x;
+
+        REQUIRE(res1.hi == res2.hi);
+        REQUIRE(res1.lo == res2.lo);
+
+        // Test smallness of the low part.
+        REQUIRE(res1.hi == res1.hi + res1.lo);
+    }
 }

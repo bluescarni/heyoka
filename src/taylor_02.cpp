@@ -234,7 +234,7 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
     auto *x_t = x_v->getType()->getScalarType();
 
     if (x_t == llvm::Type::getFP128Ty(s.context())) {
-        return call_extern_vec(s, x_v, y_v, "powq");
+        return call_extern_vec(s, {x_v, y_v}, "powq");
     } else {
 #endif
         // If we are operating on SIMD vectors, try to see if we have a sleef

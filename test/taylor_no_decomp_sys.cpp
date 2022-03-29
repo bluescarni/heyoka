@@ -49,7 +49,7 @@ const auto fp_types = std::tuple<double
 template <typename T, typename U>
 void compare_batch_scalar(std::initializer_list<U> sys, unsigned opt_level, bool high_accuracy, bool compact_mode)
 {
-    const auto batch_size = 23u;
+    const auto batch_size = 5u;
 
     llvm_state s{kw::opt_level = opt_level};
 
