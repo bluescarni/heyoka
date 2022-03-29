@@ -7,6 +7,8 @@ Changelog
 New
 ~~~
 
+- Support LLVM 14
+  (`#247 <https://github.com/bluescarni/heyoka/pull/247>`__).
 - Implement :ref:`parallel mode <tut_parallel_mode>`
   for the automatic parallelisation of an individual integration step
   (`#237 <https://github.com/bluescarni/heyoka/pull/237>`__).
@@ -14,7 +16,7 @@ New
 Changes
 ~~~~~~~
 
-- heyoka now builds against LLVM 13 without deprecation warnings
+- heyoka now builds against LLVM 13/14 without deprecation warnings
   (`#242 <https://github.com/bluescarni/heyoka/pull/242>`__).
 - In case of an early interruption, the ``propagate_grid()`` function will now
   process all available grid points before the interruption time before exiting
