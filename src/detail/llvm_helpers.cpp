@@ -209,16 +209,13 @@ llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std:
 {
     // LCOV_EXCL_START
     assert(vector_size > 0u);
+    assert(llvm::isa<llvm::PointerType>(ptr->getType()));
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()));
     assert(!llvm::isa<llvm_vector_type>(ptr->getType()->getPointerElementType()));
     // LCOV_EXCL_STOP
 
-    // Fetch the pointer type (this will result in an assertion
-    // failure if ptr is not a pointer).
-    auto ptr_t = llvm::cast<llvm::PointerType>(ptr->getType());
-
     // Fetch the scalar type.
-    auto scal_t = ptr_t->getElementType();
+    auto scal_t = ptr->getType()->getPointerElementType();
 
     if (vector_size == 1u) {
         // Scalar case.

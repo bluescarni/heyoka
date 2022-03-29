@@ -229,11 +229,20 @@ llvm::Value *taylor_step_minabs(llvm_state &s, llvm::Value *x_v, llvm::Value *y_
 // Helper to compute pow(x_v, y_v) in the Taylor stepper implementation.
 llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
 {
-#if defined(HEYOKA_HAVE_REAL128)
+    // LCOV_EXCL_START
+    assert(x_v != nullptr);
+    assert(y_v != nullptr);
+    assert(x_v->getType()->getScalarType()->isFloatingPointTy());
+    assert(x_v->getType() == y_v->getType());
+    // LCOV_EXCL_STOP
+
+    auto &context = s.context();
+
     // Determine the scalar type of the vector arguments.
     auto *x_t = x_v->getType()->getScalarType();
 
-    if (x_t == llvm::Type::getFP128Ty(s.context())) {
+#if defined(HEYOKA_HAVE_REAL128)
+    if (x_t == llvm::Type::getFP128Ty(context)) {
         return call_extern_vec(s, {x_v, y_v}, "powq");
     } else {
 #endif
@@ -242,8 +251,8 @@ llvm::Value *taylor_step_pow(llvm_state &s, llvm::Value *x_v, llvm::Value *y_v)
         if (auto *vec_t = llvm::dyn_cast<llvm_vector_type>(x_v->getType())) {
             // NOTE: if sfn ends up empty, we will be falling through
             // below and use the LLVM intrinsic instead.
-            if (const auto sfn = sleef_function_name(s.context(), "pow", vec_t->getElementType(),
-                                                     boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
+            if (const auto sfn
+                = sleef_function_name(context, "pow", x_t, boost::numeric_cast<std::uint32_t>(vec_t->getNumElements()));
                 !sfn.empty()) {
                 return llvm_invoke_external(
                     s, sfn, vec_t, {x_v, y_v},
@@ -641,10 +650,8 @@ taylor_c_make_sv_diff_globals(llvm_state &s, const taylor_dc_t &dc, std::uint32_
 // Small helper to compute the size of a global array.
 std::uint32_t taylor_c_gl_arr_size(llvm::Value *v)
 {
-    assert(llvm::isa<llvm::GlobalVariable>(v)); // LCOV_EXCL_LINE
-
     return boost::numeric_cast<std::uint32_t>(
-        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::PointerType>(v->getType())->getElementType())->getNumElements());
+        llvm::cast<llvm::ArrayType>(llvm::cast<llvm::GlobalVariable>(v)->getValueType())->getNumElements());
 }
 
 // Helper to compute and store the derivatives of the state variables in compact mode at order 'order'.
@@ -1223,6 +1230,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                                              bool high_accuracy, bool parallel_mode)
 {
     auto &builder = s.builder();
+    auto &context = s.context();
 
     // Split dc into segments.
     const auto s_dc = taylor_segment_dc(dc, n_eq);
@@ -1257,7 +1265,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // slots after the sv derivatives. If we need additional slots, allocate
     // another full column of derivatives, as it is complicated at this stage
     // to know exactly how many slots we will need.
-    auto *fp_type = llvm::cast<llvm::PointerType>(order0->getType())->getElementType();
+    auto *fp_type = to_llvm_type<T>(context);
     auto *fp_vec_type = make_vector_type(fp_type, batch_size);
     auto *array_type
         = llvm::ArrayType::get(fp_vec_type, (max_svf_idx < n_eq) ? (n_uvars * order + n_eq) : (n_uvars * (order + 1u)));
@@ -1293,7 +1301,6 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
     if (parallel_mode) {
         auto &md = s.module();
-        auto &context = s.context();
 
         // Fetch the LLVM version of T *.
         auto *scal_ptr_t = llvm::PointerType::getUnqual(to_llvm_type<T>(context));
