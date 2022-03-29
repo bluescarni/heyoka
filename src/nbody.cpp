@@ -261,6 +261,33 @@ std::vector<std::pair<expression, expression>> make_np1body_sys_fixed_masses(std
         vy_vars.emplace_back(variable(fmt::format("vy_{}", i + 1u)));
         vz_vars.emplace_back(variable(fmt::format("vz_{}", i + 1u)));
     }
+
+    // Create vectors containing r_i/(r_i)**3 for each body.
+    std::vector<expression> x_r3, y_r3, z_r3;
+    for (std::uint32_t i = 0; i < n; ++i) {
+        auto rm3 = pow(sum_sq({x_vars[i], y_vars[i], z_vars[i]}), expression{-3. / 2});
+
+        x_r3.push_back(x_vars[i] * rm3);
+        y_r3.push_back(y_vars[i] * rm3);
+        z_r3.push_back(z_vars[i] * rm3);
+    }
+
+    // Create the return value.
+    std::vector<std::pair<expression, expression>> retval;
+
+    // Accumulators for the accelerations on the bodies.
+    // The i-th element of x/y/z_acc contains the list of
+    // accelerations on body i due to:
+    // - the zero-th body,
+    // - the apparent forces,
+    // - all the other bodies.
+    std::vector<std::vector<expression>> x_acc;
+    x_acc.resize(boost::numeric_cast<decltype(x_acc.size())>(n));
+    auto y_acc = x_acc;
+    auto z_acc = x_acc;
+
+    for (std::uint32_t i = 0; i < n; ++i) {
+    }
 }
 
 std::vector<std::pair<expression, expression>> make_nbody_sys_par_masses(std::uint32_t n, number Gconst,
