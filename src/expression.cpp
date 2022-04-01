@@ -1339,16 +1339,16 @@ llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::ve
 
 template <typename T>
 llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                   bool high_accuracy, std::uint32_t)
+                                   bool high_accuracy, std::uint32_t vector_size)
 {
     if (auto fptr = std::get_if<func>(&ex.value())) {
         if constexpr (std::is_same_v<T, double>) {
-            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_dbl(s, n_uvars, batch_size, high_accuracy, vector_size);
         } else if constexpr (std::is_same_v<T, long double>) {
-            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_ldbl(s, n_uvars, batch_size, high_accuracy, vector_size);
 #if defined(HEYOKA_HAVE_REAL128)
         } else if constexpr (std::is_same_v<T, mppp::real128>) {
-            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy);
+            return fptr->taylor_c_diff_func_f128(s, n_uvars, batch_size, high_accuracy, vector_size);
 #endif
         } else {
             static_assert(detail::always_false_v<T>, "Unhandled type.");

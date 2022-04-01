@@ -1451,37 +1451,87 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // ncalls the number of times it must be called, gens the generators for the
     // function arguments and cur_order the order of the derivative.
     // TODO fix docs.
-    auto block_diff
-        = [&](const auto &func, const auto &ncalls, const auto &gens, const expression &, llvm::Value *cur_order) {
-              // LCOV_EXCL_START
-              assert(ncalls > 0u);
-              assert(!gens.empty());
-              assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-              // LCOV_EXCL_STOP
+    auto block_diff = [&](const auto &func, const auto &ncalls, const auto &gens, const expression &ex,
+                          llvm::Value *cur_order) {
+        // LCOV_EXCL_START
+        assert(ncalls > 0u);
+        assert(!gens.empty());
+        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+        // LCOV_EXCL_STOP
 
-              // Loop over the number of calls.
-              llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-                  // Create the u variable index from the first generator.
-                  auto u_idx = gens[0](cur_call_idx);
+        // TODO: drop ncalls > 1u here for better testing?
+        if (ncalls > 1u && batch_size == 1u) {
+            // The current function func needs to be called on more than 1 set of arguments
+            // and the batch size is 1: we can implement the vectorized codepath.
 
-                  // Initialise the vector of arguments with which func must be called. The following
-                  // initial arguments are always present:
-                  // - current Taylor order,
-                  // - u index of the variable,
-                  // - array of derivatives,
-                  // - pointer to the param values,
-                  // - pointer to the time value(s).
-                  std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+            // Turn the sets of arguments returned by the generators into a single set of vector arguments.
+            std::vector<llvm::Value *> gen_vec_args;
 
-                  // Create the other arguments via the generators.
-                  for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                      args.push_back(gens[i](cur_call_idx));
-                  }
+            for (const auto &gen : gens) {
+                // Generate the first argument to inspect the type.
+                auto *arg0 = gen(builder.getInt32(0));
+                auto *arg_t = arg0->getType();
 
-                  // Calculate the derivative and store the result.
-                  taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
-              });
-          };
+                // Create the vector type.
+                auto *vec_t = make_vector_type(arg_t, ncalls);
+
+                // Init the vector with the first argument.
+                llvm::Value *vec = llvm::UndefValue::get(vec_t);
+                vec = builder.CreateInsertElement(vec, arg0, std::uint64_t(0));
+
+                // Generate and insert the remaining arguments.
+                for (std::uint32_t i = 1; i < ncalls; ++i) {
+                    vec = builder.CreateInsertElement(vec, gen(builder.getInt32(i)), i);
+                }
+
+                // Append to gen_vec_args.
+                gen_vec_args.push_back(vec);
+            }
+
+            // Create the vector diff function.
+            auto *vfunc = taylor_c_diff_func<T>(s, ex, n_uvars, 1, high_accuracy, ncalls);
+
+            // Initialise the arguments with which vfunc must be called. The following
+            // initial arguments are always present:
+            // - current Taylor order,
+            // - u indices of the variables,
+            // - array of derivatives,
+            // - pointer to the param values,
+            // - pointer to the time value(s).
+            std::vector<llvm::Value *> args{cur_order, gen_vec_args[0], diff_arr, par_ptr, time_ptr};
+
+            // Append the other arguments.
+            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                args.push_back(gen_vec_args[i]);
+            }
+
+            // Calculate the derivative and store the result.
+            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, gen_vec_args[0], builder.CreateCall(vfunc, args));
+        } else {
+            // Loop over the number of calls.
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                // Create the u variable index from the first generator.
+                auto u_idx = gens[0](cur_call_idx);
+
+                // Initialise the arguments with which func must be called. The following
+                // initial arguments are always present:
+                // - current Taylor order,
+                // - u index of the variable,
+                // - array of derivatives,
+                // - pointer to the param values,
+                // - pointer to the time value(s).
+                std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+
+                // Create the other arguments via the generators.
+                for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                    args.push_back(gens[i](cur_call_idx));
+                }
+
+                // Calculate the derivative and store the result.
+                taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+            });
+        }
+    };
 
     // Helper to compute concurrently all the derivatives
     // in a segment using the parallel wrappers.
