@@ -383,7 +383,7 @@ inline llvm::Value *taylor_diff(llvm_state &s, const expression &ex, const std::
 
 template <typename T>
 HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func(llvm_state &, const expression &, std::uint32_t, std::uint32_t,
-                                                     bool);
+                                                     bool, std::uint32_t);
 
 HEYOKA_DLL_PUBLIC std::uint32_t get_param_size(const expression &);
 

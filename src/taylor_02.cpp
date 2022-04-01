@@ -1053,12 +1053,16 @@ struct llvm_func_name_compare {
 };
 
 // For each segment in s_dc, this function will return a dict mapping an LLVM function
-// f for the computation of a Taylor derivative to a size and a vector of std::functions. For example, one entry
-// in the return value will read something like:
-// {f : (2, [g_0, g_1, g_2])}
+// f for the computation of a Taylor derivative to:
+// - an integer,
+// - a vector of std::functions,
+// - an expression.
+// For example, one entry in the return value will read something like:
+// {f : (2, [g_0, g_1, g_2], func(u_0, u_1, u_2))}
 // The meaning in this example is that the arity of f is 3 and it will be called with 2 different
 // sets of arguments. The g_i functions are expected to be called with input argument j in [0, 1]
 // to yield the value of the i-th function argument for f at the j-th invocation.
+// func(u_0, u_1, u_2) is the heyoka expression from which f was generated.
 template <typename T>
 auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s_dc, std::uint32_t n_eq,
                                 std::uint32_t n_uvars, std::uint32_t batch_size, bool high_accuracy)
@@ -1071,62 +1075,70 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     // functions are invoked in taylor_compute_jet_compact_mode() is always the same. If we used directly pointer
     // comparisons instead, the order could vary across different executions and different platforms. The name
     // mangling we do when creating the function names should ensure that there are no possible name collisions.
-    std::vector<
-        std::map<llvm::Function *, std::tuple<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
-                 llvm_func_name_compare>>
+    using gen_vec_t = std::vector<std::function<llvm::Value *(llvm::Value *)>>;
+    std::vector<std::map<llvm::Function *, std::tuple<std::uint32_t, gen_vec_t, expression>, llvm_func_name_compare>>
         retval;
 
-    // Variable to keep track of the u variable
+    // Counter to keep track of the index of the u variable
     // on whose definition we are operating.
     auto cur_u_idx = n_eq;
     for (const auto &seg : s_dc) {
-        // This structure maps an LLVM function to sets of arguments
-        // with which the function is to be called. For instance, if function
-        // f(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
-        // will contain {f : [[a, b, c], [d, e, f]]}.
+        // This structure maps an LLVM function to:
+        // - the sets of arguments with which the function is to be called,
+        // - the expression that was used for the generation of the LLVM function.
+        // For instance, if the LLVM function f generated from the heyoka expression
+        // func(x, y, z) is to be called as f(a, b, c) and f(d, e, f), then tmp_map
+        // will contain {f : ([[a, b, c], [d, e, f]], func(x, y, z))}.
         // After construction, we have verified that for each function
         // in the map the sets of arguments have all the same size.
-        std::unordered_map<llvm::Function *, std::vector<std::vector<std::variant<std::uint32_t, number>>>> tmp_map;
+        using v_args_t = std::vector<std::vector<std::variant<std::uint32_t, number>>>;
+        std::unordered_map<llvm::Function *, std::tuple<v_args_t, expression>> tmp_map;
 
         for (const auto &ex : seg) {
-            // Get the function for the computation of the derivative.
-            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy);
+            // Generate or get the function for the computation of the derivative.
+            auto func = taylor_c_diff_func<T>(s, ex.first, n_uvars, batch_size, high_accuracy, 1);
 
             // Insert the function into tmp_map.
-            const auto [it, is_new_func] = tmp_map.try_emplace(func);
+            const auto [it, is_new_func] = tmp_map.try_emplace(func, v_args_t{}, ex.first);
 
-            assert(is_new_func || !it->second.empty()); // LCOV_EXCL_LINE
+            assert(is_new_func || !std::get<0>(it->second).empty()); // LCOV_EXCL_LINE
 
             // Convert the variables/constants in the current dc
             // element into a set of indices/constants.
             const auto cdiff_args = taylor_udef_to_variants(ex.first, ex.second);
 
-            if (!is_new_func && it->second.back().size() - 1u != cdiff_args.size()) {
+            if (!is_new_func && std::get<0>(it->second).back().size() - 1u != cdiff_args.size()) {
                 throw std::invalid_argument(
                     "Inconsistent arity detected in a Taylor derivative function in compact "
                     "mode: the same function is being called with both {} and {} arguments"_format(
-                        it->second.back().size() - 1u, cdiff_args.size()));
+                        std::get<0>(it->second).back().size() - 1u, cdiff_args.size()));
             }
 
             // Add the new set of arguments.
-            it->second.emplace_back();
+            std::get<0>(it->second).emplace_back();
             // Add the idx of the u variable.
-            it->second.back().emplace_back(cur_u_idx);
+            std::get<0>(it->second).back().emplace_back(cur_u_idx);
             // Add the actual function arguments.
-            it->second.back().insert(it->second.back().end(), cdiff_args.begin(), cdiff_args.end());
+            std::get<0>(it->second)
+                .back()
+                .insert(std::get<0>(it->second).back().end(), cdiff_args.begin(), cdiff_args.end());
 
             ++cur_u_idx;
         }
 
-        // Now we build the transposition of tmp_map: from {f : [[a, b, c], [d, e, f]]}
-        // to {f : [[a, d], [b, e], [c, f]]}.
-        std::unordered_map<llvm::Function *, std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>>
-            tmp_map_transpose;
-        for (const auto &[func, vv] : tmp_map) {
-            assert(!vv.empty()); // LCOV_EXCL_LINE
+        // Now we build the arguments transposition of tmp_map: from {f : ([[a, b, c], [d, e, f]], func(x, y, z))}
+        // to {f : ([[a, d], [b, e], [c, f]], func(x, y, z))}.
+        using v_args_t_t = std::vector<std::variant<std::vector<std::uint32_t>, std::vector<number>>>;
+        std::unordered_map<llvm::Function *, std::tuple<v_args_t_t, expression>> tmp_map_transpose;
+        for (auto &[func, tup] : tmp_map) {
+            const auto &vv = std::get<0>(tup);
+
+            assert(!vv.empty());                                                    // LCOV_EXCL_LINE
+            assert(std::holds_alternative<heyoka::func>(std::get<1>(tup).value())); // LCOV_EXCL_LINE
 
             // Add the function.
-            const auto [it, ins_status] = tmp_map_transpose.try_emplace(func);
+            const auto [it, ins_status]
+                = tmp_map_transpose.try_emplace(func, v_args_t_t{}, std::move(std::get<1>(tup)));
             assert(ins_status); // LCOV_EXCL_LINE
 
             const auto n_calls = vv.size();
@@ -1146,7 +1158,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
 
                 // Turn tmp_c_vec (a vector of variants) into a variant
                 // of vectors, and insert the result.
-                it->second.push_back(taylor_c_vv_transpose(tmp_c_vec));
+                std::get<0>(it->second).push_back(taylor_c_vv_transpose(tmp_c_vec));
             }
         }
 
@@ -1154,17 +1166,19 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
         retval.emplace_back();
         auto &a_map = retval.back();
 
-        for (const auto &[func, vv] : tmp_map_transpose) {
+        for (auto &[func, tup] : tmp_map_transpose) {
+            const auto &vv = std::get<0>(tup);
+
             assert(!vv.empty()); // LCOV_EXCL_LINE
 
-            // Add the function.
-            const auto [it, ins_status] = a_map.try_emplace(func);
-            assert(ins_status); // LCOV_EXCL_LINE
-
-            // Set the number of calls for this function.
-            std::get<0>(it->second)
+            // Compute the number of calls for this function.
+            const auto ncalls
                 = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(std::get<0>(it->second) > 0u); // LCOV_EXCL_LINE
+            assert(ncalls > 0u); // LCOV_EXCL_LINE
+
+            // Add the function.
+            const auto [it, ins_status] = a_map.try_emplace(func, ncalls, gen_vec_t{}, std::move(std::get<1>(tup)));
+            assert(ins_status); // LCOV_EXCL_LINE
 
             // Create the g functions for each argument.
             for (const auto &v : vv) {
@@ -1436,36 +1450,38 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
     // func is the LLVM function for the computation of the Taylor derivative in the block,
     // ncalls the number of times it must be called, gens the generators for the
     // function arguments and cur_order the order of the derivative.
-    auto block_diff = [&](const auto &func, const auto &ncalls, const auto &gens, llvm::Value *cur_order) {
-        // LCOV_EXCL_START
-        assert(ncalls > 0u);
-        assert(!gens.empty());
-        assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
-        // LCOV_EXCL_STOP
+    // TODO fix docs.
+    auto block_diff
+        = [&](const auto &func, const auto &ncalls, const auto &gens, const expression &, llvm::Value *cur_order) {
+              // LCOV_EXCL_START
+              assert(ncalls > 0u);
+              assert(!gens.empty());
+              assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
+              // LCOV_EXCL_STOP
 
-        // Loop over the number of calls.
-        llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
-            // Create the u variable index from the first generator.
-            auto u_idx = gens[0](cur_call_idx);
+              // Loop over the number of calls.
+              llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(ncalls), [&](llvm::Value *cur_call_idx) {
+                  // Create the u variable index from the first generator.
+                  auto u_idx = gens[0](cur_call_idx);
 
-            // Initialise the vector of arguments with which func must be called. The following
-            // initial arguments are always present:
-            // - current Taylor order,
-            // - u index of the variable,
-            // - array of derivatives,
-            // - pointer to the param values,
-            // - pointer to the time value(s).
-            std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
+                  // Initialise the vector of arguments with which func must be called. The following
+                  // initial arguments are always present:
+                  // - current Taylor order,
+                  // - u index of the variable,
+                  // - array of derivatives,
+                  // - pointer to the param values,
+                  // - pointer to the time value(s).
+                  std::vector<llvm::Value *> args{cur_order, u_idx, diff_arr, par_ptr, time_ptr};
 
-            // Create the other arguments via the generators.
-            for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
-                args.push_back(gens[i](cur_call_idx));
-            }
+                  // Create the other arguments via the generators.
+                  for (decltype(gens.size()) i = 1; i < gens.size(); ++i) {
+                      args.push_back(gens[i](cur_call_idx));
+                  }
 
-            // Calculate the derivative and store the result.
-            taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
-        });
-    };
+                  // Calculate the derivative and store the result.
+                  taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, u_idx, builder.CreateCall(func, args));
+              });
+          };
 
     // Helper to compute concurrently all the derivatives
     // in a segment using the parallel wrappers.
@@ -1523,7 +1539,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
             // of order cur_order serially.
             for (const auto &map : f_maps) {
                 for (const auto &p : map) {
-                    block_diff(p.first, std::get<0>(p.second), std::get<1>(p.second), cur_order);
+                    block_diff(p.first, std::get<0>(p.second), std::get<1>(p.second), std::get<2>(p.second), cur_order);
                 }
             }
         }
@@ -1588,7 +1604,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 for (const auto &p : map) {
                     const auto ncalls = std::get<0>(p.second);
 
-                    block_diff(p.first, ncalls, std::get<1>(p.second), builder.getInt32(order));
+                    block_diff(p.first, ncalls, std::get<1>(p.second), std::get<2>(p.second), builder.getInt32(order));
 
                     // Update cur_start_u_idx taking advantage of the fact
                     // that each block in a segment processes the derivatives

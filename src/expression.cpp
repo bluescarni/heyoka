@@ -1339,7 +1339,7 @@ llvm::Value *taylor_diff_f128(llvm_state &s, const expression &ex, const std::ve
 
 template <typename T>
 llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                   bool high_accuracy)
+                                   bool high_accuracy, std::uint32_t)
 {
     if (auto fptr = std::get_if<func>(&ex.value())) {
         if constexpr (std::is_same_v<T, double>) {
@@ -1361,15 +1361,15 @@ llvm::Function *taylor_c_diff_func(llvm_state &s, const expression &ex, std::uin
 }
 
 template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<double>(llvm_state &, const expression &, std::uint32_t,
-                                                                      std::uint32_t, bool);
+                                                                      std::uint32_t, bool, std::uint32_t);
 
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<long double>(llvm_state &, const expression &,
-                                                                           std::uint32_t, std::uint32_t, bool);
+template HEYOKA_DLL_PUBLIC llvm::Function *
+taylor_c_diff_func<long double>(llvm_state &, const expression &, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-template HEYOKA_DLL_PUBLIC llvm::Function *taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &,
-                                                                             std::uint32_t, std::uint32_t, bool);
+template HEYOKA_DLL_PUBLIC llvm::Function *
+taylor_c_diff_func<mppp::real128>(llvm_state &, const expression &, std::uint32_t, std::uint32_t, bool, std::uint32_t);
 
 #endif
 
