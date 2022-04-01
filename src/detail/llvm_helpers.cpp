@@ -203,6 +203,12 @@ std::uint32_t get_vector_size(llvm::Value *x)
     }
 }
 
+// Fetch the alignment of a type.
+std::uint64_t get_alignment(llvm::Module &md, llvm::Type *tp)
+{
+    return md.getDataLayout().getABITypeAlignment(tp);
+}
+
 // Helper to load into a vector of size vector_size the sequential scalar data starting at ptr.
 // If vector_size is 1, a scalar is loaded instead.
 llvm::Value *load_vector_from_memory(ir_builder &builder, llvm::Value *ptr, std::uint32_t vector_size)
@@ -270,15 +276,17 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     }
 }
 
-// Gather a vector of type vec_tp from the vector of pointers ptrs. align is the alignment of the
-// scalar values stored in ptrs.
-llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs, std::size_t align)
+// Gather a vector of type vec_tp from the vector of pointers ptrs.
+llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
         // LCOV_EXCL_START
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
         assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
         // LCOV_EXCL_STOP
+
+        // Fetch the alignment of the scalar type.
+        const auto align = get_alignment(*builder.GetInsertBlock()->getModule(), vec_tp->getScalarType());
 
         return builder.CreateMaskedGather(
 #if LLVM_VERSION_MAJOR >= 13
@@ -290,7 +298,7 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
 #if LLVM_VERSION_MAJOR == 10
             boost::numeric_cast<unsigned>(align)
 #else
-            llvm::Align(boost::numeric_cast<std::uint64_t>(align))
+            llvm::Align(align)
 #endif
         );
     } else {
@@ -1260,9 +1268,8 @@ namespace
 
 // Add a function to count the number of sign changes in the coefficients
 // of a polynomial of degree n. The coefficients are SIMD vectors of size batch_size
-// and scalar type scal_t. The alignment of scal_t is scal_t_align.
-llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size,
-                                  std::size_t scal_t_align)
+// and scalar type scal_t.
+llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32_t n, std::uint32_t batch_size)
 {
     assert(batch_size > 0u);
 
@@ -1373,9 +1380,8 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
                                           vector_splat(builder, builder.getInt32(batch_size), batch_size)));
             assert(llvm_depr_GEP_type_check(cf_ptr_v, scal_t)); // LCOV_EXCL_LINE
             auto last_nz_ptr = builder.CreateInBoundsGEP(scal_t, cf_ptr_v, last_nz_ptr_idx);
-            auto last_nz_cf = batch_size > 1u
-                                  ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr, scal_t_align)
-                                  : static_cast<llvm::Value *>(builder.CreateLoad(scal_t, last_nz_ptr));
+            auto last_nz_cf = batch_size > 1u ? gather_vector_from_memory(builder, cur_cf->getType(), last_nz_ptr)
+                                              : static_cast<llvm::Value *>(builder.CreateLoad(scal_t, last_nz_ptr));
 
             // Compute the sign of the current coefficient(s).
             auto cur_sgn = llvm_sgn(s, cur_cf);
@@ -1434,19 +1440,19 @@ llvm::Function *llvm_add_csc_impl(llvm_state &s, llvm::Type *scal_t, std::uint32
 
 llvm::Function *llvm_add_csc_dbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size, alignof(double));
+    return llvm_add_csc_impl(s, detail::to_llvm_type<double>(s.context()), n, batch_size);
 }
 
 llvm::Function *llvm_add_csc_ldbl(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size, alignof(long double));
+    return llvm_add_csc_impl(s, detail::to_llvm_type<long double>(s.context()), n, batch_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
 llvm::Function *llvm_add_csc_f128(llvm_state &s, std::uint32_t n, std::uint32_t batch_size)
 {
-    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size, alignof(mppp::real128));
+    return llvm_add_csc_impl(s, to_llvm_type<mppp::real128>(s.context()), n, batch_size);
 }
 
 #endif

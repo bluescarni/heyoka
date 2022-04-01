@@ -2333,3 +2333,28 @@ TEST_CASE("dl modulus batch")
 
     tuple_for_each(fp_types, tester);
 }
+
+TEST_CASE("get_alignment")
+{
+    llvm_state s;
+
+    auto &md = s.module();
+    auto &context = s.context();
+    auto &builder = s.builder();
+
+    auto *tp = detail::to_llvm_type<double>(context);
+    REQUIRE(detail::get_alignment(md, tp) == alignof(double));
+
+#if !defined(HEYOKA_ARCH_PPC)
+    tp = detail::to_llvm_type<long double>(context);
+    REQUIRE(detail::get_alignment(md, tp) == alignof(long double));
+#endif
+
+#if defined(HEYOKA_HAVE_REAL128)
+    tp = detail::to_llvm_type<mppp::real128>(context);
+    REQUIRE(detail::get_alignment(md, tp) == alignof(mppp::real128));
+#endif
+
+    REQUIRE(detail::get_alignment(md, builder.getInt32Ty()) == alignof(std::uint32_t));
+    REQUIRE(detail::get_alignment(md, builder.getInt32Ty()) == alignof(std::int32_t));
+}
