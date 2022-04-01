@@ -282,6 +282,8 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
         // LCOV_EXCL_START
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(llvm::cast<llvm_vector_type>(vec_tp)->getNumElements()
+               == llvm::cast<llvm_vector_type>(ptrs->getType())->getNumElements());
         assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
         // LCOV_EXCL_STOP
 
@@ -311,9 +313,8 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     }
 }
 
-// Scatter the vector val to the memory locations contained in ptrs. align is the alignment of the
-// scalar values stored in ptrs.
-void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value *ptrs, std::size_t align)
+// Scatter the vector val to the memory locations contained in ptrs.
+void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value *ptrs)
 {
     if (llvm::isa<llvm_vector_type>(ptrs->getType())) {
         // LCOV_EXCL_START
@@ -323,11 +324,14 @@ void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value
         assert(val->getType()->getScalarType() == ptrs->getType()->getScalarType()->getPointerElementType());
         // LCOV_EXCL_STOP
 
+        // Fetch the alignment of the scalar type.
+        const auto align = get_alignment(*builder.GetInsertBlock()->getModule(), val->getType()->getScalarType());
+
         builder.CreateMaskedScatter(val, ptrs,
 #if LLVM_VERSION_MAJOR == 10
                                     boost::numeric_cast<unsigned>(align)
 #else
-                                    llvm::Align(boost::numeric_cast<std::uint64_t>(align))
+                                    llvm::Align()
 #endif
         );
     } else {
