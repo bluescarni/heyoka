@@ -331,7 +331,7 @@ void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value
 #if LLVM_VERSION_MAJOR == 10
                                     boost::numeric_cast<unsigned>(align)
 #else
-                                    llvm::Align()
+                                    llvm::Align(align)
 #endif
         );
     } else {
