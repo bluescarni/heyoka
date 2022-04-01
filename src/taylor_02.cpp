@@ -19,6 +19,7 @@
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -1071,7 +1072,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
     // comparisons instead, the order could vary across different executions and different platforms. The name
     // mangling we do when creating the function names should ensure that there are no possible name collisions.
     std::vector<
-        std::map<llvm::Function *, std::pair<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
+        std::map<llvm::Function *, std::tuple<std::uint32_t, std::vector<std::function<llvm::Value *(llvm::Value *)>>>,
                  llvm_func_name_compare>>
         retval;
 
@@ -1161,23 +1162,24 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             assert(ins_status); // LCOV_EXCL_LINE
 
             // Set the number of calls for this function.
-            it->second.first
+            std::get<0>(it->second)
                 = std::visit([](const auto &x) { return boost::numeric_cast<std::uint32_t>(x.size()); }, vv[0]);
-            assert(it->second.first > 0u); // LCOV_EXCL_LINE
+            assert(std::get<0>(it->second) > 0u); // LCOV_EXCL_LINE
 
             // Create the g functions for each argument.
             for (const auto &v : vv) {
-                it->second.second.push_back(std::visit(
-                    [&s](const auto &x) {
-                        using type = detail::uncvref_t<decltype(x)>;
+                std::get<1>(it->second)
+                    .push_back(std::visit(
+                        [&s](const auto &x) {
+                            using type = detail::uncvref_t<decltype(x)>;
 
-                        if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
-                            return taylor_c_make_arg_gen_vidx(s, x);
-                        } else {
-                            return taylor_c_make_arg_gen_vc<T>(s, x);
-                        }
-                    },
-                    v));
+                            if constexpr (std::is_same_v<type, std::vector<std::uint32_t>>) {
+                                return taylor_c_make_arg_gen_vidx(s, x);
+                            } else {
+                                return taylor_c_make_arg_gen_vc<T>(s, x);
+                            }
+                        },
+                        v));
             }
         }
     }
@@ -1193,7 +1195,7 @@ auto taylor_build_function_maps(llvm_state &s, const std::vector<taylor_dc_t> &s
             fm_bd.emplace_back();
 
             for (const auto &p : m) {
-                fm_bd.back().push_back(p.second.first);
+                fm_bd.back().push_back(std::get<0>(p.second));
             }
         }
 
@@ -1341,10 +1343,10 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 const auto &func = p.first;
 
                 // The number of func calls.
-                const auto ncalls = p.second.first;
+                const auto ncalls = std::get<0>(p.second);
 
                 // The generators for the arguments of func.
-                const auto &gens = p.second.second;
+                const auto &gens = std::get<1>(p.second);
 
                 // Fetch the current insertion block.
                 auto *orig_bb = builder.GetInsertBlock();
@@ -1521,7 +1523,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
             // of order cur_order serially.
             for (const auto &map : f_maps) {
                 for (const auto &p : map) {
-                    block_diff(p.first, p.second.first, p.second.second, cur_order);
+                    block_diff(p.first, std::get<0>(p.second), std::get<1>(p.second), cur_order);
                 }
             }
         }
@@ -1571,7 +1573,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                 // that each block in a segment processes the derivatives
                 // of exactly ncalls u variables.
                 for (const auto &p : f_maps[i]) {
-                    const auto ncalls = p.second.first;
+                    const auto ncalls = std::get<0>(p.second);
                     cur_start_u_idx += ncalls;
                 }
             }
@@ -1584,9 +1586,9 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
                 // Compute the derivatives of all the blocks in the segment.
                 for (const auto &p : map) {
-                    const auto ncalls = p.second.first;
+                    const auto ncalls = std::get<0>(p.second);
 
-                    block_diff(p.first, ncalls, p.second.second, builder.getInt32(order));
+                    block_diff(p.first, ncalls, std::get<1>(p.second), builder.getInt32(order));
 
                     // Update cur_start_u_idx taking advantage of the fact
                     // that each block in a segment processes the derivatives
