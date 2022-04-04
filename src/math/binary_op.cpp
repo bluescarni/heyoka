@@ -732,12 +732,12 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {n, var});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size,
+                                                          vector_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -773,7 +773,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             s, builder.CreateICmpEQ(order, builder.getInt32(0)),
             [&]() {
                 // For order zero, run the codegen.
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size);
                 auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(AddOrSub ? builder.CreateFAdd(num_vec, ret) : builder.CreateFSub(num_vec, ret),
@@ -823,12 +823,12 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size,
+                                                          vector_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -865,7 +865,7 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
             [&]() {
                 // For order zero, run the codegen.
                 auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, builder.getInt32(0), var_idx);
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size);
 
                 builder.CreateStore(AddOrSub ? builder.CreateFAdd(ret, num_vec) : builder.CreateFSub(ret, num_vec),
                                     retval);
@@ -907,12 +907,12 @@ llvm::Function *bo_taylor_c_diff_func_addsub_impl(llvm_state &s, const binary_op
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair
-        = taylor_c_diff_func_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size, {var0, var1});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, AddOrSub ? "add" : "sub", n_uvars, batch_size,
+                                                          vector_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 

@@ -18,12 +18,10 @@ TEST_CASE("foo")
 {
     auto [x, y, z, t] = make_vars("x", "y", "z", "t");
 
-    taylor_adaptive<double> ta{
-        {prime(x) = par[0] + 2., prime(y) = par[1] + 3., prime(z) = par[2] + 4., prime(t) = par[3] + 5.},
-        {0., 0., 0., 0.},
-        kw::pars = {10., 20., 30., 40.},
-        kw::compact_mode = true,
-        kw::opt_level = 3u};
+    taylor_adaptive<double> ta{{prime(x) = x + y, prime(y) = y + z, prime(z) = z + t, prime(t) = t + x},
+                               {0., 0., 0., 0.},
+                               kw::compact_mode = true,
+                               kw::opt_level = 3u};
 
     std::cout << ta.get_llvm_state().get_ir() << '\n';
 
