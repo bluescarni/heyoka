@@ -59,7 +59,7 @@ HEYOKA_DLL_PUBLIC llvm::Value *load_vector_from_memory(ir_builder &, llvm::Value
 HEYOKA_DLL_PUBLIC void store_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *gather_vector_from_memory(ir_builder &, llvm::Type *, llvm::Value *);
-HEYOKA_DLL_PUBLIC void scatter_vector_to_memory(ir_builder &, llvm::Type *, llvm::Value *);
+HEYOKA_DLL_PUBLIC void scatter_vector_to_memory(ir_builder &, llvm::Value *, llvm::Value *);
 
 HEYOKA_DLL_PUBLIC llvm::Value *vector_splat(ir_builder &, llvm::Value *, std::uint32_t);
 

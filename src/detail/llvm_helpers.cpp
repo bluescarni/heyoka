@@ -276,7 +276,9 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     }
 }
 
-// Gather a vector of type vec_tp from the vector of pointers ptrs.
+// Gather a vector of type vec_tp from ptrs. If vec_tp is a vector type, then ptrs
+// must be a vector of pointers of the same size and the returned value is also a vector
+// of that size. Otherwise, ptrs must be a single scalar pointer and the returned value is a scalar.
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
@@ -313,7 +315,9 @@ llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, 
     }
 }
 
-// Scatter the vector val to the memory locations contained in ptrs.
+// Scatter val to ptrs. If val is a vector, then ptrs must be a vector of pointers
+// and a vector scatter takes place. Otherwise, ptrs must be a single scalar pointer
+// and a scalar store takes place.
 void scatter_vector_to_memory(ir_builder &builder, llvm::Value *val, llvm::Value *ptrs)
 {
     if (llvm::isa<llvm_vector_type>(ptrs->getType())) {

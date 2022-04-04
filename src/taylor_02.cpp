@@ -1459,33 +1459,25 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
         assert(std::all_of(gens.begin(), gens.end(), [](const auto &f) { return static_cast<bool>(f); }));
         // LCOV_EXCL_STOP
 
-        // TODO: drop ncalls > 1u here for better testing?
-        if (ncalls > 1u && batch_size == 1u) {
-            // The current function func needs to be called on more than 1 set of arguments
-            // and the batch size is 1: we can implement the vectorized codepath.
+        if (batch_size == 1u) {
+            // The batch size is 1: we can implement the vectorized codepath.
 
             // Turn the sets of arguments returned by the generators into a single set of vector arguments.
-            std::vector<llvm::Value *> gen_vec_args;
+            std::vector<llvm::Value *> gen_vec_args, tmp;
 
             for (const auto &gen : gens) {
-                // Generate the first argument to inspect the type.
-                auto *arg0 = gen(builder.getInt32(0));
-                auto *arg_t = arg0->getType();
+                // Generate the arguments into tmp.
+                tmp.clear();
 
-                // Create the vector type.
-                auto *vec_t = make_vector_type(arg_t, ncalls);
-
-                // Init the vector with the first argument.
-                llvm::Value *vec = llvm::UndefValue::get(vec_t);
-                vec = builder.CreateInsertElement(vec, arg0, std::uint64_t(0));
-
-                // Generate and insert the remaining arguments.
-                for (std::uint32_t i = 1; i < ncalls; ++i) {
-                    vec = builder.CreateInsertElement(vec, gen(builder.getInt32(i)), i);
+                for (std::uint32_t i = 0; i < ncalls; ++i) {
+                    tmp.push_back(gen(builder.getInt32(i)));
                 }
 
-                // Append to gen_vec_args.
-                gen_vec_args.push_back(vec);
+                // Transform tmp into a vector and add it
+                // to gen_vec_args.
+                // NOTE: if ncalls is 1, then scalars_to_vector()
+                // will just return the first element of tmp.
+                gen_vec_args.push_back(scalars_to_vector(builder, tmp));
             }
 
             // Create the vector diff function.

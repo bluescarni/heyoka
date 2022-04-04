@@ -67,6 +67,7 @@
 #endif
 
 #include <heyoka/detail/llvm_helpers.hpp>
+#include <heyoka/detail/llvm_vector_type.hpp>
 #include <heyoka/detail/logging_impl.hpp>
 #include <heyoka/detail/string_conv.hpp>
 #include <heyoka/detail/type_traits.hpp>
@@ -198,6 +199,118 @@ taylor_c_diff_func_name_args_impl(llvm::LLVMContext &context, const std::string 
     return std::make_pair(std::move(fname), std::move(fargs));
 }
 
+// TODO remove the other version, then rename?
+template <typename T>
+std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_vfunc_name_args(llvm::LLVMContext &context, const std::string &name, std::uint32_t n_uvars,
+                              std::uint32_t batch_size, std::uint32_t vector_size,
+                              const std::vector<std::variant<variable, number, param>> &args,
+                              std::uint32_t n_hidden_deps)
+{
+    // LCOV_EXCL_START
+    assert(n_uvars > 0u);
+    assert(vector_size == 1u || batch_size == 1u);
+    // LCOV_EXCL_STOP
+
+    // Fetch the scalar floating-point type corresponding to T.
+    auto scal_fp_t = to_llvm_type<T>(context);
+
+    // Fetch the floating-point type stored in diff_arr.
+    auto diff_val_t = make_vector_type(scal_fp_t, batch_size);
+
+    // Init the name.
+    auto fname = fmt::format("heyoka.taylor_c_diff.{}.{}.", vector_size, name);
+
+    // Init the vector of arguments:
+    // - diff order,
+    // - idx/indices of the u variable(s) whose diff is being computed,
+    // - diff array (pointer to diff_val_t),
+    // - par ptr (pointer to scalar),
+    // - time ptr (pointer to scalar).
+    std::vector<llvm::Type *> fargs{llvm::Type::getInt32Ty(context),
+                                    make_vector_type(llvm::Type::getInt32Ty(context), vector_size),
+                                    llvm::PointerType::getUnqual(diff_val_t), llvm::PointerType::getUnqual(scal_fp_t),
+                                    llvm::PointerType::getUnqual(scal_fp_t)};
+
+    // Add the mangling and LLVM arg types for the argument types. Also, detect if
+    // we have variables in the arguments.
+    bool with_var = false;
+    for (decltype(args.size()) i = 0; i < args.size(); ++i) {
+        // Detect variable.
+        if (std::holds_alternative<variable>(args[i])) {
+            with_var = true;
+        }
+
+        // Name mangling.
+        fname += std::visit([](const auto &v) { return taylor_c_diff_mangle(v); }, args[i]);
+
+        // Add the arguments separator, if we are not at the
+        // last argument.
+        if (i != args.size() - 1u) {
+            fname += '_';
+        }
+
+        // Add the LLVM function argument type.
+        fargs.push_back(std::visit(
+            [&](const auto &v) -> llvm::Type * {
+                using type = detail::uncvref_t<decltype(v)>;
+
+                if constexpr (std::is_same_v<type, number>) {
+                    // For numbers, the argument is passed as a scalar
+                    // floating-point value, or a vector of floating-point
+                    // values in vector mode.
+                    return make_vector_type(scal_fp_t, vector_size);
+                } else {
+                    // For vars and params, the argument is an index
+                    // in an array, or a vector of indices in vector mode.
+                    return make_vector_type(llvm::Type::getInt32Ty(context), vector_size);
+                }
+            },
+            args[i]));
+    }
+
+    // Close the argument list with a ".".
+    // NOTE: this will result in a ".." in the name
+    // if the function has zero arguments.
+    fname += '.';
+
+    // If we have variables in the arguments, add mangling
+    // for n_uvars. This is needed because the function logic
+    // for accessing the derivatives depends on n_uvars.
+    if (with_var) {
+        fname += fmt::format("n_uvars_{}.", n_uvars);
+    }
+
+    // Finally, add the mangling for diff_val_t.
+    fname += llvm_mangle_type(diff_val_t);
+
+    // Fill in the hidden dependency arguments. These are all indices or vectors
+    // of indices.
+    fargs.insert(fargs.end(), boost::numeric_cast<decltype(fargs.size())>(n_hidden_deps),
+                 make_vector_type(llvm::Type::getInt32Ty(context), vector_size));
+
+    return std::make_pair(std::move(fname), std::move(fargs));
+}
+
+template HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_vfunc_name_args<double>(llvm::LLVMContext &, const std::string &, std::uint32_t, std::uint32_t,
+                                      std::uint32_t, const std::vector<std::variant<variable, number, param>> &,
+                                      std::uint32_t);
+
+template HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_vfunc_name_args<long double>(llvm::LLVMContext &, const std::string &, std::uint32_t, std::uint32_t,
+                                           std::uint32_t, const std::vector<std::variant<variable, number, param>> &,
+                                           std::uint32_t);
+
+#if defined(HEYOKA_HAVE_REAL128)
+
+template HEYOKA_DLL_PUBLIC std::pair<std::string, std::vector<llvm::Type *>>
+taylor_c_diff_vfunc_name_args<mppp::real128>(llvm::LLVMContext &, const std::string &, std::uint32_t, std::uint32_t,
+                                             std::uint32_t, const std::vector<std::variant<variable, number, param>> &,
+                                             std::uint32_t);
+
+#endif
+
 namespace
 {
 
@@ -280,13 +393,33 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm:
     return vector_splat(s.builder(), n, batch_size);
 }
 
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const number &, llvm::Value *n, llvm::Value *,
+                                            std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    // LCOV_EXCL_START
+#if !defined(NDEBUG)
+    assert(batch_size > 0u);
+    assert(vector_size > 0u);
+
+    if (vector_size == 1u) {
+        assert(!llvm::isa<llvm_vector_type>(n->getType()));
+    } else {
+        assert(batch_size == 1u);
+        assert(llvm::isa<llvm_vector_type>(n->getType()));
+        assert(llvm::cast<llvm_vector_type>(n->getType())->getNumElements() == vector_size);
+    }
+#endif
+    // LCOV_EXCL_STOP
+
+    return vector_size == 1u ? vector_splat(s.builder(), n, batch_size) : n;
+}
+
 llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
                                             std::uint32_t batch_size)
 {
     // LCOV_EXCL_START
     assert(batch_size > 0u);
     assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
-    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
@@ -297,6 +430,42 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
                                           par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
     return load_vector_from_memory(builder, ptr, batch_size);
+}
+
+llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::Value *p, llvm::Value *par_ptr,
+                                            std::uint32_t batch_size, std::uint32_t vector_size)
+{
+    // LCOV_EXCL_START
+#if !defined(NDEBUG)
+    assert(batch_size > 0u);
+    assert(vector_size > 0u);
+
+    assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
+    assert(!llvm::isa<llvm_vector_type>(llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType()));
+
+    if (vector_size == 1u) {
+        assert(!llvm::isa<llvm_vector_type>(p->getType()));
+    } else {
+        assert(batch_size == 1u);
+        assert(llvm::isa<llvm_vector_type>(p->getType()));
+        assert(llvm::cast<llvm_vector_type>(p->getType())->getNumElements() == vector_size);
+    }
+#endif
+    // LCOV_EXCL_STOP
+
+    auto &builder = s.builder();
+
+    // Fetch the scalar floating-point type of the parameters.
+    auto *scal_fp_t = llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType();
+
+    // NOTE: overflow checks are done in taylor_compute_jet().
+
+    // Fetch the pointer(s) into par_ptr.
+    auto *ptr = builder.CreateInBoundsGEP(scal_fp_t, par_ptr,
+                                          vector_size == 1u ? builder.CreateMul(p, builder.getInt32(batch_size)) : p);
+
+    // Gather.
+    return gather_vector_from_memory(builder, make_vector_type(scal_fp_t, vector_size), ptr);
 }
 
 // Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the
@@ -314,38 +483,90 @@ llvm::Value *taylor_fetch_diff(const std::vector<llvm::Value *> &arr, std::uint3
     return arr[idx];
 }
 
-// Load the derivative of order 'order' of the u variable u_idx from the array of Taylor derivatives diff_arr.
+// Load the derivative of order 'order' of the u variable(s) u_idx from the array of Taylor derivatives diff_arr.
 // n_uvars is the total number of u variables.
 llvm::Value *taylor_c_load_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
                                 llvm::Value *u_idx)
 {
-    auto &builder = s.builder();
-
     // NOTE: overflow check has already been done to ensure that the
     // total size of diff_arr fits in a 32-bit unsigned integer.
-    assert(llvm_depr_GEP_type_check(diff_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+    auto &builder = s.builder();
 
-    return builder.CreateLoad(pointee_type(diff_arr), ptr);
+    // Fetch the floating-point type in diff_arr.
+    auto *diff_val_t = pointee_type(diff_arr);
+
+    if (auto *vec_idx_t = llvm::dyn_cast<llvm_vector_type>(u_idx->getType())) {
+        // Vector of indices.
+
+        // NOTE: vector mode and batch mode are mutually exclusive.
+        assert(!llvm::isa<llvm_vector_type>(diff_val_t)); // LCOV_EXCL_LINE
+
+        // Fetch the vector floating-point type.
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_idx_t->getNumElements());
+        // NOTE: the expectation here is that vectors of size 1 never show up, as they are always
+        // turned into scalars by helpers such as make_vector_type() & co.
+        assert(vector_size > 1u); // LCOV_EXCL_LINE
+        auto *vec_fp_t = make_vector_type(diff_val_t, vector_size);
+
+        // Compute the pointers.
+        auto *ptrs = builder.CreateInBoundsGEP(
+            diff_val_t, diff_arr,
+            builder.CreateAdd(vector_splat(builder, builder.CreateMul(order, builder.getInt32(n_uvars)), vector_size),
+                              u_idx));
+
+        // Load.
+        return gather_vector_from_memory(builder, vec_fp_t, ptrs);
+    } else {
+        // Single index.
+        auto *ptr = builder.CreateInBoundsGEP(
+            diff_val_t, diff_arr, builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+
+        return builder.CreateLoad(diff_val_t, ptr);
+    }
 }
 
-// Store the value val as the derivative of order 'order' of the u variable u_idx
+// Store the value x as the derivative of order 'order' of the u variable u_idx
 // into the array of Taylor derivatives diff_arr. n_uvars is the total number of u variables.
 void taylor_c_store_diff(llvm_state &s, llvm::Value *diff_arr, std::uint32_t n_uvars, llvm::Value *order,
-                         llvm::Value *u_idx, llvm::Value *val)
+                         llvm::Value *u_idx, llvm::Value *x)
 {
-    auto &builder = s.builder();
-
     // NOTE: overflow check has already been done to ensure that the
     // total size of diff_arr fits in a 32-bit unsigned integer.
-    assert(llvm_depr_GEP_type_check(diff_arr, pointee_type(diff_arr))); // LCOV_EXCL_LINE
-    auto *ptr
-        = builder.CreateInBoundsGEP(pointee_type(diff_arr), diff_arr,
-                                    builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+    auto &builder = s.builder();
 
-    builder.CreateStore(val, ptr);
+    // Fetch the floating-point type in diff_arr.
+    auto *diff_val_t = pointee_type(diff_arr);
+
+    if (auto *vec_idx_t = llvm::dyn_cast<llvm_vector_type>(u_idx->getType())) {
+        // Vector mode.
+
+        // LCOV_EXCL_START
+        // NOTE: vector mode and batch mode are mutually exclusive.
+        assert(!llvm::isa<llvm_vector_type>(diff_val_t));
+        assert(llvm::isa<llvm_vector_type>(x->getType()));
+        assert(llvm::cast<llvm_vector_type>(x->getType())->getNumElements() == vec_idx_t->getNumElements());
+        // LCOV_EXCL_STOP
+
+        const auto vector_size = boost::numeric_cast<std::uint32_t>(vec_idx_t->getNumElements());
+        // NOTE: the expectation here is that vectors of size 1 never show up, as they are always
+        // turned into scalars by helpers such as make_vector_type() & co.
+        assert(vector_size > 1u); // LCOV_EXCL_LINE
+
+        // Compute the pointers.
+        auto *ptrs = builder.CreateInBoundsGEP(
+            diff_val_t, diff_arr,
+            builder.CreateAdd(vector_splat(builder, builder.CreateMul(order, builder.getInt32(n_uvars)), vector_size),
+                              u_idx));
+
+        // Store.
+        scatter_vector_to_memory(builder, x, ptrs);
+    } else {
+        // Scalar mode.
+        auto *ptr = builder.CreateInBoundsGEP(
+            diff_val_t, diff_arr, builder.CreateAdd(builder.CreateMul(order, builder.getInt32(n_uvars)), u_idx));
+
+        builder.CreateStore(x, ptr);
+    }
 }
 
 namespace
