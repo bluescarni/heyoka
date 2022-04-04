@@ -276,12 +276,16 @@ void store_vector_to_memory(ir_builder &builder, llvm::Value *ptr, llvm::Value *
     }
 }
 
-// Gather a vector of type vec_tp from the vector of pointers ptrs.
+// Gather a vector of type vec_tp from ptrs. If vec_tp is a vector type, then ptrs
+// must be a vector of pointers of the same size and the returned value is also a vector
+// of that size. Otherwise, ptrs must be a single scalar pointer and the returned value is a scalar.
 llvm::Value *gather_vector_from_memory(ir_builder &builder, llvm::Type *vec_tp, llvm::Value *ptrs)
 {
     if (llvm::isa<llvm_vector_type>(vec_tp)) {
         // LCOV_EXCL_START
         assert(llvm::isa<llvm_vector_type>(ptrs->getType()));
+        assert(llvm::cast<llvm_vector_type>(vec_tp)->getNumElements()
+               == llvm::cast<llvm_vector_type>(ptrs->getType())->getNumElements());
         assert(ptrs->getType()->getScalarType()->getPointerElementType() == vec_tp->getScalarType());
         // LCOV_EXCL_STOP
 
@@ -1622,7 +1626,7 @@ llvm::Function *llvm_add_inv_kep_E_impl(llvm_state &s, std::uint32_t batch_size)
         auto ig = builder.CreateFAdd(ig1, ig2);
 
         // Make extra sure the initial guess is in the [0, 2*pi) range.
-        auto lb = vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+        auto lb = llvm::ConstantFP::get(tp, 0.);
         auto ub = vector_splat(builder, codegen<T>(s, number{nextafter(dl_twopi_hi, T(0))}), batch_size);
         ig = llvm_max(s, ig, lb);
         ig = llvm_min(s, ig, ub);

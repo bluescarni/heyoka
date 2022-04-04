@@ -17,6 +17,7 @@
 #include <boost/numeric/conversion/cast.hpp>
 
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -27,7 +28,6 @@
 #include <heyoka/detail/llvm_helpers.hpp>
 #include <heyoka/func.hpp>
 #include <heyoka/llvm_state.hpp>
-#include <heyoka/number.hpp>
 #include <heyoka/taylor.hpp>
 
 namespace heyoka::detail
@@ -89,7 +89,7 @@ inline llvm::Function *taylor_c_diff_func_unary_num_det(llvm_state &s, const F &
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), retval);
             });
 
         // Return the result.

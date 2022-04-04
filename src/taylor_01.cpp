@@ -286,7 +286,6 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
     // LCOV_EXCL_START
     assert(batch_size > 0u);
     assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
-    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
@@ -1768,7 +1767,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
             store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
 
             // Zero-init the element in comp_arr.
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+            builder.CreateStore(llvm::ConstantFP::get(vector_t, 0.),
                                 builder.CreateInBoundsGEP(vector_t, comp_arr, {cur_var_idx}));
         });
 
