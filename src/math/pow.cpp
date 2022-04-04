@@ -26,6 +26,7 @@
 
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -368,16 +369,16 @@ namespace
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const U &n0, const V &n1,
-                                            std::uint32_t n_uvars, std::uint32_t batch_size)
+                                            std::uint32_t n_uvars, std::uint32_t batch_size, std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {n0, n1});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "pow", n_uvars, batch_size, vector_size, {n0, n1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -413,14 +414,15 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             [&]() {
                 // If the order is zero, run the codegen.
                 builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_diff_numparam_codegen(s, n0, num_base, par_ptr, batch_size),
-                                            taylor_c_diff_numparam_codegen(s, n1, num_exp, par_ptr, batch_size)}),
+                    codegen_from_values<T>(
+                        s, fn,
+                        {taylor_c_diff_numparam_codegen(s, n0, num_base, par_ptr, batch_size, vector_size),
+                         taylor_c_diff_numparam_codegen(s, n1, num_exp, par_ptr, batch_size, vector_size)}),
                     retval);
             },
             [&]() {
                 // Otherwise, return zero.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), retval);
+                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), retval);
             });
 
         // Return the result.
@@ -448,16 +450,17 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 // Derivative of pow(variable, number).
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, const variable &var, const U &n,
-                                            std::uint32_t n_uvars, std::uint32_t batch_size)
+                                            std::uint32_t n_uvars, std::uint32_t batch_size, std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    const auto val_t_width = vector_size > 1u ? vector_size : batch_size;
+    auto val_t = to_llvm_vector_type<T>(context, val_t_width);
 
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "pow", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "pow", n_uvars, batch_size, vector_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -498,18 +501,19 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
             [&]() {
                 // For order 0, invoke the function on the order 0 of var_idx.
                 builder.CreateStore(
-                    codegen_from_values<T>(s, fn,
-                                           {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
-                                            taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size)}),
+                    codegen_from_values<T>(
+                        s, fn,
+                        {taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx),
+                         taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size, vector_size)}),
                     retval);
             },
             [&]() {
                 // Create FP vector versions of exponent and order.
-                auto alpha_v = taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size);
-                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), batch_size);
+                auto alpha_v = taylor_c_diff_numparam_codegen(s, n, exponent, par_ptr, batch_size, vector_size);
+                auto ord_v = vector_splat(builder, builder.CreateUIToFP(ord, to_llvm_type<T>(context)), val_t_width);
 
                 // Init the accumulator.
-                builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size), acc);
+                builder.CreateStore(llvm::ConstantFP::get(val_t, 0.), acc);
 
                 // Run the loop.
                 llvm_loop_u32(s, builder.getInt32(0), ord, [&](llvm::Value *j) {
@@ -517,12 +521,10 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
                     auto aj = taylor_c_load_diff(s, diff_ptr, n_uvars, j, u_idx);
 
                     // Compute the factor n*alpha-j*(alpha+1).
-                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), batch_size);
+                    auto j_v = vector_splat(builder, builder.CreateUIToFP(j, to_llvm_type<T>(context)), val_t_width);
                     auto fac = builder.CreateFSub(
                         builder.CreateFMul(ord_v, alpha_v),
-                        builder.CreateFMul(
-                            j_v,
-                            builder.CreateFAdd(alpha_v, vector_splat(builder, codegen<T>(s, number{1.}), batch_size))));
+                        builder.CreateFMul(j_v, builder.CreateFAdd(alpha_v, llvm::ConstantFP::get(val_t, 1.))));
 
                     builder.CreateStore(builder.CreateFAdd(builder.CreateLoad(val_t, acc),
                                                            builder.CreateFMul(fac, builder.CreateFMul(b_nj, aj))),
@@ -563,7 +565,7 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &s, const pow_impl &fn, c
 template <typename T, typename U1, typename U2,
           std::enable_if_t<!std::conjunction_v<is_num_param<U1>, is_num_param<U2>>, int> = 0>
 llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, const pow_impl &, const U1 &, const U2 &, std::uint32_t,
-                                            std::uint32_t)
+                                            std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of a pow() in compact mode");
@@ -571,37 +573,37 @@ llvm::Function *taylor_c_diff_func_pow_impl(llvm_state &, const pow_impl &, cons
 
 template <typename T>
 llvm::Function *taylor_c_diff_func_pow(llvm_state &s, const pow_impl &fn, std::uint32_t n_uvars,
-                                       std::uint32_t batch_size)
+                                       std::uint32_t batch_size, std::uint32_t vector_size)
 {
     assert(fn.args().size() == 2u);
 
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return taylor_c_diff_func_pow_impl<T>(s, fn, v1, v2, n_uvars, batch_size);
+            return taylor_c_diff_func_pow_impl<T>(s, fn, v1, v2, n_uvars, batch_size, vector_size);
         },
         fn.args()[0].value(), fn.args()[1].value());
 }
 
 } // namespace
 
-llvm::Function *pow_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                 bool) const
+llvm::Function *pow_impl::taylor_c_diff_func_dbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                 std::uint32_t vector_size) const
 {
-    return taylor_c_diff_func_pow<double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_pow<double>(s, *this, n_uvars, batch_size, vector_size);
 }
 
-llvm::Function *pow_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *pow_impl::taylor_c_diff_func_ldbl(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                  std::uint32_t vector_size) const
 {
-    return taylor_c_diff_func_pow<long double>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_pow<long double>(s, *this, n_uvars, batch_size, vector_size);
 }
 
 #if defined(HEYOKA_HAVE_REAL128)
 
-llvm::Function *pow_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size,
-                                                  bool) const
+llvm::Function *pow_impl::taylor_c_diff_func_f128(llvm_state &s, std::uint32_t n_uvars, std::uint32_t batch_size, bool,
+                                                  std::uint32_t vector_size) const
 {
-    return taylor_c_diff_func_pow<mppp::real128>(s, *this, n_uvars, batch_size);
+    return taylor_c_diff_func_pow<mppp::real128>(s, *this, n_uvars, batch_size, vector_size);
 }
 
 #endif
