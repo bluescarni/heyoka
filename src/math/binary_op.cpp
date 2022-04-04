@@ -1007,26 +1007,27 @@ llvm::Function *bo_taylor_c_diff_func_sub(llvm_state &s, const binary_op &bo, st
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
-    // TODO fix vector size.
-    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "mul", 1);
+    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "mul", vector_size);
 }
 
 // Derivative of var * number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "mul", n_uvars, batch_size, vector_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1059,7 +1060,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1083,17 +1085,18 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 // Derivative of number * var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {n, var});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "mul", n_uvars, batch_size, vector_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1126,7 +1129,8 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFMul(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1150,17 +1154,19 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 // Derivative of var * var.
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &, const variable &var0,
-                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "mul", n_uvars, batch_size, {var0, var1});
+    const auto na_pair
+        = taylor_c_diff_vfunc_name_args<T>(context, "mul", n_uvars, batch_size, vector_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1226,7 +1232,7 @@ llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &s, const binary_op &,
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_mul_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
-                                               std::uint32_t)
+                                               std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of mul() in compact mode");
@@ -1239,7 +1245,7 @@ llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, st
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_c_diff_func_mul_impl<T>(s, bo, v1, v2, n_uvars, batch_size);
+            return bo_taylor_c_diff_func_mul_impl<T>(s, bo, v1, v2, n_uvars, batch_size, vector_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }
@@ -1248,26 +1254,27 @@ llvm::Function *bo_taylor_c_diff_func_mul(llvm_state &s, const binary_op &bo, st
 template <typename T, typename U, typename V,
           std::enable_if_t<std::conjunction_v<is_num_param<U>, is_num_param<V>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &bo, const U &num0, const V &num1,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
-    // TODO fix vector size.
-    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "div", 1);
+    return bo_taylor_c_diff_func_num_num<T>(s, bo, num0, num1, n_uvars, batch_size, "div", vector_size);
 }
 
 // Derivative of var / number.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &var, const U &n,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var, n});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "div", n_uvars, batch_size, vector_size, {var, n});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1300,7 +1307,8 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
         auto ret = taylor_c_load_diff(s, diff_arr, n_uvars, order, var_idx);
 
         // Create the return value.
-        builder.CreateRet(builder.CreateFDiv(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size)));
+        builder.CreateRet(
+            builder.CreateFDiv(ret, taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size)));
 
         // Verify.
         s.verify_function(f);
@@ -1324,17 +1332,18 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 // Derivative of number / var.
 template <typename T, typename U, std::enable_if_t<is_num_param_v<U>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const U &n, const variable &var,
-                                               std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {n, var});
+    const auto na_pair = taylor_c_diff_vfunc_name_args<T>(context, "div", n_uvars, batch_size, vector_size, {n, var});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1377,7 +1386,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
             s, builder.CreateICmpEQ(ord, builder.getInt32(0)),
             [&]() {
                 // For order zero, run the codegen.
-                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size);
+                auto num_vec = taylor_c_diff_numparam_codegen(s, n, num, par_ptr, batch_size, vector_size);
                 auto ret = taylor_c_load_diff(s, diff_ptr, n_uvars, builder.getInt32(0), var_idx);
 
                 builder.CreateStore(builder.CreateFDiv(num_vec, ret), retval);
@@ -1428,17 +1437,19 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 // Derivative of var / var.
 template <typename T>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &, const variable &var0,
-                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size)
+                                               const variable &var1, std::uint32_t n_uvars, std::uint32_t batch_size,
+                                               std::uint32_t vector_size)
 {
     auto &module = s.module();
     auto &builder = s.builder();
     auto &context = s.context();
 
-    // Fetch the floating-point type.
-    auto val_t = to_llvm_vector_type<T>(context, batch_size);
+    // Fetch the return type.
+    auto val_t = to_llvm_vector_type<T>(context, vector_size > 1u ? vector_size : batch_size);
 
     // Fetch the function name and arguments.
-    const auto na_pair = taylor_c_diff_func_name_args<T>(context, "div", n_uvars, batch_size, {var0, var1});
+    const auto na_pair
+        = taylor_c_diff_vfunc_name_args<T>(context, "div", n_uvars, batch_size, vector_size, {var0, var1});
     const auto &fname = na_pair.first;
     const auto &fargs = na_pair.second;
 
@@ -1509,7 +1520,7 @@ llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &s, const binary_op &,
 template <typename, typename V1, typename V2,
           std::enable_if_t<!std::conjunction_v<is_num_param<V1>, is_num_param<V2>>, int> = 0>
 llvm::Function *bo_taylor_c_diff_func_div_impl(llvm_state &, const binary_op &, const V1 &, const V2 &, std::uint32_t,
-                                               std::uint32_t)
+                                               std::uint32_t, std::uint32_t)
 {
     throw std::invalid_argument("An invalid argument type was encountered while trying to build the Taylor derivative "
                                 "of div() in compact mode");
@@ -1522,7 +1533,7 @@ llvm::Function *bo_taylor_c_diff_func_div(llvm_state &s, const binary_op &bo, st
 {
     return std::visit(
         [&](const auto &v1, const auto &v2) {
-            return bo_taylor_c_diff_func_div_impl<T>(s, bo, v1, v2, n_uvars, batch_size);
+            return bo_taylor_c_diff_func_div_impl<T>(s, bo, v1, v2, n_uvars, batch_size, vector_size);
         },
         bo.lhs().value(), bo.rhs().value());
 }

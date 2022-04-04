@@ -459,13 +459,17 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
     auto *scal_fp_t = llvm::cast<llvm::PointerType>(par_ptr->getType())->getPointerElementType();
 
     // NOTE: overflow checks are done in taylor_compute_jet().
+    if (vector_size == 1u) {
+        auto *ptr = builder.CreateInBoundsGEP(scal_fp_t, par_ptr, builder.CreateMul(p, builder.getInt32(batch_size)));
 
-    // Fetch the pointer(s) into par_ptr.
-    auto *ptr = builder.CreateInBoundsGEP(scal_fp_t, par_ptr,
-                                          vector_size == 1u ? builder.CreateMul(p, builder.getInt32(batch_size)) : p);
+        return load_vector_from_memory(builder, ptr, batch_size);
+    } else {
+        // Fetch the pointers into par_ptr.
+        auto *ptrs = builder.CreateInBoundsGEP(scal_fp_t, par_ptr, p);
 
-    // Gather.
-    return gather_vector_from_memory(builder, make_vector_type(scal_fp_t, vector_size), ptr);
+        // Gather.
+        return gather_vector_from_memory(builder, make_vector_type(scal_fp_t, vector_size), ptrs);
+    }
 }
 
 // Helper to fetch the derivative of order 'order' of the u variable at index u_idx from the

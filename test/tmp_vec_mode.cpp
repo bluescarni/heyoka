@@ -19,11 +19,15 @@ TEST_CASE("foo")
     auto [x, y, z, t] = make_vars("x", "y", "z", "t");
 
     taylor_adaptive<double> ta{{prime(x) = x + y, prime(y) = y + z, prime(z) = z + t, prime(t) = t + x},
-                               {0., 0., 0., 0.},
+                               {1., 2., 3., 4.},
                                kw::compact_mode = true,
                                kw::opt_level = 3u};
 
     std::cout << ta.get_llvm_state().get_ir() << '\n';
+
+    for (const auto &[ex, _] : ta.get_decomposition()) {
+        std::cout << ex << '\n';
+    }
 
     ta.propagate_until(5.);
 
