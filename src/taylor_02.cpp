@@ -1466,7 +1466,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
             const auto nregs = ncalls / barfo_size, rem = ncalls % barfo_size;
 
-            for (std::uint32_t idx = 0; idx < nregs; ++idx) {
+            llvm_loop_u32(s, builder.getInt32(0), builder.getInt32(nregs), [&](llvm::Value *idx) {
                 // Turn the sets of arguments returned by the generators into a single set of vector arguments.
                 std::vector<llvm::Value *> gen_vec_args, tmp;
 
@@ -1475,7 +1475,8 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
                     tmp.clear();
 
                     for (std::uint32_t i = 0; i < barfo_size; ++i) {
-                        tmp.push_back(gen(builder.getInt32(idx * barfo_size + i)));
+                        tmp.push_back(gen(builder.CreateAdd(builder.CreateMul(idx, builder.getInt32(barfo_size)),
+                                                            builder.getInt32(i))));
                     }
 
                     // Transform tmp into a vector and add it
@@ -1505,7 +1506,7 @@ llvm::Value *taylor_compute_jet_compact_mode(llvm_state &s, llvm::Value *order0,
 
                 // Calculate the derivative and store the result.
                 taylor_c_store_diff(s, diff_arr, n_uvars, cur_order, gen_vec_args[0], builder.CreateCall(vfunc, args));
-            }
+            });
 
             if (rem != 0u) {
                 std::vector<llvm::Value *> gen_vec_args, tmp;
