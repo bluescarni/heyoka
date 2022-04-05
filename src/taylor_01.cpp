@@ -286,7 +286,6 @@ llvm::Value *taylor_c_diff_numparam_codegen(llvm_state &s, const param &, llvm::
     // LCOV_EXCL_START
     assert(batch_size > 0u);
     assert(llvm::isa<llvm::PointerType>(par_ptr->getType()));
-    assert(!llvm::cast<llvm::PointerType>(par_ptr->getType())->isVectorTy());
     // LCOV_EXCL_STOP
 
     auto &builder = s.builder();
@@ -1768,7 +1767,7 @@ void taylor_add_d_out_function(llvm_state &s, std::uint32_t n_eq, std::uint32_t 
             store_vector_to_memory(builder, builder.CreateInBoundsGEP(fp_scal_t, out_ptr, out_idx), tc);
 
             // Zero-init the element in comp_arr.
-            builder.CreateStore(vector_splat(builder, codegen<T>(s, number{0.}), batch_size),
+            builder.CreateStore(llvm::ConstantFP::get(vector_t, 0.),
                                 builder.CreateInBoundsGEP(vector_t, comp_arr, {cur_var_idx}));
         });
 
@@ -2484,8 +2483,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
             auto tptr_lo = builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tl_idx);
 
             // Gather the hi/lo values.
-            auto tidx_val_hi = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_hi, alignof(T));
-            auto tidx_val_lo = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_lo, alignof(T));
+            auto tidx_val_hi = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_hi);
+            auto tidx_val_lo = detail::gather_vector_from_memory(builder, fp_vec_t, tptr_lo);
 
             // Compute the two conditions !(tm < *tidx) and !(tm > *tidx).
             auto cmp_lt
@@ -2560,10 +2559,10 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
     auto tc_l_idx = builder.CreateAdd(builder.CreateMul(tc_idx, batch_splat), batch_offset);
 
     // Load the times corresponding to tc_idx.
-    auto start_tm_hi = detail::gather_vector_from_memory(
-        builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, times_ptr_hi_vec, tc_l_idx), alignof(T));
-    auto start_tm_lo = detail::gather_vector_from_memory(
-        builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx), alignof(T));
+    auto start_tm_hi = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                         builder.CreateInBoundsGEP(fp_t, times_ptr_hi_vec, tc_l_idx));
+    auto start_tm_lo = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                         builder.CreateInBoundsGEP(fp_t, times_ptr_lo_vec, tc_l_idx));
 
     // Compute the value of h = tm - start_tm.
     auto h = detail::llvm_dl_add(m_llvm_state, tm, zero_vec_fp, builder.CreateFNeg(start_tm_hi),
@@ -2594,8 +2593,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
             // Load the coefficient from tc_ptrs. The index is:
             // m_batch_size * (order + 1u) * cur_var_idx.
             auto *load_idx = builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx);
-            auto *tcs = detail::gather_vector_from_memory(
-                builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx), alignof(T));
+            auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                          builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
 
             // Store it in out_ptr. The index is:
             // m_batch_size * cur_var_idx.
@@ -2624,7 +2623,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                             builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
                             builder.CreateMul(builder.getInt32(m_batch_size), cur_order));
                         auto *cf = detail::gather_vector_from_memory(
-                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx), alignof(T));
+                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
                         auto *tmp = builder.CreateFMul(cf, cur_h_val);
 
                         // Compute the quantities for the compensation.
@@ -2652,8 +2651,8 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
             auto *load_idx
                 = builder.CreateAdd(builder.CreateMul(builder.getInt32(m_batch_size * (order + 1u)), cur_var_idx),
                                     builder.getInt32(m_batch_size * order));
-            auto *tcs = detail::gather_vector_from_memory(
-                builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx), alignof(T));
+            auto *tcs = detail::gather_vector_from_memory(builder, fp_vec_t,
+                                                          builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
 
             // Store it in out_ptr. The index is:
             // m_batch_size * cur_var_idx.
@@ -2677,7 +2676,7 @@ void continuous_output_batch<T>::add_c_out_function(std::uint32_t order, std::ui
                             builder.CreateMul(builder.getInt32(m_batch_size),
                                               builder.CreateSub(builder.getInt32(order), cur_order)));
                         auto *tcs = detail::gather_vector_from_memory(
-                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx), alignof(T));
+                            builder, fp_vec_t, builder.CreateInBoundsGEP(fp_t, tc_ptrs, load_idx));
 
                         // Accumulate in out_ptr. The index is:
                         // m_batch_size * cur_var_idx.

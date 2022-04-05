@@ -303,13 +303,14 @@ llvm::Value *taylor_determine_h(llvm_state &s,
 
     llvm::Value *max_abs_state = nullptr, *max_abs_diff_o = nullptr, *max_abs_diff_om1 = nullptr;
 
+    auto *vec_t = to_llvm_vector_type<T>(context, batch_size);
+
     if (diff_variant.index() == 0u) {
         // Compact mode.
         auto *diff_arr = std::get<llvm::Value *>(diff_variant);
 
         // These will end up containing the norm infinity of the state vector + sv_funcs and the
         // norm infinity of the derivatives at orders order and order - 1.
-        auto vec_t = to_llvm_vector_type<T>(context, batch_size);
         max_abs_state = builder.CreateAlloca(vec_t);
         max_abs_diff_o = builder.CreateAlloca(vec_t);
         max_abs_diff_om1 = builder.CreateAlloca(vec_t);
@@ -407,12 +408,10 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     }
 
     // Determine if we are in absolute or relative tolerance mode.
-    auto abs_or_rel
-        = builder.CreateFCmpOLE(max_abs_state, vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+    auto abs_or_rel = builder.CreateFCmpOLE(max_abs_state, llvm::ConstantFP::get(vec_t, 1.));
 
     // Estimate rho at orders order - 1 and order.
-    auto num_rho
-        = builder.CreateSelect(abs_or_rel, vector_splat(builder, codegen<T>(s, number{1.}), batch_size), max_abs_state);
+    auto num_rho = builder.CreateSelect(abs_or_rel, llvm::ConstantFP::get(vec_t, 1.), max_abs_state);
     auto rho_o = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_o),
                                  vector_splat(builder, codegen<T>(s, number{T(1) / order}), batch_size));
     auto rho_om1 = taylor_step_pow(s, builder.CreateFDiv(num_rho, max_abs_diff_om1),
@@ -432,9 +431,8 @@ llvm::Value *taylor_determine_h(llvm_state &s,
     h = taylor_step_minabs(s, h, max_h_vec);
 
     // Handle backwards propagation.
-    auto backward = builder.CreateFCmpOLT(max_h_vec, vector_splat(builder, codegen<T>(s, number{0.}), batch_size));
-    auto h_fac = builder.CreateSelect(backward, vector_splat(builder, codegen<T>(s, number{-1.}), batch_size),
-                                      vector_splat(builder, codegen<T>(s, number{1.}), batch_size));
+    auto backward = builder.CreateFCmpOLT(max_h_vec, llvm::ConstantFP::get(vec_t, 0.));
+    auto h_fac = builder.CreateSelect(backward, llvm::ConstantFP::get(vec_t, -1.), llvm::ConstantFP::get(vec_t, 1.));
     h = builder.CreateFMul(h_fac, h);
 
     return h;
@@ -535,7 +533,7 @@ llvm::Value *taylor_compute_sv_diff(llvm_state &s, const expression &ex, const s
                 if (order == 1u) {
                     return taylor_codegen_numparam<T>(s, v, par_ptr, batch_size);
                 } else {
-                    return vector_splat(builder, codegen<T>(s, number{0.}), batch_size);
+                    return llvm::ConstantFP::get(to_llvm_vector_type<T>(s.context(), batch_size), 0.);
                 }
             } else {
                 assert(false);
